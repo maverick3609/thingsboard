@@ -121,6 +121,7 @@ export class AttributeTableComponent extends PageComponent implements AfterViewI
   activeValue = false;
   dirtyValue = false;
   entityIdValue: EntityId;
+  entityType = EntityType;
 
   attributeScopeSelectionReadonly = false;
 
@@ -141,6 +142,10 @@ export class AttributeTableComponent extends PageComponent implements AfterViewI
 
   get disableAttributeScopeSelection(): boolean {
     return this.disableAttributeScopeSelectionValue;
+  }
+
+  get disableAddTelemetry(): boolean {
+    return this.defaultAttributeScope === this.latestTelemetryTypes.LATEST_TELEMETRY && this.entityType.ENTITY_VIEW === this.entityIdValue.entityType;
   }
 
   @Input()

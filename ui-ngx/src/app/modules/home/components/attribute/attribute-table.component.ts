@@ -90,6 +90,7 @@ import { Filters } from '@shared/models/query/query.models';
 import { hidePageSizePixelValue } from '@shared/models/constants';
 import { DeleteTimeseriesPanelComponent } from '@home/components/attribute/delete-timeseries-panel.component';
 import { FormBuilder } from '@angular/forms';
+import { coerceBoolean } from '@shared/decorators/coercion';
 
 @Component({
     selector: 'tb-attribute-table',
@@ -121,7 +122,6 @@ export class AttributeTableComponent extends PageComponent implements AfterViewI
   activeValue = false;
   dirtyValue = false;
   entityIdValue: EntityId;
-  entityType = EntityType;
 
   attributeScopeSelectionReadonly = false;
 
@@ -144,9 +144,9 @@ export class AttributeTableComponent extends PageComponent implements AfterViewI
     return this.disableAttributeScopeSelectionValue;
   }
 
-  get disableAddTelemetry(): boolean {
-    return this.defaultAttributeScope === this.latestTelemetryTypes.LATEST_TELEMETRY && this.entityType.ENTITY_VIEW === this.entityIdValue.entityType;
-  }
+  @Input()
+  @coerceBoolean()
+  disableAddTelemetry: boolean;
 
   @Input()
   set disableAttributeScopeSelection(value: boolean) {

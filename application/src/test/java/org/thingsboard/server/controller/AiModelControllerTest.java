@@ -19,6 +19,7 @@ import com.datastax.oss.driver.api.core.uuid.Uuids;
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.junit.Test;
 import org.springframework.test.web.servlet.ResultActions;
+import org.thingsboard.common.util.SsrfProtectionValidator;
 import org.thingsboard.server.common.data.EntityType;
 import org.thingsboard.server.common.data.ai.AiModel;
 import org.thingsboard.server.common.data.ai.model.chat.AnthropicChatModelConfig;
@@ -134,6 +135,37 @@ public class AiModelControllerTest extends AbstractControllerTest {
         assertThat(updatedModel.getName()).isEqualTo("Test model updated");
         assertThat(updatedModel.getConfiguration()).isEqualTo(newModelConfig);
         assertThat(updatedModel.getExternalId()).isNull();
+    }
+
+    @Test
+    public void saveAiModel_whenBaseUrlIsPrivateIp_shouldReturnBadRequest() throws Exception {
+        // GIVEN
+        loginTenantAdmin();
+        SsrfProtectionValidator.setEnabled(true);
+
+        try {
+            var modelConfig = OpenAiChatModelConfig.builder()
+                    .providerConfig(OpenAiProviderConfig.builder()
+                            .baseUrl("http://172.17.0.1:22/")
+                            .apiKey("test-api-key")
+                            .build())
+                    .modelId("gpt-4o")
+                    .build();
+
+            AiModel model = AiModel.builder()
+                    .tenantId(tenantId)
+                    .name("SSRF test model")
+                    .configuration(modelConfig)
+                    .build();
+
+            // WHEN
+            ResultActions result = doPost("/api/ai/model", model);
+
+            // THEN
+            result.andExpect(status().isBadRequest());
+        } finally {
+            SsrfProtectionValidator.setEnabled(false);
+        }
     }
 
     /* --- Get by ID API tests --- */

@@ -195,7 +195,7 @@ public class AiModelControllerTest extends AbstractControllerTest {
                     modelConfig);
 
             // WHEN
-            TbChatResponse response = doPost("/api/ai/chat", chatRequest, TbChatResponse.class);
+            TbChatResponse response = doPost("/api/ai/model/chat", chatRequest, TbChatResponse.class);
 
             // THEN
             assertThat(response).isInstanceOf(TbChatResponse.Failure.class);

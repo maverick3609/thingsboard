@@ -72,7 +72,8 @@ public enum EntityType {
             return "AI model";
         }
     },
-    API_KEY(44);
+    API_KEY(44),
+    WHITE_LABELING(200, "white_labeling");
 
     @Getter
     private final int protoNumber; // Corresponds to EntityTypeProto

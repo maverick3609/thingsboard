@@ -96,17 +96,28 @@ public class MqttTransportService implements TbTransportService {
                         .childOption(ChannelOption.SO_KEEPALIVE, keepAlive);
                 sslServerChannel = b.bind(sslHost, sslPort).sync().channel();
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             log.error("Failed to start MQTT transport, releasing resources", e);
-            if (serverChannel != null) {
-                serverChannel.close();
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
             }
-            if (sslServerChannel != null) {
-                sslServerChannel.close();
+            try {
+                if (serverChannel != null) {
+                    serverChannel.close().sync();
+                }
+                if (sslServerChannel != null) {
+                    sslServerChannel.close().sync();
+                }
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            } finally {
+                workerGroup.shutdownGracefully();
+                bossGroup.shutdownGracefully();
             }
-            workerGroup.shutdownGracefully();
-            bossGroup.shutdownGracefully();
-            throw e;
+            if (e instanceof Exception) {
+                throw (Exception) e;
+            }
+            throw (Error) e;
         }
         log.info("Mqtt transport started!");
     }

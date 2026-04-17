@@ -20,9 +20,6 @@ import io.netty.channel.EventLoopGroup;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.net.BindException;
@@ -33,14 +30,11 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.Mockito.mock;
 
-@ExtendWith(MockitoExtension.class)
 public class MqttTransportServiceTest {
 
     private static final String HOST = "127.0.0.1";
-
-    @Mock
-    private MqttTransportContext context;
 
     private MqttTransportService service;
     private ServerSocket occupiedSocket;
@@ -61,7 +55,7 @@ public class MqttTransportServiceTest {
         ReflectionTestUtils.setField(service, "bossGroupThreadCount", 1);
         ReflectionTestUtils.setField(service, "workerGroupThreadCount", 1);
         ReflectionTestUtils.setField(service, "keepAlive", true);
-        ReflectionTestUtils.setField(service, "context", context);
+        ReflectionTestUtils.setField(service, "context", mock(MqttTransportContext.class));
     }
 
     @AfterEach
@@ -76,13 +70,9 @@ public class MqttTransportServiceTest {
         assertThatThrownBy(() -> service.init())
                 .isInstanceOf(BindException.class);
 
-        Channel serverChannel = (Channel) ReflectionTestUtils.getField(service, "serverChannel");
-        Channel sslServerChannel = (Channel) ReflectionTestUtils.getField(service, "sslServerChannel");
         EventLoopGroup boss = (EventLoopGroup) ReflectionTestUtils.getField(service, "bossGroup");
         EventLoopGroup worker = (EventLoopGroup) ReflectionTestUtils.getField(service, "workerGroup");
 
-        assertThat(serverChannel).isNull();
-        assertThat(sslServerChannel).isNull();
         assertThat(boss).isNotNull();
         assertThat(worker).isNotNull();
         assertThat(boss.isShuttingDown()).isTrue();

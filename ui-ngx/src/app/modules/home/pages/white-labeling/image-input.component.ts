@@ -14,10 +14,75 @@
 /// limitations under the License.
 ///
 
-import { Component } from '@angular/core';
+import { Component, forwardRef } from '@angular/core';
+import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 
 @Component({
   selector: 'tb-wl-image-input',
-  template: '<p>Image Input (loading...)</p>'
+  templateUrl: './image-input.component.html',
+  providers: [{
+    provide: NG_VALUE_ACCESSOR,
+    useExisting: forwardRef(() => ImageInputComponent),
+    multi: true
+  }]
 })
-export class ImageInputComponent {}
+export class ImageInputComponent implements ControlValueAccessor {
+  value: string = null;
+  disabled = false;
+
+  private onChange: (val: string) => void = () => {};
+  private onTouched: () => void = () => {};
+
+  writeValue(val: string): void {
+    this.value = val ?? null;
+  }
+
+  registerOnChange(fn: (val: string) => void): void {
+    this.onChange = fn;
+  }
+
+  registerOnTouched(fn: () => void): void {
+    this.onTouched = fn;
+  }
+
+  setDisabledState(isDisabled: boolean): void {
+    this.disabled = isDisabled;
+  }
+
+  onFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files?.length) {
+      this.readFile(input.files[0]);
+    }
+  }
+
+  onDrop(event: DragEvent): void {
+    event.preventDefault();
+    if (event.dataTransfer?.files?.length) {
+      this.readFile(event.dataTransfer.files[0]);
+    }
+  }
+
+  onDragOver(event: DragEvent): void {
+    event.preventDefault();
+  }
+
+  clear(): void {
+    this.value = null;
+    this.onChange(null);
+    this.onTouched();
+  }
+
+  private readFile(file: File): void {
+    if (file.size > 1024 * 1024) {
+      return; // Max 1MB
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      this.value = reader.result as string;
+      this.onChange(this.value);
+      this.onTouched();
+    };
+    reader.readAsDataURL(file);
+  }
+}

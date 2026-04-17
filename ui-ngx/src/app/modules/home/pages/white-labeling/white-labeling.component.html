@@ -1,0 +1,59 @@
+<!--
+
+    Copyright © 2016-2026 The Thingsboard Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<div class="white-labeling-page">
+  <div class="toolbar">
+    <h2>White Labeling</h2>
+    <span class="spacer"></span>
+    <button mat-button color="warn" (click)="deleteSettings()" [disabled]="loading" type="button">
+      <mat-icon>delete</mat-icon> Delete
+    </button>
+    <button mat-button (click)="preview()" [disabled]="loading" type="button">
+      <mat-icon>visibility</mat-icon> Preview
+    </button>
+    <button mat-raised-button color="primary" (click)="save()" [disabled]="loading" type="button">
+      <mat-icon>save</mat-icon> Save
+    </button>
+  </div>
+
+  <div *ngIf="isTenantAdmin" class="scope-selector">
+    <mat-slide-toggle [checked]="isCustomerScope" (change)="toggleCustomerScope()">
+      Edit Customer Settings
+    </mat-slide-toggle>
+    <mat-form-field *ngIf="isCustomerScope" class="customer-select">
+      <mat-label>Customer ID</mat-label>
+      <input matInput [(ngModel)]="selectedCustomerId" (blur)="loadParams()">
+    </mat-form-field>
+  </div>
+
+  <mat-tab-group *ngIf="!loading">
+    <mat-tab label="General">
+      <tb-general-wl-settings
+        [params]="generalParams"
+        (paramsChange)="onGeneralParamsChange($event)">
+      </tb-general-wl-settings>
+    </mat-tab>
+    <mat-tab label="Login Page">
+      <tb-login-wl-settings
+        [params]="loginParams"
+        (paramsChange)="onLoginParamsChange($event)">
+      </tb-login-wl-settings>
+    </mat-tab>
+  </mat-tab-group>
+
+  <mat-spinner *ngIf="loading" diameter="40" class="loading-spinner"></mat-spinner>
+</div>

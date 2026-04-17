@@ -48,6 +48,7 @@ import { ScadaSymbolModule } from '@home/pages/scada-symbol/scada-symbol.module'
 import { GatewaysModule } from '@home/pages/gateways/gateways.module';
 import { MobileModule } from '@home/pages/mobile/mobile.module';
 import { AiModelModule } from '@home/pages/ai-model/ai-model.module';
+import { WhiteLabelingModule } from '@home/pages/white-labeling/white-labeling.module';
 
 @NgModule({
   exports: [
@@ -83,6 +84,7 @@ import { AiModelModule } from '@home/pages/ai-model/ai-model.module';
     AccountModule,
     ScadaSymbolModule,
     AiModelModule,
+    WhiteLabelingModule,
   ]
 })
 export class HomePagesModule { }

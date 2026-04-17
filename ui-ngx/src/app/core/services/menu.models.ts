@@ -109,7 +109,8 @@ export enum MenuId {
   version_control = 'version_control',
   api_usage = 'api_usage',
   trendz_settings = 'trendz_settings',
-  ai_models = 'ai_models'
+  ai_models = 'ai_models',
+  white_labeling = 'white_labeling'
 }
 
 declare type MenuFilter = (authState: AuthState) => boolean;
@@ -740,6 +741,16 @@ export const menuSectionMap = new Map<MenuId, MenuSection>([
       path: '/settings/trendz',
       icon: 'trendz-settings'
     }
+  ],
+  [
+    MenuId.white_labeling,
+    {
+      id: MenuId.white_labeling,
+      name: 'white-labeling.white-labeling',
+      type: 'link',
+      path: '/settings/whiteLabeling',
+      icon: 'format_paint'
+    }
   ]
 ]);
 
@@ -802,7 +813,8 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
           {id: MenuId.general},
           {id: MenuId.mail_server},
           {id: MenuId.notification_settings},
-          {id: MenuId.queues}
+          {id: MenuId.queues},
+          {id: MenuId.white_labeling}
         ]
       },
       {
@@ -908,7 +920,8 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
           {id: MenuId.repository_settings},
           {id: MenuId.auto_commit_settings},
           {id: MenuId.trendz_settings},
-          {id: MenuId.ai_models}
+          {id: MenuId.ai_models},
+          {id: MenuId.white_labeling}
         ]
       },
       {
@@ -944,6 +957,12 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
         id: MenuId.notifications_center,
         pages: [
           {id: MenuId.notification_inbox}
+        ]
+      },
+      {
+        id: MenuId.settings,
+        pages: [
+          {id: MenuId.white_labeling}
         ]
       }
     ]

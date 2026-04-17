@@ -48,6 +48,7 @@ import { catchError } from 'rxjs/operators';
 import { JsLibraryTableConfigResolver } from '@home/pages/admin/resource/js-library-table-config.resolver';
 import { TrendzSettingsComponent } from '@home/pages/admin/trendz-settings.component';
 import { aiModelRoutes } from '@home/pages/ai-model/ai-model-routing.module';
+import { WhiteLabelingComponent } from '@home/pages/white-labeling/white-labeling.component';
 
 export const scadaSymbolResolver: ResolveFn<ScadaSymbolData> =
   (route: ActivatedRouteSnapshot,
@@ -224,7 +225,7 @@ const routes: Routes = [
     path: 'settings',
     component: RouterTabsComponent,
     data: {
-      auth: [Authority.SYS_ADMIN, Authority.TENANT_ADMIN],
+      auth: [Authority.SYS_ADMIN, Authority.TENANT_ADMIN, Authority.CUSTOMER_USER],
       showMainLoadingBar: false,
       breadcrumb: {
         menuId: MenuId.settings
@@ -235,10 +236,11 @@ const routes: Routes = [
         path: '',
         children: [],
         data: {
-          auth: [Authority.SYS_ADMIN, Authority.TENANT_ADMIN],
+          auth: [Authority.SYS_ADMIN, Authority.TENANT_ADMIN, Authority.CUSTOMER_USER],
           redirectTo: {
             SYS_ADMIN: '/settings/general',
-            TENANT_ADMIN: '/settings/home'
+            TENANT_ADMIN: '/settings/home',
+            CUSTOMER_USER: '/settings/whiteLabeling'
           }
         }
       },
@@ -364,6 +366,17 @@ const routes: Routes = [
         }
       },
       ...aiModelRoutes,
+      {
+        path: 'whiteLabeling',
+        component: WhiteLabelingComponent,
+        data: {
+          auth: [Authority.SYS_ADMIN, Authority.TENANT_ADMIN, Authority.CUSTOMER_USER],
+          title: 'white-labeling.white-labeling',
+          breadcrumb: {
+            menuId: MenuId.white_labeling
+          }
+        }
+      },
       {
         path: 'security-settings',
         redirectTo: '/security-settings/general'

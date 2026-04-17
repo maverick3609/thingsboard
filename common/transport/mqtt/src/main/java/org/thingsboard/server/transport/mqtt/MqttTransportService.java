@@ -80,20 +80,33 @@ public class MqttTransportService implements TbTransportService {
         log.info("Starting MQTT transport...");
         bossGroup = new NioEventLoopGroup(bossGroupThreadCount);
         workerGroup = new NioEventLoopGroup(workerGroupThreadCount);
-        ServerBootstrap b = new ServerBootstrap();
-        b.group(bossGroup, workerGroup)
-                .channel(NioServerSocketChannel.class)
-                .childHandler(new MqttTransportServerInitializer(context, false))
-                .childOption(ChannelOption.SO_KEEPALIVE, keepAlive);
-
-        serverChannel = b.bind(host, port).sync().channel();
-        if (sslEnabled) {
-            b = new ServerBootstrap();
+        try {
+            ServerBootstrap b = new ServerBootstrap();
             b.group(bossGroup, workerGroup)
                     .channel(NioServerSocketChannel.class)
-                    .childHandler(new MqttTransportServerInitializer(context, true))
+                    .childHandler(new MqttTransportServerInitializer(context, false))
                     .childOption(ChannelOption.SO_KEEPALIVE, keepAlive);
-            sslServerChannel = b.bind(sslHost, sslPort).sync().channel();
+
+            serverChannel = b.bind(host, port).sync().channel();
+            if (sslEnabled) {
+                b = new ServerBootstrap();
+                b.group(bossGroup, workerGroup)
+                        .channel(NioServerSocketChannel.class)
+                        .childHandler(new MqttTransportServerInitializer(context, true))
+                        .childOption(ChannelOption.SO_KEEPALIVE, keepAlive);
+                sslServerChannel = b.bind(sslHost, sslPort).sync().channel();
+            }
+        } catch (Exception e) {
+            log.error("Failed to start MQTT transport, releasing resources", e);
+            if (serverChannel != null) {
+                serverChannel.close();
+            }
+            if (sslServerChannel != null) {
+                sslServerChannel.close();
+            }
+            workerGroup.shutdownGracefully();
+            bossGroup.shutdownGracefully();
+            throw e;
         }
         log.info("Mqtt transport started!");
     }

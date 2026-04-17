@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS white_labeling (
     tenant_id uuid NOT NULL,
     customer_id uuid NOT NULL,
     type varchar(32) NOT NULL,
-    settings varchar,
+    settings jsonb,
     domain_id uuid,
     CONSTRAINT white_labeling_pkey PRIMARY KEY (tenant_id, customer_id, type)
 );

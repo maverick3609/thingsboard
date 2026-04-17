@@ -17,7 +17,6 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SharedModule } from '@shared/shared.module';
-import { WhiteLabelingRoutingModule } from './white-labeling-routing.module';
 import { WhiteLabelingComponent } from './white-labeling.component';
 import { GeneralWlSettingsComponent } from './general-wl-settings.component';
 import { LoginWlSettingsComponent } from './login-wl-settings.component';
@@ -34,8 +33,7 @@ import { ImageInputComponent } from './image-input.component';
   ],
   imports: [
     CommonModule,
-    SharedModule,
-    WhiteLabelingRoutingModule
+    SharedModule
   ]
 })
 export class WhiteLabelingModule {}

@@ -173,6 +173,7 @@ import org.thingsboard.server.dao.tenant.TenantService;
 import org.thingsboard.server.dao.user.UserService;
 import org.thingsboard.server.dao.widget.WidgetTypeService;
 import org.thingsboard.server.dao.widget.WidgetsBundleService;
+import org.thingsboard.server.dao.wl.WhiteLabelingService;
 import org.thingsboard.server.exception.DataValidationException;
 import org.thingsboard.server.exception.EntitiesLimitExceededException;
 import org.thingsboard.server.exception.ThingsboardErrorResponseHandler;
@@ -393,6 +394,9 @@ public abstract class BaseController {
 
     @Autowired
     protected ApiKeyService apiKeyService;
+
+    @Autowired
+    protected WhiteLabelingService whiteLabelingService;
 
     @Value("${server.log_controller_error_stack_trace}")
     @Getter

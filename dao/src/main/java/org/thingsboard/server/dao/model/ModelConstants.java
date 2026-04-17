@@ -762,6 +762,14 @@ public class ModelConstants {
     public static final String API_KEY_ENABLED_COLUMN_NAME = "enabled";
     public static final String API_KEY_DESCRIPTION_COLUMN_NAME = "description";
 
+    /**
+     * White labeling constants.
+     */
+    public static final String WHITE_LABELING_TABLE_NAME = "white_labeling";
+    public static final String WHITE_LABELING_SETTINGS_PROPERTY = "settings";
+    public static final String WHITE_LABELING_TYPE_PROPERTY = "type";
+    public static final String WHITE_LABELING_DOMAIN_ID_PROPERTY = "domain_id";
+
     protected static final String[] NONE_AGGREGATION_COLUMNS = new String[]{LONG_VALUE_COLUMN, DOUBLE_VALUE_COLUMN, BOOLEAN_VALUE_COLUMN, STRING_VALUE_COLUMN, JSON_VALUE_COLUMN, KEY_COLUMN, TS_COLUMN};
 
     protected static final String[] COUNT_AGGREGATION_COLUMNS = new String[]{count(LONG_VALUE_COLUMN), count(DOUBLE_VALUE_COLUMN), count(BOOLEAN_VALUE_COLUMN), count(STRING_VALUE_COLUMN), count(JSON_VALUE_COLUMN), max(TS_COLUMN)};

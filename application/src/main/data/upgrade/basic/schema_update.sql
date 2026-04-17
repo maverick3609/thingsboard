@@ -80,3 +80,16 @@ DROP TABLE IF EXISTS calculated_field_link;
 ANALYZE calculated_field;
 
 -- REMOVAL OF CALCULATED FIELD LINKS PERSISTENCE END
+
+-- WHITE LABELING TABLE START
+
+CREATE TABLE IF NOT EXISTS white_labeling (
+    tenant_id uuid NOT NULL,
+    customer_id uuid NOT NULL,
+    type varchar(32) NOT NULL,
+    settings varchar,
+    domain_id uuid,
+    CONSTRAINT white_labeling_pkey PRIMARY KEY (tenant_id, customer_id, type)
+);
+
+-- WHITE LABELING TABLE END

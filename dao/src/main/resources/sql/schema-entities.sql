@@ -978,3 +978,12 @@ CREATE TABLE IF NOT EXISTS ai_model (
     CONSTRAINT ai_model_name_unq_key        UNIQUE (tenant_id, name),
     CONSTRAINT ai_model_external_id_unq_key UNIQUE (tenant_id, external_id)
 );
+
+CREATE TABLE IF NOT EXISTS white_labeling (
+    tenant_id uuid NOT NULL,
+    customer_id uuid NOT NULL,
+    type varchar(32) NOT NULL,
+    settings varchar,
+    domain_id uuid,
+    CONSTRAINT white_labeling_pkey PRIMARY KEY (tenant_id, customer_id, type)
+);

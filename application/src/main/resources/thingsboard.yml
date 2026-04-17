@@ -749,6 +749,9 @@ cache:
     apiKeys:
       timeToLiveInMinutes: "${CACHE_SPECS_API_KEYS_TTL:1440}" # API keys cache TTL
       maxSize: "${CACHE_SPECS_API_KEYS_MAX_SIZE:10000}" # 0 means the cache is disabled
+    whiteLabelingCache:
+      timeToLiveInMinutes: "${CACHE_SPECS_WHITE_LABELING_TTL:1440}"
+      maxSize: "${CACHE_SPECS_WHITE_LABELING_MAX_SIZE:10000}"
 
   # Deliberately placed outside the 'specs' group above
   notificationRules:

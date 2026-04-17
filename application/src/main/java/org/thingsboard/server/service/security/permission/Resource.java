@@ -54,7 +54,8 @@ public enum Resource {
     MOBILE_APP_SETTINGS,
     JOB(EntityType.JOB),
     AI_MODEL(EntityType.AI_MODEL),
-    API_KEY(EntityType.API_KEY);
+    API_KEY(EntityType.API_KEY),
+    WHITE_LABELING(EntityType.WHITE_LABELING);
 
     private final Set<EntityType> entityTypes;
 

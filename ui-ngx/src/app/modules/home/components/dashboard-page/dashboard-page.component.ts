@@ -158,6 +158,7 @@ import {
   MoveWidgetsDialogResult
 } from '@home/components/dashboard-page/layout/move-widgets-dialog.component';
 import { HttpStatusCode } from '@angular/common/http';
+import { WhiteLabelingRuntimeService } from '@core/services/white-labeling-runtime.service';
 
 // @dynamic
 @Component({
@@ -385,7 +386,8 @@ export class DashboardPageComponent extends PageComponent implements IDashboardC
               private viewContainerRef: ViewContainerRef,
               private cd: ChangeDetectorRef,
               public elRef: ElementRef,
-              private injector: Injector) {
+              private injector: Injector,
+              private wlRuntime: WhiteLabelingRuntimeService) {
     super(store);
     if (isDefinedAndNotNull(this.embeddedValue)) {
       this.embedded = this.embeddedValue;
@@ -393,6 +395,9 @@ export class DashboardPageComponent extends PageComponent implements IDashboardC
   }
 
   ngOnInit() {
+    this.rxSubscriptions.push(this.wlRuntime.logo$.subscribe(url => {
+      this.defaultDashboardLogo = url;
+    }));
     this.rxSubscriptions.push(this.route.data.subscribe(
       (data) => {
         let dashboardPageInitData: DashboardPageInitData;

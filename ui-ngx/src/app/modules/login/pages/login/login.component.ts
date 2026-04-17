@@ -24,6 +24,9 @@ import { OAuth2ClientLoginInfo } from '@shared/models/oauth2.models';
 import { validateEmail } from '@app/core/utils';
 import { PageComponent } from '@shared/components/page.component';
 import { finalize } from 'rxjs/operators';
+import { WhiteLabelingHttpService } from '@core/http/white-labeling.service';
+import { WhiteLabelingRuntimeService } from '@core/services/white-labeling-runtime.service';
+import { LoginWhiteLabelingParams } from '@shared/models/white-labeling.models';
 
 @Component({
     selector: 'tb-login',
@@ -42,14 +45,29 @@ export class LoginComponent extends PageComponent implements OnInit {
   });
   oauth2Clients: Array<OAuth2ClientLoginInfo> = null;
 
+  loginLogo: string = 'assets/logo_title_white.svg';
+  pageBackgroundColor: string = null;
+  darkForeground: boolean = false;
+
   constructor(private authService: AuthService,
               public fb: UntypedFormBuilder,
-              private router: Router) {
+              private router: Router,
+              private wlHttp: WhiteLabelingHttpService,
+              private wlRuntime: WhiteLabelingRuntimeService) {
     super();
   }
 
   ngOnInit() {
     this.oauth2Clients = this.authService.oauth2Clients;
+    this.wlHttp.getLoginWhiteLabelParams({ ignoreErrors: true }).subscribe(
+      (params: LoginWhiteLabelingParams) => {
+        this.wlRuntime.applyLoginParams(params);
+        if (params.logoImageUrl) { this.loginLogo = params.logoImageUrl; }
+        if (params.pageBackgroundColor) { this.pageBackgroundColor = params.pageBackgroundColor; }
+        this.darkForeground = params.darkForeground;
+      },
+      () => {}
+    );
   }
 
   login(): void {

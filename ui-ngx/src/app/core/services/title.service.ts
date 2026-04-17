@@ -21,6 +21,7 @@ import { TranslateService } from '@ngx-translate/core';
 import { filter } from 'rxjs/operators';
 
 import { environment as env } from '@env/environment';
+import { WhiteLabelingRuntimeService } from './white-labeling-runtime.service';
 
 @Injectable({
   providedIn: 'root'
@@ -28,7 +29,8 @@ import { environment as env } from '@env/environment';
 export class TitleService {
   constructor(
     private translate: TranslateService,
-    private title: Title
+    private title: Title,
+    private wlRuntime: WhiteLabelingRuntimeService
   ) {}
 
   setTitle(
@@ -41,15 +43,16 @@ export class TitleService {
     }
     const { title } = lastChild.data;
     const translate = lazyTranslate || this.translate;
+    const appTitle = this.wlRuntime.currentAppTitle || env.appTitle;
     if (title) {
       translate
         .get(title)
         .pipe(filter(translatedTitle => translatedTitle !== title))
         .subscribe(translatedTitle =>
-          this.title.setTitle(`${env.appTitle} | ${translatedTitle}`)
+          this.title.setTitle(`${appTitle} | ${translatedTitle}`)
         );
     } else {
-      this.title.setTitle(env.appTitle);
+      this.title.setTitle(appTitle);
     }
   }
 }

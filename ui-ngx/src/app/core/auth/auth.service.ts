@@ -20,6 +20,8 @@ import { HttpClient } from '@angular/common/http';
 
 import { Observable, of, ReplaySubject, throwError } from 'rxjs';
 import { catchError, map, mergeMap, tap } from 'rxjs/operators';
+import { WhiteLabelingHttpService } from '@core/http/white-labeling.service';
+import { WhiteLabelingRuntimeService } from '@core/services/white-labeling-runtime.service';
 
 import { LoginRequest, LoginResponse, PublicLoginRequest } from '@shared/models/login.models';
 import { Router, UrlTree } from '@angular/router';
@@ -61,7 +63,9 @@ export class AuthService {
     private zone: NgZone,
     private utils: UtilsService,
     private translate: TranslateService,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private wlHttp: WhiteLabelingHttpService,
+    private wlRuntime: WhiteLabelingRuntimeService
   ) {
   }
 
@@ -607,6 +611,10 @@ export class AuthService {
 
   private notifyAuthenticated(authPayload: AuthPayload) {
     this.store.dispatch(new ActionAuthAuthenticated(authPayload));
+    this.wlHttp.getWhiteLabelParams({ ignoreErrors: true }).subscribe(
+      params => this.wlRuntime.applyParams(params),
+      () => {}
+    );
   }
 
   private updateAndValidateToken(token, prefix, notify) {

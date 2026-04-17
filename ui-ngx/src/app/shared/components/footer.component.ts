@@ -15,6 +15,7 @@
 ///
 
 import { Component } from '@angular/core';
+import { WhiteLabelingRuntimeService } from '@core/services/white-labeling-runtime.service';
 
 @Component({
     selector: 'tb-footer',
@@ -25,5 +26,10 @@ import { Component } from '@angular/core';
 export class FooterComponent {
 
   year = new Date().getFullYear();
+
+  showNameVersion$ = this.wlRuntime.showNameVersion$;
+  platformName$ = this.wlRuntime.platformName$;
+
+  constructor(private wlRuntime: WhiteLabelingRuntimeService) {}
 
 }

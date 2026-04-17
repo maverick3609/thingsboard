@@ -16,5 +16,10 @@
 
 -->
 <section class="footer-text">
-  <small>Copyright © {{year}} The ThingsBoard Authors</small>
+  <small *ngIf="(showNameVersion$ | async) && (platformName$ | async) as name; else defaultFooter">
+    Copyright © {{year}} {{name}}
+  </small>
+  <ng-template #defaultFooter>
+    <small>Copyright © {{year}} The ThingsBoard Authors</small>
+  </ng-template>
 </section>

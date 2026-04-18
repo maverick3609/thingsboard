@@ -25,6 +25,7 @@ import { LoginWhiteLabelingParams, WhiteLabelingParams } from '@shared/models/wh
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 @Component({
+  standalone: false,
   selector: 'tb-white-labeling',
   templateUrl: './white-labeling.component.html',
   styleUrls: ['./white-labeling.component.scss']

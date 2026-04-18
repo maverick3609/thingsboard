@@ -19,6 +19,7 @@ import { FormBuilder, FormGroup } from '@angular/forms';
 import { WhiteLabelingParams } from '@shared/models/white-labeling.models';
 
 @Component({
+  standalone: false,
   selector: 'tb-general-wl-settings',
   templateUrl: './general-wl-settings.component.html'
 })

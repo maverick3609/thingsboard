@@ -19,6 +19,7 @@ import { FormBuilder, FormGroup } from '@angular/forms';
 import { LoginWhiteLabelingParams } from '@shared/models/white-labeling.models';
 
 @Component({
+  standalone: false,
   selector: 'tb-login-wl-settings',
   templateUrl: './login-wl-settings.component.html'
 })

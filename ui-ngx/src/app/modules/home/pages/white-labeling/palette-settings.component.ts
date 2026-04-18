@@ -19,6 +19,7 @@ import { ControlValueAccessor, FormBuilder, FormGroup, NG_VALUE_ACCESSOR } from 
 import { PaletteSettings } from '@shared/models/white-labeling.models';
 
 @Component({
+  standalone: false,
   selector: 'tb-palette-settings',
   templateUrl: './palette-settings.component.html',
   providers: [{

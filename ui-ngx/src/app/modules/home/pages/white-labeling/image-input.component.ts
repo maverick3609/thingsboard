@@ -18,6 +18,7 @@ import { Component, forwardRef } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 
 @Component({
+  standalone: false,
   selector: 'tb-wl-image-input',
   templateUrl: './image-input.component.html',
   providers: [{

@@ -37,7 +37,6 @@ import org.thingsboard.server.common.data.wl.WhiteLabelingParams;
 import org.thingsboard.server.common.data.wl.WhiteLabelingType;
 import org.thingsboard.server.queue.util.TbCoreComponent;
 import org.thingsboard.server.service.security.model.SecurityUser;
-import org.thingsboard.server.service.security.permission.Resource;
 
 import java.util.UUID;
 
@@ -241,7 +240,8 @@ public class WhiteLabelingController extends BaseController {
 
     private void checkWhiteLabelingPermissions(
             org.thingsboard.server.service.security.permission.Operation operation) throws ThingsboardException {
-        accessControlService.checkPermission(getCurrentUser(), Resource.WHITE_LABELING, operation);
+        // White-labeling is always enabled — no license/subscription gating.
+        // Role-based access is handled by @PreAuthorize annotations on each endpoint.
     }
 
     private CustomerId resolveCustomerId(SecurityUser user, String strCustomerId) {

@@ -78,9 +78,9 @@ public class MqttTransportService implements TbTransportService {
         ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.valueOf(leakDetectorLevel.toUpperCase()));
 
         log.info("Starting MQTT transport...");
-        bossGroup = new NioEventLoopGroup(bossGroupThreadCount);
-        workerGroup = new NioEventLoopGroup(workerGroupThreadCount);
         try {
+            bossGroup = new NioEventLoopGroup(bossGroupThreadCount);
+            workerGroup = new NioEventLoopGroup(workerGroupThreadCount);
             ServerBootstrap b = new ServerBootstrap();
             b.group(bossGroup, workerGroup)
                     .channel(NioServerSocketChannel.class)
@@ -96,7 +96,7 @@ public class MqttTransportService implements TbTransportService {
                         .childOption(ChannelOption.SO_KEEPALIVE, keepAlive);
                 sslServerChannel = b.bind(sslHost, sslPort).sync().channel();
             }
-        } catch (Throwable e) {
+        } catch (Exception e) {
             log.error("Failed to start MQTT transport, releasing resources", e);
             if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
@@ -108,16 +108,17 @@ public class MqttTransportService implements TbTransportService {
                 if (sslServerChannel != null) {
                     sslServerChannel.close().sync();
                 }
-            } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
+            } catch (Exception suppressed) {
+                e.addSuppressed(suppressed);
             } finally {
-                workerGroup.shutdownGracefully();
-                bossGroup.shutdownGracefully();
+                if (workerGroup != null) {
+                    workerGroup.shutdownGracefully();
+                }
+                if (bossGroup != null) {
+                    bossGroup.shutdownGracefully();
+                }
             }
-            if (e instanceof Exception) {
-                throw (Exception) e;
-            }
-            throw (Error) e;
+            throw e;
         }
         log.info("Mqtt transport started!");
     }

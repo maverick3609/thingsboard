@@ -270,6 +270,13 @@ public class AlarmRuleState {
         this.durationCheckFuture = durationCheckFuture;
     }
 
+    public void cancelDurationCheckFuture() {
+        if (durationCheckFuture != null) {
+            durationCheckFuture.cancel(true);
+            durationCheckFuture = null;
+        }
+    }
+
     public boolean isEmpty() {
         return eventCount == 0L && firstEventTs == 0L && lastCheckTs == 0L && durationCheckFuture == null;
     }

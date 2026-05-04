@@ -711,6 +711,18 @@ public abstract class BaseTimeseriesServiceTest extends AbstractServiceTest {
     }
 
     @Test
+    public void testFindDeviceMaxAggregationOverNegativeMixedLongAndDoubleTsData() throws Exception {
+        save(deviceId, 5000, -100L);
+        save(deviceId, 15000, -50.0);
+
+        List<TsKvEntry> list = tsService.findAll(tenantId, deviceId, Collections.singletonList(new BaseReadTsKvQuery(LONG_KEY, 0,
+                60000, 60000, 1, Aggregation.MAX))).get(MAX_TIMEOUT, TimeUnit.SECONDS);
+
+        assertEquals(1, list.size());
+        assertEquals(java.util.Optional.of(-50.0), list.get(0).getDoubleValue());
+    }
+
+    @Test
     public void testSaveTs_RemoveTs_AndSaveTsAgain() throws Exception {
         save(deviceId, 2000000L, 95);
         save(deviceId, 4000000L, 100);

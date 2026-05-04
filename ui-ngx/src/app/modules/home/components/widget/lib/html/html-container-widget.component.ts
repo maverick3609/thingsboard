@@ -24,7 +24,6 @@ import {
   Optional,
   Type,
   ViewChild,
-  ViewContainerRef,
   ViewEncapsulation
 } from '@angular/core';
 import { WidgetContext } from '@home/models/widget-component.models';
@@ -91,7 +90,6 @@ export class HtmlContainerWidgetComponent implements OnInit {
   widgetErrorData: ExceptionData;
 
   constructor(private elementRef: ElementRef<HTMLElement>,
-              private containerRef: ViewContainerRef,
               @Optional() @Inject(MODULES_MAP) private modulesMap: IModulesMap,
               @Inject(SHARED_MODULE_TOKEN) private sharedModule: Type<any>,
               @Inject(WIDGET_COMPONENTS_MODULE_TOKEN) private widgetComponentsModule: Type<any>,
@@ -190,7 +188,6 @@ export class HtmlContainerWidgetComponent implements OnInit {
   }
 
   private initAngularComponent(imports?: Type<any>[], containerFunction?: CompiledTbFunction<WidgetContainerAngularFunction>): void {
-    //this.containerRef.clear();
     this.angularContainer.viewContainerRef.clear();
     const destroyContainerInstanceResources = this.destroyContainerInstanceResources.bind(this);
     const template = this.settings.html || '';
@@ -225,9 +222,9 @@ export class HtmlContainerWidgetComponent implements OnInit {
     ).subscribe({
       next: (componentType) => {
         this.containerInstanceComponentType = componentType;
-        const injector: Injector = Injector.create({providers: [], parent: this.angularContainer.viewContainerRef.injector/*this.containerRef.injector*/});
+        const injector: Injector = Injector.create({providers: [], parent: this.angularContainer.viewContainerRef.injector});
         try {
-          /*this.containerRef*/this.angularContainer.viewContainerRef.createComponent(this.containerInstanceComponentType,
+          this.angularContainer.viewContainerRef.createComponent(this.containerInstanceComponentType,
               {index: 0, injector});
 
         } catch (error) {

@@ -3,7 +3,7 @@
   "name": "HTML Container",
   "deprecated": false,
   "image": "tb-image;/api/images/system/html_card_system_widget_image.png",
-  "description": null,
+  "description": "Configurable HTML, CSS and JavaScript widget with access to the Widget API via WidgetContext and the ability to load external resources or modules. Supports two modes: plain HTML (regular HTML/JS bound to the widget container) and Angular (Angular template with bound variables and functions). Use for custom complex visualizations or actions when system widgets are not enough.",
   "descriptor": {
     "type": "static",
     "sizeX": 9.5,
@@ -12,7 +12,7 @@
     "templateHtml": "<tb-html-container-widget \n    [ctx]=\"ctx\">\n</tb-html-container-widget>",
     "templateCss": "",
     "controllerScript": "self.onInit = function() {\n    \n}\n",
-    "settingsDirective": "",
+    "settingsDirective": "tb-html-container-widget-settings",
     "hasBasicMode": true,
     "basicModeDirective": "tb-html-container-basic-config",
     "defaultConfig": "{\"datasources\":[],\"timewindow\":{\"realtime\":{\"timewindowMs\":60000}},\"showTitle\":false,\"backgroundColor\":\"rgba(255, 255, 255, 0)\",\"color\":\"rgba(0, 0, 0, 0.87)\",\"padding\":\"0\",\"settings\":{\"type\":\"PLAIN\",\"html\":\"\",\"css\":\"\",\"js\":\"\",\"resources\":[]},\"title\":\"HTML Container\",\"dropShadow\":false,\"enableFullscreen\":false,\"widgetStyle\":{},\"widgetCss\":\"\",\"pageSize\":1024,\"noDataDisplayMessage\":\"\",\"configMode\":\"basic\"}"
@@ -31,5 +31,5 @@
     }
   ],
   "scada": false,
-  "tags": null
+  "tags": ["html", "css", "javascript", "custom", "script", "code", "container", "angular", "template", "external resources", "widget api", "advanced", "custom visualization", "custom action", "web", "markup"]
 }

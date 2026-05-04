@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 
-import { Component } from '@angular/core';
+import { Component, HostBinding } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
 import { Store } from '@ngrx/store';
 import { AppState } from '@core/core.state';
@@ -33,6 +33,8 @@ import {
   standalone: false
 })
 export class HtmlContainerBasicConfigComponent extends BasicWidgetConfigComponent {
+
+  @HostBinding('style.height') height = '100%';
 
   htmlContainerWidgetConfigForm: UntypedFormGroup;
 

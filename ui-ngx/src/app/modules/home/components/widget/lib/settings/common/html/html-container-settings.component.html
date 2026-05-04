@@ -16,7 +16,7 @@
 
 -->
 <ng-container [formGroup]="htmlContainerSettingsForm">
-  <div class="tb-form-panel no-padding no-border">
+  <div class="tb-form-panel no-padding no-border relative h-full">
     <div class="flex flex-row items-center gap-4">
       <div class="tb-form-panel-title" translate>widgets.html-container.container-type</div>
       <tb-toggle-select formControlName="type">
@@ -24,15 +24,13 @@
         <tb-toggle-option [value]="HtmlContainerWidgetType.ANGULAR">{{ 'widgets.html-container.type-angular' | translate }}</tb-toggle-option>
       </tb-toggle-select>
     </div>
-    <div class="tb-form-panel stroked !py-2">
-      <mat-expansion-panel #resourcesPanel="matExpansionPanel" class="tb-settings" [expanded]="false" >
-        <mat-expansion-panel-header class="flex flex-row flex-wrap">
-          <mat-panel-title class="h-10">
-            <div [matBadge]="resourcesFormArray.length" [matBadgeHidden]="resourcesPanel.expanded || !resourcesFormArray.length"
-                 matBadgeSize="small">{{ 'widgets.html-container.resources' | translate }}</div>
-          </mat-panel-title>
-        </mat-expansion-panel-header>
-        <ng-template matExpansionPanelContent>
+    <mat-tab-group [mat-stretch-tabs]="false" selectedIndex="3" class="flex-1">
+      <mat-tab #resourceTab="matTab">
+        <ng-template mat-tab-label>
+          <div [matBadge]="resourcesFormArray.length" [matBadgeHidden]="resourceTab.isActive || !resourcesFormArray.length"
+               matBadgeSize="small">{{ 'widgets.html-container.resources' | translate }}</div>
+        </ng-template>
+        <div class="flex flex-col gap-2 pt-4">
           @if (resourcesFormArray.length) {
             @for (resourceControl of resourcesControls; track resourceControl; let i = $index) {
               <div class="tb-form-row no-border no-padding" [formGroup]="resourceControl">
@@ -60,7 +58,7 @@
             <span translate
                   class="tb-prompt flex items-center justify-center">widgets.html-container.no-resources</span>
           }
-          <div class="mt-2">
+          <div>
             <button mat-raised-button color="primary"
                     (click)="addResource()"
                     matTooltip="{{'widget.add-resource' | translate}}"
@@ -68,30 +66,33 @@
               <span translate>action.add</span>
             </button>
           </div>
-        </ng-template>
-      </mat-expansion-panel>
-    </div>
-    <div class="tb-form-row">
-      <tb-html class="flex-1"
-               formControlName="html"
-               label="{{ (htmlContainerSettingsForm.get('type').value === HtmlContainerWidgetType.ANGULAR ? 'widgets.html-container.angular-html-template' : 'widgets.html-container.html') | translate }}">
-      </tb-html>
-    </div>
-    <div class="tb-form-row">
-      <tb-css class="flex-1"
-              formControlName="css"
-              label="{{ 'widgets.html-container.css' | translate }}">
-      </tb-css>
-    </div>
-    <div class="tb-form-row">
-      <tb-js-func class="flex-1"
-                  formControlName="js"
-                  [globalVariables]="functionScopeVariables"
-                  [editorCompleter]="containerFunctionEditorCompleter"
-                  [functionArgs]="htmlContainerSettingsForm.get('type').value === HtmlContainerWidgetType.ANGULAR ? ['ctx'] : ['ctx', 'container']"
-                  withModules
-                  functionTitle="{{ 'widgets.html-container.js-function' | translate }}">
-      </tb-js-func>
-    </div>
+        </div>
+      </mat-tab>
+      <mat-tab label="{{ (htmlContainerSettingsForm.get('type').value === HtmlContainerWidgetType.ANGULAR ? 'widgets.html-container.angular-html-template' : 'widgets.html-container.html') | translate }}">
+        <tb-html class="flex-1"
+                 [fillHeight]="true"
+                 formControlName="html"
+                 label="{{ (htmlContainerSettingsForm.get('type').value === HtmlContainerWidgetType.ANGULAR ? 'widgets.html-container.angular-html-template' : 'widgets.html-container.html') | translate }}">
+        </tb-html>
+      </mat-tab>
+      <mat-tab label="{{ 'widgets.html-container.css' | translate }}">
+        <tb-css class="flex-1"
+                [fillHeight]="true"
+                formControlName="css"
+                label="{{ 'widgets.html-container.css' | translate }}">
+        </tb-css>
+      </mat-tab>
+      <mat-tab label="{{ 'widgets.html-container.java-script' | translate }}">
+        <tb-js-func class="flex-1"
+                    [fillHeight]="true"
+                    formControlName="js"
+                    [globalVariables]="functionScopeVariables"
+                    [editorCompleter]="containerFunctionEditorCompleter"
+                    [functionArgs]="htmlContainerSettingsForm.get('type').value === HtmlContainerWidgetType.ANGULAR ? ['ctx'] : ['ctx', 'container']"
+                    withModules
+                    functionTitle="{{ 'widgets.html-container.js-function' | translate }}">
+        </tb-js-func>
+      </mat-tab>
+    </mat-tab-group>
   </div>
 </ng-container>

@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 
-import { Component } from '@angular/core';
+import { Component, HostBinding } from '@angular/core';
 import { WidgetSettings, WidgetSettingsComponent } from '@shared/models/widget.models';
 import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
 import { Store } from '@ngrx/store';
@@ -28,6 +28,9 @@ import { htmlContainerDefaultSettings } from '@home/components/widget/lib/html/h
     standalone: false
 })
 export class HtmlContainerWidgetSettingsComponent extends WidgetSettingsComponent {
+
+  @HostBinding('height')
+  hostHeight = '100%';
 
   htmlContainerWidgetSettingsForm: UntypedFormGroup;
 

@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 
-import { Component, DestroyRef, forwardRef, Input, OnInit } from '@angular/core';
+import { Component, DestroyRef, forwardRef, HostBinding, Input, OnInit } from '@angular/core';
 import { WidgetResource } from '@shared/models/widget.models';
 import {
   ControlValueAccessor,
@@ -39,7 +39,7 @@ import { WidgetService } from '@core/http/widget.service';
 @Component({
   selector: 'tb-html-container-settings',
   templateUrl: './html-container-settings.component.html',
-  styleUrls: [],
+  styleUrls: ['./html-container-settings.component.scss'],
   providers: [
     {
       provide: NG_VALUE_ACCESSOR,
@@ -61,6 +61,9 @@ export class HtmlContainerSettingsComponent implements OnInit, ControlValueAcces
   functionScopeVariables = this.widgetService.getWidgetScopeVariables();
 
   containerFunctionEditorCompleter = ContainerFunctionEditorCompleter;
+
+  @HostBinding('class')
+  hostClass = 'tb-html-container-settings';
 
   @Input()
   disabled: boolean;

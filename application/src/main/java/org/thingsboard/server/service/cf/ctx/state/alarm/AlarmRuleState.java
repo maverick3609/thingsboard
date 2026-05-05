@@ -256,10 +256,7 @@ public class AlarmRuleState {
         firstEventTs = 0L;
         lastCheckTs = 0L;
         duration = 0L;
-        if (durationCheckFuture != null) {
-            durationCheckFuture.cancel(true);
-            durationCheckFuture = null;
-        }
+        cancelDurationCheckFuture();
     }
 
     public void setDurationCheckFuture(ScheduledFuture<?> durationCheckFuture) {

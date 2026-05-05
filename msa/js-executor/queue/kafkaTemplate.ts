@@ -21,6 +21,7 @@ import { JsInvokeMessageProcessor } from '../api/jsInvokeMessageProcessor'
 import { IQueue } from './queue.models';
 import {
     Admin,
+    CompressionCodecs,
     CompressionTypes,
     Consumer,
     Kafka,
@@ -30,10 +31,13 @@ import {
     Producer,
     TopicMessages
 } from 'kafkajs';
+import LZ4Codec from '@2l/kafkajs-lz4';
 import { isNotEmptyStr } from '../api/utils';
 import { KeyObject } from 'tls';
 
 import process, { exit, kill } from 'process';
+
+CompressionCodecs[CompressionTypes.LZ4] = new LZ4Codec().codec;
 
 export class KafkaTemplate implements IQueue {
 
@@ -46,7 +50,18 @@ export class KafkaTemplate implements IQueue {
     private linger = Number(config.get('kafka.linger_ms'));
     private requestTimeout = Number(config.get('kafka.requestTimeout'));
     private connectionTimeout = Number(config.get('kafka.connectionTimeout'));
-    private compressionType = (config.get('kafka.compression') === "gzip") ? CompressionTypes.GZIP : CompressionTypes.None;
+    private compressionType = KafkaTemplate.resolveCompressionType(config.get('kafka.compression'));
+
+    private static resolveCompressionType(compression: string): CompressionTypes {
+        switch (compression) {
+            case 'gzip':
+                return CompressionTypes.GZIP;
+            case 'lz4':
+                return CompressionTypes.LZ4;
+            default:
+                return CompressionTypes.None;
+        }
+    }
     private partitionsConsumedConcurrently = Number(config.get('kafka.partitions_consumed_concurrently'));
 
     private kafkaClient: Kafka;

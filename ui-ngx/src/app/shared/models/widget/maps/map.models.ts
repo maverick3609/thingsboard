@@ -204,6 +204,8 @@ export type MapDataLayerType = 'trips' | 'markers' | 'polygons' | 'circles' | 'p
 
 export const mapDataLayerTypes: MapDataLayerType[] = ['trips', 'markers', 'polygons', 'circles', 'polylines'];
 
+export const latestMapDataLayerTypes: MapDataLayerType[] = ['markers', 'polygons', 'circles', 'polylines'];
+
 export const mapDataLayerValid = (dataLayer: MapDataLayerSettings, type: MapDataLayerType): boolean => {
   if (!dataLayer.dsType || ![DatasourceType.function, DatasourceType.device, DatasourceType.entity].includes(dataLayer.dsType)) {
     return false;

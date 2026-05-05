@@ -219,7 +219,8 @@ const getMapDataLayerDatasources = (settings: MapDataLayerSettings[],
   return datasources;
 };
 
-const getMapDataLayersDatasources = (settings: BaseMapSettings, layerTypes: MapDataLayerType[], includeDataKeys = false): Datasource[] => {
+const getMapDataLayersDatasources = (settings: BaseMapSettings,
+                                     layerTypes: readonly MapDataLayerType[], includeDataKeys = false): Datasource[] => {
   const datasources: Datasource[] = [];
   for (const layerType of layerTypes) {
     const dataLayerSettings = settings[layerType];

@@ -1011,6 +1011,33 @@ public class SystemPatchApplierTest {
     }
 
     @Test
+    void whenOnlyBundleImageFormatDiffers_thenNoUpdate() throws Exception {
+        Path bundlesDir = tempDir.resolve("widget_bundles");
+        Files.createDirectories(bundlesDir);
+        when(installScripts.getWidgetBundlesDir()).thenReturn(bundlesDir);
+
+        // File carries a base64 data URI; DB has the resolved system-image URL — same content, different format.
+        Files.writeString(bundlesDir.resolve("charts.json"),
+                "{\"widgetsBundle\":{\"alias\":\"charts\",\"title\":\"Charts\",\"description\":\"d\",\"order\":10," +
+                        "\"image\":\"data:image/png;base64,iVBORw0KGgo\"}," +
+                        "\"widgetTypeFqns\":[]}");
+
+        WidgetsBundle existingBundle = createTestBundle("charts", "Charts");
+        existingBundle.setDescription("d");
+        existingBundle.setOrder(10);
+        existingBundle.setImage("tb-image;/api/images/system/charts.png");
+        when(widgetsBundleService.findWidgetsBundleByTenantIdAndAlias(TenantId.SYS_TENANT_ID, "charts")).thenReturn(existingBundle);
+        when(widgetTypeService.findWidgetFqnsByWidgetsBundleId(TenantId.SYS_TENANT_ID, existingBundle.getId()))
+                .thenReturn(List.of());
+
+        Integer updated = ReflectionTestUtils.invokeMethod(reconciler, "updateWidgetBundles");
+
+        assertEquals(0, updated);
+        verify(widgetsBundleService, never()).saveWidgetsBundle(any());
+        verify(widgetTypeService, never()).updateWidgetsBundleWidgetFqns(any(), any(), any());
+    }
+
+    @Test
     void whenBundleMetadataChanged_thenUpdateBundle() throws Exception {
         Path bundlesDir = tempDir.resolve("widget_bundles");
         Files.createDirectories(bundlesDir);

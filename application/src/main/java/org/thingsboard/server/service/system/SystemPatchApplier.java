@@ -316,9 +316,12 @@ public class SystemPatchApplier {
     }
 
     private boolean isWidgetsBundleChanged(WidgetsBundle existing, WidgetsBundle file) {
+        // Image is intentionally NOT compared: the file always carries a base64 data URI, while the DB stores
+        // the system-image URL produced by ImageService.replaceBase64WithImageUrl on save. A naive string compare
+        // would always report a diff and re-save every system bundle on every patch run. Image content changes
+        // are out of scope for the patch applier — full reinstall covers them.
         return !Objects.equals(existing.getTitle(), file.getTitle())
                 || !Objects.equals(existing.getDescription(), file.getDescription())
-                || !Objects.equals(existing.getImage(), file.getImage())
                 || !Objects.equals(existing.getOrder(), file.getOrder())
                 || existing.isScada() != file.isScada();
     }

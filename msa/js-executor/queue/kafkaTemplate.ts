@@ -56,7 +56,10 @@ export class KafkaTemplate implements IQueue {
             case 'lz4': {
                 // Load the LZ4 codec lazily so users who don't enable LZ4 don't take a hard
                 // dependency on the lz4-napi native binary (e.g. inside pkg-built executables).
-                const LZ4Codec = require('@2l/kafkajs-lz4').default;
+                // The package re-assigns module.exports = LZ4Codec, which wipes the __esModule
+                // flag and the .default property — so accept either shape.
+                const lz4Module = require('@2l/kafkajs-lz4');
+                const LZ4Codec = lz4Module.default || lz4Module;
                 CompressionCodecs[CompressionTypes.LZ4] = new LZ4Codec().codec;
                 return CompressionTypes.LZ4;
             }

@@ -31,13 +31,10 @@ import {
     Producer,
     TopicMessages
 } from 'kafkajs';
-import LZ4Codec from '@2l/kafkajs-lz4';
 import { isNotEmptyStr } from '../api/utils';
 import { KeyObject } from 'tls';
 
 import process, { exit, kill } from 'process';
-
-CompressionCodecs[CompressionTypes.LZ4] = new LZ4Codec().codec;
 
 export class KafkaTemplate implements IQueue {
 
@@ -50,15 +47,25 @@ export class KafkaTemplate implements IQueue {
     private linger = Number(config.get('kafka.linger_ms'));
     private requestTimeout = Number(config.get('kafka.requestTimeout'));
     private connectionTimeout = Number(config.get('kafka.connectionTimeout'));
-    private compressionType = KafkaTemplate.resolveCompressionType(config.get('kafka.compression'));
+    private compressionType = this.resolveCompressionType(config.get('kafka.compression'));
 
-    private static resolveCompressionType(compression: string): CompressionTypes {
+    private resolveCompressionType(compression: string): CompressionTypes {
         switch (compression) {
             case 'gzip':
                 return CompressionTypes.GZIP;
-            case 'lz4':
+            case 'lz4': {
+                // Load the LZ4 codec lazily so users who don't enable LZ4 don't take a hard
+                // dependency on the lz4-napi native binary (e.g. inside pkg-built executables).
+                const LZ4Codec = require('@2l/kafkajs-lz4').default;
+                CompressionCodecs[CompressionTypes.LZ4] = new LZ4Codec().codec;
                 return CompressionTypes.LZ4;
+            }
+            case 'none':
+                return CompressionTypes.None;
             default:
+                if (isNotEmptyStr(compression)) {
+                    this.logger.warn('Unknown kafka.compression value "%s"; falling back to no compression. Supported values: gzip, lz4, none.', compression);
+                }
                 return CompressionTypes.None;
         }
     }

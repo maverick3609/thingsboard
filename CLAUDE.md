@@ -2,46 +2,28 @@
 
 ThingsBoard is an open-source IoT platform (v4.3.1.1) for device management, data collection, processing, and visualization. It's a multi-module Maven project with a Java 17/Spring Boot 3.5 backend and Angular 20 frontend.
 
-## Architecture
+## Context Navigation (Graphify)
 
-### Module Layout
+### 3-Layer Query Rule
+1. **First:** query `graphify-out/graph.json` or `graphify-out/wiki/index.md`
+   to understand code structure and connections
+2. **Second:** query the Obsidian vault for decisions, progress, and project context
+3. **Third:** only read raw code files when editing
+   or when the first two layers don't have the answer
 
-| Module | Purpose |
-|--------|---------|
-| `application/` | Main Spring Boot app — REST controllers, services, actor system |
-| `common/` | Shared libraries: actor framework, data models, queue/transport abstractions, protobuf definitions |
-| `dao/` | Data access layer (JPA + Cassandra), entity models, caching |
-| `rule-engine/` | Rule engine API (`rule-engine-api/`) and built-in node implementations (`rule-engine-components/`) |
-| `transport/` | Protocol transports: MQTT, HTTP, CoAP, LwM2M, SNMP |
-| `edqs/` | Event-Driven Queue System |
-| `ui-ngx/` | Angular 20 frontend (Angular Material, NgRx, ECharts, Leaflet) |
-| `msa/` | Microservice packaging: js-executor, web-ui, vc-executor, black-box-tests |
-| `netty-mqtt/` | Custom MQTT protocol implementation |
-| `rest-client/` | Java REST API client library |
-| `monitoring/` | Monitoring module |
-| `tools/` | Utility tools |
+### When to rebuild the graph
+- After structural changes (new modules, major refactors)
+- Command: `graphify . --update` (only processes modified files)
+- The graph is persistent — NO need to rebuild every session
 
-### Backend Patterns
+### Do NOT
+- Don't manually modify files inside `graphify-out/`
+- Don't re-read the entire codebase if the graph already has the information
 
-- **Entry point**: `application/.../ThingsboardServerApplication.java` — uses `@SpringBootConfiguration` + `@EnableAsync` + `@EnableScheduling`
-- **Component scan**: `org.thingsboard.server` and `org.thingsboard.script`
-- **Controllers**: `@RestController` with `@PreAuthorize` for auth. OpenAPI 3.0 annotations (`io.swagger.v3.oas.annotations`). Controller constants in `ControllerConstants.java`
-- **DAO pattern**: Generic `Dao<T>` interface → JPA repositories. Supports PostgreSQL (primary) and Cassandra (timeseries)
-- **Rule engine**: Actor-based message processing. `TbMsg` is the central message type. Rule nodes annotated with `@RuleNode`. Messages route through rule chains with SUCCESS/FAILURE relation types
-- **Actor system**: Hierarchical actors — App → Tenant → Device/RuleChain/RuleNode. Located in `application/.../actors/`
-- **Async**: Uses Guava `ListenableFuture` throughout (not CompletableFuture)
-- **Queues**: Abstracted message queue layer (`common/queue/`) supporting Kafka, RabbitMQ, AWS SQS, Azure Service Bus, Google Pub/Sub
+## Obsidian Vault
 
-### Frontend Patterns
-
-- **Angular prefix**: `tb-` (e.g., `<tb-component>`)
-- **State management**: NgRx (store + effects)
-- **Styling**: SCSS + Tailwind CSS 3
-- **Build**: Custom esbuild via `@angular-builders/custom-esbuild:application`
-- **Output**: `ui-ngx/target/generated-resources/public`
-
-## Code Style
-
-- **Java**: Java 17, Lombok annotations (`@Data`, `@Slf4j`, etc.), Apache 2.0 license headers (enforced by `mvn license:format`)
-- **Frontend**: 2-space indentation, UTF-8, ESLint with Angular/TypeScript rules
-- **Lombok config**: `addconstructorproperties=true`, `@Lazy` is copyable
+- **Root:** `/Users/maverick/Office/Product/vault/`
+- **Project subtree:** `vault/thingsboard/` — `architecture/` (decisions), `features/`, `logs/` (session logs), `pipeline/`, `data/`
+- **Conventions:** see `vault/CLAUDE.md` — Zettelkasten, wikilinks `[[note]]`, YAML frontmatter, kebab-case filenames
+- **Graphify auto-exports to** `vault/graphify/thingsboard/` — read-only, do not edit manually
+- **Session commands** (`/resume`, `/save`) are defined in `vault/CLAUDE.md`

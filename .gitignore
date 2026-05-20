@@ -39,3 +39,5 @@ rebuild-docker.sh
 .run
 .claude
 .planning
+/docs/
+/.codegraph/

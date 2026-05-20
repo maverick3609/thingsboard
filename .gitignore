@@ -37,7 +37,7 @@ rebuild-docker.sh
 */.run/**
 .run/**
 .run
-.claude
+.claude/settings.local.json
 .planning
 /docs/
 /.codegraph/

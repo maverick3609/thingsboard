@@ -53,6 +53,22 @@
         (paramsChange)="onLoginParamsChange($event)">
       </tb-login-wl-settings>
     </mat-tab>
+    <mat-tab *ngIf="canEditLegal" label="Privacy Policy">
+      <tb-legal-content
+        [content]="privacyPolicy"
+        [label]="'Privacy Policy'"
+        (contentChange)="privacyPolicy = $event"
+        (save)="savePrivacyPolicy()">
+      </tb-legal-content>
+    </mat-tab>
+    <mat-tab *ngIf="canEditLegal" label="Terms of Use">
+      <tb-legal-content
+        [content]="termsOfUse"
+        [label]="'Terms of Use'"
+        (contentChange)="termsOfUse = $event"
+        (save)="saveTermsOfUse()">
+      </tb-legal-content>
+    </mat-tab>
   </mat-tab-group>
 
   <mat-spinner *ngIf="loading" diameter="40" class="loading-spinner"></mat-spinner>

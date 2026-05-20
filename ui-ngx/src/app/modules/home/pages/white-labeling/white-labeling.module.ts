@@ -22,6 +22,7 @@ import { GeneralWlSettingsComponent } from './general-wl-settings.component';
 import { LoginWlSettingsComponent } from './login-wl-settings.component';
 import { PaletteSettingsComponent } from './palette-settings.component';
 import { ImageInputComponent } from './image-input.component';
+import { LegalContentComponent } from './legal-content.component';
 
 @NgModule({
   declarations: [
@@ -29,7 +30,8 @@ import { ImageInputComponent } from './image-input.component';
     GeneralWlSettingsComponent,
     LoginWlSettingsComponent,
     PaletteSettingsComponent,
-    ImageInputComponent
+    ImageInputComponent,
+    LegalContentComponent
   ],
   imports: [
     CommonModule,

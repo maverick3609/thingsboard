@@ -15,6 +15,7 @@
  */
 package org.thingsboard.server.dao.wl;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import org.thingsboard.server.common.data.id.CustomerId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.wl.LoginWhiteLabelingParams;
@@ -48,6 +49,14 @@ public interface WhiteLabelingService {
     WhiteLabelingParams mergeSystemWhiteLabelingParams(WhiteLabelingParams params);
     WhiteLabelingParams mergeTenantWhiteLabelingParams(TenantId tenantId, WhiteLabelingParams params);
     WhiteLabelingParams mergeCustomerWhiteLabelingParams(TenantId tenantId, CustomerId customerId, WhiteLabelingParams params);
+
+    // Privacy Policy & Terms of Use
+    JsonNode getTenantPrivacyPolicy(TenantId tenantId);
+    JsonNode getWebPrivacyPolicy(String serverName);
+    JsonNode savePrivacyPolicy(TenantId tenantId, JsonNode policy);
+    JsonNode getTenantTermsOfUse(TenantId tenantId);
+    JsonNode getWebTermsOfUse(String serverName);
+    JsonNode saveTermsOfUse(TenantId tenantId, JsonNode terms);
 
     // Delete
     void deleteWhiteLabeling(TenantId tenantId, CustomerId customerId, WhiteLabelingType type);

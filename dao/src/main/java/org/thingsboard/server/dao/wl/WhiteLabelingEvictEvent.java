@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.thingsboard.server.common.data.wl;
+package org.thingsboard.server.dao.wl;
 
-public enum WhiteLabelingType {
-    GENERAL,
-    LOGIN,
-    TERMS_OF_USE,
-    PRIVACY_POLICY
+import lombok.Data;
+
+@Data
+public class WhiteLabelingEvictEvent {
+
+    private final WhiteLabelingCacheKey key;
+
 }

@@ -33,6 +33,8 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 export class WhiteLabelingComponent implements OnInit {
   generalParams: WhiteLabelingParams = null;
   loginParams: LoginWhiteLabelingParams = null;
+  privacyPolicy: any = null;
+  termsOfUse: any = null;
   authority: Authority;
   loading = false;
   selectedCustomerId: string = null;
@@ -72,6 +74,16 @@ export class WhiteLabelingComponent implements OnInit {
         this.loginParams = {} as LoginWhiteLabelingParams;
       }
     });
+    if (this.canEditLegal) {
+      this.wlHttp.getPrivacyPolicy({ ignoreErrors: true }).subscribe({
+        next: data => this.privacyPolicy = data || { content: '' },
+        error: () => this.privacyPolicy = { content: '' }
+      });
+      this.wlHttp.getTermsOfUse({ ignoreErrors: true }).subscribe({
+        next: data => this.termsOfUse = data || { content: '' },
+        error: () => this.termsOfUse = { content: '' }
+      });
+    }
   }
 
   save(): void {
@@ -131,6 +143,28 @@ export class WhiteLabelingComponent implements OnInit {
 
   get isTenantAdmin(): boolean {
     return this.authority === Authority.TENANT_ADMIN;
+  }
+
+  get canEditLegal(): boolean {
+    return this.authority === Authority.SYS_ADMIN || this.authority === Authority.TENANT_ADMIN;
+  }
+
+  savePrivacyPolicy(): void {
+    this.wlHttp.savePrivacyPolicy(this.privacyPolicy).subscribe({
+      next: saved => {
+        this.privacyPolicy = saved;
+        this.snackBar.open('Privacy policy saved', 'OK', { duration: 3000 });
+      }
+    });
+  }
+
+  saveTermsOfUse(): void {
+    this.wlHttp.saveTermsOfUse(this.termsOfUse).subscribe({
+      next: saved => {
+        this.termsOfUse = saved;
+        this.snackBar.open('Terms of use saved', 'OK', { duration: 3000 });
+      }
+    });
   }
 
   toggleCustomerScope(): void {

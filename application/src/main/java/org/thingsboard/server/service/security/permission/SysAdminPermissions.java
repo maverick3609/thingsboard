@@ -47,6 +47,7 @@ public class SysAdminPermissions extends AbstractPermissions {
         put(Resource.QUEUE, systemEntityPermissionChecker);
         put(Resource.NOTIFICATION, systemEntityPermissionChecker);
         put(Resource.MOBILE_APP_SETTINGS, PermissionChecker.allowAllPermissionChecker);
+        put(Resource.WHITE_LABELING, PermissionChecker.allowAllPermissionChecker);
         put(Resource.API_KEY, PermissionChecker.allowAllPermissionChecker);
     }
 

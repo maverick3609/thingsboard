@@ -16,13 +16,10 @@
 package org.thingsboard.server.dao.wl;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
-import org.thingsboard.server.common.data.CacheConstants;
+import org.springframework.transaction.event.TransactionalEventListener;
+import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.common.data.id.CustomerId;
 import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.id.TenantId;
@@ -30,64 +27,66 @@ import org.thingsboard.server.common.data.wl.LoginWhiteLabelingParams;
 import org.thingsboard.server.common.data.wl.WhiteLabeling;
 import org.thingsboard.server.common.data.wl.WhiteLabelingParams;
 import org.thingsboard.server.common.data.wl.WhiteLabelingType;
+import org.thingsboard.server.dao.entity.AbstractCachedService;
 import org.thingsboard.server.dao.model.sql.WhiteLabelingCompositeKey;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
-public class DefaultWhiteLabelingService implements WhiteLabelingService {
-
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+public class DefaultWhiteLabelingService
+    extends AbstractCachedService<WhiteLabelingCacheKey, WhiteLabeling, WhiteLabelingEvictEvent>
+    implements WhiteLabelingService {
 
     private final WhiteLabelingDao whiteLabelingDao;
 
-    // --- Raw getters ---
+    public DefaultWhiteLabelingService(WhiteLabelingDao whiteLabelingDao) {
+        this.whiteLabelingDao = whiteLabelingDao;
+    }
+
+    // --- Cache event handling ---
+
+    @TransactionalEventListener(classes = WhiteLabelingEvictEvent.class)
+    @Override
+    public void handleEvictEvent(WhiteLabelingEvictEvent event) {
+        if (event.getKey() != null) {
+            cache.evict(event.getKey());
+        }
+    }
+
+    // --- Raw getters (cached via transactional cache) ---
 
     @Override
-    @Cacheable(cacheNames = CacheConstants.WHITE_LABELING_CACHE,
-            key = "'sys:' + #root.methodName")
     public WhiteLabelingParams getSystemWhiteLabelingParams() {
-        return loadParams(WhiteLabelingCompositeKey.forSystem(WhiteLabelingType.GENERAL),
+        return loadParamsCached(WhiteLabelingCompositeKey.forSystem(WhiteLabelingType.GENERAL),
                 WhiteLabelingParams.class);
     }
 
     @Override
-    @Cacheable(cacheNames = CacheConstants.WHITE_LABELING_CACHE,
-            key = "'tenant:' + #tenantId.id + ':GENERAL'")
     public WhiteLabelingParams getTenantWhiteLabelingParams(TenantId tenantId) {
-        return loadParams(WhiteLabelingCompositeKey.forTenant(tenantId, WhiteLabelingType.GENERAL),
+        return loadParamsCached(WhiteLabelingCompositeKey.forTenant(tenantId, WhiteLabelingType.GENERAL),
                 WhiteLabelingParams.class);
     }
 
     @Override
-    @Cacheable(cacheNames = CacheConstants.WHITE_LABELING_CACHE,
-            key = "'customer:' + #tenantId.id + ':' + #customerId.id + ':GENERAL'")
     public WhiteLabelingParams getCustomerWhiteLabelingParams(TenantId tenantId, CustomerId customerId) {
-        return loadParams(WhiteLabelingCompositeKey.forCustomer(tenantId, customerId, WhiteLabelingType.GENERAL),
+        return loadParamsCached(WhiteLabelingCompositeKey.forCustomer(tenantId, customerId, WhiteLabelingType.GENERAL),
                 WhiteLabelingParams.class);
     }
 
     @Override
-    @Cacheable(cacheNames = CacheConstants.WHITE_LABELING_CACHE,
-            key = "'sys:loginParams'")
     public LoginWhiteLabelingParams getSystemLoginWhiteLabelingParams() {
-        return loadParams(WhiteLabelingCompositeKey.forSystem(WhiteLabelingType.LOGIN),
+        return loadParamsCached(WhiteLabelingCompositeKey.forSystem(WhiteLabelingType.LOGIN),
                 LoginWhiteLabelingParams.class);
     }
 
     @Override
-    @Cacheable(cacheNames = CacheConstants.WHITE_LABELING_CACHE,
-            key = "'tenant:' + #tenantId.id + ':LOGIN'")
     public LoginWhiteLabelingParams getTenantLoginWhiteLabelingParams(TenantId tenantId) {
-        return loadParams(WhiteLabelingCompositeKey.forTenant(tenantId, WhiteLabelingType.LOGIN),
+        return loadParamsCached(WhiteLabelingCompositeKey.forTenant(tenantId, WhiteLabelingType.LOGIN),
                 LoginWhiteLabelingParams.class);
     }
 
     @Override
-    @Cacheable(cacheNames = CacheConstants.WHITE_LABELING_CACHE,
-            key = "'customer:' + #tenantId.id + ':' + #customerId.id + ':LOGIN'")
     public LoginWhiteLabelingParams getCustomerLoginWhiteLabelingParams(TenantId tenantId, CustomerId customerId) {
-        return loadParams(WhiteLabelingCompositeKey.forCustomer(tenantId, customerId, WhiteLabelingType.LOGIN),
+        return loadParamsCached(WhiteLabelingCompositeKey.forCustomer(tenantId, customerId, WhiteLabelingType.LOGIN),
                 LoginWhiteLabelingParams.class);
     }
 
@@ -132,44 +131,38 @@ public class DefaultWhiteLabelingService implements WhiteLabelingService {
     // --- Save ---
 
     @Override
-    @CacheEvict(cacheNames = CacheConstants.WHITE_LABELING_CACHE, allEntries = true)
     public WhiteLabelingParams saveSystemWhiteLabelingParams(WhiteLabelingParams params) {
-        saveWl(TenantId.SYS_TENANT_ID, new CustomerId(EntityId.NULL_UUID), WhiteLabelingType.GENERAL, params);
+        saveWlAndEvict(TenantId.SYS_TENANT_ID, new CustomerId(EntityId.NULL_UUID), WhiteLabelingType.GENERAL, params);
         return params;
     }
 
     @Override
-    @CacheEvict(cacheNames = CacheConstants.WHITE_LABELING_CACHE, allEntries = true)
     public WhiteLabelingParams saveTenantWhiteLabelingParams(TenantId tenantId, WhiteLabelingParams params) {
-        saveWl(tenantId, new CustomerId(EntityId.NULL_UUID), WhiteLabelingType.GENERAL, params);
+        saveWlAndEvict(tenantId, new CustomerId(EntityId.NULL_UUID), WhiteLabelingType.GENERAL, params);
         return params;
     }
 
     @Override
-    @CacheEvict(cacheNames = CacheConstants.WHITE_LABELING_CACHE, allEntries = true)
     public WhiteLabelingParams saveCustomerWhiteLabelingParams(TenantId tenantId, CustomerId customerId, WhiteLabelingParams params) {
-        saveWl(tenantId, customerId, WhiteLabelingType.GENERAL, params);
+        saveWlAndEvict(tenantId, customerId, WhiteLabelingType.GENERAL, params);
         return params;
     }
 
     @Override
-    @CacheEvict(cacheNames = CacheConstants.WHITE_LABELING_CACHE, allEntries = true)
     public LoginWhiteLabelingParams saveSystemLoginWhiteLabelingParams(LoginWhiteLabelingParams params) {
-        saveWl(TenantId.SYS_TENANT_ID, new CustomerId(EntityId.NULL_UUID), WhiteLabelingType.LOGIN, params);
+        saveWlAndEvict(TenantId.SYS_TENANT_ID, new CustomerId(EntityId.NULL_UUID), WhiteLabelingType.LOGIN, params);
         return params;
     }
 
     @Override
-    @CacheEvict(cacheNames = CacheConstants.WHITE_LABELING_CACHE, allEntries = true)
     public LoginWhiteLabelingParams saveTenantLoginWhiteLabelingParams(TenantId tenantId, LoginWhiteLabelingParams params) {
-        saveWl(tenantId, new CustomerId(EntityId.NULL_UUID), WhiteLabelingType.LOGIN, params);
+        saveWlAndEvict(tenantId, new CustomerId(EntityId.NULL_UUID), WhiteLabelingType.LOGIN, params);
         return params;
     }
 
     @Override
-    @CacheEvict(cacheNames = CacheConstants.WHITE_LABELING_CACHE, allEntries = true)
     public LoginWhiteLabelingParams saveCustomerLoginWhiteLabelingParams(TenantId tenantId, CustomerId customerId, LoginWhiteLabelingParams params) {
-        saveWl(tenantId, customerId, WhiteLabelingType.LOGIN, params);
+        saveWlAndEvict(tenantId, customerId, WhiteLabelingType.LOGIN, params);
         return params;
     }
 
@@ -200,26 +193,58 @@ public class DefaultWhiteLabelingService implements WhiteLabelingService {
         return merged;
     }
 
-    // --- Delete ---
+    // --- Privacy Policy & Terms of Use ---
 
     @Override
-    @CacheEvict(cacheNames = CacheConstants.WHITE_LABELING_CACHE, allEntries = true)
-    public void deleteWhiteLabeling(TenantId tenantId, CustomerId customerId, WhiteLabelingType type) {
-        WhiteLabelingCompositeKey key;
-        if (tenantId.isSysTenantId()) {
-            key = WhiteLabelingCompositeKey.forSystem(type);
-        } else if (customerId != null && !customerId.isNullUid()) {
-            key = WhiteLabelingCompositeKey.forCustomer(tenantId, customerId, type);
-        } else {
-            key = WhiteLabelingCompositeKey.forTenant(tenantId, type);
-        }
-        whiteLabelingDao.removeByCompositeKey(key);
+    public JsonNode getTenantPrivacyPolicy(TenantId tenantId) {
+        return loadSettingsCached(WhiteLabelingCompositeKey.forTenant(tenantId, WhiteLabelingType.PRIVACY_POLICY));
     }
 
     @Override
-    @CacheEvict(cacheNames = CacheConstants.WHITE_LABELING_CACHE, allEntries = true)
+    public JsonNode getWebPrivacyPolicy(String serverName) {
+        JsonNode system = loadSettingsCached(WhiteLabelingCompositeKey.forSystem(WhiteLabelingType.PRIVACY_POLICY));
+        return system;
+    }
+
+    @Override
+    public JsonNode savePrivacyPolicy(TenantId tenantId, JsonNode policy) {
+        saveRawSettingsAndEvict(tenantId, new CustomerId(EntityId.NULL_UUID), WhiteLabelingType.PRIVACY_POLICY, policy);
+        return policy;
+    }
+
+    @Override
+    public JsonNode getTenantTermsOfUse(TenantId tenantId) {
+        return loadSettingsCached(WhiteLabelingCompositeKey.forTenant(tenantId, WhiteLabelingType.TERMS_OF_USE));
+    }
+
+    @Override
+    public JsonNode getWebTermsOfUse(String serverName) {
+        JsonNode system = loadSettingsCached(WhiteLabelingCompositeKey.forSystem(WhiteLabelingType.TERMS_OF_USE));
+        return system;
+    }
+
+    @Override
+    public JsonNode saveTermsOfUse(TenantId tenantId, JsonNode terms) {
+        saveRawSettingsAndEvict(tenantId, new CustomerId(EntityId.NULL_UUID), WhiteLabelingType.TERMS_OF_USE, terms);
+        return terms;
+    }
+
+    // --- Delete ---
+
+    @Override
+    public void deleteWhiteLabeling(TenantId tenantId, CustomerId customerId, WhiteLabelingType type) {
+        WhiteLabelingCompositeKey key = resolveCompositeKey(tenantId, customerId, type);
+        whiteLabelingDao.removeByCompositeKey(key);
+        publishEvictEvent(new WhiteLabelingEvictEvent(WhiteLabelingCacheKey.forKey(key)));
+    }
+
+    @Override
     public void deleteAllTenantWhiteLabeling(TenantId tenantId) {
         whiteLabelingDao.deleteByTenantId(tenantId);
+        for (WhiteLabelingType type : WhiteLabelingType.values()) {
+            WhiteLabelingCompositeKey ck = WhiteLabelingCompositeKey.forTenant(tenantId, type);
+            publishEvictEvent(new WhiteLabelingEvictEvent(WhiteLabelingCacheKey.forKey(ck)));
+        }
     }
 
     // --- Permission helpers (always true, no license gating) ---
@@ -236,31 +261,63 @@ public class DefaultWhiteLabelingService implements WhiteLabelingService {
 
     // --- Private helpers ---
 
-    private <T> T loadParams(WhiteLabelingCompositeKey key, Class<T> clazz) {
-        WhiteLabeling wl = whiteLabelingDao.findByCompositeKey(key);
+    private <T> T loadParamsCached(WhiteLabelingCompositeKey compositeKey, Class<T> clazz) {
+        WhiteLabelingCacheKey cacheKey = WhiteLabelingCacheKey.forKey(compositeKey);
+        WhiteLabeling wl = cache.getAndPutInTransaction(cacheKey,
+                () -> whiteLabelingDao.findByCompositeKey(compositeKey), false);
         if (wl == null || wl.getSettings() == null) {
             return null;
         }
         try {
-            return MAPPER.treeToValue(wl.getSettings(), clazz);
+            return JacksonUtil.treeToValue(wl.getSettings(), clazz);
         } catch (Exception e) {
-            log.error("Failed to deserialize white-labeling params for key {}", key, e);
+            log.error("Failed to deserialize white-labeling params for key {}", compositeKey, e);
             return null;
         }
     }
 
-    private void saveWl(TenantId tenantId, CustomerId customerId, WhiteLabelingType type, Object params) {
+    private JsonNode loadSettingsCached(WhiteLabelingCompositeKey compositeKey) {
+        WhiteLabelingCacheKey cacheKey = WhiteLabelingCacheKey.forKey(compositeKey);
+        WhiteLabeling wl = cache.getAndPutInTransaction(cacheKey,
+                () -> whiteLabelingDao.findByCompositeKey(compositeKey), false);
+        return wl != null ? wl.getSettings() : null;
+    }
+
+    private void saveWlAndEvict(TenantId tenantId, CustomerId customerId, WhiteLabelingType type, Object params) {
         try {
-            JsonNode settingsNode = MAPPER.valueToTree(params);
+            JsonNode settingsNode = JacksonUtil.valueToTree(params);
+            saveRawSettingsAndEvict(tenantId, customerId, type, settingsNode);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to save white-labeling params", e);
+        }
+    }
+
+    private void saveRawSettingsAndEvict(TenantId tenantId, CustomerId customerId, WhiteLabelingType type, JsonNode settings) {
+        WhiteLabelingCompositeKey compositeKey = new WhiteLabelingCompositeKey(
+                tenantId.getId(), customerId.getId(), type);
+        WhiteLabelingEvictEvent evictEvent = new WhiteLabelingEvictEvent(WhiteLabelingCacheKey.forKey(compositeKey));
+        try {
             WhiteLabeling wl = WhiteLabeling.builder()
                     .tenantId(tenantId)
                     .customerId(customerId)
                     .type(type)
-                    .settings(settingsNode)
+                    .settings(settings)
                     .build();
             whiteLabelingDao.save(wl);
+            publishEvictEvent(evictEvent);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to save white-labeling params", e);
+            handleEvictEvent(evictEvent);
+            throw e;
+        }
+    }
+
+    private WhiteLabelingCompositeKey resolveCompositeKey(TenantId tenantId, CustomerId customerId, WhiteLabelingType type) {
+        if (tenantId.isSysTenantId()) {
+            return WhiteLabelingCompositeKey.forSystem(type);
+        } else if (customerId != null && !customerId.isNullUid()) {
+            return WhiteLabelingCompositeKey.forCustomer(tenantId, customerId, type);
+        } else {
+            return WhiteLabelingCompositeKey.forTenant(tenantId, type);
         }
     }
 }

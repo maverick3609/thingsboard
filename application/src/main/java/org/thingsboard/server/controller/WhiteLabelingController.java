@@ -15,7 +15,7 @@
  */
 package org.thingsboard.server.controller;
 
-import io.swagger.v3.oas.annotations.Parameter;
+import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +37,8 @@ import org.thingsboard.server.common.data.wl.WhiteLabelingParams;
 import org.thingsboard.server.common.data.wl.WhiteLabelingType;
 import org.thingsboard.server.queue.util.TbCoreComponent;
 import org.thingsboard.server.service.security.model.SecurityUser;
+import org.thingsboard.server.service.security.permission.Operation;
+import org.thingsboard.server.service.security.permission.Resource;
 
 import java.util.UUID;
 
@@ -86,7 +88,7 @@ public class WhiteLabelingController extends BaseController {
     public WhiteLabelingParams getCurrentWhiteLabelParams(
             @RequestParam(value = "customerId", required = false) String strCustomerId
     ) throws ThingsboardException {
-        checkWhiteLabelingPermissions(org.thingsboard.server.service.security.permission.Operation.READ);
+        checkWhiteLabelingPermissions(Operation.READ);
         SecurityUser user = getCurrentUser();
         switch (user.getAuthority()) {
             case SYS_ADMIN:
@@ -110,7 +112,7 @@ public class WhiteLabelingController extends BaseController {
     public LoginWhiteLabelingParams getCurrentLoginWhiteLabelParams(
             @RequestParam(value = "customerId", required = false) String strCustomerId
     ) throws ThingsboardException {
-        checkWhiteLabelingPermissions(org.thingsboard.server.service.security.permission.Operation.READ);
+        checkWhiteLabelingPermissions(Operation.READ);
         SecurityUser user = getCurrentUser();
         switch (user.getAuthority()) {
             case SYS_ADMIN:
@@ -136,7 +138,7 @@ public class WhiteLabelingController extends BaseController {
             @RequestBody WhiteLabelingParams params,
             @RequestParam(value = "customerId", required = false) String strCustomerId
     ) throws ThingsboardException {
-        checkWhiteLabelingPermissions(org.thingsboard.server.service.security.permission.Operation.WRITE);
+        checkWhiteLabelingPermissions(Operation.WRITE);
         SecurityUser user = getCurrentUser();
         switch (user.getAuthority()) {
             case SYS_ADMIN:
@@ -162,7 +164,7 @@ public class WhiteLabelingController extends BaseController {
             @RequestBody LoginWhiteLabelingParams params,
             @RequestParam(value = "customerId", required = false) String strCustomerId
     ) throws ThingsboardException {
-        checkWhiteLabelingPermissions(org.thingsboard.server.service.security.permission.Operation.WRITE);
+        checkWhiteLabelingPermissions(Operation.WRITE);
         SecurityUser user = getCurrentUser();
         switch (user.getAuthority()) {
             case SYS_ADMIN:
@@ -187,7 +189,7 @@ public class WhiteLabelingController extends BaseController {
     public WhiteLabelingParams previewWhiteLabelParams(
             @RequestBody WhiteLabelingParams params
     ) throws ThingsboardException {
-        checkWhiteLabelingPermissions(org.thingsboard.server.service.security.permission.Operation.WRITE);
+        checkWhiteLabelingPermissions(Operation.WRITE);
         SecurityUser user = getCurrentUser();
         switch (user.getAuthority()) {
             case SYS_ADMIN:
@@ -219,7 +221,7 @@ public class WhiteLabelingController extends BaseController {
     public void deleteCurrentWhiteLabelParams(
             @RequestParam(value = "customerId", required = false) String strCustomerId
     ) throws ThingsboardException {
-        checkWhiteLabelingPermissions(org.thingsboard.server.service.security.permission.Operation.WRITE);
+        checkWhiteLabelingPermissions(Operation.WRITE);
         SecurityUser user = getCurrentUser();
         CustomerId customerId = resolveCustomerId(user, strCustomerId);
         whiteLabelingService.deleteWhiteLabeling(user.getTenantId(), customerId, WhiteLabelingType.GENERAL);
@@ -230,18 +232,64 @@ public class WhiteLabelingController extends BaseController {
     public void deleteCurrentLoginWhiteLabelParams(
             @RequestParam(value = "customerId", required = false) String strCustomerId
     ) throws ThingsboardException {
-        checkWhiteLabelingPermissions(org.thingsboard.server.service.security.permission.Operation.WRITE);
+        checkWhiteLabelingPermissions(Operation.WRITE);
         SecurityUser user = getCurrentUser();
         CustomerId customerId = resolveCustomerId(user, strCustomerId);
         whiteLabelingService.deleteWhiteLabeling(user.getTenantId(), customerId, WhiteLabelingType.LOGIN);
     }
 
+    // --- Privacy Policy ---
+
+    @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
+    @GetMapping(value = "/whiteLabel/privacyPolicy", produces = "application/json")
+    public JsonNode getPrivacyPolicy() throws ThingsboardException {
+        checkWhiteLabelingPermissions(Operation.READ);
+        SecurityUser user = getCurrentUser();
+        return whiteLabelingService.getTenantPrivacyPolicy(user.getTenantId());
+    }
+
+    @GetMapping(value = "/noauth/whiteLabel/privacyPolicy", produces = "application/json")
+    public JsonNode getWebPrivacyPolicy(HttpServletRequest request) {
+        return whiteLabelingService.getWebPrivacyPolicy(request.getServerName());
+    }
+
+    @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
+    @PostMapping(value = "/whiteLabel/privacyPolicy")
+    @ResponseStatus(HttpStatus.OK)
+    public JsonNode savePrivacyPolicy(@RequestBody JsonNode policy) throws ThingsboardException {
+        checkWhiteLabelingPermissions(Operation.WRITE);
+        SecurityUser user = getCurrentUser();
+        return whiteLabelingService.savePrivacyPolicy(user.getTenantId(), policy);
+    }
+
+    // --- Terms of Use ---
+
+    @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
+    @GetMapping(value = "/whiteLabel/termsOfUse", produces = "application/json")
+    public JsonNode getTermsOfUse() throws ThingsboardException {
+        checkWhiteLabelingPermissions(Operation.READ);
+        SecurityUser user = getCurrentUser();
+        return whiteLabelingService.getTenantTermsOfUse(user.getTenantId());
+    }
+
+    @GetMapping(value = "/noauth/whiteLabel/termsOfUse", produces = "application/json")
+    public JsonNode getWebTermsOfUse(HttpServletRequest request) {
+        return whiteLabelingService.getWebTermsOfUse(request.getServerName());
+    }
+
+    @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
+    @PostMapping(value = "/whiteLabel/termsOfUse")
+    @ResponseStatus(HttpStatus.OK)
+    public JsonNode saveTermsOfUse(@RequestBody JsonNode terms) throws ThingsboardException {
+        checkWhiteLabelingPermissions(Operation.WRITE);
+        SecurityUser user = getCurrentUser();
+        return whiteLabelingService.saveTermsOfUse(user.getTenantId(), terms);
+    }
+
     // --- Private helpers ---
 
-    private void checkWhiteLabelingPermissions(
-            org.thingsboard.server.service.security.permission.Operation operation) throws ThingsboardException {
-        // White-labeling is always enabled — no license/subscription gating.
-        // Role-based access is handled by @PreAuthorize annotations on each endpoint.
+    private void checkWhiteLabelingPermissions(Operation operation) throws ThingsboardException {
+        accessControlService.checkPermission(getCurrentUser(), Resource.WHITE_LABELING, operation);
     }
 
     private CustomerId resolveCustomerId(SecurityUser user, String strCustomerId) {

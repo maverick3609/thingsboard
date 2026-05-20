@@ -85,4 +85,32 @@ export class WhiteLabelingHttpService {
     if (customerId) url += `?customerId=${customerId}`;
     return this.http.delete<void>(url, defaultHttpOptionsFromConfig(config));
   }
+
+  // Privacy Policy
+
+  getPrivacyPolicy(config?: RequestConfig): Observable<any> {
+    return this.http.get<any>('/api/whiteLabel/privacyPolicy', defaultHttpOptionsFromConfig(config));
+  }
+
+  getWebPrivacyPolicy(config?: RequestConfig): Observable<any> {
+    return this.http.get<any>('/api/noauth/whiteLabel/privacyPolicy', defaultHttpOptionsFromConfig(config));
+  }
+
+  savePrivacyPolicy(policy: any, config?: RequestConfig): Observable<any> {
+    return this.http.post<any>('/api/whiteLabel/privacyPolicy', policy, defaultHttpOptionsFromConfig(config));
+  }
+
+  // Terms of Use
+
+  getTermsOfUse(config?: RequestConfig): Observable<any> {
+    return this.http.get<any>('/api/whiteLabel/termsOfUse', defaultHttpOptionsFromConfig(config));
+  }
+
+  getWebTermsOfUse(config?: RequestConfig): Observable<any> {
+    return this.http.get<any>('/api/noauth/whiteLabel/termsOfUse', defaultHttpOptionsFromConfig(config));
+  }
+
+  saveTermsOfUse(terms: any, config?: RequestConfig): Observable<any> {
+    return this.http.post<any>('/api/whiteLabel/termsOfUse', terms, defaultHttpOptionsFromConfig(config));
+  }
 }

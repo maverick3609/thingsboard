@@ -52,6 +52,7 @@ public enum Resource {
     NOTIFICATION(EntityType.NOTIFICATION_TARGET, EntityType.NOTIFICATION_TEMPLATE,
             EntityType.NOTIFICATION_REQUEST, EntityType.NOTIFICATION_RULE),
     MOBILE_APP_SETTINGS,
+    WHITE_LABELING,
     JOB(EntityType.JOB),
     AI_MODEL(EntityType.AI_MODEL),
     API_KEY(EntityType.API_KEY);

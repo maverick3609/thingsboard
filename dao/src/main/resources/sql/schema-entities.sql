@@ -988,3 +988,15 @@ CREATE TABLE IF NOT EXISTS white_labeling (
     domain_id uuid,
     CONSTRAINT white_labeling_pkey PRIMARY KEY (tenant_id, customer_id, type)
 );
+
+CREATE TABLE IF NOT EXISTS iot_hub_installed_item (
+    id              UUID          NOT NULL PRIMARY KEY,
+    created_time    BIGINT        NOT NULL,
+    tenant_id       UUID          NOT NULL,
+    item_id         UUID          NOT NULL,
+    item_version_id UUID          NOT NULL,
+    item_name       VARCHAR       NOT NULL,
+    item_type       VARCHAR       NOT NULL,
+    version         VARCHAR       NOT NULL,
+    descriptor      JSONB         NOT NULL
+);

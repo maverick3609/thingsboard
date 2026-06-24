@@ -5,7 +5,7 @@ The purpose is **merge survival**: after each `git merge upstream/release-4.3`,
 walk this ledger and verify every patch is still present (an upstream rewrite
 of a file can silently revert our changes).
 
-- **Baseline:** `upstream/release-4.3` (tag `v4.3.1.1`)
+- **Baseline:** `upstream/release-4.3` (version 4.3.1.3, merge `06f05c6108`)
 - **Integration branch:** `inferrix-release-4.3`
 - **Overlay paths (additive, not tracked here):** `inferrix-reporting/`, `ui-ngx/src/inferrix/`, `.claude/`, `INFERRIX.md`
 

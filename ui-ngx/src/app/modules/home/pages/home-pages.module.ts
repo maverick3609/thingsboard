@@ -49,6 +49,7 @@ import { GatewaysModule } from '@home/pages/gateways/gateways.module';
 import { MobileModule } from '@home/pages/mobile/mobile.module';
 import { AiModelModule } from '@home/pages/ai-model/ai-model.module';
 import { WhiteLabelingModule } from '@home/pages/white-labeling/white-labeling.module';
+import { IotHubModule } from '@home/pages/iot-hub/iot-hub.module';
 
 @NgModule({
   exports: [
@@ -85,6 +86,7 @@ import { WhiteLabelingModule } from '@home/pages/white-labeling/white-labeling.m
     ScadaSymbolModule,
     AiModelModule,
     WhiteLabelingModule,
+    IotHubModule,
   ]
 })
 export class HomePagesModule { }

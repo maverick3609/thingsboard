@@ -13,7 +13,7 @@ ThingsBoard is an open-source IoT platform (v4.3.1.1) for device management, dat
 
 ### When to rebuild the graph
 - After structural changes (new modules, major refactors)
-- Command: `graphify . --update` (only processes modified files)
+- Command: `graphify update .` (only processes modified files)
 - The graph is persistent — NO need to rebuild every session
 
 ### Do NOT

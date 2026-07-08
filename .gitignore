@@ -37,10 +37,6 @@ rebuild-docker.sh
 */.run/**
 .run/**
 .run
-.claude/settings.local.json
+.claude
 .planning
-/docs/
-/.codegraph/
-/graphify-out/
-/.superpowers/
-/.todo/
+docs/superpowers/

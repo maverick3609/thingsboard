@@ -5,7 +5,7 @@ The purpose is **merge survival**: after each `git merge upstream/release-4.3`,
 walk this ledger and verify every patch is still present (an upstream rewrite
 of a file can silently revert our changes).
 
-- **Baseline:** `upstream/release-4.3` (version 4.3.1.3, merge `06f05c6108`)
+- **Baseline:** `upstream/release-4.3` (client version 4.3.1.3, last merged `684abbf911` on 2026-07-08; upstream tip `1053516151`). Upstream periodically **rebuilds** this branch's history, so each sync re-reconciles against a 2017 merge base (~68 conflicts) rather than a routine fast-forward — expect Bucket-A ledger conflicts, Bucket-B take-theirs, delete/delete removals, and spurious `wl/*.java` rename/rename conflicts.
 - **Integration branch:** `inferrix-release-4.3`
 - **Overlay paths (additive, not tracked here):** `inferrix-reporting/`, `ui-ngx/src/inferrix/`, `.claude/`, `INFERRIX.md`
 
@@ -55,7 +55,7 @@ If any of the above show as conflicted or reverted after merging `upstream/relea
   - `ui-ngx/.../shared/models/white-labeling.models.ts`
 - **Status:** 15 commits on `inferrix-release-4.3` — fully committed. Latest: `2248c8bc55 feat(wl): add permission wiring, transactional cache, and legal-content support`.
 
-### TB-core files modified (22)
+### TB-core files modified (23)
 
 #### Backend (10)
 
@@ -72,7 +72,7 @@ If any of the above show as conflicted or reverted after merging `upstream/relea
 | 9 | `dao/src/main/java/org/thingsboard/server/dao/model/ModelConstants.java` | Add a `White labeling constants.` block with `WHITE_LABELING_TABLE_NAME`, `WHITE_LABELING_SETTINGS_PROPERTY`, `WHITE_LABELING_TYPE_PROPERTY`, `WHITE_LABELING_DOMAIN_ID_PROPERTY`, after the API key constants block (~line 762) | Schema constants for the JPA entity |
 | 10 | `dao/src/main/resources/sql/schema-entities.sql` | Append `CREATE TABLE IF NOT EXISTS white_labeling (...)` at end of file | Schema for fresh installs |
 
-#### Frontend (12)
+#### Frontend (13)
 
 | # | File | Change | Why |
 |---|------|--------|-----|
@@ -88,6 +88,7 @@ If any of the above show as conflicted or reverted after merging `upstream/relea
 | 20 | `ui-ngx/src/app/modules/login/pages/login/login.component.ts` | (a) import `WhiteLabelingHttpService`, `WhiteLabelingRuntimeService`, `LoginWhiteLabelingParams`; (b) add `loginLogo`, `pageBackgroundColor`, `darkForeground` fields with defaults; (c) inject the two WL services; (d) in `ngOnInit`, call `wlHttp.getLoginWhiteLabelParams` and apply params + assign fields | Login page reads its own WL params before authentication |
 | 21 | `ui-ngx/src/app/shared/components/footer.component.html` | Replace single `<small>Copyright © {{year}} The ThingsBoard Authors</small>` with a conditional `*ngIf="(showNameVersion$ \| async) && (platformName$ \| async) as name; else defaultFooter"` and a `#defaultFooter` template that preserves the original | Footer text comes from WL settings when available |
 | 22 | `ui-ngx/src/app/shared/components/footer.component.ts` | (a) import + inject `WhiteLabelingRuntimeService`; (b) expose `showNameVersion$ = wlRuntime.showNameVersion$` and `platformName$ = wlRuntime.platformName$` as fields | Bind the observables consumed by the template |
+| 23 | `ui-ngx/src/assets/locale/locale.constant-en_US.json` | Add `"white-labeling": "White-labeling"` as the last key of the `functions` i18n section (after `scheduler`) | i18n label for the White-labeling menu entry. This is the ONLY Inferrix key in a 10k-line file upstream churns constantly, so it is trivially dropped on merge — the merge guard must grep this file's "ours" side for `white-labeling` before take-theirs |
 
 ### Merge-recovery procedure (WL-specific notes)
 
@@ -96,6 +97,7 @@ If any of the above show as conflicted or reverted after merging `upstream/relea
 - **`admin-routing.module.ts`** — three sub-changes on the same `/settings` route. Verify all three (`auth` array, `redirectTo` map, new child route).
 - **`Resource.java`** — upstream adds enum values here regularly. Verify `WHITE_LABELING,` survives in its expected position (between `MOBILE_APP_SETTINGS` and `JOB`).
 - **`schema_update.sql`** and **`schema-entities.sql`** both create the `white_labeling` table — confirm both still contain the block (upstream may rewrite ordering).
+- **`locale.constant-en_US.json`** — the `functions.white-labeling` key is the only Inferrix content in this 10k-line file; upstream churns it every release and it does NOT stand out by name in a big diff. The merge procedure greps each Bucket-B "ours" side for `inferrix|whitelabel|white-labeling|...` precisely to catch this file before a blind take-theirs. Keep that guard.
 
 ---
 

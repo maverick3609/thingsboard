@@ -182,7 +182,7 @@ export class SentTableConfigResolver  {
     };
     switch (status) {
       case NotificationRequestStatus.SCHEDULED:
-        styleObj.color = '#305680';
+        styleObj.color = '#2b388f';
         break;
       case NotificationRequestStatus.PROCESSING:
         styleObj.color = '#D47D18';

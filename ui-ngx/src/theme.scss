@@ -56,8 +56,41 @@ $tb-mat-indigo: (
   )
 );
 
+$tb-mat-inferrix-red: (
+  50: #fde7e8,
+  100: #fac3c5,
+  200: #f69ba0,
+  300: #f2737a,
+  400: #ef4a53,
+  500: #ec1c24,
+  600: #d4191f,
+  700: #b8161b,
+  800: #9c1217,
+  900: #7a0e12,
+  A100: #ff8a90,
+  A200: #ff5158,
+  A400: #ff1721,
+  A700: #e00007,
+  contrast: (
+    50: rgba(black, 0.87),
+    100: rgba(black, 0.87),
+    200: rgba(black, 0.87),
+    300: rgba(black, 0.87),
+    400: white,
+    500: white,
+    600: white,
+    700: white,
+    800: white,
+    900: white,
+    A100: rgba(black, 0.87),
+    A200: rgba(black, 0.87),
+    A400: white,
+    A700: white,
+  )
+);
+
 $tb-primary: mat.m2-define-palette($tb-mat-indigo);
-$tb-accent: mat.m2-define-palette(mat.$m2-deep-orange-palette);
+$tb-accent: mat.m2-define-palette($tb-mat-inferrix-red);
 
 $tb-mat-theme: mat.m2-define-light-theme((
   color: (

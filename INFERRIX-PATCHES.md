@@ -102,6 +102,32 @@ If any of the above show as conflicted or reverted after merging `upstream/relea
 
 ---
 
+## Feature: Default Inferrix Cortex Branding
+
+Bakes Inferrix branding into the default build (every `yarn build:prod` output is Inferrix-branded — no white-labeling runtime config involved). Brand colors: primary blue `#2b388f`, red `#ec1c24` (sampled from `docs/images/FF_INFERRIX_slogan black.png`).
+
+| # | File | Change | Why |
+|---|------|--------|-----|
+| B1 | `ui-ngx/src/assets/logo_title_white.svg` | Entire file replaced with an SVG-wrapped white-text variant of the Inferrix slogan logo (blue→white, red kept; embedded base64 PNG) | Default logo for login page, sidebar, dashboards — rendered on dark chrome |
+| B2 | `ui-ngx/src/assets/logo_white.svg` | Entire file replaced with the icon-only white variant (radial mark) | Icon-only brand mark |
+| B3 | `ui-ngx/src/thingsboard.ico` | Binary replaced with Inferrix favicon (`docs/images/favicon.ico`) | Browser tab icon; filename kept so `index.html` link and angular.json assets need no change |
+| B4 | `ui-ngx/src/index.html` | `<title>ThingsBoard</title>` → `<title>Inferrix Cortex</title>` | Initial tab title before Angular boots |
+| B5 | `ui-ngx/src/environments/environment.ts` + `environment.prod.ts` | `appTitle: 'ThingsBoard'` → `appTitle: 'Inferrix Cortex'` | Runtime page titles |
+| B6 | `ui-ngx/src/scss/constants.scss` | `$tb-primary-color: #2b388f`, `$tb-secondary-color: #4553a8`, `$tb-hue3-color: #b0b7e6` | Theme primary (light 500/600, dark surface 800 all derive from these) |
+| B7 | `ui-ngx/src/theme.scss` | New `$tb-mat-inferrix-red` palette map (500 `#ec1c24`) inserted before `$tb-primary`; `$tb-accent` now `mat.m2-define-palette($tb-mat-inferrix-red)` instead of deep-orange | Accent color = brand red |
+| B8 | 13 component files: `script-lang`, `markdown`, `widget-button-toggle`, `alarm-rule-filter-text`, `image-cards-select`, `getting-started-widget`, `getting-started-completed-dialog`, `recent-dashboards-widget`, `rate-limits-text`, `filter-text`, `rulechain-page`, `device-check-connectivity-dialog` (.scss) + `notification.component.ts`, `sent-table-config.resolver.ts` | Hardcoded `#305680` → `#2b388f` | Stray old-primary accents in component styles |
+
+| B9 | `ui-ngx/src/app/modules/home/home.component.html` | Removed the `<tb-github-badge class="lt-md:!hidden">` line from the primary toolbar | No "Star on GitHub" button in a branded product |
+| B10 | `ui-ngx/src/app/modules/home/home.component.scss` | `.tb-logo-title` height `36px` → `52px` | Larger sidebar logo (header is 64px tall) |
+| B11 | `ui-ngx/src/app/modules/home/components/dashboard-page/dashboard-page.component.html` | Dashboard footer span: `Powered by <a href="https://thingsboard.io">ThingsBoard v.{{ thingsboardVersion }}</a>` → `Powered by <a href="https://www.inferrix.com">Inferrix Cortex v.{{ thingsboardVersion }}</a>` | Branded dashboard footer linking to inferrix.com |
+| B12 | `ui-ngx/src/assets/locale/locale.constant-en_US.json` | Both `dashboard.socialshare-*` values: "powered by ThingsBoard" → "powered by Inferrix Cortex" | Branded share text (same merge-guard caveat as row 23) |
+
+**Intentionally NOT changed** (persisted widget-content defaults, not chrome): `widget-action-dialog.component.ts`, `unread-notification-widget.models.ts`, `segmented-button-widget.models.ts`, `value-stepper-widget.models.ts`, and the mobile-page preview HTML mocks.
+
+**Merge recovery:** all rows are simple value/file replacements. On conflict, keep ours for B1–B7; for B8 re-run `grep -rln '305680' ui-ngx/src/app --include='*.scss'` and re-apply the sed. The `src/inferrix/` overlay (angular.json `inferrix*` configs) still exists but is now redundant for logo/title — defaults carry the branding.
+
+---
+
 ## How to extend this ledger
 
 When you modify a TB-core file for a new feature:

@@ -125,6 +125,12 @@ public class DefaultWhiteLabelingService
         LoginWhiteLabelingParams base = system != null
                 ? new LoginWhiteLabelingParams(system)
                 : LoginWhiteLabelingParams.defaultLoginParams();
+        // Login-specific values win, but general system branding (logo, title,
+        // favicon, palette) must reach the pre-auth login page too.
+        WhiteLabelingParams general = getSystemWhiteLabelingParams();
+        if (general != null) {
+            base.merge(general);
+        }
         return base;
     }
 

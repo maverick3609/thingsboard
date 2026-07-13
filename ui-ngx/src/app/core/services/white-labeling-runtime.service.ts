@@ -18,6 +18,16 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { WhiteLabelingParams, LoginWhiteLabelingParams, PaletteSettings } from '@shared/models/white-labeling.models';
 
+// 500-shade of the Material palettes offered by PaletteSettingsComponent.paletteOptions;
+// used when a palette only sets extendsPalette without explicit color overrides.
+const MATERIAL_PALETTE_BASE_COLORS: { [palette: string]: string } = {
+  indigo: '#3f51b5', blue: '#2196f3', red: '#f44336', green: '#4caf50',
+  purple: '#9c27b0', orange: '#ff9800', teal: '#009688', pink: '#e91e63',
+  cyan: '#00bcd4', amber: '#ffc107', 'deep-purple': '#673ab7', 'light-blue': '#03a9f4',
+  lime: '#cddc39', yellow: '#ffeb3b', 'light-green': '#8bc34a', brown: '#795548',
+  grey: '#9e9e9e', 'blue-grey': '#607d8b'
+};
+
 @Injectable({ providedIn: 'root' })
 export class WhiteLabelingRuntimeService {
 
@@ -172,7 +182,61 @@ export class WhiteLabelingRuntimeService {
       }
     }
     css += '}\n';
+
+    // The compiled Material theme does not consume the --tb-* variables, so also
+    // emit direct overrides for the primary-colored chrome (toolbars, side menu,
+    // primary buttons, tabs, progress bars).
+    const primary = this.resolvePaletteColor(paletteSettings.primaryPalette);
+    if (primary) {
+      css += `
+.mat-toolbar.mat-primary,
+mat-sidenav.tb-site-sidenav {
+  background: ${primary} !important;
+}
+.mat-mdc-raised-button.mat-primary {
+  --mdc-protected-button-container-color: ${primary};
+}
+.mat-mdc-unelevated-button.mat-primary {
+  --mdc-filled-button-container-color: ${primary};
+}
+.mat-mdc-button.mat-primary {
+  --mdc-text-button-label-text-color: ${primary};
+}
+.mat-mdc-outlined-button.mat-primary {
+  --mdc-outlined-button-label-text-color: ${primary};
+}
+.mat-mdc-tab .mdc-tab-indicator__content--underline {
+  border-color: ${primary} !important;
+}
+.mat-mdc-tab.mdc-tab--active .mdc-tab__text-label,
+.mat-mdc-tab-link.mdc-tab--active .mdc-tab__text-label {
+  color: ${primary};
+}
+.mat-mdc-progress-bar.mat-primary {
+  --mdc-linear-progress-active-indicator-color: ${primary};
+}
+`;
+    }
+    const accent = this.resolvePaletteColor(paletteSettings.accentPalette);
+    if (accent) {
+      css += `
+.mat-mdc-raised-button.mat-accent {
+  --mdc-protected-button-container-color: ${accent};
+}
+.mat-mdc-slide-toggle.mat-accent {
+  --mdc-switch-selected-track-color: ${accent};
+  --mdc-switch-selected-hover-track-color: ${accent};
+  --mdc-switch-selected-focus-track-color: ${accent};
+  --mdc-switch-selected-pressed-track-color: ${accent};
+}
+`;
+    }
     styleEl.textContent = css;
+  }
+
+  private resolvePaletteColor(palette: { extendsPalette?: string; colors?: { [shade: string]: string } }): string {
+    if (!palette) return null;
+    return palette.colors?.['500'] || MATERIAL_PALETTE_BASE_COLORS[palette.extendsPalette] || null;
   }
 
   private removePalette(): void {

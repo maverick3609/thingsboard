@@ -29,6 +29,7 @@ public class LoginWhiteLabelingParams extends WhiteLabelingParams {
     private String pageBackgroundColor;
     private boolean darkForeground;
     private Boolean showNameBottom;
+    private String loginCardColor;
     private DomainId domainId;
     private String baseUrl;
 
@@ -38,6 +39,7 @@ public class LoginWhiteLabelingParams extends WhiteLabelingParams {
         this.pageBackgroundColor = other.pageBackgroundColor;
         this.darkForeground = other.darkForeground;
         this.showNameBottom = other.showNameBottom;
+        this.loginCardColor = other.loginCardColor;
         this.domainId = other.domainId;
         this.baseUrl = other.baseUrl;
     }
@@ -47,6 +49,7 @@ public class LoginWhiteLabelingParams extends WhiteLabelingParams {
         super.merge(parent);
         if (this.pageBackgroundColor == null) this.pageBackgroundColor = parent.pageBackgroundColor;
         if (this.showNameBottom == null) this.showNameBottom = parent.showNameBottom;
+        if (this.loginCardColor == null) this.loginCardColor = parent.loginCardColor;
         if (this.domainId == null) this.domainId = parent.domainId;
         if (this.baseUrl == null) this.baseUrl = parent.baseUrl;
     }

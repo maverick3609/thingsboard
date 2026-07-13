@@ -50,6 +50,7 @@ export interface LoginWhiteLabelingParams extends WhiteLabelingParams {
   pageBackgroundColor: string;
   darkForeground: boolean;
   showNameBottom: boolean;
+  loginCardColor: string;
   domainId: string;
   baseUrl: string;
 }

@@ -46,6 +46,8 @@ export class LoginComponent extends PageComponent implements OnInit {
   oauth2Clients: Array<OAuth2ClientLoginInfo> = null;
 
   loginLogo: string = 'assets/logo_title_white.svg';
+  loginLogoHeight: number = null;
+  loginCardColor: string = null;
   pageBackgroundColor: string = null;
   darkForeground: boolean = false;
 
@@ -63,6 +65,8 @@ export class LoginComponent extends PageComponent implements OnInit {
       (params: LoginWhiteLabelingParams) => {
         this.wlRuntime.applyLoginParams(params);
         if (params.logoImageUrl) { this.loginLogo = params.logoImageUrl; }
+        if (params.logoImageHeight) { this.loginLogoHeight = params.logoImageHeight; }
+        if (params.loginCardColor) { this.loginCardColor = params.loginCardColor; }
         if (params.pageBackgroundColor) { this.pageBackgroundColor = params.pageBackgroundColor; }
         this.darkForeground = params.darkForeground;
       },

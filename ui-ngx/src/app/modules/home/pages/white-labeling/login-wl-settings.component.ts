@@ -33,6 +33,9 @@ export class LoginWlSettingsComponent implements OnInit, OnChanges {
 
   ngOnInit(): void {
     this.form = this.fb.group({
+      logoImageUrl: [null],
+      logoImageHeight: [null],
+      loginCardColor: [null],
       pageBackgroundColor: [null],
       darkForeground: [false],
       showNameBottom: [false]
@@ -50,6 +53,9 @@ export class LoginWlSettingsComponent implements OnInit, OnChanges {
   private patchForm(): void {
     if (!this.params) { return; }
     this.form.patchValue({
+      logoImageUrl: this.params.logoImageUrl || null,
+      logoImageHeight: this.params.logoImageHeight || null,
+      loginCardColor: this.params.loginCardColor || null,
       pageBackgroundColor: this.params.pageBackgroundColor || null,
       darkForeground: this.params.darkForeground ?? false,
       showNameBottom: this.params.showNameBottom ?? false
@@ -60,6 +66,9 @@ export class LoginWlSettingsComponent implements OnInit, OnChanges {
     const v = this.form.value;
     this.paramsChange.emit({
       ...this.params,
+      logoImageUrl: v.logoImageUrl,
+      logoImageHeight: v.logoImageHeight,
+      loginCardColor: v.loginCardColor,
       pageBackgroundColor: v.pageBackgroundColor,
       darkForeground: v.darkForeground,
       showNameBottom: v.showNameBottom

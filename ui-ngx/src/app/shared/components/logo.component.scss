@@ -27,6 +27,9 @@
 :host-context(.login-logo) {
   width: 280px;
   height: 60px;
+  img {
+    object-fit: contain;
+  }
   a {
     text-decoration: none;
     border: none;

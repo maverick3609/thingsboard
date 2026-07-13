@@ -7598,6 +7598,7 @@
         "custom-css": "Custom CSS",
         "hide-connectivity-dialog": "Hide connectivity dialog",
         "login-page-settings": "Login page settings",
+        "login-card-color": "Login window color",
         "page-background-color": "Page background color",
         "dark-foreground": "Dark foreground text",
         "show-name-bottom": "Show platform name at bottom",

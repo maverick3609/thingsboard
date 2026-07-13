@@ -15,12 +15,16 @@
     limitations under the License.
 
 -->
-<div class="tb-login-content mat-app-background tb-dark flex flex-1 items-center justify-center">
-  <mat-card appearance="raised" style="max-height: 80vh; overflow-y: auto;">
+<div class="tb-login-content mat-app-background flex flex-1 items-center justify-center"
+     [class.tb-dark]="!darkForeground"
+     [style.background-color]="pageBackgroundColor">
+  <mat-card appearance="raised" style="max-height: 80vh; overflow-y: auto;"
+            [style.background-color]="loginCardColor">
     <mat-card-content class="!p-6">
       <form class="tb-login-form flex flex-col" [formGroup]="loginFormGroup" (ngSubmit)="login()">
         <div class="flex flex-col items-center justify-start" style="padding: 16px 0;">
-          <tb-logo [src]="loginLogo" target="_blank" class="login-logo"></tb-logo>
+          <tb-logo [src]="loginLogo" target="_blank" class="login-logo"
+                   [style.height.px]="loginLogoHeight"></tb-logo>
         </div>
         <mat-progress-bar color="warn" mode="indeterminate" *ngIf="isLoading || (isLoading$ | async)">
         </mat-progress-bar>

@@ -43,7 +43,7 @@ public class AuditLog extends BaseData<AuditLogId> {
     private String entityName;
     @Schema(description = "JSON object with User id.", accessMode = Schema.AccessMode.READ_ONLY)
     private UserId userId;
-    @Schema(description = "Unique user name(email) of the user that performed some action on logged entity", example = "tenant@thingsboard.org", accessMode = Schema.AccessMode.READ_ONLY)
+    @Schema(description = "Unique user name(email) of the user that performed some action on logged entity", example = "tenant@inferrix.com", accessMode = Schema.AccessMode.READ_ONLY)
     private String userName;
     @Schema(description = "String represented Action type", example = "ADDED", accessMode = Schema.AccessMode.READ_ONLY)
     private ActionType actionType;

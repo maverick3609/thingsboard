@@ -290,7 +290,7 @@ New module `ui-ngx/src/app/modules/home/pages/scheduler/` + `ui-ngx/src/app/shar
 | 7 | EDQS fields/processor, `query.SchedulerEventFilter`, VC export/import | dropped | Scope decision |
 | 8 | `reports.scheduler.min_interval` | `scheduler.min_interval` | Reporting doesn't own our scheduler |
 | 9 | PE RBAC (`common/data` Resource + group permissions) | CE `application` Resource + tenant/customer checkers | CE permission architecture |
-| 10 | Fire/skip logging at DEBUG | INFO (fire) / WARN (skip) | Operational visibility |
+| 10 | Sparse logging (engine trace/debug only; DAO and controller silent) | Fire at INFO / skip at WARN, plus DEBUG flow logging in every ported class: DAO finder entry/exit-count + save/delete INFO, validator warn-before-reject, controller endpoint-entry with user/tenant, queue-wiring traces, UI console.error handlers on every side-effect subscribe. Pure repeat-math classes stay log-free (called in tight loops); their flow is visible from callers | Debuggability requirement: every flow must be traceable and errors catchable from logs alone |
 | 11 | Solution-templates installer wiring | dropped | No solutions service in CE |
 
 Everything else — models, schedule semantics, DDL, DAO queries, engine lifecycle, TbMsg construction, REST paths/payloads, UI structure and i18n — is PE-identical.

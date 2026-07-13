@@ -28,7 +28,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
   standalone: false,
   selector: 'tb-white-labeling',
   templateUrl: './white-labeling.component.html',
-  styleUrls: ['./white-labeling.component.scss']
+  styleUrls: ['./white-labeling.component.scss', '../admin/settings-card.scss']
 })
 export class WhiteLabelingComponent implements OnInit {
   generalParams: WhiteLabelingParams = null;

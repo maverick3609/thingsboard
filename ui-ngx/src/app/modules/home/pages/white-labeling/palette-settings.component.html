@@ -16,9 +16,9 @@
 
 -->
 <div [formGroup]="form" class="palette-settings">
-  <h4>Primary Palette</h4>
+  <h4 translate>white-labeling.primary-palette</h4>
   <mat-form-field>
-    <mat-label>Extends Palette</mat-label>
+    <mat-label translate>white-labeling.extends-palette</mat-label>
     <mat-select formControlName="primaryExtends">
       <mat-option *ngFor="let p of paletteOptions" [value]="p">{{p}}</mat-option>
     </mat-select>
@@ -30,9 +30,9 @@
     </div>
   </div>
 
-  <h4>Accent Palette</h4>
+  <h4 translate>white-labeling.accent-palette</h4>
   <mat-form-field>
-    <mat-label>Extends Palette</mat-label>
+    <mat-label translate>white-labeling.extends-palette</mat-label>
     <mat-select formControlName="accentExtends">
       <mat-option *ngFor="let p of paletteOptions" [value]="p">{{p}}</mat-option>
     </mat-select>

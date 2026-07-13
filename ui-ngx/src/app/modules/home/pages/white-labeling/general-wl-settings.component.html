@@ -17,62 +17,62 @@
 -->
 <form [formGroup]="form" class="wl-settings-form">
   <section>
-    <h3>Branding</h3>
+    <h3 translate>white-labeling.branding</h3>
     <div class="form-row">
-      <label>Logo Image</label>
+      <label translate>white-labeling.logo-image</label>
       <tb-wl-image-input formControlName="logoImageUrl"></tb-wl-image-input>
     </div>
     <mat-form-field class="full-width">
-      <mat-label>Logo Image Height (px)</mat-label>
+      <mat-label translate>white-labeling.logo-image-height</mat-label>
       <input matInput type="number" formControlName="logoImageHeight">
     </mat-form-field>
     <mat-form-field class="full-width">
-      <mat-label>Application Title</mat-label>
+      <mat-label translate>white-labeling.application-title</mat-label>
       <input matInput formControlName="appTitle">
     </mat-form-field>
     <div class="form-row">
-      <label>Favicon</label>
+      <label translate>white-labeling.favicon</label>
       <tb-wl-image-input formControlName="faviconUrl"></tb-wl-image-input>
     </div>
   </section>
 
   <section>
-    <h3>Color Palette</h3>
+    <h3 translate>white-labeling.color-palette</h3>
     <tb-palette-settings formControlName="paletteSettings"></tb-palette-settings>
   </section>
 
   <section>
-    <h3>Help Links</h3>
+    <h3 translate>white-labeling.help-links</h3>
     <mat-form-field class="full-width">
-      <mat-label>Help Link Base URL</mat-label>
+      <mat-label translate>white-labeling.help-link-base-url</mat-label>
       <input matInput formControlName="helpLinkBaseUrl">
     </mat-form-field>
     <mat-form-field class="full-width">
-      <mat-label>UI Help Base URL</mat-label>
+      <mat-label translate>white-labeling.ui-help-base-url</mat-label>
       <input matInput formControlName="uiHelpBaseUrl">
     </mat-form-field>
-    <mat-slide-toggle formControlName="enableHelpLinks">Enable Help Links</mat-slide-toggle>
+    <mat-slide-toggle formControlName="enableHelpLinks">{{ 'white-labeling.enable-help-links' | translate }}</mat-slide-toggle>
   </section>
 
   <section>
-    <h3>Platform Info</h3>
-    <mat-slide-toggle formControlName="showNameVersion">Show Platform Name &amp; Version</mat-slide-toggle>
+    <h3 translate>white-labeling.platform-info</h3>
+    <mat-slide-toggle formControlName="showNameVersion">{{ 'white-labeling.show-platform-name-version' | translate }}</mat-slide-toggle>
     <mat-form-field class="full-width">
-      <mat-label>Platform Name</mat-label>
+      <mat-label translate>white-labeling.platform-name</mat-label>
       <input matInput formControlName="platformName">
     </mat-form-field>
     <mat-form-field class="full-width">
-      <mat-label>Platform Version</mat-label>
+      <mat-label translate>white-labeling.platform-version</mat-label>
       <input matInput formControlName="platformVersion">
     </mat-form-field>
   </section>
 
   <section>
-    <h3>Advanced</h3>
+    <h3 translate>white-labeling.advanced</h3>
     <mat-form-field class="full-width">
-      <mat-label>Custom CSS</mat-label>
+      <mat-label translate>white-labeling.custom-css</mat-label>
       <textarea matInput formControlName="customCss" rows="6"></textarea>
     </mat-form-field>
-    <mat-slide-toggle formControlName="hideConnectivityDialog">Hide Connectivity Dialog</mat-slide-toggle>
+    <mat-slide-toggle formControlName="hideConnectivityDialog">{{ 'white-labeling.hide-connectivity-dialog' | translate }}</mat-slide-toggle>
   </section>
 </form>

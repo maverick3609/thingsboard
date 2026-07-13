@@ -17,12 +17,12 @@
 -->
 <form [formGroup]="form" class="wl-settings-form">
   <section>
-    <h3>Login Page Settings</h3>
+    <h3 translate>white-labeling.login-page-settings</h3>
     <mat-form-field class="full-width">
-      <mat-label>Page Background Color</mat-label>
+      <mat-label translate>white-labeling.page-background-color</mat-label>
       <input matInput type="color" formControlName="pageBackgroundColor">
     </mat-form-field>
-    <mat-slide-toggle formControlName="darkForeground">Dark Foreground Text</mat-slide-toggle>
-    <mat-slide-toggle formControlName="showNameBottom">Show Platform Name at Bottom</mat-slide-toggle>
+    <mat-slide-toggle formControlName="darkForeground">{{ 'white-labeling.dark-foreground' | translate }}</mat-slide-toggle>
+    <mat-slide-toggle formControlName="showNameBottom">{{ 'white-labeling.show-name-bottom' | translate }}</mat-slide-toggle>
   </section>
 </form>

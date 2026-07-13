@@ -15,61 +15,69 @@
     limitations under the License.
 
 -->
-<div class="white-labeling-page">
-  <div class="toolbar">
-    <h2>White Labeling</h2>
-    <span class="spacer"></span>
-    <button mat-button color="warn" (click)="deleteSettings()" [disabled]="loading" type="button">
-      <mat-icon>delete</mat-icon> Delete
-    </button>
-    <button mat-button (click)="preview()" [disabled]="loading" type="button">
-      <mat-icon>visibility</mat-icon> Preview
-    </button>
-    <button mat-raised-button color="primary" (click)="save()" [disabled]="loading" type="button">
-      <mat-icon>save</mat-icon> Save
-    </button>
-  </div>
+<mat-card appearance="outlined" class="settings-card">
+  <mat-card-header>
+    <mat-card-title>
+      <div class="flex flex-row">
+        <span class="mat-headline-5" translate>white-labeling.white-labeling</span>
+      </div>
+    </mat-card-title>
+  </mat-card-header>
+  <mat-progress-bar color="warn" mode="indeterminate" *ngIf="loading">
+  </mat-progress-bar>
+  <div style="height: 4px;" *ngIf="!loading"></div>
+  <mat-card-content>
+    <div *ngIf="isTenantAdmin" class="scope-selector">
+      <mat-slide-toggle [checked]="isCustomerScope" (change)="toggleCustomerScope()">
+        {{ 'white-labeling.edit-customer-settings' | translate }}
+      </mat-slide-toggle>
+      <mat-form-field *ngIf="isCustomerScope" class="customer-select" subscriptSizing="dynamic">
+        <mat-label>{{ 'white-labeling.customer-id' | translate }}</mat-label>
+        <input matInput [(ngModel)]="selectedCustomerId" (blur)="loadParams()">
+      </mat-form-field>
+    </div>
 
-  <div *ngIf="isTenantAdmin" class="scope-selector">
-    <mat-slide-toggle [checked]="isCustomerScope" (change)="toggleCustomerScope()">
-      Edit Customer Settings
-    </mat-slide-toggle>
-    <mat-form-field *ngIf="isCustomerScope" class="customer-select">
-      <mat-label>Customer ID</mat-label>
-      <input matInput [(ngModel)]="selectedCustomerId" (blur)="loadParams()">
-    </mat-form-field>
-  </div>
+    <mat-tab-group *ngIf="!loading">
+      <mat-tab label="{{ 'white-labeling.general' | translate }}">
+        <tb-general-wl-settings
+          [params]="generalParams"
+          (paramsChange)="onGeneralParamsChange($event)">
+        </tb-general-wl-settings>
+      </mat-tab>
+      <mat-tab label="{{ 'white-labeling.login-page' | translate }}">
+        <tb-login-wl-settings
+          [params]="loginParams"
+          (paramsChange)="onLoginParamsChange($event)">
+        </tb-login-wl-settings>
+      </mat-tab>
+      <mat-tab *ngIf="canEditLegal" label="{{ 'white-labeling.privacy-policy' | translate }}">
+        <tb-legal-content
+          [content]="privacyPolicy"
+          [label]="'white-labeling.privacy-policy' | translate"
+          (contentChange)="privacyPolicy = $event"
+          (save)="savePrivacyPolicy()">
+        </tb-legal-content>
+      </mat-tab>
+      <mat-tab *ngIf="canEditLegal" label="{{ 'white-labeling.terms-of-use' | translate }}">
+        <tb-legal-content
+          [content]="termsOfUse"
+          [label]="'white-labeling.terms-of-use' | translate"
+          (contentChange)="termsOfUse = $event"
+          (save)="saveTermsOfUse()">
+        </tb-legal-content>
+      </mat-tab>
+    </mat-tab-group>
 
-  <mat-tab-group *ngIf="!loading">
-    <mat-tab label="General">
-      <tb-general-wl-settings
-        [params]="generalParams"
-        (paramsChange)="onGeneralParamsChange($event)">
-      </tb-general-wl-settings>
-    </mat-tab>
-    <mat-tab label="Login Page">
-      <tb-login-wl-settings
-        [params]="loginParams"
-        (paramsChange)="onLoginParamsChange($event)">
-      </tb-login-wl-settings>
-    </mat-tab>
-    <mat-tab *ngIf="canEditLegal" label="Privacy Policy">
-      <tb-legal-content
-        [content]="privacyPolicy"
-        [label]="'Privacy Policy'"
-        (contentChange)="privacyPolicy = $event"
-        (save)="savePrivacyPolicy()">
-      </tb-legal-content>
-    </mat-tab>
-    <mat-tab *ngIf="canEditLegal" label="Terms of Use">
-      <tb-legal-content
-        [content]="termsOfUse"
-        [label]="'Terms of Use'"
-        (contentChange)="termsOfUse = $event"
-        (save)="saveTermsOfUse()">
-      </tb-legal-content>
-    </mat-tab>
-  </mat-tab-group>
-
-  <mat-spinner *ngIf="loading" diameter="40" class="loading-spinner"></mat-spinner>
-</div>
+    <div class="flex flex-row flex-wrap items-center justify-end gap-2">
+      <button mat-button color="warn" (click)="deleteSettings()" [disabled]="loading" type="button">
+        {{ 'action.delete' | translate }}
+      </button>
+      <button mat-button color="primary" (click)="preview()" [disabled]="loading" type="button">
+        {{ 'white-labeling.preview' | translate }}
+      </button>
+      <button mat-raised-button color="primary" (click)="save()" [disabled]="loading" type="button">
+        {{ 'action.save' | translate }}
+      </button>
+    </div>
+  </mat-card-content>
+</mat-card>

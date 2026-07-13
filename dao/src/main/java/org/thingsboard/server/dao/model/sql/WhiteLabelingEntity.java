@@ -26,6 +26,8 @@ import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcType;
+import org.hibernate.dialect.PostgreSQLJsonPGObjectJsonbType;
 import org.thingsboard.server.common.data.id.CustomerId;
 import org.thingsboard.server.common.data.id.DomainId;
 import org.thingsboard.server.common.data.id.TenantId;
@@ -62,7 +64,8 @@ public class WhiteLabelingEntity implements ToData<WhiteLabeling> {
     private WhiteLabelingType type;
 
     @Convert(converter = JsonConverter.class)
-    @Column(name = WHITE_LABELING_SETTINGS_PROPERTY)
+    @JdbcType(PostgreSQLJsonPGObjectJsonbType.class)
+    @Column(name = WHITE_LABELING_SETTINGS_PROPERTY, columnDefinition = "jsonb")
     private JsonNode settings;
 
     @Column(name = WHITE_LABELING_DOMAIN_ID_PROPERTY)

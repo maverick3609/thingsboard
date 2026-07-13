@@ -192,8 +192,8 @@ Reload full `SchedulerEvent` from DB (stale-delete guard: gone → evict, stop).
 
 | Type | Action |
 |---|---|
-| `updateFirmware` / `updateSoftware` | OTA package id from `msgBody`; originator `DEVICE` → set fw/sw id + `saveDevice`; `DEVICE_PROFILE` → set id + `saveDeviceProfile` + `OtaPackageStateService.update`. PE's `ENTITY_GROUP` branch dropped |
-| `generateReport` | `schedulerReportExecutor.executeReport(tenantId, event)` (no-op until Reporting lands) |
+| `updateFirmware` / `updateSoftware` | OTA package id from `msgBody`; originator `DEVICE` → set fw/sw id + `saveDevice`; `DEVICE_PROFILE` → set id + `saveDeviceProfile` + `OtaPackageStateService.update`. PE's `ENTITY_GROUP` branch dropped. **After** the OTA assignment, the default rule-engine message is also pushed (PE behavior: every type except `generateReport` falls through to the TbMsg push) |
+| `generateReport` | `schedulerReportExecutor.executeReport(tenantId, event)` (no-op until Reporting lands); the only type that does **not** push a rule-engine message |
 | **default** — `updateAttributes`, `sendRpcRequest`, `generateDashboardReport`, custom types | Build `TbMsg`: `type = configuration.msgType ?: event.type` (`generateDashboardReport` maps to `TbMsgType.generateReport`); `originator = configuration.originatorId ?: event.id`; `metadata = configuration.metadata` verbatim, else defaults `{customerId, eventName, additionalInfo}`; `data = msgBody` (JSON). `sendRpcRequest` additionally sets `originServiceId` (this node) and `expirationTime = now + max(rpcMinTimeout, metadata.timeout)`. Push via `TbClusterService.pushMsgToRuleEngine(tenantId, originatorId, tbMsg, null)` |
 
 Always: `scheduleNextEvent(now, …)` re-arms the next occurrence. Firing errors are caught, logged at ERROR with tenant/event/type, and never break the chain. Each fire is logged at INFO with tenant/event/type/originator (upgraded from PE's DEBUG — operational visibility).

@@ -1,5 +1,5 @@
 /**
- * Copyright © 2016-2026 The Thingsboard Authors
+ * Copyright © 2016-2026 The Inferrix Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +36,9 @@ public class TimerRepeat implements SchedulerRepeat {
     @Override
     public long getNext(long startTime, long ts, String timezone) {
         long interval = this.timeUnit.toMillis(this.repeatInterval);
+        if (interval <= 0) {
+            return 0L;
+        }
         for (long tmp = startTime; tmp < this.endsOn; tmp += interval) {
             if (tmp <= ts) {
                 continue;

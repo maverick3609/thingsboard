@@ -1,5 +1,5 @@
 /**
- * Copyright © 2016-2026 The Thingsboard Authors
+ * Copyright © 2016-2026 The Inferrix Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,6 +34,9 @@ public class EveryNDaysRepeat implements SchedulerRepeat {
 
     @Override
     public long getNext(long startTime, long ts, String timezone) {
+        if (this.days <= 0) {
+            return 0L;
+        }
         Calendar calendar = SchedulerUtils.getCalendarWithTimeZone(timezone);
         long tmp = startTime;
         int repeatIteration = 0;

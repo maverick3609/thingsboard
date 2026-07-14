@@ -1,5 +1,5 @@
 /**
- * Copyright © 2016-2026 The Thingsboard Authors
+ * Copyright © 2016-2026 The Inferrix Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -151,6 +151,40 @@ class SchedulerRepeatTest {
         r.setEndsOn(at(UTC, 2029, 1, 1, 0, 0));
         assertThat(r.getNext(start, start, "UTC")).isEqualTo(at(UTC, 2027, 5, 15, 0, 0));
         assertThat(r.getNext(start, at(UTC, 2028, 5, 15, 0, 0), "UTC")).isZero(); // 2029-05-15 >= endsOn
+    }
+
+    // ---------- repeat-stride DoS guards ----------
+
+    @Test
+    void nonPositiveStrides_returnZero_insteadOfHanging() {
+        long start = at(UTC, 2026, 8, 1, 10, 0);
+        long endsOn = at(UTC, 2026, 8, 20, 0, 0);
+        TimerRepeat timer = new TimerRepeat();
+        timer.setRepeatInterval(0);
+        timer.setTimeUnit(TimeUnit.MINUTES);
+        timer.setEndsOn(endsOn);
+        assertThat(timer.getNext(start, start, "UTC")).isZero();
+
+        EveryNDaysRepeat days = new EveryNDaysRepeat();
+        days.setDays(0);
+        days.setEndsOn(endsOn);
+        assertThat(days.getNext(start, start, "UTC")).isZero();
+
+        EveryNWeeksRepeat weeks = new EveryNWeeksRepeat();
+        weeks.setWeeks(-1);
+        weeks.setEndsOn(endsOn);
+        assertThat(weeks.getNext(start, start, "UTC")).isZero();
+    }
+
+    @Test
+    void weeklyRepeat_nullOrEmptyDayMask_returnsZero() {
+        long start = at(UTC, 2026, 8, 3, 9, 0);
+        WeeklyRepeat r = new WeeklyRepeat();
+        r.setEndsOn(at(UTC, 2026, 8, 31, 0, 0));
+        r.setRepeatOn(null);
+        assertThat(r.getNext(start, start - 1, "UTC")).isZero();
+        r.setRepeatOn(List.of());
+        assertThat(r.getNext(start, start - 1, "UTC")).isZero();
     }
 
     // ---------- JSON round-trip (polymorphic) ----------

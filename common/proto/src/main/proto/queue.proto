@@ -1692,6 +1692,7 @@ message ToCoreMsg {
   LifecycleEventProto lifecycleEventMsg = 8;
   ErrorEventProto errorEventMsg = 9;
   ToDeviceActorNotificationMsgProto toDeviceActorNotification = 10;
+  SchedulerServiceMsgProto schedulerServiceMsg = 11;
   DeviceConnectProto deviceConnectMsg = 50;
   DeviceDisconnectProto deviceDisconnectMsg = 51;
   DeviceInactivityProto deviceInactivityMsg = 52;
@@ -1827,6 +1828,17 @@ message NotificationSchedulerServiceMsg {
   int64 requestIdMSB = 3;
   int64 requestIdLSB = 4;
   int64 ts = 5;
+}
+
+/* Scheduler (Inferrix PE-replication) */
+message SchedulerServiceMsgProto {
+  int64 tenantIdMSB = 1;
+  int64 tenantIdLSB = 2;
+  int64 eventIdMSB = 3;
+  int64 eventIdLSB = 4;
+  bool added = 5;
+  bool updated = 6;
+  bool deleted = 7;
 }
 
 message NotificationRuleProcessorMsg {

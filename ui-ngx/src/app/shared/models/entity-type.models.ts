@@ -53,6 +53,7 @@ export enum EntityType {
   CALCULATED_FIELD = 'CALCULATED_FIELD',
   AI_MODEL = 'AI_MODEL',
   API_KEY = 'API_KEY',
+  SCHEDULER_EVENT = 'SCHEDULER_EVENT',
 }
 
 export enum AliasEntityType {
@@ -521,6 +522,19 @@ export const entityTypeTranslations = new Map<EntityType | AliasEntityType, Enti
         selectedEntities: 'api-key.selected-api-keys'
       }
     ],
+    [
+      EntityType.SCHEDULER_EVENT,
+      {
+        type: 'entity.type-scheduler-event',
+        typePlural: 'entity.type-scheduler-events',
+        list: 'entity.list-of-scheduler-events',
+        details: 'scheduler.scheduler-event-details',
+        add: 'scheduler.add-scheduler-event',
+        noEntities: 'scheduler.no-scheduler-events-text',
+        search: 'scheduler.search',
+        selectedEntities: 'scheduler.selected-scheduler-events'
+      }
+    ],
   ]
 );
 
@@ -669,6 +683,12 @@ export const entityTypeResources = new Map<EntityType, EntityTypeResource<BaseDa
       EntityType.API_KEY,
       {
         helpLinkId: 'apiKeys'
+      }
+    ],
+    [
+      EntityType.SCHEDULER_EVENT,
+      {
+        helpLinkId: 'scheduler'
       }
     ],
   ]

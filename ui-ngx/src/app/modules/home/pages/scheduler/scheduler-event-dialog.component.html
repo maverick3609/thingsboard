@@ -51,14 +51,9 @@
         formControlName="customerId">
       </tb-entity-select>
       <mat-checkbox formControlName="enabled">{{ 'scheduler.enabled' | translate }}</mat-checkbox>
-      <!-- top-level originator: the entity the event fires to (bean field, engine reads it). Shown per type. -->
-      <div class="tb-form-panel-title" *ngIf="showOriginator" translate>scheduler.originator</div>
-      <tb-entity-select
-        *ngIf="showOriginator"
-        formControlName="originatorId">
-      </tb-entity-select>
       <tb-scheduler-event-schedule formControlName="schedule"></tb-scheduler-event-schedule>
-      <tb-json-object-edit formControlName="configuration" [label]="'scheduler.configuration' | translate"></tb-json-object-edit>
+      <tb-scheduler-event-config formControlName="configuration"
+                                 [eventType]="schedulerEventFormGroup.get('type').value"></tb-scheduler-event-config>
     </fieldset>
   </div>
   <div mat-dialog-actions class="flex justify-end">

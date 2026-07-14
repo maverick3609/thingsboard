@@ -21,11 +21,13 @@ import { HomeComponentsModule } from '@home/components/home-components.module';
 import { SchedulerRoutingModule } from '@home/pages/scheduler/scheduler-routing.module';
 import { SchedulerEventDialogComponent } from '@home/pages/scheduler/scheduler-event-dialog.component';
 import { SchedulerEventScheduleComponent } from '@home/pages/scheduler/scheduler-event-schedule.component';
+import { SchedulerEventConfigComponent } from '@home/pages/scheduler/scheduler-event-config.component';
 
 @NgModule({
   declarations: [
     SchedulerEventDialogComponent,
-    SchedulerEventScheduleComponent
+    SchedulerEventScheduleComponent,
+    SchedulerEventConfigComponent
   ],
   imports: [
     CommonModule,

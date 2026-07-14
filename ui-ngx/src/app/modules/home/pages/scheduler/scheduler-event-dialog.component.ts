@@ -73,22 +73,23 @@ export class SchedulerEventDialogComponent extends DialogComponent<SchedulerEven
       type: [event ? event.type : null, [Validators.required]],
       enabled: [event ? event.enabled : true],
       customerId: [event ? event.customerId : null],
-      // top-level originatorId — the entity the engine fires to (NOT inside configuration).
-      // Shown/required per event type via schedulerEventConfigTypes[type].originator (see template + save()).
-      originatorId: [event ? event.originatorId : null],
       schedule: [event ? event.schedule : {
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         startTime: Date.now() + 3600 * 1000
       }, [Validators.required]],
-      configuration: [event ? event.configuration : {
-        msgType: null, msgBody: {}, metadata: null
-      }, [Validators.required]]
+      // configuration.originatorId is a TRANSIENT bridge: seeded here from the top-level
+      // event.originatorId bean field so the per-type config form's originator picker
+      // (tb-scheduler-event-config) shows the current value. save() lifts it back out
+      // to the top-level bean field and strips it from the persisted configuration.
+      configuration: [event
+        ? {...event.configuration, ...(event.originatorId ? {originatorId: event.originatorId} : {})}
+        : {msgType: null, msgBody: {}, metadata: null}, [Validators.required]]
     });
-  }
 
-  get showOriginator(): boolean {
-    const type = this.schedulerEventFormGroup?.get('type').value;
-    return !!(type && this.configTypes[type]?.originator);
+    this.schedulerEventFormGroup.get('type').valueChanges.subscribe(() => {
+      this.schedulerEventFormGroup.get('configuration').setValue(
+        {msgType: null, msgBody: {}, metadata: null});
+    });
   }
 
   isErrorState(control: FormControl | null, form: FormGroupDirective | NgForm | null): boolean {
@@ -107,10 +108,18 @@ export class SchedulerEventDialogComponent extends DialogComponent<SchedulerEven
       return;
     }
     const formValue = this.schedulerEventFormGroup.getRawValue();
-    const event: SchedulerEvent = {...(this.data.schedulerEvent || {} as SchedulerEvent), ...formValue};
+    const configuration = {...formValue.configuration};
+    const originatorId = configuration.originatorId || null;
+    delete configuration.originatorId;
+    const event: SchedulerEvent = {
+      ...(this.data.schedulerEvent || {} as SchedulerEvent),
+      ...formValue,
+      originatorId,
+      configuration
+    };
     this.schedulerEventService.saveSchedulerEvent(event).subscribe({
       next: saved => this.dialogRef.close(saved),
-      error: err => console.error('[Scheduler] save event failed', err)
+      error: err => console.error('[Scheduler] save failed', err)
     });
   }
 }

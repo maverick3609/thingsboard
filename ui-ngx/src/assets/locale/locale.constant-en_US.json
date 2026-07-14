@@ -5288,7 +5288,12 @@
         "update-attributes": "Update Attributes",
         "send-rpc-request": "Send RPC Request to Device",
         "update-firmware": "Update Firmware",
-        "update-software": "Update Software"
+        "update-software": "Update Software",
+        "attributes": "Attributes",
+        "message-type": "Message type",
+        "metadata": "Metadata",
+        "report-config-hint": "Report generation activates when the Reporting module is installed. Configuration is stored and will be used as-is once wired.",
+        "ota-package-id": "OTA package id (JSON: {\"entityType\": \"OTA_PACKAGE\", \"id\": \"...\"})"
     },
     "security": {
         "security": "Security",

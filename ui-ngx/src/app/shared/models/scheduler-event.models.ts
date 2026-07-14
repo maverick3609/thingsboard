@@ -62,11 +62,12 @@ export interface SchedulerEventSchedule {
   repeat?: SchedulerRepeat;
 }
 
-// NOTE: originatorId is NOT here. The backend fires to the TOP-LEVEL bean field
-// SchedulerEventInfo.originatorId (BaseSchedulerEventService.getOriginatorId =
-// event.getOriginatorId() ?: event.getId()). No backend code reads
-// configuration.originatorId. Configuration is msgType/msgBody/metadata only.
 export interface SchedulerEventConfiguration {
+  // TRANSIENT UI-only field: the per-type config form's originator picker writes it here,
+  // and the dialog lifts it out to the top-level SchedulerEventInfo.originatorId bean field
+  // (deleting it from configuration) before POST. The engine reads the top-level bean field;
+  // the persisted configuration JSON never contains originatorId. See spec §2 "UI originator flow".
+  originatorId?: EntityId;
   msgType?: string;
   msgBody?: any;
   metadata?: {[key: string]: string};

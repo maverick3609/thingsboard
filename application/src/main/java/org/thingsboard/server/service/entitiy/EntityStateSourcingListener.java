@@ -52,6 +52,7 @@ import org.thingsboard.server.common.data.plugin.ComponentLifecycleEvent;
 import org.thingsboard.server.common.data.relation.EntityRelation;
 import org.thingsboard.server.common.data.rule.RuleChain;
 import org.thingsboard.server.common.data.rule.RuleChainType;
+import org.thingsboard.server.common.data.scheduler.SchedulerEventInfo;
 import org.thingsboard.server.common.data.security.DeviceCredentials;
 import org.thingsboard.server.common.msg.TbMsg;
 import org.thingsboard.server.common.msg.TbMsgDataType;
@@ -71,7 +72,9 @@ import org.thingsboard.server.gen.transport.TransportProtos.ToCalculatedFieldMsg
 import org.thingsboard.server.queue.TbQueueCallback;
 import org.thingsboard.server.queue.TbQueueMsgMetadata;
 import org.thingsboard.server.service.cf.CalculatedFieldCache;
+import org.thingsboard.server.service.scheduler.SchedulerService;
 
+import java.util.Optional;
 import java.util.Set;
 
 @Slf4j
@@ -84,6 +87,7 @@ public class EntityStateSourcingListener {
     private final EdgeSynchronizationManager edgeSynchronizationManager;
     private final JobManager jobManager;
     private final CalculatedFieldCache calculatedFieldCache;
+    private final Optional<SchedulerService> schedulerService;
 
     @PostConstruct
     public void init() {
@@ -155,6 +159,18 @@ public class EntityStateSourcingListener {
             case CUSTOMER -> {
                 tbClusterService.onCustomerUpdated((Customer) event.getEntity(), (Customer) event.getOldEntity());
             }
+            case SCHEDULER_EVENT -> {
+                SchedulerEventInfo schedulerEventInfo = (SchedulerEventInfo) event.getEntity();
+                boolean created = event.getCreated() != null && event.getCreated();
+                log.trace("[{}][{}] Handling scheduler event save event, created [{}]", tenantId, entityId, created);
+                schedulerService.ifPresent(s -> {
+                    if (created) {
+                        s.onSchedulerEventAdded(schedulerEventInfo);
+                    } else {
+                        s.onSchedulerEventUpdated(schedulerEventInfo);
+                    }
+                });
+            }
             default -> {
             }
         }
@@ -223,6 +239,12 @@ public class EntityStateSourcingListener {
             case CALCULATED_FIELD -> {
                 CalculatedField calculatedField = (CalculatedField) event.getEntity();
                 tbClusterService.onCalculatedFieldDeleted(calculatedField, TbQueueCallback.EMPTY);
+            }
+            case SCHEDULER_EVENT -> {
+                if (event.getEntity() instanceof SchedulerEventInfo schedulerEventInfo) {
+                    log.trace("[{}][{}] Handling scheduler event deletion event", tenantId, entityId);
+                    schedulerService.ifPresent(s -> s.onSchedulerEventDeleted(schedulerEventInfo));
+                }
             }
             default -> {
             }

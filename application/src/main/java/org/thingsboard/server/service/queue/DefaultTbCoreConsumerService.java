@@ -95,6 +95,7 @@ import org.thingsboard.server.service.queue.processing.IdMsgPair;
 import org.thingsboard.server.service.resource.TbImageService;
 import org.thingsboard.server.service.rpc.TbCoreDeviceRpcService;
 import org.thingsboard.server.service.ruleengine.RuleEngineCallService;
+import org.thingsboard.server.service.scheduler.SchedulerService;
 import org.thingsboard.server.service.security.auth.jwt.settings.JwtSettingsService;
 import org.thingsboard.server.service.state.DeviceStateService;
 import org.thingsboard.server.service.subscription.SubscriptionManagerService;
@@ -106,6 +107,7 @@ import org.thingsboard.server.service.ws.notification.sub.NotificationRequestUpd
 import org.thingsboard.server.service.ws.notification.sub.NotificationUpdate;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -148,6 +150,7 @@ public class DefaultTbCoreConsumerService extends AbstractConsumerService<ToCore
     private final TbImageService imageService;
     private final RuleEngineCallService ruleEngineCallService;
     private final EdqsService edqsService;
+    private final Optional<SchedulerService> schedulerService;
     private final TbCoreConsumerStats stats;
 
     private MainQueueConsumerManager<TbProtoQueueMsg<ToCoreMsg>, QueueConfig> mainConsumer;
@@ -178,7 +181,8 @@ public class DefaultTbCoreConsumerService extends AbstractConsumerService<ToCore
                                         TbImageService imageService,
                                         TbResourceDataCache tbResourceDataCache,
                                         RuleEngineCallService ruleEngineCallService,
-                                        EdqsService edqsService) {
+                                        EdqsService edqsService,
+                                        Optional<SchedulerService> schedulerService) {
         super(actorContext, tenantProfileCache, deviceProfileCache, assetProfileCache, tbResourceDataCache, apiUsageStateService, partitionService,
                 eventPublisher, jwtSettingsService);
         this.stateService = stateService;
@@ -195,6 +199,7 @@ public class DefaultTbCoreConsumerService extends AbstractConsumerService<ToCore
         this.ruleEngineCallService = ruleEngineCallService;
         this.queueFactory = tbCoreQueueFactory;
         this.edqsService = edqsService;
+        this.schedulerService = schedulerService;
     }
 
     @PostConstruct
@@ -311,6 +316,9 @@ public class DefaultTbCoreConsumerService extends AbstractConsumerService<ToCore
                         TransportProtos.NotificationSchedulerServiceMsg notificationSchedulerServiceMsg = toCoreMsg.getNotificationSchedulerServiceMsg();
                         log.trace("[{}] Forwarding message to notification scheduler service {}", id, toCoreMsg.getNotificationSchedulerServiceMsg());
                         forwardToNotificationSchedulerService(notificationSchedulerServiceMsg, callback);
+                    } else if (toCoreMsg.hasSchedulerServiceMsg()) {
+                        log.trace("[{}] Forwarding message to scheduler service {}", id, toCoreMsg.getSchedulerServiceMsg());
+                        forwardToSchedulerService(toCoreMsg.getSchedulerServiceMsg(), callback);
                     } else if (toCoreMsg.hasErrorEventMsg()) {
                         forwardToEventService(toCoreMsg.getErrorEventMsg(), callback);
                     } else if (toCoreMsg.hasLifecycleEventMsg()) {
@@ -685,6 +693,10 @@ public class DefaultTbCoreConsumerService extends AbstractConsumerService<ToCore
         } catch (Exception e) {
             callback.onFailure(new RuntimeException("Failed to schedule notification request", e));
         }
+    }
+
+    private void forwardToSchedulerService(TransportProtos.SchedulerServiceMsgProto msg, TbCallback callback) {
+        schedulerService.ifPresentOrElse(s -> s.onQueueMsg(msg, callback), callback::onSuccess);
     }
 
     private void forwardToDeviceActor(TransportToDeviceActorMsg toDeviceActorMsg, TbCallback callback) {

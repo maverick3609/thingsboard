@@ -1006,6 +1006,7 @@ audit-log:
       "ota_package": "${AUDIT_LOG_MASK_OTA_PACKAGE:W}" # Ota package logging levels.
       "calculated_field": "${AUDIT_LOG_MASK_CALCULATED_FIELD:W}" # Calculated field logging levels.
       "ai_model": "${AUDIT_LOG_MASK_AI_MODEL:W}" # AI model logging levels.
+      "scheduler_event": "${AUDIT_LOG_MASK_SCHEDULER_EVENT:W}" # Scheduler event logging levels.
   sink:
     # Type of external sink. possible options: none, elasticsearch
     type: "${AUDIT_LOG_SINK_TYPE:none}"
@@ -1022,6 +1023,11 @@ audit-log:
     port: "${AUDIT_LOG_SINK_PORT:9200}" # Port of external sink system
     user_name: "${AUDIT_LOG_SINK_USER_NAME:}" # Username used to access external sink system
     password: "${AUDIT_LOG_SINK_PASSWORD:}" # Password used to access external sink system
+
+# Scheduler events parameters (Inferrix PE-replication)
+scheduler:
+  # Minimum interval between subsequent scheduler events in seconds. Applicable for timer based events.
+  min_interval: "${SCHEDULER_MIN_INTERVAL_IN_SEC:60}"
 
 # Device state parameters
 state:

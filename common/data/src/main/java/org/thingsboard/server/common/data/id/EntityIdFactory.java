@@ -84,6 +84,7 @@ public class EntityIdFactory {
             case ADMIN_SETTINGS -> new AdminSettingsId(uuid);
             case AI_MODEL -> new AiModelId(uuid);
             case API_KEY -> new ApiKeyId(uuid);
+            case SCHEDULER_EVENT -> new SchedulerEventId(uuid);
         };
     }
 

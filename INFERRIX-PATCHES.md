@@ -131,6 +131,30 @@ Bakes Inferrix branding into the default build (every `yarn build:prod` output i
 
 ---
 
+## Feature: Scheduler (PE replication)
+
+- **Spec:** `docs/specs/2026-07-13-scheduler-design.md`; plan: `docs/superpowers/plans/2026-07-13-scheduler.md`
+- **New additive paths (not tracked below):** `common/data/.../scheduler/*`, `common/data/.../id/SchedulerEventId.java`, `dao/.../scheduler/*`, `dao/.../sql/scheduler/*`, `dao/.../model/sql/*SchedulerEvent*`, `dao/.../service/validator/SchedulerEventDataValidator.java`, `application/.../service/scheduler/*`, `application/.../service/entitiy/scheduler/*`, `application/.../controller/SchedulerEventController.java`, `ui-ngx/src/app/modules/home/pages/scheduler/*`, `ui-ngx/src/app/shared/models/scheduler-event.models.ts`, `ui-ngx/src/app/core/http/scheduler-event.service.ts`
+- **Status:** in progress on `inferrix-release-4.3`
+
+### TB-core files modified
+
+| # | File | Change | Why |
+|---|------|--------|-----|
+| S1 | `common/data/.../EntityType.java` | `SCHEDULER_EVENT(103)` appended after `API_KEY(44)` (comma-swap on API_KEY) | New entity type; proto number 103 matches PE |
+| S2 | `common/data/.../id/EntityIdFactory.java` | `case SCHEDULER_EVENT -> new SchedulerEventId(uuid);` in `getByTypeAndUuid` after `API_KEY` case | Id factory for the new type |
+| S2a | `common/data/.../id/EntityId.java` | `@DiscriminatorMapping(value = "SCHEDULER_EVENT", schema = SchedulerEventId.class)` added to the `@Schema` polymorphic discriminator list on `EntityId`, in alphabetical position before `TB_RESOURCE` | Registers `SchedulerEventId` in the Swagger polymorphic schema for `EntityId` so generated API docs/clients resolve the new id type correctly |
+| S3 | `common/data/.../msg/TbMsgType.java` | `generateReport("Generate Report"),` after `REST_API_REQUEST` | Msg type fired by generateDashboardReport events (PE constant name kept lowercase for msg-type string parity) |
+
+### Merge-recovery procedure
+
+- **`EntityType.java`** — verify `SCHEDULER_EVENT(103)` is still the last enum constant (comma-swapped with `API_KEY`). Upstream regularly appends new entity types here; re-apply the comma-swap if a merge drops it.
+- **`EntityIdFactory.java`** — verify the `case SCHEDULER_EVENT -> new SchedulerEventId(uuid);` arm survives in `getByTypeAndUuid`. This is an exhaustive `switch` expression — if upstream adds a new `EntityType` constant, the compiler will fail loudly until every arm (including ours) is present, so a dropped case is unmissable.
+- **`EntityId.java`** — verify the `@DiscriminatorMapping` for `SCHEDULER_EVENT` survives in the class-level `@Schema` annotation on `EntityId`. This is annotation metadata only (no compile-time enforcement), so a merge could silently drop it without breaking the build — check by hand.
+- **`TbMsgType.java`** — verify `generateReport("Generate Report"),` survives after `REST_API_REQUEST`. Not an exhaustive switch; a merge could silently drop it — check by hand.
+
+---
+
 ## How to extend this ledger
 
 When you modify a TB-core file for a new feature:

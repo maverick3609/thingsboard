@@ -60,6 +60,7 @@ import java.util.UUID;
                 @DiscriminatorMapping(value = "RPC", schema = RpcId.class),
                 @DiscriminatorMapping(value = "RULE_CHAIN", schema = RuleChainId.class),
                 @DiscriminatorMapping(value = "RULE_NODE", schema = RuleNodeId.class),
+                @DiscriminatorMapping(value = "SCHEDULER_EVENT", schema = SchedulerEventId.class),
                 @DiscriminatorMapping(value = "TB_RESOURCE", schema = TbResourceId.class),
                 @DiscriminatorMapping(value = "TENANT", schema = TenantId.class),
                 @DiscriminatorMapping(value = "TENANT_PROFILE", schema = TenantProfileId.class),

@@ -5196,6 +5196,8 @@
         "monthly": "Monthly",
         "yearly": "Yearly",
         "timer": "Timer-based",
+        "repeat-interval": "Repeat interval",
+        "time-unit": "Time unit",
         "repeats-required": "Repeats is required.",
         "repeat-on": "Repeat on",
         "repeat-every": "Repeat every",

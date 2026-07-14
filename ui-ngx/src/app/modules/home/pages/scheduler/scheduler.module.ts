@@ -20,10 +20,12 @@ import { SharedModule } from '@shared/shared.module';
 import { HomeComponentsModule } from '@home/components/home-components.module';
 import { SchedulerRoutingModule } from '@home/pages/scheduler/scheduler-routing.module';
 import { SchedulerEventDialogComponent } from '@home/pages/scheduler/scheduler-event-dialog.component';
+import { SchedulerEventScheduleComponent } from '@home/pages/scheduler/scheduler-event-schedule.component';
 
 @NgModule({
   declarations: [
-    SchedulerEventDialogComponent
+    SchedulerEventDialogComponent,
+    SchedulerEventScheduleComponent
   ],
   imports: [
     CommonModule,

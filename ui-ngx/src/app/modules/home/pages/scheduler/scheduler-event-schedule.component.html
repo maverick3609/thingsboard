@@ -1,0 +1,62 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<div [formGroup]="scheduleFormGroup" class="flex flex-col">
+  <tb-timezone-select formControlName="timezone" required></tb-timezone-select>
+  <tb-datetime formControlName="startTime" [dateText]="'scheduler.start-time' | translate" required></tb-datetime>
+  <mat-checkbox formControlName="repeatEnabled">{{ 'scheduler.repeat' | translate }}</mat-checkbox>
+  <div formGroupName="repeat" *ngIf="scheduleFormGroup.get('repeatEnabled').value" class="flex flex-col">
+    <mat-form-field class="mat-block">
+      <mat-label translate>scheduler.repeats</mat-label>
+      <mat-select formControlName="type">
+        <mat-option *ngFor="let type of repeatTypes" [value]="type">
+          {{ repeatTypeTranslations.get(type) | translate }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+    <div *ngIf="repeatType === 'WEEKLY'" class="flex flex-row flex-wrap gap-2">
+      <mat-checkbox *ngFor="let day of weekDays"
+                    [checked]="isWeekDaySelected(day)"
+                    (change)="toggleWeekDay(day)">
+        {{ weekDayLabels[day] | translate }}
+      </mat-checkbox>
+    </div>
+    <mat-form-field *ngIf="repeatType === 'EVERY_N_DAYS'" class="mat-block">
+      <mat-label translate>scheduler.repeat-every-n-days</mat-label>
+      <input matInput type="number" min="1" formControlName="days">
+    </mat-form-field>
+    <mat-form-field *ngIf="repeatType === 'EVERY_N_WEEKS'" class="mat-block">
+      <mat-label translate>scheduler.repeat-every-n-weeks</mat-label>
+      <input matInput type="number" min="1" formControlName="weeks">
+    </mat-form-field>
+    <div *ngIf="repeatType === 'TIMER'" class="flex flex-row gap-2">
+      <mat-form-field class="flex-1">
+        <mat-label translate>scheduler.repeat-interval</mat-label>
+        <input matInput type="number" min="1" formControlName="repeatInterval">
+      </mat-form-field>
+      <mat-form-field class="flex-1">
+        <mat-label translate>scheduler.time-unit</mat-label>
+        <mat-select formControlName="timeUnit">
+          <mat-option *ngFor="let unit of timeUnits" [value]="unit">
+            {{ ('scheduler.' + unit.toLowerCase()) | translate }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+    <tb-datetime formControlName="endsOn" [dateText]="'scheduler.ends-on' | translate" required></tb-datetime>
+  </div>
+</div>

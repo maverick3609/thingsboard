@@ -57,7 +57,7 @@
         *ngIf="showOriginator"
         formControlName="originatorId">
       </tb-entity-select>
-      <tb-json-object-edit formControlName="schedule" [label]="'scheduler.schedule' | translate"></tb-json-object-edit>
+      <tb-scheduler-event-schedule formControlName="schedule"></tb-scheduler-event-schedule>
       <tb-json-object-edit formControlName="configuration" [label]="'scheduler.configuration' | translate"></tb-json-object-edit>
     </fieldset>
   </div>

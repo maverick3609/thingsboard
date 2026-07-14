@@ -108,6 +108,7 @@ export enum MenuId {
   features = 'features',
   otaUpdates = 'otaUpdates',
   version_control = 'version_control',
+  scheduler = 'scheduler',
   api_usage = 'api_usage',
   trendz_settings = 'trendz_settings',
   ai_models = 'ai_models',
@@ -724,6 +725,16 @@ export const menuSectionMap = new Map<MenuId, MenuSection>([
     }
   ],
   [
+    MenuId.scheduler,
+    {
+      id: MenuId.scheduler,
+      name: 'scheduler.scheduler',
+      type: 'link',
+      path: '/features/scheduler',
+      icon: 'schedule'
+    }
+  ],
+  [
     MenuId.api_usage,
     {
       id: MenuId.api_usage,
@@ -890,7 +901,8 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
         id: MenuId.features,
         pages: [
           {id: MenuId.otaUpdates},
-          {id: MenuId.version_control}
+          {id: MenuId.version_control},
+          {id: MenuId.scheduler}
         ]
       },
       {
@@ -974,6 +986,7 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
           {id: MenuId.notification_inbox}
         ]
       },
+      {id: MenuId.scheduler},
       {
         id: MenuId.settings,
         pages: [

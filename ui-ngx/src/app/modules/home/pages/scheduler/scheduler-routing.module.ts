@@ -1,5 +1,5 @@
 ///
-/// Copyright © 2016-2026 The Thingsboard Authors
+/// Copyright © 2016-2026 The Inferrix Authors
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -14,41 +14,33 @@
 /// limitations under the License.
 ///
 
-import { RouterModule, Routes } from '@angular/router';
-import { Authority } from '@shared/models/authority.enum';
 import { NgModule } from '@angular/core';
-import { otaUpdatesRoutes } from '@home/pages/ota-update/ota-update-routing.module';
-import { vcRoutes } from '@home/pages/vc/vc-routing.module';
-import { schedulerRoutes } from '@home/pages/scheduler/scheduler-routing.module';
+import { RouterModule, Routes } from '@angular/router';
+import { EntitiesTableComponent } from '@home/components/entity/entities-table.component';
+import { Authority } from '@shared/models/authority.enum';
 import { MenuId } from '@core/services/menu.models';
+import { SchedulerEventsTableConfigResolver } from '@home/pages/scheduler/scheduler-events-table-config.resolver';
 
-const routes: Routes = [
+export const schedulerRoutes: Routes = [
   {
-    path: 'features',
+    path: 'scheduler',
+    component: EntitiesTableComponent,
     data: {
       auth: [Authority.TENANT_ADMIN, Authority.CUSTOMER_USER],
+      title: 'scheduler.scheduler',
       breadcrumb: {
-        menuId: MenuId.features
+        menuId: MenuId.scheduler
       }
     },
-    children: [
-      {
-        path: '',
-        children: [],
-        data: {
-          auth: [Authority.TENANT_ADMIN, Authority.CUSTOMER_USER],
-          redirectTo: '/features/otaUpdates'
-        }
-      },
-      ...otaUpdatesRoutes,
-      ...vcRoutes,
-      ...schedulerRoutes
-    ]
+    resolve: {
+      entitiesTableConfig: SchedulerEventsTableConfigResolver
+    }
   }
 ];
 
 @NgModule({
-  imports: [RouterModule.forChild(routes)],
-  exports: [RouterModule]
+  imports: [RouterModule.forChild(schedulerRoutes)],
+  exports: [RouterModule],
+  providers: [SchedulerEventsTableConfigResolver]
 })
-export class FeaturesRoutingModule { }
+export class SchedulerRoutingModule { }

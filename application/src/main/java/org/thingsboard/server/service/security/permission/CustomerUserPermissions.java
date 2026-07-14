@@ -51,6 +51,7 @@ public class CustomerUserPermissions extends AbstractPermissions {
         put(Resource.TB_RESOURCE, customerResourcePermissionChecker);
         put(Resource.MOBILE_APP_SETTINGS, new PermissionChecker.GenericPermissionChecker(Operation.READ));
         put(Resource.WHITE_LABELING, new PermissionChecker.GenericPermissionChecker(Operation.READ, Operation.WRITE));
+        put(Resource.SCHEDULER_EVENT, schedulerEventPermissionChecker);
         put(Resource.API_KEY, apiKeysPermissionChecker);
     }
 
@@ -86,6 +87,28 @@ public class CustomerUserPermissions extends AbstractPermissions {
                         return false;
                     }
                     return operation.equals(Operation.CLAIM_DEVICES) || user.getCustomerId().equals(((HasCustomerId) entity).getCustomerId());
+                }
+            };
+
+    // Like customerEntityPermissionChecker, but also allows Operation.CREATE: customer users
+    // create scheduler events directly (self-service scheduling), unlike assets/devices which
+    // are provisioned by tenant admins and only assigned to customers afterwards.
+    private static final PermissionChecker schedulerEventPermissionChecker =
+            new PermissionChecker.GenericPermissionChecker(Operation.CREATE, Operation.READ, Operation.WRITE, Operation.DELETE) {
+
+                @Override
+                @SuppressWarnings("unchecked")
+                public boolean hasPermission(SecurityUser user, Operation operation, EntityId entityId, HasTenantId entity) {
+                    if (!super.hasPermission(user, operation, entityId, entity)) {
+                        return false;
+                    }
+                    if (!user.getTenantId().equals(entity.getTenantId())) {
+                        return false;
+                    }
+                    if (!(entity instanceof HasCustomerId)) {
+                        return false;
+                    }
+                    return user.getCustomerId().equals(((HasCustomerId) entity).getCustomerId());
                 }
             };
 

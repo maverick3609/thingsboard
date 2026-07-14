@@ -53,6 +53,7 @@ public enum Resource {
             EntityType.NOTIFICATION_REQUEST, EntityType.NOTIFICATION_RULE),
     MOBILE_APP_SETTINGS,
     WHITE_LABELING,
+    SCHEDULER_EVENT(EntityType.SCHEDULER_EVENT),
     JOB(EntityType.JOB),
     AI_MODEL(EntityType.AI_MODEL),
     API_KEY(EntityType.API_KEY);

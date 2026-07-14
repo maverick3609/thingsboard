@@ -876,8 +876,11 @@
                     <version>3.0</version>
                     <configuration>
                         <header>${main.dir}/license-header-template.txt</header>
+                        <validHeaders>
+                            <validHeader>${main.dir}/license-header-template-thingsboard.txt</validHeader>
+                        </validHeaders>
                         <properties>
-                            <owner>The Thingsboard Authors</owner>
+                            <owner>The Inferrix Authors</owner>
                         </properties>
                         <excludes>
                             <exclude>**/.env</exclude>

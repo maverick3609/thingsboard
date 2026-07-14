@@ -292,6 +292,7 @@ New module `ui-ngx/src/app/modules/home/pages/scheduler/` + `ui-ngx/src/app/shar
 | 9 | PE RBAC (`common/data` Resource + group permissions) | CE `application` Resource + tenant/customer checkers | CE permission architecture |
 | 10 | Sparse logging (engine trace/debug only; DAO and controller silent) | Fire at INFO / skip at WARN, plus DEBUG flow logging in every ported class: DAO finder entry/exit-count + save/delete INFO, validator warn-before-reject, controller endpoint-entry with user/tenant, queue-wiring traces, UI console.error handlers on every side-effect subscribe. Pure repeat-math classes stay log-free (called in tight loops); their flow is visible from callers | Debuggability requirement: every flow must be traceable and errors catchable from logs alone |
 | 11 | Solution-templates installer wiring | dropped | No solutions service in CE |
+| 12 | `getNext` trusts stride fields (`repeatInterval`/`days`/`weeks`, `repeatOn`) | Guards added: non-positive stride or null/empty `repeatOn` → `getNext` returns 0 (event dormant), each covered by a unit test | PE bug: a tenant-controllable non-positive stride causes an infinite loop on the single-threaded scheduler executor (platform-wide DoS) or a REST thread (time-window listing); guards are behavior-preserving for valid input |
 
 Everything else — models, schedule semantics, DDL, DAO queries, engine lifecycle, TbMsg construction, REST paths/payloads, UI structure and i18n — is PE-identical.
 
@@ -304,7 +305,7 @@ Frontend (5–6): `menu.models.ts`, `locale.constant-en_US.json`, `entity-type.m
 
 Each gets a row in a new `## Feature: Scheduler` section of `INFERRIX-PATCHES.md` with insertion anchors + merge-recovery notes, added in the same commit that touches the file. The Bucket-B merge-guard grep gains `scheduler_event|SchedulerEvent|MenuId.scheduler` (not bare `scheduler` — upstream uses it heavily). `menu.models.ts` and `locale.constant-en_US.json` become triple-touched — flag them as the top-2 merge-risk files.
 
-New additive files carry the ThingsBoard Apache-2.0 license header (they live in TB-core paths and are checked by `license-maven-plugin`).
+New additive files carry the Apache-2.0 header with owner **The Inferrix Authors** (root-pom `license-maven-plugin` owner property); legacy ThingsBoard-headered files remain valid via a `validHeaders` entry (`license-header-template-thingsboard.txt`, ledger row B15).
 
 ---
 

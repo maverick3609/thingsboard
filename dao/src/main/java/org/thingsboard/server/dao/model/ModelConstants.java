@@ -772,6 +772,21 @@ public class ModelConstants {
     public static final String WHITE_LABELING_DOMAIN_ID_PROPERTY = "domain_id";
 
     /**
+     * Scheduler event constants.
+     */
+    public static final String SCHEDULER_EVENT_TABLE_NAME = "scheduler_event";
+    public static final String SCHEDULER_EVENT_TENANT_ID_PROPERTY = TENANT_ID_PROPERTY;
+    public static final String SCHEDULER_EVENT_CUSTOMER_ID_PROPERTY = CUSTOMER_ID_PROPERTY;
+    public static final String SCHEDULER_EVENT_NAME_PROPERTY = "name";
+    public static final String SCHEDULER_EVENT_TYPE_PROPERTY = "type";
+    public static final String SCHEDULER_EVENT_SCHEDULE_PROPERTY = "schedule";
+    public static final String SCHEDULER_EVENT_CONFIGURATION_PROPERTY = "configuration";
+    public static final String SCHEDULER_EVENT_ENABLED_PROPERTY = "enabled";
+    public static final String SCHEDULER_EVENT_ORIGINATOR_ID_PROPERTY = "originator_id";
+    public static final String SCHEDULER_EVENT_ORIGINATOR_TYPE_PROPERTY = "originator_type";
+    public static final String SCHEDULER_EVENT_ADDITIONAL_INFO_PROPERTY = ADDITIONAL_INFO_PROPERTY;
+
+    /**
      * IoT Hub installed item constants.
      */
     public static final String IOT_HUB_INSTALLED_ITEM_TABLE_NAME = "iot_hub_installed_item";

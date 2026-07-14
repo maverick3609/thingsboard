@@ -145,6 +145,10 @@ Bakes Inferrix branding into the default build (every `yarn build:prod` output i
 | S2 | `common/data/.../id/EntityIdFactory.java` | `case SCHEDULER_EVENT -> new SchedulerEventId(uuid);` in `getByTypeAndUuid` after `API_KEY` case | Id factory for the new type |
 | S2a | `common/data/.../id/EntityId.java` | `@DiscriminatorMapping(value = "SCHEDULER_EVENT", schema = SchedulerEventId.class)` added to the `@Schema` polymorphic discriminator list on `EntityId`, in alphabetical position before `TB_RESOURCE` | Registers `SchedulerEventId` in the Swagger polymorphic schema for `EntityId` so generated API docs/clients resolve the new id type correctly |
 | S3 | `common/data/.../msg/TbMsgType.java` | `generateReport("Generate Report"),` after `REST_API_REQUEST` | Msg type fired by generateDashboardReport events (PE constant name kept lowercase for msg-type string parity) |
+| S4 | `dao/src/main/resources/sql/schema-entities.sql` | Append `CREATE TABLE IF NOT EXISTS scheduler_event (...)` DDL at end of file | Schema for fresh installs |
+| S5 | `dao/src/main/resources/sql/schema-entities-idx.sql` | Append `CREATE INDEX IF NOT EXISTS idx_scheduler_event_originator_id ON scheduler_event(tenant_id, originator_id);` at end of file | Index for scheduler_event queries |
+| S6 | `application/src/main/data/upgrade/basic/schema_update.sql` | Append the same `CREATE TABLE ... scheduler_event` + index block wrapped in `-- SCHEDULER EVENT TABLE START/END` comments after the `-- WHITE LABELING TABLE END` marker | Upgrade path for existing installs |
+| S7 | `dao/src/main/java/org/thingsboard/server/dao/model/ModelConstants.java` | Add `Scheduler event constants.` block with `SCHEDULER_EVENT_TABLE_NAME`, `SCHEDULER_EVENT_TENANT_ID_PROPERTY`, `SCHEDULER_EVENT_CUSTOMER_ID_PROPERTY`, `SCHEDULER_EVENT_NAME_PROPERTY`, `SCHEDULER_EVENT_TYPE_PROPERTY`, `SCHEDULER_EVENT_SCHEDULE_PROPERTY`, `SCHEDULER_EVENT_CONFIGURATION_PROPERTY`, `SCHEDULER_EVENT_ENABLED_PROPERTY`, `SCHEDULER_EVENT_ORIGINATOR_ID_PROPERTY`, `SCHEDULER_EVENT_ORIGINATOR_TYPE_PROPERTY`, `SCHEDULER_EVENT_ADDITIONAL_INFO_PROPERTY` after the White labeling constants block (~line 772) | Schema constants for Task 4's JPA entity mapping |
 
 ### Merge-recovery procedure
 
@@ -152,6 +156,9 @@ Bakes Inferrix branding into the default build (every `yarn build:prod` output i
 - **`EntityIdFactory.java`** — verify the `case SCHEDULER_EVENT -> new SchedulerEventId(uuid);` arm survives in `getByTypeAndUuid`. This is an exhaustive `switch` expression — if upstream adds a new `EntityType` constant, the compiler will fail loudly until every arm (including ours) is present, so a dropped case is unmissable.
 - **`EntityId.java`** — verify the `@DiscriminatorMapping` for `SCHEDULER_EVENT` survives in the class-level `@Schema` annotation on `EntityId`. This is annotation metadata only (no compile-time enforcement), so a merge could silently drop it without breaking the build — check by hand.
 - **`TbMsgType.java`** — verify `generateReport("Generate Report"),` survives after `REST_API_REQUEST`. Not an exhaustive switch; a merge could silently drop it — check by hand.
+- **`schema-entities.sql`** and **`schema_update.sql`** — verify both contain the `scheduler_event` table block. Upstream may reorder or restructure these files; confirm the table definition with the exact column names and constraints (especially `scheduler_event_external_id_unq_key`) is still present in both.
+- **`schema-entities-idx.sql`** — verify the `idx_scheduler_event_originator_id` index survives at the end. Upstream may reorder; re-apply if dropped.
+- **`ModelConstants.java`** — verify the `Scheduler event constants.` block survives after the White labeling constants block. All 10 constants must be present and the generic constants (`TENANT_ID_PROPERTY`, `CUSTOMER_ID_PROPERTY`, `ADDITIONAL_INFO_PROPERTY`) must remain as references, not hardcoded strings.
 
 ---
 

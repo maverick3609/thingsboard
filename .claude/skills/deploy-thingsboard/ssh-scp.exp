@@ -1,0 +1,18 @@
+#!/usr/bin/expect -f
+# Usage: ssh-scp.exp <user> <host> <password> <local-file> <remote-path>
+# Copies one file with password auth. Password passed as an argument (not stored).
+# Invoke as `expect -f ssh-scp.exp ...` so it does not depend on the +x bit.
+set timeout 1800
+set user [lindex $argv 0]
+set host [lindex $argv 1]
+set pass [lindex $argv 2]
+set src  [lindex $argv 3]
+set dst  [lindex $argv 4]
+spawn scp -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12 $src $user@$host:$dst
+expect {
+  -re {(?i)password:} { send "$pass\r"; exp_continue }
+  -re {(?i)\(yes/no}  { send "yes\r";  exp_continue }
+  eof
+}
+catch wait result
+exit [lindex $result 3]

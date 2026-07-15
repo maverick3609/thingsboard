@@ -1,0 +1,22 @@
+#!/usr/bin/expect -f
+# Usage: ssh-run.exp <user> <host> <password> <remote-command>
+# Runs one remote command over ssh with password auth and returns its output.
+# Password is passed as an argument (never stored in this file). macOS has no
+# sshpass; this uses the built-in expect instead.
+#
+# NOTE: this spawns ssh WITHOUT -t (no remote TTY). For sudo inside <remote-command>,
+# give EACH sudo its own password on stdin:  echo "<pass>" | sudo -S <cmd>
+# Do not rely on `sudo -v` caching — it does not survive across commands here.
+set timeout 150
+set user [lindex $argv 0]
+set host [lindex $argv 1]
+set pass [lindex $argv 2]
+set cmd  [lindex $argv 3]
+spawn ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12 $user@$host $cmd
+expect {
+  -re {(?i)password:} { send "$pass\r"; exp_continue }
+  -re {(?i)\(yes/no}  { send "yes\r";  exp_continue }
+  eof
+}
+catch wait result
+exit [lindex $result 3]

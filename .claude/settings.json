@@ -10,6 +10,15 @@
             "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/enforce-license-header.sh"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/check-overlay-idempotent.sh"
+          }
+        ]
       }
     ]
   }

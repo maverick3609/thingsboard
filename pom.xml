@@ -932,6 +932,7 @@
                             <exclude>**/valkey-certs/**</exclude>
                             <exclude>**/data/certs/**</exclude>
                             <exclude>**/*.otf</exclude>
+                            <exclude>**/license-header-template*.txt</exclude>
                         </excludes>
                         <mapping>
                             <proto>JAVADOC_STYLE</proto>

@@ -39,6 +39,9 @@ import java.util.concurrent.TimeUnit;
 public class SqlDatabaseUpgradeService implements DatabaseEntitiesUpgradeService {
 
     private static final String SCHEMA_UPDATE_SQL = "schema_update.sql";
+    private static final String SQL_DIR = "sql";
+    // Inferrix schema overlay — single source of truth for all Inferrix-owned DDL (idempotent).
+    private static final String SCHEMA_INFERRIX_SQL = "schema-inferrix.sql";
 
     private final InstallScripts installScripts;
     private final JdbcTemplate jdbcTemplate;
@@ -62,6 +65,9 @@ public class SqlDatabaseUpgradeService implements DatabaseEntitiesUpgradeService
     public void upgradeDatabase() {
         log.info("Updating schema...");
         loadSql(getSchemaUpdateFile("basic"));
+        // Inferrix schema overlay — idempotent Inferrix-owned DDL, re-applied on every upgrade
+        log.info("Applying Inferrix schema overlay: {}", SCHEMA_INFERRIX_SQL);
+        loadSql(Paths.get(installScripts.getDataDir(), SQL_DIR, SCHEMA_INFERRIX_SQL));
         ltsMigrationService.runSchemaMigrations(schemaSettingsService.getDbSchemaVersion(), schemaSettingsService.getPackageSchemaVersion());
         log.info("Schema updated.");
     }

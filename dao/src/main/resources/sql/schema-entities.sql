@@ -1000,21 +1000,3 @@ CREATE TABLE IF NOT EXISTS iot_hub_installed_item (
     version         VARCHAR       NOT NULL,
     descriptor      JSONB         NOT NULL
 );
-
-CREATE TABLE IF NOT EXISTS scheduler_event (
-    id uuid NOT NULL CONSTRAINT scheduler_event_pkey PRIMARY KEY,
-    created_time bigint NOT NULL,
-    additional_info varchar,
-    customer_id uuid,
-    originator_id uuid,
-    originator_type varchar(255),
-    name varchar(255),
-    tenant_id uuid,
-    type varchar(255),
-    schedule varchar,
-    configuration varchar(10000000),
-    enabled boolean,
-    external_id uuid,
-    version BIGINT DEFAULT 1,
-    CONSTRAINT scheduler_event_external_id_unq_key UNIQUE (tenant_id, external_id)
-);

@@ -33,6 +33,7 @@ public class TimescaleSqlInitializer {
             "sql/schema-entities.sql",
             "sql/schema-entities-idx.sql",
             "sql/schema-entities-idx-psql-addon.sql",
+            "sql/schema-inferrix.sql",
             "sql/schema-views.sql",
             "sql/schema-functions.sql",
             "sql/system-data.sql",

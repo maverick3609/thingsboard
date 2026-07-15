@@ -29,9 +29,18 @@ public class SqlEntityDatabaseSchemaService extends SqlAbstractDatabaseSchemaSer
     public static final String SCHEMA_ENTITIES_IDX_PSQL_ADDON_SQL = "schema-entities-idx-psql-addon.sql";
     public static final String SCHEMA_VIEWS_SQL = "schema-views.sql";
     public static final String SCHEMA_FUNCTIONS_SQL = "schema-functions.sql";
+    // Inferrix schema overlay — single source of truth for all Inferrix-owned DDL (idempotent).
+    public static final String SCHEMA_INFERRIX_SQL = "schema-inferrix.sql";
 
     public SqlEntityDatabaseSchemaService() {
         super(SCHEMA_ENTITIES_SQL, SCHEMA_ENTITIES_IDX_SQL);
+    }
+
+    @Override
+    public void createDatabaseSchema(boolean createIndexes) throws Exception {
+        super.createDatabaseSchema(createIndexes);
+        log.info("Installing Inferrix SQL DataBase schema overlay part: " + SCHEMA_INFERRIX_SQL);
+        executeQueryFromFile(SCHEMA_INFERRIX_SQL);
     }
 
     @Override

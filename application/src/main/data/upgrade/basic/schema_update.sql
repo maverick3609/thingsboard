@@ -93,27 +93,3 @@ CREATE TABLE IF NOT EXISTS white_labeling (
 );
 
 -- WHITE LABELING TABLE END
-
--- SCHEDULER EVENT TABLE START
-
-CREATE TABLE IF NOT EXISTS scheduler_event (
-    id uuid NOT NULL CONSTRAINT scheduler_event_pkey PRIMARY KEY,
-    created_time bigint NOT NULL,
-    additional_info varchar,
-    customer_id uuid,
-    originator_id uuid,
-    originator_type varchar(255),
-    name varchar(255),
-    tenant_id uuid,
-    type varchar(255),
-    schedule varchar,
-    configuration varchar(10000000),
-    enabled boolean,
-    external_id uuid,
-    version BIGINT DEFAULT 1,
-    CONSTRAINT scheduler_event_external_id_unq_key UNIQUE (tenant_id, external_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_scheduler_event_originator_id ON scheduler_event(tenant_id, originator_id);
-
--- SCHEDULER EVENT TABLE END

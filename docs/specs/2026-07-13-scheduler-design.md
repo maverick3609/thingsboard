@@ -1,7 +1,7 @@
 # Scheduler (PE Replication) — Design Specification
 
 **Date:** 2026-07-13
-**Status:** Approved
+**Status:** Implemented (2026-07-15)
 **Source:** ThingsBoard PE 4.2.0 (decompiled from `docs/jars/`, javap + CFR)
 **Target:** Inferrix CE 4.3.1.3, branch `inferrix-release-4.3`
 **Approach:** In-core PE-mirror — classes at exact PE paths, PE-identical REST API and data models, core-file modifications tracked in `INFERRIX-PATCHES.md`
@@ -76,14 +76,15 @@ Exact field/method signatures come from the decompiled PE classes in `docs/jars/
 
 ```json
 {
-  "originatorId": { "entityType": "DEVICE", "id": "…" },
   "msgType": "updateAttributes",
   "msgBody": { "targetTemperature": 22 },
   "metadata": { "scope": "SERVER_SCOPE" }
 }
 ```
 
-Effective originator = `configuration.originatorId ?: event.id`.
+Effective originator = `event.originatorId ?: event.id` — read from the **top-level `originatorId` bean field** (`originator_id` column, `BaseSchedulerEventService.getOriginatorId` = `event.getOriginatorId() ?: event.getId()`), **not** from the configuration JSON. No backend code reads `configuration.originatorId`, and the **persisted `configuration` JSON never contains `originatorId`**.
+
+**UI originator flow (PE-faithful).** The per-type config form component owns the originator picker (a required `tb-entity-select` in `updateAttributes` (any entity), `sendRpcRequest` (DEVICE only), `updateFirmware`/`updateSoftware` (DEVICE + DEVICE_PROFILE); absent for report/custom), whose value it writes into `configuration.originatorId` (a **transient UI-only field**). The dialog bridges this to the top-level bean field: on **load** it copies `event.originatorId` **into** `configuration.originatorId` (so the picker shows the current value); on **save** it lifts `configuration.originatorId` back out to the top-level `event.originatorId` and **deletes** `configuration.originatorId` before POST. Net: the picker lives per-type in the config form, but the value round-trips through the top-level bean field the engine actually reads.
 
 ### Enums / IDs (core-file touches)
 
@@ -134,7 +135,7 @@ Placement:
 New files under `dao/src/main/java/org/thingsboard/server/dao/`:
 
 - `scheduler/SchedulerEventService` (interface, `extends EntityDaoService`) — PE has 22 methods; v1 keeps 14: find by id / info / withCustomerInfo (sync + async + by-ids), `findSchedulerEventsByTenantId[AndType]`, `findSchedulerEventsByTenantIdAndEnabled`, `findSchedulerEventsByTenantIdAndFilter` (paged), `findSchedulerEventsByTimeFilter`, `saveSchedulerEvent`, `deleteSchedulerEvent`, `deleteSchedulerEventsByTenantId`, `deleteSchedulerEventsByTenantIdAndCustomerId`. **Dropped:** `assignSchedulerEventToEdge`, `unassignSchedulerEventFromEdge`, 3 edge finders (edge out of scope); `findScheduledReportEvents` ×2 + `countScheduledReportEventsByTemplateId` (PE reports)
-- `scheduler/BaseSchedulerEventService` — `extends AbstractEntityService`. Deps: `SchedulerEventDao`, `SchedulerEventInfoDao`, `DataValidator<SchedulerEvent>`, `EntityCountService` (PE's `EdgeService` dep dropped). Save publishes `SaveEntityEvent` + count-cache evict; delete publishes `DeleteEntityEvent`. Constraint hook: `scheduler_event_external_id_unq_key`. Static `getOriginatorId(event)` = `configuration.originatorId ?: event.id`
+- `scheduler/BaseSchedulerEventService` — `extends AbstractEntityService`. Deps: `SchedulerEventDao`, `SchedulerEventInfoDao`, `DataValidator<SchedulerEvent>`, `EntityCountService` (PE's `EdgeService` dep dropped). Save publishes `SaveEntityEvent` + count-cache evict; delete publishes `DeleteEntityEvent`. Constraint hook: `scheduler_event_external_id_unq_key`. Static `getOriginatorId(event)` = `event.getOriginatorId() ?: event.getId()` (reads the top-level `originatorId` bean field, NOT `configuration.originatorId`)
 - `scheduler/SchedulerEventDao`, `scheduler/SchedulerEventInfoDao` (interfaces); `sql/scheduler/JpaSchedulerEventDao`, `sql/scheduler/JpaSchedulerEventInfoDao` (impls); `sql/scheduler/SchedulerEventRepository`, `sql/scheduler/SchedulerEventInfoRepository` (Spring Data)
 - `model/sql/AbstractSchedulerEventInfoEntity<T>` (`extends BaseVersionedEntity<T>`), `model/sql/SchedulerEventInfoEntity`, `model/sql/SchedulerEventEntity` (`@Table("scheduler_event")`), `model/sql/SchedulerEventWithCustomerInfoEntity` (+ `customerTitle`, `customerIsPublic` via LEFT JOIN on customer; public flag parsed from customer `additional_info`)
 - `service/validator/SchedulerEventDataValidator`
@@ -194,7 +195,7 @@ Reload full `SchedulerEvent` from DB (stale-delete guard: gone → evict, stop).
 |---|---|
 | `updateFirmware` / `updateSoftware` | OTA package id from `msgBody`; originator `DEVICE` → set fw/sw id + `saveDevice`; `DEVICE_PROFILE` → set id + `saveDeviceProfile` + `OtaPackageStateService.update`. PE's `ENTITY_GROUP` branch dropped. **After** the OTA assignment, the default rule-engine message is also pushed (PE behavior: every type except `generateReport` falls through to the TbMsg push) |
 | `generateReport` | `schedulerReportExecutor.executeReport(tenantId, event)` (no-op until Reporting lands); the only type that does **not** push a rule-engine message |
-| **default** — `updateAttributes`, `sendRpcRequest`, `generateDashboardReport`, custom types | Build `TbMsg`: `type = configuration.msgType ?: event.type` (`generateDashboardReport` maps to `TbMsgType.generateReport`); `originator = configuration.originatorId ?: event.id`; `metadata = configuration.metadata` verbatim, else defaults `{customerId, eventName, additionalInfo}`; `data = msgBody` (JSON). `sendRpcRequest` additionally sets `originServiceId` (this node) and `expirationTime = now + max(rpcMinTimeout, metadata.timeout)`. Push via `TbClusterService.pushMsgToRuleEngine(tenantId, originatorId, tbMsg, null)` |
+| **default** — `updateAttributes`, `sendRpcRequest`, `generateDashboardReport`, custom types | Build `TbMsg`: `type = configuration.msgType ?: event.type` (`generateDashboardReport` maps to `TbMsgType.generateReport`); `originator = getOriginatorId(event)` = `event.originatorId ?: event.id` (top-level bean field, NOT `configuration.originatorId`); `metadata = configuration.metadata` verbatim, else defaults `{customerId, eventName, additionalInfo}`; `data = msgBody` (JSON). `sendRpcRequest` additionally sets `originServiceId` (this node) and `expirationTime = now + max(rpcMinTimeout, metadata.timeout)`. Push via `TbClusterService.pushMsgToRuleEngine(tenantId, originatorId, tbMsg, null)` |
 
 Always: `scheduleNextEvent(now, …)` re-arms the next occurrence. Firing errors are caught, logged at ERROR with tenant/event/type, and never break the chain. Each fire is logged at INFO with tenant/event/type/originator (upgraded from PE's DEBUG — operational visibility).
 

@@ -1,0 +1,22 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.tb-scheduler-calendar-container {
+  position: relative;
+  min-height: 500px;
+}
+
+.tb-scheduler-view-select {
+  width: 180px;
+}
+
+.tb-scheduler-context-menu-container {
+  .tb-context-menu-header {
+    padding: 8px 16px;
+    .tb-context-menu-title { font-weight: 500; }
+    .tb-context-menu-subtitle { font-size: 12px; opacity: 0.7; }
+  }
+}

@@ -34,6 +34,7 @@ export interface SchedulerEventDialogData {
   schedulerEvent: SchedulerEvent | null;
   isAdd: boolean;
   isCustomerUser: boolean;
+  readonly?: boolean;
 }
 
 @Component({
@@ -47,6 +48,7 @@ export class SchedulerEventDialogComponent extends DialogComponent<SchedulerEven
 
   schedulerEventFormGroup: FormGroup;
   isAdd: boolean;
+  readonly: boolean;
   entityType = EntityType;
   configTypes: {[type: string]: SchedulerEventConfigType};
   configTypeKeys: string[];
@@ -61,6 +63,7 @@ export class SchedulerEventDialogComponent extends DialogComponent<SchedulerEven
               private schedulerEventService: SchedulerEventService) {
     super(store, router, dialogRef);
     this.isAdd = data.isAdd;
+    this.readonly = data.readonly === true;
     this.configTypes = {...schedulerEventConfigTypes};
     if (data.isCustomerUser) {
       delete this.configTypes.generateReport;   // PE parity: hidden from customer users
@@ -90,6 +93,10 @@ export class SchedulerEventDialogComponent extends DialogComponent<SchedulerEven
       this.schedulerEventFormGroup.get('configuration').setValue(
         {msgType: null, msgBody: {}, metadata: null});
     });
+
+    if (this.readonly) {
+      this.schedulerEventFormGroup.disable();
+    }
   }
 
   isErrorState(control: FormControl | null, form: FormGroupDirective | NgForm | null): boolean {

@@ -1,0 +1,99 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<div class="tb-scheduler-events tb-absolute-fill flex flex-col">
+  <mat-button-toggle-group class="tb-scheduler-mode-toggle" [(ngModel)]="mode" style="margin: 8px;">
+    <mat-button-toggle value="list">{{ 'scheduler.list-mode' | translate }}</mat-button-toggle>
+    <mat-button-toggle value="calendar">{{ 'scheduler.calendar-mode' | translate }}</mat-button-toggle>
+  </mat-button-toggle-group>
+
+  <!-- LIST MODE: Task 9 entities table -->
+  <tb-entities-table *ngIf="mode === 'list'" class="flex flex-1"
+                     [entitiesTableConfig]="entitiesTableConfig"></tb-entities-table>
+
+  <!-- CALENDAR MODE -->
+  <div *ngIf="mode === 'calendar'" class="tb-scheduler-calendar flex flex-1 flex-col" style="padding: 8px;">
+
+    <!-- custom toolbar -->
+    <div class="flex flex-row items-center gap-2" style="margin-bottom: 8px;">
+      <h2 class="mat-headline-6 flex-1" style="margin: 0;">{{ calendarViewTitle() }}</h2>
+
+      <mat-form-field subscriptSizing="dynamic" class="tb-scheduler-view-select">
+        <mat-label>{{ 'scheduler.calendar-view-type' | translate }}</mat-label>
+        <mat-select [(ngModel)]="currentCalendarView" (ngModelChange)="changeCalendarView()">
+          <mat-option *ngFor="let v of schedulerCalendarViews" [value]="v">
+            {{ schedulerCalendarViewTranslations.get(v) | translate }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <button mat-raised-button [disabled]="isCalendarToday()" (click)="gotoCalendarToday()">
+        {{ 'scheduler.today' | translate }}
+      </button>
+      <button mat-mini-fab class="tb-scheduler-nav-button"
+              [matTooltip]="'scheduler.navigate-before' | translate" matTooltipPosition="above"
+              (click)="gotoCalendarPrev()"><mat-icon>navigate_before</mat-icon></button>
+      <button mat-mini-fab class="tb-scheduler-nav-button"
+              [matTooltip]="'scheduler.navigate-next' | translate" matTooltipPosition="above"
+              (click)="gotoCalendarNext()"><mat-icon>navigate_next</mat-icon></button>
+    </div>
+
+    <!-- calendar + context-menu anchor -->
+    <div #calendarContainer class="tb-scheduler-calendar-container flex-1">
+      <div style="visibility: hidden; position: absolute;"
+           [style.left]="schedulerEventMenuPosition.x"
+           [style.top]="schedulerEventMenuPosition.y"
+           [matMenuTriggerFor]="schedulerEventMenu"
+           #schedulerEventMenuTrigger="matMenuTrigger"></div>
+
+      <mat-menu #schedulerEventMenu="matMenu" class="tb-scheduler-context-menu" [overlapTrigger]="true">
+        <ng-template matMenuContent let-schedulerEvent="schedulerEvent">
+          <div class="tb-scheduler-context-menu-container" (mouseleave)="onSchedulerEventContextMenuMouseLeave()">
+            <div class="tb-context-menu-header">
+              <div class="tb-context-menu-title">{{ schedulerEvent.name }}</div>
+              <div class="tb-context-menu-subtitle">{{ schedulerEvent.type }}</div>
+            </div>
+            <button mat-menu-item *ngIf="editEnabled"
+                    (click)="editSchedulerEvent(schedulerContextMenuEvent, schedulerEvent)">
+              <mat-icon>edit</mat-icon><span>{{ 'action.edit' | translate }}</span>
+            </button>
+            <button mat-menu-item (click)="viewSchedulerEvent(schedulerContextMenuEvent, schedulerEvent)">
+              <mat-icon>visibility</mat-icon><span>{{ 'action.view' | translate }}</span>
+            </button>
+            <button mat-menu-item *ngIf="deleteEnabled"
+                    (click)="deleteSchedulerEvent(schedulerContextMenuEvent, schedulerEvent)">
+              <mat-icon>delete</mat-icon><span>{{ 'action.delete' | translate }}</span>
+            </button>
+          </div>
+        </ng-template>
+      </mat-menu>
+
+      <full-calendar #calendar [options]="calendarOptions">
+        <ng-template #eventContent let-arg>
+          <div class="fc-event-main-frame">
+            <div class="fc-event-time">{{ arg.timeText }}</div>
+            <div class="fc-event-title-container">
+              <b class="fc-event-title fc-sticky" *ngIf="arg.event.extendedProps.repeatInterval">
+                {{ arg.event.extendedProps.repeatInterval }}&nbsp;</b>
+              <div class="fc-event-title fc-sticky">{{ arg.event.title }}</div>
+            </div>
+          </div>
+        </ng-template>
+      </full-calendar>
+    </div>
+  </div>
+</div>

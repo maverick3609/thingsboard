@@ -17,7 +17,7 @@
 -->
 <form [formGroup]="schedulerEventFormGroup" (ngSubmit)="save()" style="min-width: 600px;">
   <mat-toolbar color="primary">
-    <h2>{{ (isAdd ? 'scheduler.add-scheduler-event' : 'scheduler.edit-scheduler-event') | translate }}</h2>
+    <h2>{{ (readonly ? 'scheduler.scheduler-event' : (isAdd ? 'scheduler.add-scheduler-event' : 'scheduler.edit-scheduler-event')) | translate }}</h2>
     <span class="flex-1"></span>
     <button mat-icon-button type="button" (click)="cancel()">
       <mat-icon class="material-icons">close</mat-icon>
@@ -60,7 +60,7 @@
     <button mat-button type="button" [disabled]="isLoading$ | async" (click)="cancel()">
       {{ 'action.cancel' | translate }}
     </button>
-    <button mat-raised-button color="primary" type="submit" [disabled]="(isLoading$ | async) || schedulerEventFormGroup.invalid">
+    <button *ngIf="!readonly" mat-raised-button color="primary" type="submit" [disabled]="(isLoading$ | async) || schedulerEventFormGroup.invalid">
       {{ (isAdd ? 'action.add' : 'action.save') | translate }}
     </button>
   </div>

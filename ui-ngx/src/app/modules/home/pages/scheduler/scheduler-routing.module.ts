@@ -16,15 +16,15 @@
 
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import { EntitiesTableComponent } from '@home/components/entity/entities-table.component';
 import { Authority } from '@shared/models/authority.enum';
 import { MenuId } from '@core/services/menu.models';
 import { SchedulerEventsTableConfigResolver } from '@home/pages/scheduler/scheduler-events-table-config.resolver';
+import { SchedulerEventsComponent } from '@home/pages/scheduler/scheduler-events.component';
 
 export const schedulerRoutes: Routes = [
   {
     path: 'scheduler',
-    component: EntitiesTableComponent,
+    component: SchedulerEventsComponent,
     data: {
       auth: [Authority.TENANT_ADMIN, Authority.CUSTOMER_USER],
       title: 'scheduler.scheduler',

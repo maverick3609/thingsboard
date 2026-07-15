@@ -5293,7 +5293,8 @@
         "message-type": "Message type",
         "metadata": "Metadata",
         "report-config-hint": "Report generation activates when the Reporting module is installed. Configuration is stored and will be used as-is once wired.",
-        "ota-package-id": "OTA package id (JSON: {\"entityType\": \"OTA_PACKAGE\", \"id\": \"...\"})"
+        "ota-package-id": "OTA package id (JSON: {\"entityType\": \"OTA_PACKAGE\", \"id\": \"...\"})",
+        "ending-on": "ending on"
     },
     "security": {
         "security": "Security",

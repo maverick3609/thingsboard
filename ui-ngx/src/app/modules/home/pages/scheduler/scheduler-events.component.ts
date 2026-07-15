@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 
-import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { ChangeDetectorRef } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
@@ -109,7 +109,7 @@ const dayOfWeekI18n = [
 })
 export class SchedulerEventsComponent implements OnInit, OnDestroy {
 
-  @ViewChild('calendarContainer', { static: false }) calendarContainer: any;
+  @ViewChild('calendarContainer', { static: false }) calendarContainer: ElementRef;
   @ViewChild('schedulerEventMenuTrigger', { static: true }) schedulerEventMenuTrigger: MatMenuTrigger;
 
   private calendarApi: Calendar;
@@ -242,18 +242,18 @@ export class SchedulerEventsComponent implements OnInit, OnDestroy {
         timeUnitToI18n[ev.schedule.repeat.timeUnit],
         { count: ev.schedule.repeat.repeatInterval });
     }
+    const info = this.getSchedulerEventInfo(ev.schedule, start);
     return {
       id: ev.id.id,
       title: `${ev.name} - ${typeName}`,
       name: ev.name,
       type: typeName,
-      info: this.getSchedulerEventInfo(ev.schedule, start),
       start: start.toDate(),
       end: end ? end.toDate() : null,
       extendedProps: {
         name: ev.name,
         type: typeName,
-        info: this.getSchedulerEventInfo(ev.schedule, start),
+        info,
         repeatInterval
       }
     };

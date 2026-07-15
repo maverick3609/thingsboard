@@ -37,16 +37,34 @@
     </div>
     <mat-form-field *ngIf="repeatType === 'EVERY_N_DAYS'" class="mat-block">
       <mat-label translate>scheduler.repeat-every-n-days</mat-label>
-      <input matInput type="number" min="1" formControlName="days">
+      <input matInput type="number" min="1" formControlName="days" required>
+      <mat-error *ngIf="scheduleFormGroup.get('repeat').get('days').hasError('required')">
+        {{ 'scheduler.repeat-days-required' | translate }}
+      </mat-error>
+      <mat-error *ngIf="scheduleFormGroup.get('repeat').get('days').hasError('min')">
+        {{ 'scheduler.invalid-repeat-days-value' | translate }}
+      </mat-error>
     </mat-form-field>
     <mat-form-field *ngIf="repeatType === 'EVERY_N_WEEKS'" class="mat-block">
       <mat-label translate>scheduler.repeat-every-n-weeks</mat-label>
-      <input matInput type="number" min="1" formControlName="weeks">
+      <input matInput type="number" min="1" formControlName="weeks" required>
+      <mat-error *ngIf="scheduleFormGroup.get('repeat').get('weeks').hasError('required')">
+        {{ 'scheduler.repeat-weeks-required' | translate }}
+      </mat-error>
+      <mat-error *ngIf="scheduleFormGroup.get('repeat').get('weeks').hasError('min')">
+        {{ 'scheduler.invalid-repeat-weeks-value' | translate }}
+      </mat-error>
     </mat-form-field>
     <div *ngIf="repeatType === 'TIMER'" class="flex flex-row gap-2">
       <mat-form-field class="flex-1">
         <mat-label translate>scheduler.repeat-interval</mat-label>
-        <input matInput type="number" min="1" formControlName="repeatInterval">
+        <input matInput type="number" min="1" formControlName="repeatInterval" required>
+        <mat-error *ngIf="scheduleFormGroup.get('repeat').get('repeatInterval').hasError('required')">
+          {{ 'scheduler.repeat-interval-required' | translate }}
+        </mat-error>
+        <mat-error *ngIf="scheduleFormGroup.get('repeat').get('repeatInterval').hasError('min')">
+          {{ 'scheduler.invalid-repeat-interval-value' | translate }}
+        </mat-error>
       </mat-form-field>
       <mat-form-field class="flex-1">
         <mat-label translate>scheduler.time-unit</mat-label>

@@ -120,7 +120,15 @@ public class SchedulerEventControllerTest extends AbstractControllerTest {
     @Test
     public void testDelete() throws Exception {
         SchedulerEvent saved = doPost("/api/schedulerEvent", buildEvent("Doomed", "custom"), SchedulerEvent.class);
+
+        Mockito.reset(tbClusterService, auditLogService);
         doDelete("/api/schedulerEvent/" + saved.getId().getId()).andExpect(status().isOk());
+        // Scheduler delete fires: audit log + ONE ENTITY_DELETED rule-engine push, but NO edge
+        // notify (SCHEDULER_EVENT is not edge-syncable — mirrors the save-path exclusion).
+        testNotifyEntityOneTimeMsgToEdgeServiceNever(saved, saved.getId(), saved.getId(),
+                savedTenant.getId(), tenantAdmin.getCustomerId(), tenantAdmin.getId(),
+                tenantAdmin.getEmail(), ActionType.DELETED, saved.getId().getId());
+
         doGet("/api/schedulerEvent/" + saved.getId().getId()).andExpect(status().isNotFound());
     }
 

@@ -22,7 +22,6 @@ import { PageLink } from '@shared/models/page/page-link';
 import { PageData } from '@shared/models/page/page-data';
 import {
   SchedulerEvent,
-  SchedulerEventInfo,
   SchedulerEventWithCustomerInfo
 } from '@shared/models/scheduler-event.models';
 

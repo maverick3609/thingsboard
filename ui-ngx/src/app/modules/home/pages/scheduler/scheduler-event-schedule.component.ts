@@ -56,9 +56,9 @@ export class SchedulerEventScheduleComponent implements ControlValueAccessor, Va
         type: [SchedulerRepeatType.DAILY],
         endsOn: [null],
         repeatOn: [[1, 2, 3, 4, 5]],
-        days: [1],
-        weeks: [1],
-        repeatInterval: [1],
+        days: [1, [Validators.required, Validators.min(1)]],
+        weeks: [1, [Validators.required, Validators.min(1)]],
+        repeatInterval: [1, [Validators.required, Validators.min(1)]],
         timeUnit: [SchedulerTimeUnit.HOURS]
       })
     });

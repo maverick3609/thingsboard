@@ -113,7 +113,7 @@ public class EdgeEventSourcingListener {
             return;
         }
         try {
-            if (EntityType.TENANT == entityType || EntityType.EDGE == entityType) {
+            if (EntityType.TENANT == entityType || EntityType.EDGE == entityType || EntityType.SCHEDULER_EVENT == entityType) {
                 return;
             }
             log.trace("[{}] DeleteEntityEvent called: {}", tenantId, event);

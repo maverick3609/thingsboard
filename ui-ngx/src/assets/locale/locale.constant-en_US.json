@@ -5207,6 +5207,8 @@
         "repeat-every-n-weeks": "Repeat every N weeks",
         "repeat-weeks-required": "Number of weeks to repeat is required.",
         "invalid-repeat-weeks-value": "Number of weeks to repeat must be positive integer.",
+        "repeat-interval-required": "Repeat interval is required.",
+        "invalid-repeat-interval-value": "Repeat interval must be positive integer.",
         "ends-on": "Ends on",
         "sunday-label": "Sun",
         "monday-label": "Mon",

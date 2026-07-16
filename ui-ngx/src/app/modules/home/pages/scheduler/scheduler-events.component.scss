@@ -19,6 +19,13 @@
   height: 100%;
 }
 
+.tb-scheduler-list-container {
+  // Containing block for tb-entities-table's mat-drawer-container.tb-absolute-fill,
+  // so the list fills the space below the mode toggle rather than the whole page.
+  position: relative;
+  min-height: 0;
+}
+
 .tb-scheduler-calendar-container {
   position: relative;
   min-height: 500px;

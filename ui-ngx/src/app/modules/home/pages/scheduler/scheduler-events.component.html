@@ -21,9 +21,13 @@
     <mat-button-toggle value="calendar">{{ 'scheduler.calendar-mode' | translate }}</mat-button-toggle>
   </mat-button-toggle-group>
 
-  <!-- LIST MODE: Task 9 entities table -->
-  <tb-entities-table *ngIf="mode === 'list'" class="flex flex-1"
-                     [entitiesTableConfig]="entitiesTableConfig"></tb-entities-table>
+  <!-- LIST MODE: Task 9 entities table.
+       Wrapper establishes a positioning + flex context so the table's internal
+       mat-drawer-container.tb-absolute-fill fills THIS container (below the mode
+       toggle) instead of escaping to .tb-scheduler-events and covering the toggle. -->
+  <div *ngIf="mode === 'list'" class="tb-scheduler-list-container flex flex-1">
+    <tb-entities-table [entitiesTableConfig]="entitiesTableConfig"></tb-entities-table>
+  </div>
 
   <!-- CALENDAR MODE -->
   <div *ngIf="mode === 'calendar'" class="tb-scheduler-calendar flex flex-1 flex-col" style="padding: 8px;">

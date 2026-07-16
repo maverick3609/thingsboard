@@ -40,3 +40,4 @@ rebuild-docker.sh
 .claude
 .planning
 docs/superpowers/
+/.superpowers/

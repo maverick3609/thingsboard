@@ -57,7 +57,8 @@ public interface ReportTemplateInfoRepository extends JpaRepository<ReportTempla
     @Query("SELECT NEW org.thingsboard.server.dao.model.sql.ReportTemplateInfoEntity(rt, c.title) " +
             "FROM ReportTemplateEntity rt LEFT JOIN CustomerEntity c ON c.id = rt.customerId " +
             "WHERE rt.tenantId = :tenantId " +
-            "AND (:searchText IS NULL OR ilike(rt.name, CONCAT('%', :searchText, '%')) = true) " +
+            "AND (:searchText IS NULL OR ilike(rt.name, CONCAT('%', :searchText, '%')) = true " +
+            "  OR ilike(c.title, CONCAT('%', :searchText, '%')) = true) " +
             "AND ((:#{#typeList == null} = true) OR rt.type IN (:typeList)) " + //HHH-15968
             "AND ((:#{#formatList == null} = true) OR rt.format IN (:formatList))") //HHH-15968
     Page<ReportTemplateInfoEntity> findTenantReportTemplatesIncludingCustomers(@Param("tenantId") UUID tenantId,

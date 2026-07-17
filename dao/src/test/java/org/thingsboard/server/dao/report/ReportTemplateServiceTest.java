@@ -101,6 +101,38 @@ public class ReportTemplateServiceTest extends AbstractServiceTest {
     }
 
     @Test
+    public void findInfosIncludingCustomers_matchesCustomerTitleAndName() {
+        Customer customer = new Customer();
+        customer.setTenantId(tenantId);
+        customer.setTitle("Zephyr Analytics Group");
+        customer = customerService.saveCustomer(customer);
+
+        ReportTemplate t = buildTemplate("Monthly Summary", null);
+        t.setCustomerId(customer.getId());
+        ReportTemplate saved = reportTemplateService.saveReportTemplate(t);
+
+        // unrelated template: no customer, unrelated name - must not match either search below
+        reportTemplateService.saveReportTemplate(buildTemplate("Unrelated Report", null));
+
+        ReportTemplateQuery byCustomerTitle = ReportTemplateQuery.builder()
+                .pageLink(new PageLink(10, 0, "Zephyr"))
+                .includeCustomers(true)
+                .build();
+        PageData<ReportTemplateInfo> byCustomerTitleResult = reportTemplateService.findReportTemplateInfos(tenantId, byCustomerTitle);
+        assertEquals(1, byCustomerTitleResult.getData().size());
+        assertEquals(saved.getId(), byCustomerTitleResult.getData().get(0).getId());
+
+        // regression: name-substring search must still work
+        ReportTemplateQuery byName = ReportTemplateQuery.builder()
+                .pageLink(new PageLink(10, 0, "Monthly"))
+                .includeCustomers(true)
+                .build();
+        PageData<ReportTemplateInfo> byNameResult = reportTemplateService.findReportTemplateInfos(tenantId, byName);
+        assertEquals(1, byNameResult.getData().size());
+        assertEquals(saved.getId(), byNameResult.getData().get(0).getId());
+    }
+
+    @Test
     public void deleteRemovesReportTemplate() {
         ReportTemplate saved = reportTemplateService.saveReportTemplate(buildTemplate("ToDelete", null));
         reportTemplateService.deleteReportTemplate(tenantId, saved.getId());

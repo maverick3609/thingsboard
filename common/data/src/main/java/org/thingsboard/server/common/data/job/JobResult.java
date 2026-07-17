@@ -41,7 +41,8 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "jobType")
 @JsonSubTypes({
-        @Type(name = "DUMMY", value = DummyJobResult.class)
+        @Type(name = "DUMMY", value = DummyJobResult.class),
+        @Type(name = "REPORT", value = ReportJobResult.class)
 })
 @Data
 @NoArgsConstructor

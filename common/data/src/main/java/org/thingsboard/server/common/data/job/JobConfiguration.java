@@ -40,6 +40,7 @@ import java.util.List;
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
 @JsonSubTypes({
         @Type(name = "DUMMY", value = DummyJobConfiguration.class),
+        @Type(name = "REPORT", value = ReportJobConfiguration.class),
 })
 @Data
 public abstract class JobConfiguration implements Serializable {

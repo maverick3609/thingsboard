@@ -22,7 +22,8 @@ import lombok.RequiredArgsConstructor;
 @Getter
 public enum JobType {
 
-    DUMMY("Dummy job");
+    DUMMY("Dummy job"),
+    REPORT("Report generation");
 
     private final String title;
 

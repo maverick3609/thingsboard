@@ -207,6 +207,18 @@ Bakes Inferrix branding into the default build (every `yarn build:prod` output i
 | R1 | `common/data/.../EntityType.java` | `REPORT_TEMPLATE(108)`, `REPORT(109)` appended after `SCHEDULER_EVENT(103)` | New entity types; PE-exact proto numbers |
 | R2 | `common/data/.../id/EntityIdFactory.java` | two `case` arms in `getByTypeAndUuid` | Id factory |
 | R3 | `common/data/.../id/EntityId.java` | two `@DiscriminatorMapping` entries | Swagger polymorphic schema |
+| R4 | `common/data/.../job/JobType.java` | `REPORT("Report generation")` appended after `DUMMY("Dummy job")` (comma-swap) | New job type; `DefaultJobManager` auto-discovers it (collects `JobProcessor` beans by `getType()`, builds `taskProducers` by iterating `JobType.values()` — verified, no other core-file touch needed for dispatch) |
+| R5 | `common/data/.../job/JobConfiguration.java` | `@Type(name = "REPORT", value = ReportJobConfiguration.class)` added to `@JsonSubTypes` | Jackson polymorphic subtype resolution for job configuration by the `type` discriminator |
+| R6 | `common/data/.../job/JobResult.java` | `@Type(name = "REPORT", value = ReportJobResult.class)` added to `@JsonSubTypes` | Jackson polymorphic subtype resolution for job result by the `jobType` discriminator |
+| R7 | `common/data/.../job/task/Task.java` | `@Type(name = "REPORT", value = ReportTask.class)` added to `@JsonSubTypes` | Jackson polymorphic subtype resolution for task by the `jobType` discriminator |
+| R8 | `common/data/.../job/task/TaskResult.java` | `@Type(name = "REPORT", value = ReportTaskResult.class)` added to `@JsonSubTypes` | Jackson polymorphic subtype resolution for task result by the `jobType` discriminator |
+| R9 | `common/data/.../job/Job.java` | `case REPORT -> new ReportJobResult();` added to the `presetResult()` switch expression, alongside `case DUMMY -> new DummyJobResult();` | **Not in the original task brief** (which scoped 5 files) — `presetResult()`'s `switch (type) {...}` is an exhaustive Java switch *expression* over `JobType` with no `default` arm; adding `JobType.REPORT` (R4) without this case is a hard compile error in `common/data` itself (verified empirically: RED before, GREEN after). Every `Job` built with `type=REPORT` needs a fresh `ReportJobResult` to accumulate task results into, mirroring `DUMMY`'s `DummyJobResult()` |
+
+### Merge-recovery procedure
+
+- **`JobType.java`** — verify `REPORT("Report generation")` survives as the last enum constant (comma-swapped with `DUMMY`). Not consumed by name in an exhaustive switch anywhere except `Job.java` (see below); a drop there removes the type outright.
+- **`JobConfiguration.java` / `JobResult.java` / `Task.java` / `TaskResult.java`** — verify the `@Type(name = "REPORT", value = Report*.class)` entry survives in each of the four `@JsonSubTypes` lists. **None of these four are compiler-enforced** — `@JsonSubTypes` is annotation metadata Jackson reads reflectively; a merge that silently drops one still compiles cleanly and only fails at runtime, the next time a REPORT job/task payload round-trips through Kafka or the REST API (mis-resolves to the wrong subtype, or Jackson throws on an unrecognized discriminator value). Check all four by hand after every merge touching `common/data/.../job/`.
+- **`Job.java`** — verify `case REPORT -> new ReportJobResult();` survives in `presetResult()`'s switch expression. **This one IS compiler-enforced** — an exhaustive switch expression over `JobType` with no `default`; a merge that adds a new `JobType` constant (or drops this arm) fails the `common/data` build outright, so breakage here is unmissable, unlike the four `@JsonSubTypes` rows above.
 
 ---
 

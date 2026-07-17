@@ -787,6 +787,16 @@ public class ModelConstants {
     public static final String SCHEDULER_EVENT_ADDITIONAL_INFO_PROPERTY = ADDITIONAL_INFO_PROPERTY;
 
     /**
+     * Report template constants.
+     */
+    public static final String REPORT_TEMPLATE_TABLE_NAME = "report_template";
+    public static final String REPORT_TEMPLATE_NAME_PROPERTY = "name";
+    public static final String REPORT_TEMPLATE_FORMAT_PROPERTY = "format";
+    public static final String REPORT_TEMPLATE_TYPE_PROPERTY = "type";
+    public static final String REPORT_TEMPLATE_DESCRIPTION_PROPERTY = "description";
+    public static final String REPORT_TEMPLATE_CONFIGURATION_PROPERTY = "configuration";
+
+    /**
      * IoT Hub installed item constants.
      */
     public static final String IOT_HUB_INSTALLED_ITEM_TABLE_NAME = "iot_hub_installed_item";

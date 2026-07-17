@@ -51,3 +51,33 @@ CREATE TABLE IF NOT EXISTS scheduler_event (
 );
 
 CREATE INDEX IF NOT EXISTS idx_scheduler_event_originator_id ON scheduler_event(tenant_id, originator_id);
+
+-- REPORTING (R1)
+CREATE TABLE IF NOT EXISTS report_template (
+    id uuid NOT NULL CONSTRAINT report_template_pkey PRIMARY KEY,
+    created_time bigint NOT NULL,
+    tenant_id uuid NOT NULL,
+    customer_id uuid,
+    name varchar(255) NOT NULL,
+    format varchar(32) NOT NULL,
+    type varchar(32) NOT NULL,
+    description varchar,
+    configuration jsonb,
+    additional_info varchar,
+    external_id uuid,
+    version bigint DEFAULT 1,
+    CONSTRAINT report_template_external_id_unq_key UNIQUE (tenant_id, external_id)
+);
+CREATE TABLE IF NOT EXISTS report (
+    id uuid NOT NULL CONSTRAINT report_pkey PRIMARY KEY,
+    created_time bigint NOT NULL,
+    tenant_id uuid NOT NULL,
+    customer_id uuid,
+    template_id uuid,
+    format varchar(32) NOT NULL,
+    name varchar(255) NOT NULL,
+    user_id uuid NOT NULL,
+    data bytea
+);
+CREATE INDEX IF NOT EXISTS idx_report_tenant_id ON report(tenant_id, created_time DESC);
+CREATE INDEX IF NOT EXISTS idx_report_template_id ON report(tenant_id, template_id);

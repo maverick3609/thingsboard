@@ -57,6 +57,8 @@ import java.util.UUID;
                 @DiscriminatorMapping(value = "OTA_PACKAGE", schema = OtaPackageId.class),
                 @DiscriminatorMapping(value = "QUEUE", schema = QueueId.class),
                 @DiscriminatorMapping(value = "QUEUE_STATS", schema = QueueStatsId.class),
+                @DiscriminatorMapping(value = "REPORT", schema = ReportId.class),
+                @DiscriminatorMapping(value = "REPORT_TEMPLATE", schema = ReportTemplateId.class),
                 @DiscriminatorMapping(value = "RPC", schema = RpcId.class),
                 @DiscriminatorMapping(value = "RULE_CHAIN", schema = RuleChainId.class),
                 @DiscriminatorMapping(value = "RULE_NODE", schema = RuleNodeId.class),

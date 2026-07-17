@@ -194,6 +194,22 @@ Bakes Inferrix branding into the default build (every `yarn build:prod` output i
 
 ---
 
+## Feature: Reporting (PE replication, R1)
+
+- **Spec:** `docs/specs/2026-07-17-reporting-design.md`; plan: `docs/superpowers/plans/2026-07-17-reporting.md`
+- **New additive paths (not tracked below):** `common/data/.../report/*`, `common/data/.../dashboardreport/*`, `common/data/.../id/Report{,Template}Id.java`, `common/data/.../job/Report*`, `common/data/.../job/task/Report*`, `common/data/.../notification/info/ReportGeneratedNotificationInfo.java`, `dao/.../report/*`, `dao/.../sql/report/*`, `dao/.../model/sql/*Report*`, `dao/.../service/validator/Report*`, `application/.../service/report/*`, `application/.../service/scheduler/report/InferrixSchedulerReportExecutor.java`, `application/.../controller/{Report,ReportTemplate,DashboardReport}Controller.java`, `ui-ngx/src/app/modules/home/pages/report/*`, `ui-ngx/.../core/http/report.service.ts`, `ui-ngx/.../shared/models/report.models.ts`. DDL in the schema overlay (§Inferrix schema overlay).
+- **Status:** in progress.
+
+### TB-core files modified
+
+| # | File | Change | Why |
+|---|------|--------|-----|
+| R1 | `common/data/.../EntityType.java` | `REPORT_TEMPLATE(108)`, `REPORT(109)` appended after `SCHEDULER_EVENT(103)` | New entity types; PE-exact proto numbers |
+| R2 | `common/data/.../id/EntityIdFactory.java` | two `case` arms in `getByTypeAndUuid` | Id factory |
+| R3 | `common/data/.../id/EntityId.java` | two `@DiscriminatorMapping` entries | Swagger polymorphic schema |
+
+---
+
 ## Inferrix schema overlay (DB migration mechanism)
 
 **The single, Inferrix-owned channel for all custom DDL.** One file holds every Inferrix table / column / index; four one-line seams feed it into all three schema consumers (fresh install, upgrade, DAO tests). Adding a future DB change = append idempotent DDL to that one file — no upstream ThingsBoard schema file changes again, and no new ledger row. (Chosen 2026-07-15 over Liquibase and over per-table appends to upstream `schema-entities.sql`. Upstream Liquibase is **not** used on this fork; this overlay + the TB-native install/upgrade app is the only DB-migration path.)

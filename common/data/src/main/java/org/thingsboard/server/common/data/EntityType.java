@@ -73,7 +73,9 @@ public enum EntityType {
         }
     },
     API_KEY(44),
-    SCHEDULER_EVENT(103);
+    SCHEDULER_EVENT(103),
+    REPORT_TEMPLATE(108),
+    REPORT(109);
 
     @Getter
     private final int protoNumber; // Corresponds to EntityTypeProto

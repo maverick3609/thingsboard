@@ -85,6 +85,8 @@ public class EntityIdFactory {
             case AI_MODEL -> new AiModelId(uuid);
             case API_KEY -> new ApiKeyId(uuid);
             case SCHEDULER_EVENT -> new SchedulerEventId(uuid);
+            case REPORT_TEMPLATE -> new ReportTemplateId(uuid);
+            case REPORT -> new ReportId(uuid);
         };
     }
 

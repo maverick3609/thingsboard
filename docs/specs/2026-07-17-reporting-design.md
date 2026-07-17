@@ -286,7 +286,8 @@ ReportJobConfiguration jobCfg = ReportJobConfiguration.builder()
     .notificationTemplateId(cfg.getNotificationTemplateId())
     .schedulerEventInfo(new EntityInfo(event.getId(), event.getName()))
     .build();
-jobManager.submitJob(new Job(tenantId, JobType.REPORT, jobCfg.getTasksKey(), event.getId(), jobCfg));
+// key = the scheduler event id (stable per event); the Job ctor assigns tasksKey itself
+jobManager.submitJob(new Job(tenantId, JobType.REPORT, event.getId().toString(), event.getId(), jobCfg));
 ```
 
 Deps: `JobManager` (CE bean, `rule-engine-api`). Logging: `log.info` on entry (tenant, event, templateId), `log.error` on parse/submit failure (caught by the engine's per-event try/catch — a failing report never stalls the scheduler). This is the sole integration point; the Scheduler's `generateReport` type becomes live the moment this bean is on the classpath.

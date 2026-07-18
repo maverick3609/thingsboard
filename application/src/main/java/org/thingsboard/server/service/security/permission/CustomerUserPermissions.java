@@ -116,10 +116,12 @@ public class CustomerUserPermissions extends AbstractPermissions {
 
     // Like customerEntityPermissionChecker, but also allows Operation.CREATE: customer users
     // generate reports on demand (self-service download, PE parity), which is a CREATE on the
-    // null-id branch of BaseController.checkEntity — same trap as Scheduler S14. Minus
-    // READ_CREDENTIALS/CLAIM_DEVICES/telemetry operations the report controllers never exercise.
+    // null-id branch of BaseController.checkEntity — same trap as Scheduler S14. Scoped to
+    // READ + CREATE only: reports are immutable (no CU-facing update endpoint) and DELETE is
+    // TENANT_ADMIN-only, so WRITE/DELETE — along with the READ_CREDENTIALS/CLAIM_DEVICES/telemetry
+    // operations the report controllers never exercise — are intentionally excluded.
     private static final PermissionChecker reportPermissionChecker =
-            new PermissionChecker.GenericPermissionChecker(Operation.CREATE, Operation.READ, Operation.WRITE, Operation.DELETE) {
+            new PermissionChecker.GenericPermissionChecker(Operation.CREATE, Operation.READ) {
 
                 @Override
                 @SuppressWarnings("unchecked")

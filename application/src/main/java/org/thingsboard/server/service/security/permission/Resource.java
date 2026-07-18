@@ -56,7 +56,9 @@ public enum Resource {
     SCHEDULER_EVENT(EntityType.SCHEDULER_EVENT),
     JOB(EntityType.JOB),
     AI_MODEL(EntityType.AI_MODEL),
-    API_KEY(EntityType.API_KEY);
+    API_KEY(EntityType.API_KEY),
+    REPORT_TEMPLATE(EntityType.REPORT_TEMPLATE),
+    REPORT(EntityType.REPORT);
 
     private final Set<EntityType> entityTypes;
 

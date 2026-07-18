@@ -53,6 +53,8 @@ public class CustomerUserPermissions extends AbstractPermissions {
         put(Resource.WHITE_LABELING, new PermissionChecker.GenericPermissionChecker(Operation.READ, Operation.WRITE));
         put(Resource.SCHEDULER_EVENT, schedulerEventPermissionChecker);
         put(Resource.API_KEY, apiKeysPermissionChecker);
+        put(Resource.REPORT_TEMPLATE, reportTemplatePermissionChecker);
+        put(Resource.REPORT, reportPermissionChecker);
     }
 
     private static final PermissionChecker customerAlarmPermissionChecker = new PermissionChecker() {
@@ -95,6 +97,52 @@ public class CustomerUserPermissions extends AbstractPermissions {
     // are provisioned by tenant admins and only assigned to customers afterwards.
     private static final PermissionChecker schedulerEventPermissionChecker =
             new PermissionChecker.GenericPermissionChecker(Operation.CREATE, Operation.READ, Operation.WRITE, Operation.DELETE) {
+
+                @Override
+                @SuppressWarnings("unchecked")
+                public boolean hasPermission(SecurityUser user, Operation operation, EntityId entityId, HasTenantId entity) {
+                    if (!super.hasPermission(user, operation, entityId, entity)) {
+                        return false;
+                    }
+                    if (!user.getTenantId().equals(entity.getTenantId())) {
+                        return false;
+                    }
+                    if (!(entity instanceof HasCustomerId)) {
+                        return false;
+                    }
+                    return user.getCustomerId().equals(((HasCustomerId) entity).getCustomerId());
+                }
+            };
+
+    // Like customerEntityPermissionChecker, but also allows Operation.CREATE: customer users
+    // generate reports on demand (self-service download, PE parity), which is a CREATE on the
+    // null-id branch of BaseController.checkEntity — same trap as Scheduler S14. Minus
+    // READ_CREDENTIALS/CLAIM_DEVICES/telemetry operations the report controllers never exercise.
+    private static final PermissionChecker reportPermissionChecker =
+            new PermissionChecker.GenericPermissionChecker(Operation.CREATE, Operation.READ, Operation.WRITE, Operation.DELETE) {
+
+                @Override
+                @SuppressWarnings("unchecked")
+                public boolean hasPermission(SecurityUser user, Operation operation, EntityId entityId, HasTenantId entity) {
+                    if (!super.hasPermission(user, operation, entityId, entity)) {
+                        return false;
+                    }
+                    if (!user.getTenantId().equals(entity.getTenantId())) {
+                        return false;
+                    }
+                    if (!(entity instanceof HasCustomerId)) {
+                        return false;
+                    }
+                    return user.getCustomerId().equals(((HasCustomerId) entity).getCustomerId());
+                }
+            };
+
+    // Report templates are tenant-authored: create/edit/delete is TA-only (no CU-exposed
+    // endpoint needs CREATE/WRITE/DELETE here). Customer users only read a template assigned to
+    // their own customer (e.g. to resolve the template name shown in their report-history list) —
+    // same customer-match shape as customerEntityPermissionChecker, scoped to READ only.
+    private static final PermissionChecker reportTemplatePermissionChecker =
+            new PermissionChecker.GenericPermissionChecker(Operation.READ) {
 
                 @Override
                 @SuppressWarnings("unchecked")

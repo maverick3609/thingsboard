@@ -417,6 +417,11 @@
             <groupId>org.thingsboard.langchain4j</groupId>
             <artifactId>langchain4j-ollama</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.microsoft.playwright</groupId>
+            <artifactId>playwright</artifactId>
+            <version>1.49.0</version>
+        </dependency>
     </dependencies>
 
     <build>

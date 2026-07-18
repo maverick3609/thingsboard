@@ -21,6 +21,7 @@ import org.thingsboard.server.common.data.User;
 import org.thingsboard.server.common.data.audit.ActionType;
 import org.thingsboard.server.common.data.id.CustomerId;
 import org.thingsboard.server.common.data.id.TenantId;
+import org.thingsboard.server.common.data.id.UserId;
 import org.thingsboard.server.common.data.security.UserCredentials;
 import org.thingsboard.server.common.data.security.model.UserPasswordPolicy;
 import org.thingsboard.server.common.data.security.model.mfa.PlatformTwoFaSettings;
@@ -42,5 +43,20 @@ public interface SystemSecurityService {
     void logLoginAction(User user, Object authenticationDetails, ActionType actionType, Exception e);
 
     void logLoginAction(User user, Object authenticationDetails, ActionType actionType, String provider, Exception e);
+
+    /**
+     * Mints a JWT access token for the given user without a password, e.g. so a headless report
+     * renderer can log in AS the report's configured user. Reuses the same
+     * {@code SecurityUser(User, boolean, UserPrincipal)} construction CE's own refresh-token flow
+     * uses ({@code AbstractAuthenticationProvider#authenticateByUserId}) so the minted token
+     * carries exactly the permissions that user would get from a real login.
+     */
+    String createUserAccessToken(TenantId tenantId, UserId userId);
+
+    /**
+     * Mints a JWT access token for the synthetic public-customer user, mirroring how CE resolves
+     * a public dashboard login ({@code AbstractAuthenticationProvider#authenticateByPublicId}).
+     */
+    String createUserAccessTokenFromPublicId(TenantId tenantId, String publicId);
 
 }

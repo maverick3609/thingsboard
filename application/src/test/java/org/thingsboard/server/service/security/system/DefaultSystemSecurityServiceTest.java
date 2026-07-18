@@ -32,9 +32,11 @@ import org.thingsboard.server.common.data.security.UserCredentials;
 import org.thingsboard.server.common.data.security.model.SecuritySettings;
 import org.thingsboard.server.common.data.security.model.UserPasswordPolicy;
 import org.thingsboard.server.dao.audit.AuditLogService;
+import org.thingsboard.server.dao.customer.CustomerService;
 import org.thingsboard.server.dao.settings.AdminSettingsService;
 import org.thingsboard.server.dao.settings.SecuritySettingsService;
 import org.thingsboard.server.dao.user.UserService;
+import org.thingsboard.server.service.security.model.token.JwtTokenFactory;
 
 import java.util.UUID;
 
@@ -60,6 +62,10 @@ public class DefaultSystemSecurityServiceTest {
     private AuditLogService auditLogService;
     @Mock
     private SecuritySettingsService securitySettingsService;
+    @Mock
+    private CustomerService customerService;
+    @Mock
+    private JwtTokenFactory tokenFactory;
 
     private DefaultSystemSecurityService systemSecurityService;
 
@@ -73,7 +79,7 @@ public class DefaultSystemSecurityServiceTest {
 
     @Before
     public void setUp() {
-        systemSecurityService = new DefaultSystemSecurityService(adminSettingsService, encoder, userService, mailService, auditLogService, securitySettingsService);
+        systemSecurityService = new DefaultSystemSecurityService(adminSettingsService, encoder, userService, mailService, auditLogService, securitySettingsService, customerService, tokenFactory);
 
         tenantId = TenantId.fromUUID(UUID.randomUUID());
         userId = new UserId(UUID.randomUUID());

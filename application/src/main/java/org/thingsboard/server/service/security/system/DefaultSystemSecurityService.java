@@ -33,23 +33,29 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.rule.engine.api.MailService;
 import org.thingsboard.server.common.data.AdminSettings;
+import org.thingsboard.server.common.data.Customer;
 import org.thingsboard.server.common.data.StringUtils;
 import org.thingsboard.server.common.data.User;
+import org.thingsboard.server.common.data.UserAuthDetails;
 import org.thingsboard.server.common.data.audit.ActionType;
 import org.thingsboard.server.common.data.exception.ThingsboardException;
 import org.thingsboard.server.common.data.id.CustomerId;
+import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.id.UserId;
+import org.thingsboard.server.common.data.security.Authority;
 import org.thingsboard.server.common.data.security.UserCredentials;
 import org.thingsboard.server.common.data.security.model.SecuritySettings;
 import org.thingsboard.server.common.data.security.model.UserPasswordPolicy;
 import org.thingsboard.server.common.data.security.model.mfa.PlatformTwoFaSettings;
 import org.thingsboard.server.dao.audit.AuditLogService;
+import org.thingsboard.server.dao.customer.CustomerService;
 import org.thingsboard.server.exception.DataValidationException;
 import org.thingsboard.server.dao.settings.AdminSettingsService;
 import org.thingsboard.server.dao.settings.SecuritySettingsService;
@@ -58,12 +64,15 @@ import org.thingsboard.server.dao.user.UserServiceImpl;
 import org.thingsboard.server.service.security.auth.rest.RestAuthenticationDetails;
 import org.thingsboard.server.service.security.exception.UserPasswordExpiredException;
 import org.thingsboard.server.service.security.model.SecurityUser;
+import org.thingsboard.server.service.security.model.UserPrincipal;
+import org.thingsboard.server.service.security.model.token.JwtTokenFactory;
 import org.thingsboard.server.utils.MiscUtils;
 import ua_parser.Client;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -77,6 +86,8 @@ public class DefaultSystemSecurityService implements SystemSecurityService {
     private final MailService mailService;
     private final AuditLogService auditLogService;
     private final SecuritySettingsService securitySettingsService;
+    private final CustomerService customerService;
+    private final JwtTokenFactory tokenFactory;
 
     @Override
     public void validateUserCredentials(TenantId tenantId, UserCredentials userCredentials, String username, String password) throws AuthenticationException {
@@ -270,6 +281,50 @@ public class DefaultSystemSecurityService implements SystemSecurityService {
         auditLogService.logEntityAction(
                 user.getTenantId(), user.getCustomerId(), user.getId(),
                 user.getName(), user.getId(), null, actionType, e, clientAddress, browser, os, device, provider);
+    }
+
+    @Override
+    public String createUserAccessToken(TenantId tenantId, UserId userId) {
+        UserAuthDetails userAuthDetails = userService.findUserAuthDetailsByUserId(tenantId, userId);
+        if (userAuthDetails == null) {
+            throw new UsernameNotFoundException("User with credentials not found");
+        }
+        if (!userAuthDetails.credentialsEnabled()) {
+            throw new DisabledException("User is not active");
+        }
+        User user = userAuthDetails.user();
+        UserPrincipal principal = new UserPrincipal(UserPrincipal.Type.USER_NAME, user.getEmail());
+        SecurityUser securityUser = new SecurityUser(user, true, principal);
+        return tokenFactory.createAccessJwtToken(securityUser).token();
+    }
+
+    @Override
+    public String createUserAccessTokenFromPublicId(TenantId tenantId, String publicId) {
+        CustomerId customerId;
+        try {
+            customerId = new CustomerId(UUID.fromString(publicId));
+        } catch (Exception e) {
+            throw new BadCredentialsException("Public Id is not valid");
+        }
+        Customer publicCustomer = customerService.findCustomerById(tenantId, customerId);
+        if (publicCustomer == null) {
+            throw new UsernameNotFoundException("Public entity not found: " + publicId);
+        }
+        if (!publicCustomer.isPublic()) {
+            throw new BadCredentialsException("Public Id is not valid");
+        }
+
+        User user = new User(new UserId(EntityId.NULL_UUID));
+        user.setTenantId(publicCustomer.getTenantId());
+        user.setCustomerId(publicCustomer.getId());
+        user.setEmail(publicId);
+        user.setAuthority(Authority.CUSTOMER_USER);
+        user.setFirstName("Public");
+        user.setLastName("Public");
+
+        UserPrincipal principal = new UserPrincipal(UserPrincipal.Type.PUBLIC_ID, publicId);
+        SecurityUser securityUser = new SecurityUser(user, true, principal);
+        return tokenFactory.createAccessJwtToken(securityUser).token();
     }
 
     private static boolean isPositiveInteger(Integer val) {

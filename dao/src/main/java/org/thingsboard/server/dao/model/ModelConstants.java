@@ -797,6 +797,16 @@ public class ModelConstants {
     public static final String REPORT_TEMPLATE_CONFIGURATION_PROPERTY = "configuration";
 
     /**
+     * Report constants.
+     */
+    public static final String REPORT_TABLE_NAME = "report";
+    public static final String REPORT_TEMPLATE_ID_PROPERTY = "template_id";
+    public static final String REPORT_FORMAT_PROPERTY = "format";
+    public static final String REPORT_NAME_PROPERTY = "name";
+    public static final String REPORT_USER_ID_PROPERTY = "user_id";
+    public static final String REPORT_DATA_PROPERTY = "data";
+
+    /**
      * IoT Hub installed item constants.
      */
     public static final String IOT_HUB_INSTALLED_ITEM_TABLE_NAME = "iot_hub_installed_item";

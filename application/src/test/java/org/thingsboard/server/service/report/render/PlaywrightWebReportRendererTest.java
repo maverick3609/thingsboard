@@ -82,39 +82,56 @@ class PlaywrightWebReportRendererTest {
 
     /**
      * A timeout leaves its checked-out pooled {@code (Playwright, Browser)} pair's driver connection in
-     * an unknown state, so {@link PlaywrightWebReportRenderer} recycles that pair — closes and relaunches
-     * it — before returning it to the pool, instead of handing a possibly-wedged pair to the next caller.
-     * Proves that recycling for real: triggers a timeout (same shape as
-     * {@link #timeoutClosesContextAndThrows}), then immediately renders again on the very same shared
-     * {@code renderer}. With only {@code maxConcurrent=2} pairs total this render stands a good chance of
-     * drawing the just-recycled pair, and must succeed either way — proving recycle-on-timeout doesn't
-     * wedge the pool for subsequent renders.
+     * an unknown state, so {@code checkin} closes that pair and offers a "dead" placeholder back to the
+     * pool in its place, instead of handing a possibly-wedged pair to the next caller; {@code checkout}
+     * lazily relaunches a dead placeholder into a fresh pair whenever a caller next draws it. This test
+     * triggers a timeout (same shape as {@link #timeoutClosesContextAndThrows}), renders once more to
+     * prove the very next caller isn't wedged, then — since {@code ArrayBlockingQueue} is strict FIFO, so
+     * exactly which pair either render draws is deterministic, not a matter of chance (unlike an earlier
+     * version of this comment claimed) — finishes by driving {@code maxConcurrent} (2) genuinely
+     * concurrent renders to prove the timeout didn't cost the pool a slot: if a slot had been lost, one of
+     * these two barrier-synchronized renders would starve past its timeout instead of completing.
      */
     @Test
-    void renderSucceedsAfterAPriorTimeout() {
+    void renderSucceedsAfterAPriorTimeout() throws Exception {
         assertThatThrownBy(() -> renderer.renderRaw("data:text/html,<script>while(true){}</script>", 1))
                 .isInstanceOf(ReportRenderException.class);
 
         byte[] pdf = renderer.renderRaw(
                 "data:text/html,<html><body><h1 style='height:200px'>After timeout</h1></body></html>", 200);
-
         assertPdf(pdf);
+
+        // No slot lost to the timeout above: the pool must still serve `maxConcurrent` (2) genuinely
+        // concurrent renders.
+        assertTwoConcurrentRendersSucceed(
+                "data:text/html,<html><body><h1 style='height:400px'>Concurrent after timeout</h1></body></html>");
     }
 
     /**
      * Proves genuine concurrency, not just that two sequential renders each work — untested by the tests
-     * above, since JUnit runs {@code @Test}s sequentially. This launches two {@code renderRaw} calls from
-     * two threads released simultaneously by a {@link CyclicBarrier} (not just submitted back-to-back,
-     * which could accidentally serialize) and asserts both genuinely-concurrent renders produce a
-     * non-empty PDF. {@code renderer} above is constructed with {@code maxConcurrent=2}, matching the two
-     * threads here, so each thread checks out its own pooled {@code (Playwright, Browser)} pair for the
-     * full duration of its render — no pair is ever driven by both threads at once, which is what makes
-     * this safe (see {@link PlaywrightWebReportRenderer} class Javadoc for why a single {@code Browser}
-     * shared across concurrent threads is not).
+     * above, since JUnit runs {@code @Test}s sequentially. See {@link #assertTwoConcurrentRendersSucceed}
+     * for the barrier-synchronized mechanics. {@code renderer} above is constructed with
+     * {@code maxConcurrent=2}, matching the two threads driven there, so each thread checks out its own
+     * pooled {@code (Playwright, Browser)} pair for the full duration of its render — no pair is ever
+     * driven by both threads at once, which is what makes this safe (see
+     * {@link PlaywrightWebReportRenderer} class Javadoc for why a single {@code Browser} shared across
+     * concurrent threads is not).
      */
     @Test
     void concurrentRendersBothSucceed() throws Exception {
-        String dataUrl = "data:text/html,<html><body><h1 style='height:400px'>Concurrent</h1></body></html>";
+        assertTwoConcurrentRendersSucceed(
+                "data:text/html,<html><body><h1 style='height:400px'>Concurrent</h1></body></html>");
+    }
+
+    /**
+     * Drives {@code maxConcurrent} (2) {@code renderRaw} calls from two threads released simultaneously
+     * by a {@link CyclicBarrier} (not just submitted back-to-back, which could accidentally serialize)
+     * and asserts both produce a non-empty PDF within {@code TEST_TIMEOUT_MS * 2}. Shared by
+     * {@link #concurrentRendersBothSucceed} (proving genuine concurrency works at all) and
+     * {@link #renderSucceedsAfterAPriorTimeout} (proving it still works, with no slot lost, after an
+     * earlier timeout).
+     */
+    private static void assertTwoConcurrentRendersSucceed(String dataUrl) throws Exception {
         CyclicBarrier startTogether = new CyclicBarrier(2);
         ExecutorService callers = Executors.newFixedThreadPool(2);
         try {

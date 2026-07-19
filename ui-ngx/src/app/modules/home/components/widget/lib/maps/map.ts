@@ -84,6 +84,7 @@ import { TbMapDataLayer } from '@home/components/widget/lib/maps/data-layer/map-
 import { EntityType } from '@shared/models/entity-type.models';
 import { ShapePatternStorage } from '@home/components/widget/lib/maps/data-layer/shapes-data-layer';
 import { TbPolylineDataLayer } from '@home/components/widget/lib/maps/data-layer/polylines-data-layer';
+import { ReportService } from '@core/services/report.service';
 import ITooltipsterInstance = JQueryTooltipster.ITooltipsterInstance;
 import TooltipPositioningSide = JQueryTooltipster.TooltipPositioningSide;
 
@@ -150,6 +151,12 @@ export abstract class TbMap<S extends BaseMapSettings> {
   private dragMode = true;
   private createMapItemActionId: string;
 
+  // Report-view (?reportView=true) map-tile readiness tracking (report.service.ts's wait-for-map
+  // set): registered here, before any tile/overlay starts loading, so a `waitReportWidgets`
+  // command sent immediately after `openReport` never races a map that hasn't registered yet.
+  protected readonly reportService: ReportService = this.ctx.$injector.get(ReportService);
+  protected mapUuid: string;
+
   private get isPlacingItem(): boolean {
     return !!this.currentEditButton;
   }
@@ -160,6 +167,15 @@ export abstract class TbMap<S extends BaseMapSettings> {
     this.ctx.actionsApi.placeMapItem = this.placeMapItem.bind(this);
     (this.ctx as any).mapInstance = this;
     this.settings = mergeDeepIgnoreArray({} as S, this.defaultSettings(), this.inputSettings as S);
+
+    if (this.reportService.reportView) {
+      try {
+        this.mapUuid = this.reportService.onWaitForMap();
+        $(containerElement).addClass('tb-web-report');
+      } catch (err) {
+        console.error('[Reporting] onWaitForMap failed', err);
+      }
+    }
 
     $(containerElement).empty();
     $(containerElement).addClass('tb-map-container');

@@ -1,0 +1,23 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../out-tsc/spec",
+    "types": ["jasmine", "node", "jquery", "flot", "tooltipster", "tinycolor2", "js-beautify",
+       "raphael", "canvas-gauges", "systemjs"]
+  },
+  "angularCompilerOptions": {
+    "fullTemplateTypeCheck": true,
+    "supportTestBed": true,
+    "supportJitMode": true
+  },
+  "files": [
+    "polyfills.ts"
+  ],
+  "include": [
+    "**/*.spec.ts",
+    "**/*.d.ts"
+  ],
+  "exclude": [
+    "app/core/auth/auth.service.spec.ts"
+  ]
+}

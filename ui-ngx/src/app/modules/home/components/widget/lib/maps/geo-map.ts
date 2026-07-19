@@ -109,6 +109,19 @@ export class TbGeoMap extends TbMap<GeoMapSettings> {
             });
           });
           defaultLayer.layer.addTo(this.map);
+          if (this.reportService.reportView) {
+            // Report-view map-tile readiness (report.service.ts wait-for-map set): the base tile
+            // layer's own 'load' event (all tiles in the current view fetched) is the earliest
+            // point at which this map is actually visually complete, as opposed to
+            // WidgetComponent.loadingData (which only reflects the data subscription).
+            defaultLayer.layer.once('load', () => {
+              try {
+                this.reportService.onMapLoaded(this.mapUuid);
+              } catch (err) {
+                console.error('[Reporting] onMapLoaded failed', err);
+              }
+            });
+          }
           this.map.attributionControl.setPrefix(defaultLayer.attributionPrefix);
           if (layers.length > 1) {
             const sidebar = this.getSidebar();

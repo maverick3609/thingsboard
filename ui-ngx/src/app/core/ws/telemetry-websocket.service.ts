@@ -57,6 +57,7 @@ import { AppState } from '@core/core.state';
 import { AuthService } from '@core/auth/auth.service';
 import { WINDOW } from '@core/services/window.service';
 import { WebsocketService } from '@core/ws/websocket.service';
+import { ReportService } from '@core/services/report.service';
 
 // @dynamic
 @Injectable({
@@ -69,7 +70,8 @@ export class TelemetryWebsocketService extends WebsocketService<TelemetrySubscri
   constructor(protected store: Store<AppState>,
               protected authService: AuthService,
               protected ngZone: NgZone,
-              @Inject(WINDOW) protected window: Window) {
+              @Inject(WINDOW) protected window: Window,
+              private reportService: ReportService) {
     super(store, authService, ngZone, 'api/ws', new TelemetryPluginCmdsWrapper(), window);
   }
 
@@ -83,6 +85,7 @@ export class TelemetryWebsocketService extends WebsocketService<TelemetrySubscri
         }
         subscriptionCommand.cmdId = cmdId;
         this.cmdWrapper.cmds.push(subscriptionCommand);
+        this.trackReportWsCommand(cmdId);
       }
     );
     this.subscribersCount++;
@@ -95,10 +98,27 @@ export class TelemetryWebsocketService extends WebsocketService<TelemetrySubscri
         (subscriptionCommand) => {
           if (subscriptionCommand.cmdId && (subscriptionCommand instanceof EntityDataCmd || subscriptionCommand instanceof UnreadSubCmd)) {
             this.cmdWrapper.cmds.push(subscriptionCommand);
+            this.trackReportWsCommand(subscriptionCommand.cmdId);
           }
         }
       );
       this.publishCommands();
+    }
+  }
+
+  /**
+   * Report-view (?reportView=true) websocket-data readiness tracker: registers a freshly
+   * (re)published, non-unsubscribe cmdId with ReportService so waitForWebsocketData can tell
+   * whether every subscription this page issued has received at least one reply. No-op outside
+   * report mode (ReportService.reportView is false).
+   */
+  private trackReportWsCommand(cmdId: number): void {
+    if (this.reportService.reportView) {
+      try {
+        this.reportService.onSendWsCommand(cmdId);
+      } catch (err) {
+        console.error('[Reporting] onSendWsCommand failed', err);
+      }
     }
   }
 
@@ -147,6 +167,13 @@ export class TelemetryWebsocketService extends WebsocketService<TelemetrySubscri
   }
 
   processOnMessage(message: WebsocketDataMsg) {
+    if (this.reportService.reportView) {
+      try {
+        this.reportService.onWsCmdUpdateMessage(message);
+      } catch (err) {
+        console.error('[Reporting] onWsCmdUpdateMessage failed', err);
+      }
+    }
     let subscriber: TelemetrySubscriber | NotificationSubscriber;
     if ('cmdId' in message && message.cmdId) {
       subscriber = this.subscribersMap.get(message.cmdId);

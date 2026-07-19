@@ -246,6 +246,18 @@ export class TbImageMap extends TbMap<ImageMapSettings> {
       this.imageOverlay.setBounds(bounds);
     } else {
       this.imageOverlay = L.imageOverlay(this.imageLayerData.imageUrl, bounds).addTo(this.map);
+      if (this.reportService.reportView) {
+        // Report-view map-tile readiness (report.service.ts wait-for-map set): the image overlay
+        // has no tile layer, so its own 'load' event (the image finished decoding/painting) is
+        // the equivalent "visually complete" signal used for the geo-map tile layer.
+        this.imageOverlay.once('load', () => {
+          try {
+            this.reportService.onMapLoaded(this.mapUuid);
+          } catch (err) {
+            console.error('[Reporting] onMapLoaded failed', err);
+          }
+        });
+      }
     }
     const padding = 200 * this.maxZoom;
     const southWest = this.pointToLatLng(-padding, h + padding);

@@ -127,6 +127,7 @@ import { FiltersDialogComponent, FiltersDialogData } from '@home/components/filt
 import { Filters } from '@shared/models/query/query.models';
 import { DashboardWidgetSelectComponent } from '@home/components/dashboard-page/dashboard-widget-select.component';
 import { MobileService } from '@core/services/mobile.service';
+import { ReportService } from '@core/services/report.service';
 
 import {
   DashboardImageDialogComponent,
@@ -366,6 +367,7 @@ export class DashboardPageComponent extends PageComponent implements IDashboardC
               private itembuffer: ItemBufferService,
               private importExport: ImportExportService,
               private mobileService: MobileService,
+              private reportService: ReportService,
               private dialog: MatDialog,
               public translate: TranslateService,
               private popoverService: TbPopoverService,
@@ -417,6 +419,7 @@ export class DashboardPageComponent extends PageComponent implements IDashboardC
             setTimeout(() => {
               this.mobileService.handleDashboardStateName(this.dashboardCtx.stateController.getCurrentStateName());
               this.mobileService.onDashboardLoaded(this.layouts.right.show, this.isRightLayoutOpened);
+              this.reportService.onDashboardLoaded(this.reportWidgetsCount());
             });
           }
         }
@@ -509,7 +512,11 @@ export class DashboardPageComponent extends PageComponent implements IDashboardC
     }
 
     this.dashboardConfiguration = this.dashboard.configuration;
-    this.dashboardCtx.dashboardTimewindow = this.dashboardConfiguration.timewindow;
+    // Report-view (?reportView=true) timewindow override: the openReport command may carry an
+    // explicit reportTimewindow (spec §6.3 point 3), which takes precedence over the dashboard's
+    // own configured timewindow so the renderer controls exactly what data range is captured.
+    this.dashboardCtx.dashboardTimewindow = (this.reportService.active && this.reportService.reportTimewindow) ?
+      this.reportService.reportTimewindow : this.dashboardConfiguration.timewindow;
     this.layouts.main.layoutCtx.widgets = new LayoutWidgetsArray(this.dashboardCtx);
     this.layouts.right.layoutCtx.widgets = new LayoutWidgetsArray(this.dashboardCtx);
     this.widgetEditMode = data.widgetEditMode;
@@ -1122,8 +1129,21 @@ export class DashboardPageComponent extends PageComponent implements IDashboardC
       }
       setTimeout(() => {
         this.mobileService.onDashboardLoaded(this.layouts.right.show, this.isRightLayoutOpened);
+        this.reportService.onDashboardLoaded(this.reportWidgetsCount());
       });
     }
+  }
+
+  /**
+   * Widget count of the currently-shown layout(s), for the report-view DOM readiness predicate
+   * (ReportService.onDashboardLoaded / isReportPageDomReady - see report.service.ts).
+   */
+  private reportWidgetsCount(): number {
+    let count = this.layouts.main.layoutCtx.widgets ? this.layouts.main.layoutCtx.widgets.size() : 0;
+    if (this.layouts.right.show && this.layouts.right.layoutCtx.widgets) {
+      count += this.layouts.right.layoutCtx.widgets.size();
+    }
+    return count;
   }
 
   private updateLayouts(layoutsData?: DashboardLayoutsInfo) {

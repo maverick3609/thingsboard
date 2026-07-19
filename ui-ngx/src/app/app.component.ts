@@ -33,6 +33,7 @@ import { svgIcons, svgIconsUrl } from '@shared/models/icon.models';
 import { ActionSettingsChangeLanguage } from '@core/settings/settings.actions';
 import { SETTINGS_KEY } from '@core/settings/settings.effects';
 import { initCustomJQueryEvents } from '@shared/models/jquery-event.models';
+import { ReportService } from '@core/services/report.service';
 
 @Component({
     selector: 'tb-root',
@@ -47,7 +48,8 @@ export class AppComponent {
               private translate: TranslateService,
               private matIconRegistry: MatIconRegistry,
               private domSanitizer: DomSanitizer,
-              private authService: AuthService) {
+              private authService: AuthService,
+              private reportService: ReportService) {
 
     console.log(`ThingsBoard Version: ${env.tbVersion}`);
 
@@ -106,6 +108,13 @@ export class AppComponent {
     ).subscribe((data) => {
       this.authService.gotoDefaultPlace(data.isAuthenticated);
     });
+    // Report-view bootstrap (headless Playwright renderer, ?reportView=true&accessToken=<JWT>):
+    // installs the postMessage protocol listener once the user-ready signal below settles.
+    // CE's reloadUser() already performs the ?accessToken= login unconditionally (unlike PE,
+    // which short-circuits its own reloadUser via `reportService.loadReportParams() ||
+    // authService.reloadUser()`), so both calls run every time; loadReportParams() only adds
+    // the report-mode listener on top, it never re-authenticates by itself.
+    this.reportService.loadReportParams();
     this.authService.reloadUser();
   }
 

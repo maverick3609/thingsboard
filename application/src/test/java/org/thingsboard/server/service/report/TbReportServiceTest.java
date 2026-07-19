@@ -77,9 +77,17 @@ class TbReportServiceTest {
         ReportData rendered = ReportData.builder()
                 .data("%PDF-x".getBytes()).name("r.pdf").contentType("application/pdf").build();
         when(dashboardReportService.generateReport(eq(tenantId), any(DashboardReportConfig.class))).thenReturn(rendered);
+        ReportId savedId = new ReportId(UUID.randomUUID());
         when(reportDao.createReport(any(Report.class), any(byte[].class))).thenAnswer(invocation -> {
-            Report saved = invocation.getArgument(0);
-            saved.setId(new ReportId(UUID.randomUUID()));
+            // Return a DISTINCT Report (copy), not the pre-save argument itself: mutating and
+            // returning the same reference can't distinguish the correct `return saved;` (the dao's
+            // response) from a `return report;` regression (TbReportService's own pre-save local),
+            // since both would then alias the very same object/id. The pre-save argument's id is
+            // left untouched (null) so only the true dao response satisfies the identity assertion
+            // on savedId below.
+            Report preSave = invocation.getArgument(0);
+            Report saved = new Report(preSave);
+            saved.setId(savedId);
             return saved;
         });
 
@@ -101,7 +109,9 @@ class TbReportServiceTest {
 
         verify(reportDao).createReport(any(Report.class), eq("%PDF-x".getBytes()));
         assertThat(r).isNotNull();
-        assertThat(r.getId()).isNotNull();
+        // Pins identity to the dao's response object, not TbReportService's own pre-save bean: a
+        // `return report;` regression carries a null id here, since only the dao's copy gets savedId.
+        assertThat(r.getId()).isEqualTo(savedId);
         assertThat(r.getName()).isEqualTo("r.pdf");
         assertThat(r.getFormat()).isEqualTo(TbReportFormat.PDF);
         assertThat(r.getTenantId()).isEqualTo(tenantId);

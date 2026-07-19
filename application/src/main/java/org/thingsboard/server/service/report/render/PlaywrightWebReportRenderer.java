@@ -430,16 +430,15 @@ public class PlaywrightWebReportRenderer {
 
         awaitSignal(page, readySignal, timeoutMs, "Timed out waiting for the report-view UI to become ready");
 
-        page.evaluate("(json) => window.postMessage(json, '*')", buildOpenReportMessage(accessToken, options));
+        page.evaluate("(json) => window.postMessage(json, '*')", buildOpenReportMessage(accessToken, options, timeoutMs));
 
         Map<String, Object> result = awaitSignal(page, resultSignal, timeoutMs, "Timed out waiting for the dashboard report result");
 
         if (!Boolean.TRUE.equals(result.get("success"))) {
-            Object error = result.get("error");
-            throw new ReportRenderException("Dashboard report render failed: " + (error != null ? error : "unknown error"));
+            throw new ReportRenderException("Dashboard report render failed: " + extractErrorMessage(result));
         }
 
-        int pageHeight = ((Number) result.get("pageHeight")).intValue();
+        int pageHeight = extractPageHeight(result);
         int pageWidth = options.getPageWidth() != null ? options.getPageWidth() : page.viewportSize().width;
         page.setViewportSize(pageWidth, pageHeight);
 
@@ -545,6 +544,35 @@ public class PlaywrightWebReportRenderer {
     }
 
     /**
+     * {@code error} is whatever the UI sent under that key — normally a {@code String}, but the
+     * defensive fallback {@code postMessage({type:'reportResult',...})} path (see
+     * {@link #extractPayload}) or any other unexpected result shape could hand this a nested
+     * {@code Map}/{@code List}/other type. {@link String#valueOf} renders any of those (never
+     * {@code null}, since that's guarded separately) without risking a surprise exception out of
+     * this failure-reporting path itself — the one place callers rely on to explain what went
+     * wrong, so it must not be what throws instead.
+     */
+    private static String extractErrorMessage(Map<String, Object> result) {
+        Object error = result.get("error");
+        return error != null ? String.valueOf(error) : "unknown error";
+    }
+
+    /**
+     * {@code pageHeight} drives the post-success viewport resize right after this call returns; a
+     * missing key or an unexpected non-numeric value would otherwise surface as a raw
+     * {@link NullPointerException}/{@link ClassCastException} out of an unchecked {@code (Number)}
+     * cast instead of the {@link ReportRenderException} contract every other failure path in this
+     * class already honors.
+     */
+    private static int extractPageHeight(Map<String, Object> result) {
+        Object pageHeight = result.get("pageHeight");
+        if (!(pageHeight instanceof Number)) {
+            throw new ReportRenderException("Dashboard report render failed: missing or non-numeric pageHeight in result: " + pageHeight);
+        }
+        return ((Number) pageHeight).intValue();
+    }
+
+    /**
      * Builds the {@code {type:'openReport', data:{...}}} envelope (handshake point 3) as an
      * already-serialized JSON string — passed through {@link Page#evaluate(String, Object)} as a
      * plain string argument (trivially Gson-serializable by Playwright's own arg marshalling) rather
@@ -552,11 +580,17 @@ public class PlaywrightWebReportRenderer {
      * directly, which Playwright's serializer doesn't know how to walk. The UI's
      * {@code onWindowMessage} accepts a string {@code event.data} and {@code JSON.parse}s it itself,
      * so this is wire-compatible with report.service.ts either way.
+     * <p>
+     * {@code data.timeout} carries {@link #openReportTimeoutMs}, not {@code timeoutMs} verbatim —
+     * see that method's Javadoc for why. Package-private (not {@code private}) purely so
+     * {@code PlaywrightWebReportRendererTest} can assert the emitted JSON directly rather than only
+     * through a full browser round-trip.
      */
-    private static String buildOpenReportMessage(String accessToken, RenderOptions options) {
+    static String buildOpenReportMessage(String accessToken, RenderOptions options, long timeoutMs) {
         ObjectNode data = JacksonUtil.newObjectNode();
         data.put("accessToken", accessToken);
         data.put("dashboardId", options.getDashboardId());
+        data.put("timeout", openReportTimeoutMs(timeoutMs));
         if (options.getState() != null) {
             data.put("state", options.getState());
         }
@@ -567,6 +601,29 @@ public class PlaywrightWebReportRenderer {
         envelope.put("type", "openReport");
         envelope.set("data", data);
         return JacksonUtil.toString(envelope);
+    }
+
+    /**
+     * report.service.ts:291 ({@code waitForLayoutReady(command.timeout)}) feeds this same number,
+     * unsplit, to <em>both</em> of its sequential UI-readiness stages ({@code waitForReportPage}
+     * then {@code waitForWebsocketData}) — and each stage falls back to a hardcoded 3000 ms
+     * default whenever {@code command.timeout} is absent, silently ignoring this renderer's own
+     * configured {@code timeoutMs} entirely. Before this method existed, {@link #buildOpenReportMessage}
+     * never set {@code data.timeout} at all, so every dashboard render was implicitly capped at
+     * 3000 ms per stage regardless of the production default (120000 ms, spec §13) — a real
+     * dashboard taking longer than that to settle would fail with a spurious "Wait for report page
+     * timed out!" well inside this renderer's actual budget.
+     * <p>
+     * Trims a fixed 5000 ms capture margin off {@code timeoutMs} — rather than passing it through
+     * verbatim — so this render's own remaining work after the UI replies (viewport resize,
+     * {@code page.pdf()}/{@code page.screenshot()}) has room to finish before the outer
+     * {@code future.get(timeoutMs)} deadline ({@link #renderDashboard}) fires; the 3000 ms floor
+     * keeps a very small configured {@code timeoutMs} from starving both UI stages down to nothing
+     * (and matches the UI's own pre-existing per-stage default, so a tiny configured timeout
+     * degrades to today's behavior rather than something worse).
+     */
+    private static long openReportTimeoutMs(long timeoutMs) {
+        return Math.max(3000L, timeoutMs - 5000L);
     }
 
     /**

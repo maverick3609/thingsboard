@@ -20,6 +20,7 @@ import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.thingsboard.server.common.data.report.ReportData;
 import org.thingsboard.server.service.report.render.PlaywrightWebReportRenderer;
@@ -52,7 +53,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * same renderer against a real, seeded ThingsBoard dashboard when {@code TB_TEST_BASE_URL} /
  * {@code TB_TEST_DASHBOARD_ID} / {@code TB_TEST_ACCESS_TOKEN} are set; skips otherwise. Documents
  * the real-platform verification path for Task 27's operator E2E pass.
+ * <p>
+ * {@code @Tag("integration")} per the Task 13 brief (this class launches real headless Chromium
+ * instances via {@link PlaywrightWebReportRenderer#init()}, not a plain in-JVM unit test); inert
+ * today — the {@code application} module's Surefire config has no {@code includedGroups}/
+ * {@code excludedGroups} filter yet, so this tag doesn't change which tests run until one is added.
  */
+@Tag("integration")
 class DashboardRenderIntegrationTest {
 
     /**
@@ -90,7 +97,15 @@ class DashboardRenderIntegrationTest {
                     "setTimeout(function(){ window.postWebReportResult({success:true, pageHeight:600}); }, 50);")),
             "fixture-failure", fixturePage(String.format(READY_POLL_AND_HANDLER_SCRIPT,
                     "setTimeout(function(){ window.postWebReportResult({success:false, error:'Wait for report page timed out!'}); }, 50);")),
-            "fixture-timeout", fixturePage("<!-- never calls postWebReportResult, not even the ready ping -->")
+            "fixture-timeout", fixturePage("<!-- never calls postWebReportResult, not even the ready ping -->"),
+            // FIX 4 regression fixtures: a success reply missing pageHeight, and a failure reply
+            // whose error is a nested object rather than a string (Playwright deserializes a JS
+            // object arg as a nested Map) — both used to risk a raw NPE/ClassCastException out of
+            // PlaywrightWebReportRenderer's unchecked result-parsing casts.
+            "fixture-missing-pageheight", fixturePage(String.format(READY_POLL_AND_HANDLER_SCRIPT,
+                    "setTimeout(function(){ window.postWebReportResult({success:true}); }, 50);")),
+            "fixture-nonstring-error", fixturePage(String.format(READY_POLL_AND_HANDLER_SCRIPT,
+                    "setTimeout(function(){ window.postWebReportResult({success:false, error:{code:42,reason:'nested'}}); }, 50);"))
     );
 
     private static String fixturePage(String bodyScript) {
@@ -171,6 +186,36 @@ class DashboardRenderIntegrationTest {
 
         assertThatThrownBy(() -> renderer.renderDashboard(baseUrl(), "test-access-token", options))
                 .isInstanceOf(ReportRenderException.class);
+    }
+
+    /**
+     * FIX 4 regression: before the guard, a success reply with no {@code pageHeight} key drove
+     * {@code ((Number) result.get("pageHeight")).intValue()} on a {@code null}, i.e. a raw
+     * {@link NullPointerException} escaping instead of this renderer's own
+     * {@link ReportRenderException} contract.
+     */
+    @Test
+    void missingPageHeightSurfacesAsReportRenderExceptionNotNpe() {
+        RenderOptions options = RenderOptions.builder().dashboardId("fixture-missing-pageheight").type("pdf").build();
+
+        assertThatThrownBy(() -> renderer.renderDashboard(baseUrl(), "test-access-token", options))
+                .isInstanceOf(ReportRenderException.class)
+                .hasMessageContaining("pageHeight");
+    }
+
+    /**
+     * FIX 4 regression: {@code error} isn't always a string — Playwright deserializes a JS object
+     * argument as a nested {@code Map}, which this test's fixture sends deliberately. Must still
+     * surface as a clean {@link ReportRenderException} message, not throw out of the
+     * failure-reporting path itself.
+     */
+    @Test
+    void nonStringErrorSurfacesAsReportRenderExceptionNotCce() {
+        RenderOptions options = RenderOptions.builder().dashboardId("fixture-nonstring-error").type("pdf").build();
+
+        assertThatThrownBy(() -> renderer.renderDashboard(baseUrl(), "test-access-token", options))
+                .isInstanceOf(ReportRenderException.class)
+                .hasMessageContaining("Dashboard report render failed");
     }
 
     /**

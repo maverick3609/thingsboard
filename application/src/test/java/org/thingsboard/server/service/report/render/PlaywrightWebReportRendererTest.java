@@ -15,9 +15,11 @@
  */
 package org.thingsboard.server.service.report.render;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.thingsboard.common.util.JacksonUtil;
 
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CompletableFuture;
@@ -39,6 +41,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * {@link CyclicBarrier}, not just back-to-back) both complete successfully against the renderer's
  * pool of thread-confined {@code (Playwright, Browser)} pairs — ahead of Task 13 wiring up the real
  * dashboard handshake.
+ * <p>
+ * Also covers a Task 13 review fix (see {@link #buildOpenReportMessageCarriesComputedTimeout()}
+ * below): {@link PlaywrightWebReportRenderer#buildOpenReportMessage} is package-private
+ * specifically so this class — already the home of this renderer's white-box unit coverage — can
+ * assert its JSON output directly.
  */
 class PlaywrightWebReportRendererTest {
 
@@ -161,6 +168,58 @@ class PlaywrightWebReportRendererTest {
     private static void assertPdf(byte[] pdf) {
         assertThat(pdf).isNotEmpty();
         assertThat(new String(pdf, 0, 5)).isEqualTo("%PDF-");
+    }
+
+    /**
+     * Task 13 review fix: before this fix, {@code buildOpenReportMessage} never set
+     * {@code data.timeout} at all, so report.service.ts's {@code command.timeout} arrived
+     * {@code undefined} and both UI readiness stages silently fell back to their own hardcoded
+     * 3000 ms defaults, ignoring whatever {@code timeoutMs} this renderer was actually configured
+     * with (production default 120000 ms, spec §13) — a real dashboard settling in, say, 10s would
+     * then fail with a spurious "Wait for report page timed out!" well inside this renderer's real
+     * budget. This asserts the sent payload carries a numeric {@code timeout} close to (not equal
+     * to — a capture margin is trimmed off, see {@link PlaywrightWebReportRenderer#buildOpenReportMessage})
+     * the configured {@code timeoutMs}: 20000 - 5000 = 15000, unambiguously distinguishable from
+     * the UI's own hardcoded 3000 ms fallback (a regression here would either omit the key
+     * entirely or leave it at a value with no relationship to the configured 20000).
+     * <p>
+     * Asserts against the parsed {@link JsonNode} (not a raw substring match) so this also catches
+     * a would-be regression that serialized {@code timeout} as a JSON string instead of a number.
+     * <p>
+     * Chose this over a fixture-echo integration test (option (a) in the review): the integration
+     * fixture's postMessage/JSON round trip already proves generically that arbitrary payload
+     * fields survive intact (see {@code DashboardRenderIntegrationTest}'s existing 3 tests, e.g.
+     * {@code accessToken}/{@code dashboardId}); a JS string-concat echo (e.g. {@code 'x:' + value})
+     * can't even distinguish a numeric {@code 15000} from a same-looking string {@code "15000"}
+     * (JS coerces either the same way), so it wouldn't be strictly more rigorous here — while this
+     * direct assertion is both cheaper (no extra headless browser launch) and precise about type.
+     */
+    @Test
+    void buildOpenReportMessageCarriesComputedTimeout() {
+        RenderOptions options = RenderOptions.builder().dashboardId("dash-1").type("pdf").build();
+
+        String json = PlaywrightWebReportRenderer.buildOpenReportMessage("test-token", options, 20000L);
+
+        JsonNode data = JacksonUtil.toJsonNode(json).get("data");
+        assertThat(data.get("timeout").isNumber()).isTrue();
+        assertThat(data.get("timeout").asLong()).isEqualTo(15000L);
+        // Unrelated fields still present/correct — this change only ever adds a key.
+        assertThat(data.get("accessToken").asText()).isEqualTo("test-token");
+        assertThat(data.get("dashboardId").asText()).isEqualTo("dash-1");
+    }
+
+    /**
+     * The 3000 ms floor: a small configured {@code timeoutMs} (below the 5000 ms capture margin)
+     * must not drive the UI-side timeout negative or to zero, which would starve every render
+     * before the UI's own widgets could ever settle.
+     */
+    @Test
+    void buildOpenReportMessageFloorsTimeoutAt3000ForASmallConfiguredTimeout() {
+        RenderOptions options = RenderOptions.builder().dashboardId("dash-1").type("pdf").build();
+
+        String json = PlaywrightWebReportRenderer.buildOpenReportMessage("test-token", options, 4000L);
+
+        assertThat(JacksonUtil.toJsonNode(json).get("data").get("timeout").asLong()).isEqualTo(3000L);
     }
 
 }

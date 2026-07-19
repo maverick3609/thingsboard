@@ -15,19 +15,27 @@
  */
 package org.thingsboard.server.service.report.render;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.options.ScreenshotType;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import org.thingsboard.common.util.JacksonUtil;
+import org.thingsboard.server.common.data.report.ReportData;
 
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
+import java.util.Date;
+import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
@@ -74,9 +82,11 @@ import java.util.concurrent.TimeoutException;
  * the failure is scoped to that one caller. The checked-out pair is always returned to the pool,
  * success or failure.
  * <p>
- * Disabled by default ({@code reports.renderer.enabled}); wiring the real bean (config-sourced
- * constructor args, dashboard handshake) lands in Task 13/26. This class is exercised directly
- * (plain {@code new} + {@link #init()}/{@link #destroy()}) to prove the render primitive.
+ * Disabled by default ({@code reports.renderer.enabled}); wiring the real bean with config-sourced
+ * constructor args lands in Task 26. Two render entry points share the pool above: {@link #renderRaw}
+ * (Task 11 — an arbitrary URL, no protocol) and {@link #renderDashboard} (Task 13 — drives the PE
+ * {@code openReport} handshake, design spec §6.3, against a real ThingsBoard dashboard). This class
+ * is exercised directly (plain {@code new} + {@link #init()}/{@link #destroy()}) to prove both.
  */
 @Slf4j
 @Component
@@ -187,6 +197,78 @@ public class PlaywrightWebReportRenderer {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new ReportRenderException("Report render interrupted: " + safeHost(url), e);
+            } finally {
+                closeQuietly(ctx);
+            }
+        } finally {
+            checkin(pb, timedOut);
+        }
+    }
+
+    /**
+     * Renders a real ThingsBoard dashboard by driving PE's {@code openReport} handshake (design spec
+     * §6.3) against a checked-out pooled pair, then wraps the captured bytes as a {@link ReportData}
+     * (name resolved via {@link ReportUtils#prepareReportName}, content type from {@code options}'
+     * {@code type}). Shares {@link #pool}'s checkout/timeout/checkin envelope with {@link #renderRaw}
+     * (same guarantees: blocks only when every pair is checked out, hard {@code timeoutMs} deadline,
+     * timed-out pairs are closed and self-heal on a later {@link #checkout}, checked-out pair is
+     * always returned) — kept as an independent copy rather than a shared private helper because the
+     * two per-page routines ({@link #doRender} vs {@link #doRenderDashboard}) differ enough (byte[]
+     * vs ReportData, and {@link #doRenderDashboard} throws its own precisely-worded
+     * {@link ReportRenderException}s that must survive un-rewrapped, see the {@code cause instanceof}
+     * check below) that a shared envelope would need its own branching anyway.
+     * <p>
+     * The handshake, per PE's {@code chunk-42C54VSB.js} (ported browser-side to
+     * {@code report.service.ts}) and design spec §6.3:
+     * <ol>
+     * <li>{@link Page#exposeFunction} registers {@code postWebReportResult} <em>before</em>
+     * navigating — the UI polls every 20 ms for it and calls it once logged in and ready.</li>
+     * <li>{@link Page#navigate} to {@code {baseUrl}/dashboards/{dashboardId}?reportView=true&accessToken=<jwt>}
+     * (+ {@code &state=} when set).</li>
+     * <li>The first {@code postWebReportResult} call is that bare "ready" ping (PE always sends
+     * {@code {success:true}} with no {@code pageHeight}/{@code error} key at all) — on it, send the
+     * {@code openReport} command via {@code window.postMessage(JSON.stringify({type,data}), '*')}.</li>
+     * <li>The <em>second</em> call is the real result: {@code {success, pageHeight, error?}}.</li>
+     * <li>On success: size the viewport to {@code pageHeight} (+ {@code pageWidth} when supplied,
+     * else the page's current viewport width), then capture. On failure/timeout: throw — PE's three
+     * verbatim UI timeout strings ({@code "Wait for report page timed out!"} etc.) pass through
+     * unmodified as the exception message.</li>
+     * </ol>
+     */
+    public ReportData renderDashboard(String baseUrl, String accessToken, RenderOptions options) {
+        String navigateUrl = buildNavigateUrl(baseUrl, options, accessToken);
+        PooledBrowser pb = checkout(navigateUrl);
+        long start = System.currentTimeMillis();
+        boolean timedOut = false;
+        try {
+            BrowserContext ctx = createContext(pb.browser, navigateUrl);
+            try {
+                CompletableFuture<ReportData> future = CompletableFuture.supplyAsync(
+                        () -> doRenderDashboard(ctx, navigateUrl, accessToken, options, timeoutMs), renderExecutor);
+                ReportData result = future.get(timeoutMs, TimeUnit.MILLISECONDS);
+                log.info("Rendered dashboard [{}] in {} ms, {} bytes", options.getDashboardId(),
+                        System.currentTimeMillis() - start, result.getData().length);
+                return result;
+            } catch (RejectedExecutionException e) {
+                log.error("Dashboard render rejected for [{}] (renderer is shutting down): {}", safeHost(navigateUrl), e.getMessage());
+                throw new ReportRenderException("Report render rejected, renderer is shutting down: " + safeHost(navigateUrl), e);
+            } catch (TimeoutException e) {
+                timedOut = true;
+                log.error("Dashboard render timed out after {} ms for [{}]", timeoutMs, safeHost(navigateUrl));
+                throw new ReportRenderException("Report render timed out after " + timeoutMs + " ms: " + safeHost(navigateUrl), e);
+            } catch (ExecutionException e) {
+                Throwable cause = e.getCause() != null ? e.getCause() : e;
+                log.error("Dashboard render failed for [{}]: {}", safeHost(navigateUrl), cause.getMessage());
+                // doRenderDashboard already throws a precisely-worded ReportRenderException (PE's
+                // verbatim UI error string, or a clear timeout/failure message) - re-throw it as-is
+                // instead of burying that message under another "Report render failed for X: " prefix.
+                if (cause instanceof ReportRenderException) {
+                    throw (ReportRenderException) cause;
+                }
+                throw new ReportRenderException("Report render failed for " + safeHost(navigateUrl) + ": " + cause.getMessage(), cause);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new ReportRenderException("Report render interrupted: " + safeHost(navigateUrl), e);
             } finally {
                 closeQuietly(ctx);
             }
@@ -307,6 +389,205 @@ public class PlaywrightWebReportRenderer {
             page.waitForTimeout(settleMs);
         }
         return page.pdf();
+    }
+
+    /**
+     * The {@code openReport} handshake against one fresh, not-yet-navigated {@link Page}
+     * (see {@link #renderDashboard} for the full sequence and the design-spec citation). Both waits
+     * below are bounded by {@code timeoutMs} — the same deadline {@link #renderDashboard}'s outer
+     * {@code future.get(timeoutMs)} enforces on the caller — so this method can't block its
+     * render-executor thread past that budget even in the pathological case where
+     * {@code postWebReportResult} is never called at all (proven by
+     * {@code DashboardRenderIntegrationTest}'s never-ready fixture): the outer envelope has already
+     * reported the timeout and force-closed the context by then, and this thread unblocks on its own
+     * shortly after via its own bounded poll loop (see {@link #awaitSignal}) rather than hanging
+     * forever.
+     */
+    private static ReportData doRenderDashboard(BrowserContext ctx, String navigateUrl, String accessToken,
+                                                 RenderOptions options, long timeoutMs) {
+        Page page = ctx.newPage();
+        page.setDefaultTimeout(timeoutMs);
+
+        CompletableFuture<Void> readySignal = new CompletableFuture<>();
+        CompletableFuture<Map<String, Object>> resultSignal = new CompletableFuture<>();
+
+        // Registered before navigation (handshake point 1) so it's present for the UI's very first
+        // document, not just later ones. The UI calls this exactly twice per openReport: once bare
+        // ({success:true}, no pageHeight/error key at all) the moment it's logged in and listening —
+        // that's the "ready" ping, our cue to send the openReport command — and once with the real
+        // {success,pageHeight,error?} result once the dashboard has settled.
+        page.exposeFunction("postWebReportResult", args -> {
+            Map<String, Object> payload = extractPayload(args);
+            if (!readySignal.isDone()) {
+                readySignal.complete(null);
+            } else {
+                resultSignal.complete(payload);
+            }
+            return null;
+        });
+
+        page.navigate(navigateUrl);
+
+        awaitSignal(page, readySignal, timeoutMs, "Timed out waiting for the report-view UI to become ready");
+
+        page.evaluate("(json) => window.postMessage(json, '*')", buildOpenReportMessage(accessToken, options));
+
+        Map<String, Object> result = awaitSignal(page, resultSignal, timeoutMs, "Timed out waiting for the dashboard report result");
+
+        if (!Boolean.TRUE.equals(result.get("success"))) {
+            Object error = result.get("error");
+            throw new ReportRenderException("Dashboard report render failed: " + (error != null ? error : "unknown error"));
+        }
+
+        int pageHeight = ((Number) result.get("pageHeight")).intValue();
+        int pageWidth = options.getPageWidth() != null ? options.getPageWidth() : page.viewportSize().width;
+        page.setViewportSize(pageWidth, pageHeight);
+
+        return capture(page, options, pageWidth, pageHeight);
+    }
+
+    /**
+     * {@code type} drives PDF vs PNG vs JPEG (PE's {@code DashboardReportConfig.type} swagger doc:
+     * "can be PDF | PNG | JPEG", case-insensitive here since PE's own contract doesn't pin a case);
+     * unset/unrecognized falls back to PDF, the primary/default format. PDF paper size is pinned to
+     * the just-set viewport pixel size (not a fixed paper format) so the single-page PDF matches the
+     * captured content instead of being clipped/padded to "Letter".
+     */
+    private static ReportData capture(Page page, RenderOptions options, int pageWidth, int pageHeight) {
+        String type = options.getType() != null ? options.getType().trim().toLowerCase() : "pdf";
+        byte[] data;
+        String contentType;
+        switch (type) {
+            case "png":
+                data = page.screenshot(new Page.ScreenshotOptions().setType(ScreenshotType.PNG));
+                contentType = "image/png";
+                break;
+            case "jpeg":
+            case "jpg":
+                data = page.screenshot(new Page.ScreenshotOptions().setType(ScreenshotType.JPEG));
+                contentType = "image/jpeg";
+                break;
+            case "pdf":
+            default:
+                data = page.pdf(new Page.PdfOptions()
+                        .setWidth(pageWidth + "px")
+                        .setHeight(pageHeight + "px")
+                        .setPrintBackground(true));
+                contentType = "application/pdf";
+                break;
+        }
+        String name = ReportUtils.prepareReportName(options.getNamePattern(), new Date(), options.getTimezone());
+        return ReportData.builder().data(data).name(name).contentType(contentType).build();
+    }
+
+    /**
+     * Waits up to {@code timeoutMs} for {@code signal} (one of {@link #doRenderDashboard}'s two
+     * {@code postWebReportResult} futures — ready ping, final result), translating a timeout into a
+     * {@link ReportRenderException} carrying {@code timeoutMessage}.
+     * <p>
+     * <b>Polls with a cheap {@link Page#evaluate} "nudge" rather than a bare
+     * {@link CompletableFuture#get(long, TimeUnit)}</b> — empirically required (proven with a
+     * minimal, exposeFunction-only reproduction outside this codebase, isolating Playwright-Java
+     * 1.49's sync client from everything else in this class): an {@link Page#exposeFunction} binding
+     * invoked as an indirect result of this renderer's own {@code page.evaluate(...postMessage...)}
+     * (i.e. browser JS calls the exposed function from inside a {@code window} {@code message}
+     * listener) does not reliably reach this callback while the calling thread is doing nothing but
+     * a plain JDK {@code CompletableFuture.get()} — it only gets flushed through once
+     * <em>something else</em> drives another Playwright/CDP round trip on the same {@link Page}. A
+     * direct (non-postMessage-mediated) exposed-function call, by contrast, arrives immediately with
+     * no nudging needed — this is specific to the postMessage-relayed path the {@code openReport}
+     * handshake's second (result) call always takes, and, empirically, sometimes even the first
+     * (ready) call when nothing has touched the page yet. Each poll tick's {@code evaluate} failure
+     * (e.g. the page was just force-closed by the outer envelope's own timeout) is swallowed — the
+     * deadline check below is what actually governs the wait, not the nudge call's own outcome.
+     */
+    private static <T> T awaitSignal(Page page, CompletableFuture<T> signal, long timeoutMs, String timeoutMessage) {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        while (!signal.isDone()) {
+            if (System.currentTimeMillis() >= deadline) {
+                throw new ReportRenderException(timeoutMessage);
+            }
+            try {
+                page.evaluate("() => true");
+            } catch (RuntimeException e) {
+                log.debug("Nudge evaluate failed while awaiting a report-view signal (will keep polling until the deadline): {}", e.getMessage());
+            }
+            try {
+                Thread.sleep(20);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new ReportRenderException(timeoutMessage + " (interrupted)", e);
+            }
+        }
+        try {
+            return signal.get();
+        } catch (ExecutionException e) {
+            throw new ReportRenderException(timeoutMessage + ": " + e.getCause(), e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ReportRenderException(timeoutMessage + " (interrupted)", e);
+        }
+    }
+
+    /**
+     * {@code postWebReportResult} is called with exactly one argument, the UI's result object; a
+     * JSON object argument arrives here as a {@code Map<String,Object>} (Playwright's binding
+     * deserializer). Defensive fallback to an empty map covers a same-origin fallback
+     * {@code postMessage({type:'reportResult',...})} call shape or any other unexpected arg vs
+     * throwing out of the exposed-function callback itself.
+     */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> extractPayload(Object[] args) {
+        if (args != null && args.length > 0 && args[0] instanceof Map) {
+            return (Map<String, Object>) args[0];
+        }
+        return Map.of();
+    }
+
+    /**
+     * Builds the {@code {type:'openReport', data:{...}}} envelope (handshake point 3) as an
+     * already-serialized JSON string — passed through {@link Page#evaluate(String, Object)} as a
+     * plain string argument (trivially Gson-serializable by Playwright's own arg marshalling) rather
+     * than handing Playwright a Jackson {@code JsonNode} tree (e.g. {@code options.getTimewindow()})
+     * directly, which Playwright's serializer doesn't know how to walk. The UI's
+     * {@code onWindowMessage} accepts a string {@code event.data} and {@code JSON.parse}s it itself,
+     * so this is wire-compatible with report.service.ts either way.
+     */
+    private static String buildOpenReportMessage(String accessToken, RenderOptions options) {
+        ObjectNode data = JacksonUtil.newObjectNode();
+        data.put("accessToken", accessToken);
+        data.put("dashboardId", options.getDashboardId());
+        if (options.getState() != null) {
+            data.put("state", options.getState());
+        }
+        if (options.getTimewindow() != null) {
+            data.set("reportTimewindow", options.getTimewindow());
+        }
+        ObjectNode envelope = JacksonUtil.newObjectNode();
+        envelope.put("type", "openReport");
+        envelope.set("data", data);
+        return JacksonUtil.toString(envelope);
+    }
+
+    /**
+     * {@code {baseUrl}/dashboards/{dashboardId}?reportView=true&accessToken=<jwt>[&state=<state>]}
+     * (design spec §6.3 point 2). {@code accessToken}/{@code state} are URL-encoded defensively: a
+     * JWT's base64url alphabet already round-trips through {@link URLEncoder} unchanged, but a
+     * dashboard {@code state} can be arbitrary base64 (padding {@code =}, {@code +}, {@code /}) that
+     * would otherwise corrupt the query string (a raw {@code +} decodes back as a space).
+     */
+    private static String buildNavigateUrl(String baseUrl, RenderOptions options, String accessToken) {
+        StringBuilder url = new StringBuilder(baseUrl)
+                .append("/dashboards/").append(options.getDashboardId())
+                .append("?reportView=true&accessToken=").append(urlEncode(accessToken));
+        if (options.getState() != null && !options.getState().isEmpty()) {
+            url.append("&state=").append(urlEncode(options.getState()));
+        }
+        return url.toString();
+    }
+
+    private static String urlEncode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
     private static void closeQuietly(BrowserContext ctx) {

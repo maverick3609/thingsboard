@@ -16,7 +16,8 @@
 
 -->
 <div [formGroup]="configFormGroup" class="flex flex-col">
-  <div *ngIf="isReportType" class="tb-hint" style="padding: 8px 0 16px;">
+  <!-- generateDashboardReport only ('raw' mode) - generateReport has its own native form below. -->
+  <div *ngIf="isReportType && mode === 'raw'" class="tb-hint" style="padding: 8px 0 16px;">
     {{ 'scheduler.report-config-hint' | translate }}
   </div>
 
@@ -63,6 +64,36 @@
                         [required]="true" formControlName="originatorId"></tb-entity-select>
       <tb-json-object-edit formControlName="msgBody"
                            [label]="'scheduler.ota-package-id' | translate" jsonRequired></tb-json-object-edit>
+    </ng-container>
+
+    <ng-container *ngSwitchCase="'report'">
+      <!-- Emits the bare ReportConfig JSON (design spec §2.3) - reportTemplateId/userId/
+           notificationTemplateId as {entityType, id}, targets as uuid[]. See updateModel(). -->
+      <div class="tb-form-panel-title">{{ 'report.report-template' | translate }}</div>
+      <mat-form-field class="mat-block">
+        <mat-label translate>report.report-template</mat-label>
+        <mat-select formControlName="reportTemplateId" required>
+          <mat-option *ngFor="let template of reportTemplates" [value]="template.id.id">
+            {{ template.name }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <div class="tb-form-panel-title">{{ 'report.recipient-user' | translate }}</div>
+      <tb-entity-select [allowedEntityTypes]="[entityType.USER]"
+                        [required]="true" formControlName="userId"></tb-entity-select>
+
+      <tb-timezone-select formControlName="timezone" required></tb-timezone-select>
+
+      <div class="tb-form-panel-title">{{ 'report.notification-targets' | translate }}</div>
+      <tb-entity-list formControlName="targets"
+                      entityType="{{ entityType.NOTIFICATION_TARGET }}"
+                      labelText="{{ 'report.notification-targets' | translate }}"
+                      placeholderText="{{ 'report.notification-target' | translate }}">
+      </tb-entity-list>
+
+      <div class="tb-form-panel-title">{{ 'report.notification-template' | translate }}</div>
+      <tb-template-autocomplete formControlName="notificationTemplateId"></tb-template-autocomplete>
     </ng-container>
 
     <ng-container *ngSwitchDefault>

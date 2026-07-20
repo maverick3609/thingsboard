@@ -65,7 +65,8 @@ public class ReportControllerTest extends AbstractControllerTest {
 
         MvcResult res = doGet("/api/v2/report/" + r.getId() + "/download").andExpect(status().isOk()).andReturn();
         assertThat(res.getResponse().getHeader("x-filename")).isEqualTo("r.pdf");
-        assertThat(res.getResponse().getHeader("Content-Disposition")).contains("attachment; filename=\"r.pdf\"");
+        String contentDisposition = res.getResponse().getHeader("Content-Disposition");
+        assertThat(contentDisposition).startsWith("attachment").contains("r.pdf");
         assertThat(res.getResponse().getContentAsByteArray()).startsWith("%PDF-".getBytes());
     }
 

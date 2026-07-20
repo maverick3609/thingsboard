@@ -62,7 +62,7 @@ public class InferrixSchedulerReportExecutor implements SchedulerReportExecutor 
                     .notificationTemplateId(cfg.getNotificationTemplateId())
                     .schedulerEventInfo(new EntityInfo(event.getId(), event.getName()))
                     .build();
-            jobManager.submitJob(new Job(tenantId, JobType.REPORT, event.getId().toString(), event.getId(), jobCfg));
+            jobManager.submitJob(new Job(tenantId, JobType.REPORT, event.getId().toString(), cfg.getReportTemplateId(), jobCfg));
         } catch (Exception e) {
             log.error("[{}] Failed to submit report job for scheduler event [{}]", tenantId, event.getId(), e);
             // The engine's per-event try/catch (DefaultSchedulerService#processEvent) logs and

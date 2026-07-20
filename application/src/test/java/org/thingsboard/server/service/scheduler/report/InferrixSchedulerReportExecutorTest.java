@@ -83,7 +83,7 @@ class InferrixSchedulerReportExecutorTest {
         Job job = captor.getValue();
         assertThat(job.getType()).isEqualTo(JobType.REPORT);
         assertThat(job.getTenantId()).isEqualTo(tenantId);
-        assertThat(job.getEntityId()).isEqualTo(event.getId());
+        assertThat(job.getEntityId()).isEqualTo(reportTemplateId);
         assertThat(job.getKey()).isEqualTo(event.getId().toString());
 
         ReportJobConfiguration cfg = job.getConfiguration();

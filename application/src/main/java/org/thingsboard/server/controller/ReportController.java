@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -57,6 +58,7 @@ import org.thingsboard.server.common.data.report.ReportData;
 import org.thingsboard.server.common.data.report.ReportInfo;
 import org.thingsboard.server.common.data.report.ReportInfoQuery;
 import org.thingsboard.server.common.data.report.ReportRequest;
+import org.thingsboard.server.common.data.report.ReportTemplate;
 import org.thingsboard.server.queue.util.TbCoreComponent;
 import org.thingsboard.server.service.report.TbReportService;
 import org.thingsboard.server.service.security.model.SecurityUser;
@@ -65,6 +67,7 @@ import org.thingsboard.server.service.security.permission.Operation;
 import org.thingsboard.server.service.security.permission.Resource;
 import org.thingsboard.server.service.security.system.SystemSecurityService;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -200,6 +203,10 @@ public class ReportController extends BaseController {
         }
         checkReportTemplateId(reportTemplateId, Operation.READ);
         UserId userId = resolveUserId(reportRequest);
+        User user = userService.findUserById(getTenantId(), userId);
+        if (user == null) {
+            throw new IllegalArgumentException("User not found: " + userId);
+        }
 
         ReportJobConfiguration jobConfiguration = ReportJobConfiguration.builder()
                 .reportTemplateId(reportTemplateId)
@@ -256,8 +263,16 @@ public class ReportController extends BaseController {
         EntityId userOwnerId = (customerId == null || customerId.isNullUid()) ? tenantId : customerId;
 
         JsonNode configuration = reportRequest.getReportTemplateConfig();
-        if (configuration == null) {
-            configuration = checkReportTemplateId(reportRequest.getReportTemplateId(), Operation.READ).getConfiguration();
+        ReportTemplateId reportTemplateId = reportRequest.getReportTemplateId();
+        if (reportTemplateId != null) {
+            // Authorization boundary (see class javadoc): must run whenever a template id is
+            // supplied, even if the caller also passed an inline config - otherwise a caller could
+            // read any tenant's template config for rendering just by supplying it inline alongside
+            // someone else's reportTemplateId, skipping the permission check entirely.
+            ReportTemplate reportTemplate = checkReportTemplateId(reportTemplateId, Operation.READ);
+            if (configuration == null) {
+                configuration = reportTemplate.getConfiguration();
+            }
         }
 
         return ReportTask.builder()
@@ -287,9 +302,17 @@ public class ReportController extends BaseController {
 
     private ResponseEntity<ByteArrayResource> buildDownloadResponse(String filename, String contentType, byte[] data) {
         ByteArrayResource resource = new ByteArrayResource(data);
+        // filename is user-controlled (Report#name); RFC-6266-encode it for Content-Disposition
+        // (rather than hand-splicing it into the header value) and strip CR/LF/control characters
+        // for the custom x-filename header, so neither is a header-injection vector.
+        String contentDisposition = ContentDisposition.attachment()
+                .filename(filename, StandardCharsets.UTF_8)
+                .build()
+                .toString();
+        String sanitizedFilename = filename.replaceAll("[\\r\\n\\p{Cntrl}]", "");
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=\"" + filename + "\"")
-                .header("x-filename", filename)
+                .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
+                .header("x-filename", sanitizedFilename)
                 .contentLength(resource.contentLength())
                 .header("Content-Type", contentType)
                 .body(resource);

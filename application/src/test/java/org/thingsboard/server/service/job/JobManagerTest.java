@@ -27,13 +27,16 @@ import org.springframework.test.context.TestPropertySource;
 import org.thingsboard.rule.engine.api.JobManager;
 import org.thingsboard.server.common.data.Device;
 import org.thingsboard.server.common.data.id.JobId;
+import org.thingsboard.server.common.data.id.ReportTemplateId;
 import org.thingsboard.server.common.data.id.TenantId;
+import org.thingsboard.server.common.data.id.UserId;
 import org.thingsboard.server.common.data.job.DummyJobConfiguration;
 import org.thingsboard.server.common.data.job.Job;
 import org.thingsboard.server.common.data.job.JobFilter;
 import org.thingsboard.server.common.data.job.JobResult;
 import org.thingsboard.server.common.data.job.JobStatus;
 import org.thingsboard.server.common.data.job.JobType;
+import org.thingsboard.server.common.data.job.ReportJobConfiguration;
 import org.thingsboard.server.common.data.job.task.DummyTaskResult;
 import org.thingsboard.server.common.data.job.task.DummyTaskResult.DummyTaskFailure;
 import org.thingsboard.server.common.data.page.PageLink;
@@ -46,6 +49,7 @@ import org.thingsboard.server.queue.task.JobStatsService;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -610,6 +614,42 @@ public class JobManagerTest extends AbstractControllerTest {
             assertThat(future.isDone()).isTrue();
             assertThat(future.get()).isNull();
         });
+    }
+
+    /**
+     * Regression coverage for the report-jobs-rejected-at-submit defect: every {@code
+     * JobType.REPORT} job's entity id is a {@link ReportTemplateId} (the generated {@code Report}
+     * doesn't exist until the job completes), so {@link Job#SUPPORTED_ENTITY_TYPES} must include
+     * {@code REPORT_TEMPLATE} or {@code DefaultJobService#saveJob} throws {@code
+     * IllegalArgumentException("Unsupported entity type ...")} for every report job, scheduled or
+     * on-demand. None of the report-job unit tests (e.g. {@code InferrixSchedulerReportExecutorTest},
+     * {@code ReportJobProcessorTest}) catch this because they mock {@link JobManager}/collaborators
+     * instead of going through the real DAO-backed {@code saveJob} path - this test submits through
+     * the real {@link JobManager} bean (same as the DUMMY tests above) specifically to exercise that
+     * validation.
+     */
+    @Test
+    public void testSubmitJob_reportType_reportTemplateEntityIdAccepted() throws Exception {
+        ReportTemplateId reportTemplateId = new ReportTemplateId(UUID.randomUUID());
+        UserId userId = new UserId(UUID.randomUUID());
+        ReportJobConfiguration configuration = ReportJobConfiguration.builder()
+                .reportTemplateId(reportTemplateId)
+                .userId(userId)
+                .timezone("UTC")
+                .build();
+
+        Job job = jobManager.submitJob(Job.builder()
+                .tenantId(tenantId)
+                .type(JobType.REPORT)
+                .key(UUID.randomUUID().toString())
+                .entityId(reportTemplateId)
+                .configuration(configuration)
+                .build()).get();
+
+        assertThat(job.getId()).isNotNull();
+        assertThat(job.getEntityId()).isEqualTo(reportTemplateId);
+        assertThat(job.getStatus()).isEqualTo(JobStatus.PENDING);
+        assertThat(jobDao.findById(tenantId, job.getId().getId())).isNotNull();
     }
 
     private Job submitJob(DummyJobConfiguration configuration) {

@@ -59,7 +59,7 @@ public class Job extends BaseData<JobId> implements HasTenantId {
     private JobResult result;
 
     public static final Set<EntityType> SUPPORTED_ENTITY_TYPES = Set.of(
-            EntityType.DEVICE, EntityType.ASSET, EntityType.DEVICE_PROFILE, EntityType.ASSET_PROFILE
+            EntityType.DEVICE, EntityType.ASSET, EntityType.DEVICE_PROFILE, EntityType.ASSET_PROFILE, EntityType.REPORT_TEMPLATE
     );
 
     @Builder(toBuilder = true)

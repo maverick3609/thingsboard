@@ -103,6 +103,8 @@ import org.thingsboard.server.common.data.id.OAuth2ClientId;
 import org.thingsboard.server.common.data.id.OtaPackageId;
 import org.thingsboard.server.common.data.id.QueueId;
 import org.thingsboard.server.common.data.id.RpcId;
+import org.thingsboard.server.common.data.id.ReportId;
+import org.thingsboard.server.common.data.id.ReportTemplateId;
 import org.thingsboard.server.common.data.id.RuleChainId;
 import org.thingsboard.server.common.data.id.RuleNodeId;
 import org.thingsboard.server.common.data.id.SchedulerEventId;
@@ -127,6 +129,8 @@ import org.thingsboard.server.common.data.plugin.ComponentType;
 import org.thingsboard.server.common.data.query.EntityDataSortOrder;
 import org.thingsboard.server.common.data.query.EntityKey;
 import org.thingsboard.server.common.data.queue.Queue;
+import org.thingsboard.server.common.data.report.Report;
+import org.thingsboard.server.common.data.report.ReportTemplate;
 import org.thingsboard.server.common.data.rpc.Rpc;
 import org.thingsboard.server.common.data.rule.RuleChain;
 import org.thingsboard.server.common.data.rule.RuleChainType;
@@ -166,6 +170,8 @@ import org.thingsboard.server.dao.ota.OtaPackageService;
 import org.thingsboard.server.dao.pat.ApiKeyService;
 import org.thingsboard.server.dao.queue.QueueService;
 import org.thingsboard.server.dao.relation.RelationService;
+import org.thingsboard.server.dao.report.ReportService;
+import org.thingsboard.server.dao.report.ReportTemplateService;
 import org.thingsboard.server.dao.resource.ResourceService;
 import org.thingsboard.server.dao.rpc.RpcService;
 import org.thingsboard.server.dao.rule.RuleChainService;
@@ -405,6 +411,12 @@ public abstract class BaseController {
 
     @Autowired
     protected SchedulerEventService schedulerEventService;
+
+    @Autowired
+    protected ReportService reportService;
+
+    @Autowired
+    protected ReportTemplateService reportTemplateService;
 
     @Value("${server.log_controller_error_stack_trace}")
     @Getter
@@ -669,6 +681,8 @@ public abstract class BaseController {
                 case AI_MODEL -> checkAiModelId(new AiModelId(entityId.getId()), operation);
                 case API_KEY -> checkApiKeyId(new ApiKeyId(entityId.getId()), operation);
                 case SCHEDULER_EVENT -> checkSchedulerEventId(new SchedulerEventId(entityId.getId()), operation);
+                case REPORT -> checkReportId(new ReportId(entityId.getId()), operation);
+                case REPORT_TEMPLATE -> checkReportTemplateId(new ReportTemplateId(entityId.getId()), operation);
                 default -> (HasId<? extends EntityId>) checkEntityId(entityId, entitiesService::findEntityByTenantIdAndId, operation);
             };
         } catch (Exception e) {
@@ -785,6 +799,14 @@ public abstract class BaseController {
 
     SchedulerEvent checkSchedulerEventId(SchedulerEventId schedulerEventId, Operation operation) throws ThingsboardException {
         return checkEntityId(schedulerEventId, schedulerEventService::findSchedulerEventById, operation);
+    }
+
+    Report checkReportId(ReportId reportId, Operation operation) throws ThingsboardException {
+        return checkEntityId(reportId, reportService::findReportById, operation);
+    }
+
+    ReportTemplate checkReportTemplateId(ReportTemplateId reportTemplateId, Operation operation) throws ThingsboardException {
+        return checkEntityId(reportTemplateId, reportTemplateService::findReportTemplateById, operation);
     }
 
     SchedulerEventInfo checkSchedulerEventInfoId(SchedulerEventId schedulerEventId, Operation operation) throws ThingsboardException {

@@ -42,6 +42,7 @@ export * from './notification.service';
 export * from './oauth2.service';
 export * from './ota-package.service';
 export * from './queue.service';
+export * from './report.service';
 export * from './resource.service';
 export * from './rule-chain.service';
 export * from './tenant.service';

@@ -54,6 +54,8 @@ export enum EntityType {
   AI_MODEL = 'AI_MODEL',
   API_KEY = 'API_KEY',
   SCHEDULER_EVENT = 'SCHEDULER_EVENT',
+  REPORT = 'REPORT',
+  REPORT_TEMPLATE = 'REPORT_TEMPLATE',
 }
 
 export enum AliasEntityType {
@@ -535,6 +537,30 @@ export const entityTypeTranslations = new Map<EntityType | AliasEntityType, Enti
         selectedEntities: 'scheduler.selected-scheduler-events'
       }
     ],
+    [
+      EntityType.REPORT,
+      {
+        type: 'entity.type-report',
+        typePlural: 'entity.type-reports',
+        list: 'entity.list-of-reports',
+        noEntities: 'report.no-reports-text',
+        search: 'report.search',
+        selectedEntities: 'report.selected-reports'
+      }
+    ],
+    [
+      EntityType.REPORT_TEMPLATE,
+      {
+        type: 'entity.type-report-template',
+        typePlural: 'entity.type-report-templates',
+        list: 'entity.list-of-report-templates',
+        details: 'report.report-template-details',
+        add: 'report.add-report-template',
+        noEntities: 'report.no-report-templates-text',
+        search: 'report.search',
+        selectedEntities: 'report.selected-report-templates'
+      }
+    ],
   ]
 );
 
@@ -689,6 +715,18 @@ export const entityTypeResources = new Map<EntityType, EntityTypeResource<BaseDa
       EntityType.SCHEDULER_EVENT,
       {
         helpLinkId: 'scheduler'
+      }
+    ],
+    [
+      EntityType.REPORT,
+      {
+        helpLinkId: 'reports'
+      }
+    ],
+    [
+      EntityType.REPORT_TEMPLATE,
+      {
+        helpLinkId: 'reportTemplates'
       }
     ],
   ]

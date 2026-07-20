@@ -23,9 +23,13 @@ import org.springframework.mock.web.MockPart;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.thingsboard.common.util.JacksonUtil;
+import org.thingsboard.server.common.data.id.UserId;
 import org.thingsboard.server.common.data.page.PageData;
 import org.thingsboard.server.common.data.report.Report;
 import org.thingsboard.server.common.data.report.ReportInfo;
+import org.thingsboard.server.common.data.report.ReportRequest;
+import org.thingsboard.server.common.data.report.ReportTemplate;
+import org.thingsboard.server.common.data.report.ReportTemplateType;
 import org.thingsboard.server.common.data.report.TbReportFormat;
 import org.thingsboard.server.dao.report.ReportService;
 import org.thingsboard.server.dao.service.DaoSqlTest;
@@ -111,6 +115,36 @@ public class ReportControllerTest extends AbstractControllerTest {
 
         Report found = doGet("/api/v2/report/" + saved.getId(), Report.class);
         assertThat(found.getName()).isEqualTo("created.pdf");
+    }
+
+    /**
+     * Closes the cross-tenant {@code userId} hole: {@code userService.findUserById(tenantId,
+     * userId)} ignores the {@code tenantId} argument (bare id lookup at the DAO layer), so before
+     * this fix a null check alone let a TENANT_ADMIN of one tenant pass another tenant's real
+     * {@code userId} into {@code /report/request}. {@link BaseController#checkUserId} is the
+     * actual tenant boundary ({@code TenantAdminPermissions#userPermissionChecker} compares
+     * {@code tenantId}s) and now runs before the job is built - proven here by referencing tenant
+     * B's admin userId from tenant A's session and expecting 403, not the job/queue path.
+     */
+    @Test
+    public void testRequestReportRejectsCrossTenantUserId() throws Exception {
+        loginTenantAdmin();
+        ReportTemplate template = new ReportTemplate();
+        template.setName("cross-tenant-test");
+        template.setFormat(TbReportFormat.PDF);
+        template.setType(ReportTemplateType.REPORT);
+        template.setConfiguration(JacksonUtil.toJsonNode("{\"type\":\"PDF\",\"components\":[]}"));
+        ReportTemplate savedTemplate = doPost("/api/reportTemplate", template, ReportTemplate.class);
+
+        loginDifferentTenant();
+        UserId otherTenantUserId = savedDifferentTenantUser.getId();
+
+        loginTenantAdmin();
+        ReportRequest reportRequest = new ReportRequest();
+        reportRequest.setReportTemplateId(savedTemplate.getId());
+        reportRequest.setUserId(otherTenantUserId.getId().toString());
+
+        doPost("/api/v2/report/request", reportRequest).andExpect(status().isForbidden());
     }
 
     private Report createReportViaDao(String name, byte[] data) {

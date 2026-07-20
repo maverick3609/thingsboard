@@ -203,10 +203,11 @@ public class ReportController extends BaseController {
         }
         checkReportTemplateId(reportTemplateId, Operation.READ);
         UserId userId = resolveUserId(reportRequest);
-        User user = userService.findUserById(getTenantId(), userId);
-        if (user == null) {
-            throw new IllegalArgumentException("User not found: " + userId);
-        }
+        // Tenant boundary: userService.findUserById(tenantId, userId) ignores tenantId (bare
+        // repository lookup by uuid), so a null check alone would let a TENANT_ADMIN of tenant A
+        // reference tenant B's real userId. checkUserId routes through accessControlService ->
+        // TenantAdminPermissions#userPermissionChecker, which actually compares tenantIds.
+        checkUserId(userId, Operation.READ);
 
         ReportJobConfiguration jobConfiguration = ReportJobConfiguration.builder()
                 .reportTemplateId(reportTemplateId)
@@ -251,10 +252,12 @@ public class ReportController extends BaseController {
         TenantId tenantId = getTenantId();
         UserId userId = resolveUserId(reportRequest);
 
-        User user = userService.findUserById(tenantId, userId);
-        if (user == null) {
-            throw new IllegalArgumentException("User not found: " + userId);
-        }
+        // Tenant boundary: userService.findUserById(tenantId, userId) ignores tenantId (bare
+        // repository lookup by uuid), so a null check alone would let a TENANT_ADMIN of tenant A
+        // mint an access token for tenant B's real user (see createUserAccessToken below).
+        // checkUserId routes through accessControlService -> TenantAdminPermissions
+        // #userPermissionChecker, which actually compares tenantIds, and also gives us the User.
+        User user = checkUserId(userId, Operation.READ);
 
         String accessToken = systemSecurityService.createUserAccessToken(tenantId, userId);
         long accessTokenExpirationTs = jwtTokenFactory.parseTokenClaims(accessToken).getPayload().getExpiration().getTime();
@@ -309,7 +312,7 @@ public class ReportController extends BaseController {
                 .filename(filename, StandardCharsets.UTF_8)
                 .build()
                 .toString();
-        String sanitizedFilename = filename.replaceAll("[\\r\\n\\p{Cntrl}]", "");
+        String sanitizedFilename = filename.replaceAll("\\p{Cntrl}", "");
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
                 .header("x-filename", sanitizedFilename)

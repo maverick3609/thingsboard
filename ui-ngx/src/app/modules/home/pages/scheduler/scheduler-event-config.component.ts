@@ -167,7 +167,18 @@ export class SchedulerEventConfigComponent implements ControlValueAccessor, Vali
       rpcParams: this.mode === 'rpc' ? (v.msgBody?.params || {}) : {},
       rpcOneway: v.metadata?.oneway === 'true',
       rpcTimeout: v.metadata?.timeout ? Number(v.metadata.timeout) : 30000,
-      rpcPersistent: v.metadata?.persistent === 'true'
+      rpcPersistent: v.metadata?.persistent === 'true',
+      // Reset the generateReport controls when a stale (previous-tick) `mode` read routes an
+      // in-dialog type switch through this generic branch instead of the 'report' branch above
+      // (scheduler-event-dialog.component.ts resets `configuration` synchronously on
+      // type.valueChanges, one tick before this component's @Input `eventType` updates). Without
+      // this, re-entering 'generateReport' later in the same dialog session would show stale
+      // report values. Harmless no-op for the other non-report modes.
+      reportTemplateId: null,
+      userId: null,
+      timezone: null,
+      targets: null,
+      notificationTemplateId: null
     }, {emitEvent: false});
   }
 

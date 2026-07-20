@@ -121,6 +121,16 @@ import {
   ManageDashboardStatesDialogData,
   ManageDashboardStatesDialogResult
 } from '@home/components/dashboard-page/states/manage-dashboard-states-dialog.component';
+import {
+  DashboardReportDownloadDialogComponent,
+  DashboardReportDownloadDialogData
+} from '@home/components/dashboard-page/report/dashboard-report-download-dialog.component';
+// Aliased: @core/http/report.service.ts's ReportService (the REST client, task 22) shares its
+// class name with the already-injected @core/services/report.service.ts's ReportService (the
+// browser-side report-view window-message protocol driver, task 12) - distinct responsibilities,
+// distinct files, same name.
+import { ReportService as ReportHttpService } from '@core/http/report.service';
+import { DashboardReportConfig } from '@shared/models/report.models';
 import { ImportExportService } from '@shared/import-export/import-export.service';
 import { AuthState } from '@app/core/auth/auth.models';
 import { FiltersDialogComponent, FiltersDialogData } from '@home/components/filter/filters-dialog.component';
@@ -368,6 +378,7 @@ export class DashboardPageComponent extends PageComponent implements IDashboardC
               private importExport: ImportExportService,
               private mobileService: MobileService,
               private reportService: ReportService,
+              private reportHttpService: ReportHttpService,
               private dialog: MatDialog,
               public translate: TranslateService,
               private popoverService: TbPopoverService,
@@ -676,6 +687,13 @@ export class DashboardPageComponent extends PageComponent implements IDashboardC
     return this.utils.customTranslation(this.dashboard.title, this.dashboard.title);
   }
 
+  // Toolbar is entirely hidden while widgetEditMode is true (see [class.!hidden]="widgetEditMode
+  // || hideToolbar" on tb-dashboard-toolbar), so this guard only needs to rule out dashboard-edit
+  // mode and the no-dashboard-loaded-yet state.
+  public showDownloadReport(): boolean {
+    return !!this.currentDashboardId && !this.isEdit;
+  }
+
   public displayExport(): boolean {
     if (this.dashboard.configuration.settings &&
       isDefined(this.dashboard.configuration.settings.showDashboardExport)) {
@@ -884,6 +902,27 @@ export class DashboardPageComponent extends PageComponent implements IDashboardC
       $event.preventDefault();
     }
     this.importExport.exportDashboard(this.currentDashboardId);
+  }
+
+  public downloadReport($event: Event) {
+    if ($event) {
+      $event.stopPropagation();
+    }
+    this.dialog.open<DashboardReportDownloadDialogComponent, DashboardReportDownloadDialogData,
+      Partial<DashboardReportConfig>>(DashboardReportDownloadDialogComponent, {
+      disableClose: true,
+      panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
+      data: {
+        state: this.dashboardCtx.state,
+        timewindow: this.dashboardCtx.dashboardTimewindow
+      }
+    }).afterClosed().subscribe((params) => {
+      if (params) {
+        this.reportHttpService.downloadDashboardReport(this.currentDashboardId, params).subscribe({
+          error: err => console.error('[Reporting] dashboard report download failed', err)
+        });
+      }
+    });
   }
 
   public openEntityAliases($event: Event) {

@@ -103,6 +103,12 @@
                   (click)="exportDashboard($event)">
             <mat-icon>file_download</mat-icon>
           </button>
+          <button [class.!hidden]="!showDownloadReport()" mat-icon-button
+                  matTooltip="{{'report.download' | translate}}"
+                  matTooltipPosition="below"
+                  (click)="downloadReport($event)">
+            <mat-icon>assessment</mat-icon>
+          </button>
           <ng-container *ngIf="!readonly && !isEdit">
             <button class="gt-md:!hidden" mat-icon-button (click)="toggleDashboardEditMode()"
                     matTooltip="{{'dashboard.edit-mode' | translate}}"

@@ -122,6 +122,7 @@ import {
 import { DashboardSettingsDialogComponent } from '@home/components/dashboard-page/dashboard-settings-dialog.component';
 import { ManageDashboardStatesDialogComponent } from '@home/components/dashboard-page/states/manage-dashboard-states-dialog.component';
 import { DashboardStateDialogComponent } from '@home/components/dashboard-page/states/dashboard-state-dialog.component';
+import { DashboardReportDownloadDialogComponent } from '@home/components/dashboard-page/report/dashboard-report-download-dialog.component';
 import { EmbedDashboardDialogComponent } from '@home/components/widget/dialog/embed-dashboard-dialog.component';
 import { EMBED_DASHBOARD_DIALOG_TOKEN } from '@home/components/widget/dialog/embed-dashboard-dialog-token';
 import { EdgeDownlinkTableComponent } from '@home/components/edge/edge-downlink-table.component';
@@ -324,6 +325,7 @@ import { EventsDialogComponent } from '@home/dialogs/events-dialog.component';
       DashboardSettingsDialogComponent,
       ManageDashboardStatesDialogComponent,
       DashboardStateDialogComponent,
+      DashboardReportDownloadDialogComponent,
       DashboardImageDialogComponent,
       EmbedDashboardDialogComponent,
       TenantProfileQueuesComponent,
@@ -479,6 +481,7 @@ import { EventsDialogComponent } from '@home/dialogs/events-dialog.component';
     DashboardSettingsDialogComponent,
     ManageDashboardStatesDialogComponent,
     DashboardStateDialogComponent,
+    DashboardReportDownloadDialogComponent,
     DashboardImageDialogComponent,
     EmbedDashboardDialogComponent,
     TenantProfileQueuesComponent,

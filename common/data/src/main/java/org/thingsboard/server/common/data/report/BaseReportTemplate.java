@@ -23,6 +23,7 @@ import org.thingsboard.server.common.data.BaseDataWithAdditionalInfo;
 import org.thingsboard.server.common.data.EntityType;
 import org.thingsboard.server.common.data.ExportableEntity;
 import org.thingsboard.server.common.data.HasCustomerId;
+import org.thingsboard.server.common.data.HasName;
 import org.thingsboard.server.common.data.HasTenantId;
 import org.thingsboard.server.common.data.HasVersion;
 import org.thingsboard.server.common.data.id.CustomerId;
@@ -39,7 +40,7 @@ import org.thingsboard.server.common.data.validation.NoXss;
 @EqualsAndHashCode(callSuper = true)
 @ToString(callSuper = true)
 public class BaseReportTemplate extends BaseDataWithAdditionalInfo<ReportTemplateId>
-        implements HasTenantId, HasCustomerId, HasVersion, ExportableEntity<ReportTemplateId> {
+        implements HasName, HasTenantId, HasCustomerId, HasVersion, ExportableEntity<ReportTemplateId> {
 
     private TenantId tenantId;
     private CustomerId customerId;

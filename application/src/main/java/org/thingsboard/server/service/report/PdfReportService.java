@@ -44,6 +44,15 @@ public class PdfReportService implements TbReportRenderService {
     private final DashboardReportService dashboardReportService;
     private final ReportTemplateService reportTemplateService;
 
+    /**
+     * Base URL the headless renderer navigates to for the scheduled/template render path (design
+     * spec §13 {@code reports.renderer.base_url}). Unlike the on-demand path ({@code
+     * DashboardReportController}, Task 20), a scheduled render has no inbound {@code HttpServletRequest}
+     * to derive a base URL from ({@code MiscUtils.constructBaseUrl}) — it's driven off a job, not a
+     * controller call — so it's sourced from config instead (Task 26).
+     */
+    private final String baseUrl;
+
     @Override
     public ReportData generateReport(ReportTask task) {
         ReportTemplate template = reportTemplateService.findReportTemplateById(task.getTenantId(), task.getReportTemplateId());
@@ -99,7 +108,7 @@ public class PdfReportService implements TbReportRenderService {
      * A), so the renderer's existing default ({@code ReportUtils.DEFAULT_REPORT_NAME_PATTERN}) is
      * used, exactly as it already is for any on-demand caller that omits one.
      */
-    private static DashboardReportConfig buildDashboardReportConfig(ReportTask task, JsonNode dashboardComponent) {
+    private DashboardReportConfig buildDashboardReportConfig(ReportTask task, JsonNode dashboardComponent) {
         DashboardReportConfig config = new DashboardReportConfig();
         config.setDashboardId(textOrNull(dashboardComponent, "dashboardId"));
         config.setState(textOrNull(dashboardComponent, "state"));
@@ -108,6 +117,7 @@ public class PdfReportService implements TbReportRenderService {
         config.setUserId(task.getUserId() != null ? task.getUserId().toString() : null);
         config.setTimezone(task.getTimezone());
         config.setType(DASHBOARD_REPORT_TYPE);
+        config.setBaseUrl(baseUrl);
         return config;
     }
 

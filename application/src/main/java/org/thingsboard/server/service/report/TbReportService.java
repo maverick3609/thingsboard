@@ -16,6 +16,7 @@
 package org.thingsboard.server.service.report;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.thingsboard.server.common.data.job.task.ReportTask;
@@ -53,10 +54,11 @@ public class TbReportService {
 
     public TbReportService(DashboardReportService dashboardReportService,
                             org.thingsboard.server.dao.report.ReportService reportDao,
-                            ReportTemplateService reportTemplateService) {
+                            ReportTemplateService reportTemplateService,
+                            @Value("${reports.renderer.base_url:http://localhost:8080}") String rendererBaseUrl) {
         this.reportDao = reportDao;
         this.reportTemplateService = reportTemplateService;
-        register(new PdfReportService(dashboardReportService, reportTemplateService));
+        register(new PdfReportService(dashboardReportService, reportTemplateService, rendererBaseUrl));
         // R2: register a CsvReportService (TbReportFormat.CSV) here once it exists.
     }
 

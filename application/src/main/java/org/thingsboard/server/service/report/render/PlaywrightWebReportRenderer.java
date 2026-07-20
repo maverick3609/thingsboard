@@ -25,6 +25,7 @@ import com.microsoft.playwright.options.ScreenshotType;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.thingsboard.common.util.JacksonUtil;
@@ -100,7 +101,10 @@ public class PlaywrightWebReportRenderer {
     private BlockingQueue<PooledBrowser> pool;
     private ExecutorService renderExecutor;
 
-    public PlaywrightWebReportRenderer(int maxConcurrent, long timeoutMs, String browserPath) {
+    public PlaywrightWebReportRenderer(
+            @Value("${reports.renderer.max_concurrent:2}") int maxConcurrent,
+            @Value("${reports.generation_timeout_ms:120000}") long timeoutMs,
+            @Value("${reports.renderer.browser_path:}") String browserPath) {
         this.maxConcurrent = maxConcurrent;
         this.timeoutMs = timeoutMs;
         this.browserPath = browserPath;

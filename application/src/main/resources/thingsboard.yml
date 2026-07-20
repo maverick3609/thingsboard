@@ -1007,6 +1007,8 @@ audit-log:
       "calculated_field": "${AUDIT_LOG_MASK_CALCULATED_FIELD:W}" # Calculated field logging levels.
       "ai_model": "${AUDIT_LOG_MASK_AI_MODEL:W}" # AI model logging levels.
       "scheduler_event": "${AUDIT_LOG_MASK_SCHEDULER_EVENT:W}" # Scheduler event logging levels.
+      "report": "${AUDIT_LOG_MASK_REPORT:W}" # Report logging levels.
+      "report_template": "${AUDIT_LOG_MASK_REPORT_TEMPLATE:W}" # Report template logging levels.
   sink:
     # Type of external sink. possible options: none, elasticsearch
     type: "${AUDIT_LOG_SINK_TYPE:none}"
@@ -1028,6 +1030,18 @@ audit-log:
 scheduler:
   # Minimum interval between subsequent scheduler events in seconds. Applicable for timer based events.
   min_interval: "${SCHEDULER_MIN_INTERVAL_IN_SEC:60}"
+
+# Reporting parameters (Inferrix PE-replication)
+reports:
+  # In-process Playwright renderer (replaces PE's external tb-web-report server).
+  # Opt-in: requires a headless Chromium; disabled by default so contexts without a browser boot cleanly.
+  renderer:
+    enabled: "${REPORTS_RENDERER_ENABLED:false}"
+    max_concurrent: "${REPORTS_RENDERER_MAX_CONCURRENT:2}"
+    browser_path: "${REPORTS_RENDERER_BROWSER_PATH:}"   # empty = Playwright-managed Chromium
+    base_url: "${REPORTS_RENDERER_BASE_URL:http://localhost:8080}"   # TB UI URL reachable by the headless browser
+  generation_timeout_ms: "${REPORTS_GENERATION_TIMEOUT_MS:120000}"
+  test_report_pool_size: "${REPORTS_TEST_REPORT_POOL_SIZE:12}"
 
 # Device state parameters
 state:

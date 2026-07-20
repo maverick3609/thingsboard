@@ -22,6 +22,7 @@ import freemarker.template.Template;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.mail.internet.MimeMessage;
+import jakarta.mail.util.ByteArrayDataSource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.exception.ExceptionUtils;
@@ -49,10 +50,13 @@ import org.thingsboard.server.common.data.exception.RateLimitExceededException;
 import org.thingsboard.server.common.data.exception.ThingsboardErrorCode;
 import org.thingsboard.server.common.data.exception.ThingsboardException;
 import org.thingsboard.server.common.data.id.CustomerId;
+import org.thingsboard.server.common.data.id.ReportId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.limit.LimitedApi;
+import org.thingsboard.server.common.data.report.Report;
 import org.thingsboard.server.common.stats.TbApiUsageReportClient;
 import org.thingsboard.server.dao.exception.IncorrectParameterException;
+import org.thingsboard.server.dao.report.ReportService;
 import org.thingsboard.server.dao.settings.AdminSettingsService;
 import org.thingsboard.server.service.apiusage.TbApiUsageStateService;
 
@@ -85,6 +89,7 @@ public class DefaultMailService implements MailService {
     private final PasswordResetExecutorService passwordResetExecutorService;
     private final TbMailContextComponent ctx;
     private final RateLimitService rateLimitService;
+    private final ReportService reportService;
 
     @Value("${mail.per_tenant_rate_limits:}")
     private String perTenantRateLimitConfig;
@@ -224,7 +229,8 @@ public class DefaultMailService implements MailService {
             }
             try {
                 MimeMessage mailMsg = javaMailSender.createMimeMessage();
-                boolean multipart = (tbEmail.getImages() != null && !tbEmail.getImages().isEmpty());
+                boolean multipart = (tbEmail.getImages() != null && !tbEmail.getImages().isEmpty())
+                        || (tbEmail.getReports() != null && !tbEmail.getReports().isEmpty());
                 MimeMessageHelper helper = new MimeMessageHelper(mailMsg, multipart, "UTF-8");
                 helper.setFrom(StringUtils.isBlank(tbEmail.getFrom()) ? mailFrom : tbEmail.getFrom());
                 helper.setTo(tbEmail.getTo().split("\\s*,\\s*"));
@@ -238,13 +244,29 @@ public class DefaultMailService implements MailService {
                 helper.setText(tbEmail.getBody(), tbEmail.isHtml());
 
                 if (multipart) {
-                    for (String imgId : tbEmail.getImages().keySet()) {
-                        String imgValue = tbEmail.getImages().get(imgId);
-                        String value = imgValue.replaceFirst("^data:image/[^;]*;base64,?", "");
-                        byte[] bytes = javax.xml.bind.DatatypeConverter.parseBase64Binary(value);
-                        String contentType = helper.getFileTypeMap().getContentType(imgId);
-                        InputStreamSource iss = () -> new ByteArrayInputStream(bytes);
-                        helper.addInline(imgId, iss, contentType);
+                    // Guarded independently: multipart can now be true from reports alone (below),
+                    // so images is not guaranteed non-null here anymore.
+                    if (tbEmail.getImages() != null) {
+                        for (String imgId : tbEmail.getImages().keySet()) {
+                            String imgValue = tbEmail.getImages().get(imgId);
+                            String value = imgValue.replaceFirst("^data:image/[^;]*;base64,?", "");
+                            byte[] bytes = javax.xml.bind.DatatypeConverter.parseBase64Binary(value);
+                            String contentType = helper.getFileTypeMap().getContentType(imgId);
+                            InputStreamSource iss = () -> new ByteArrayInputStream(bytes);
+                            helper.addInline(imgId, iss, contentType);
+                        }
+                    }
+                    if (tbEmail.getReports() != null) {
+                        for (ReportId reportId : tbEmail.getReports()) {
+                            Report report = reportService.findReportById(tenantId, reportId);
+                            if (report == null) {
+                                log.warn("Skipping email attachment, report not found, tenantId [{}], reportId [{}]", tenantId, reportId);
+                                continue;
+                            }
+                            byte[] reportBytes = reportService.getReportData(tenantId, reportId);
+                            helper.addAttachment(report.getName(), new ByteArrayDataSource(reportBytes, report.getFormat().getContentType()));
+                            log.info("Attached report to email, tenantId [{}], reportId [{}], name [{}]", tenantId, reportId, report.getName());
+                        }
                     }
                 }
                 sendMailWithTimeout(javaMailSender, helper.getMimeMessage(), timeout);

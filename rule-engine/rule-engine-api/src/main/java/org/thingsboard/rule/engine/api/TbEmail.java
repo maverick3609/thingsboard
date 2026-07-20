@@ -17,7 +17,9 @@ package org.thingsboard.rule.engine.api;
 
 import lombok.Builder;
 import lombok.Data;
+import org.thingsboard.server.common.data.id.ReportId;
 
+import java.util.List;
 import java.util.Map;
 
 @Data
@@ -32,5 +34,6 @@ public class TbEmail {
     private final String body;
     private final Map<String, String> images;
     private final boolean html;
+    private final List<ReportId> reports;
 
 }

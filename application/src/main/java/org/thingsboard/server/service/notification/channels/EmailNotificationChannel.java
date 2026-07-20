@@ -22,6 +22,7 @@ import org.thingsboard.rule.engine.api.TbEmail;
 import org.thingsboard.server.common.data.User;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.notification.NotificationDeliveryMethod;
+import org.thingsboard.server.common.data.notification.NotificationRequestConfig;
 import org.thingsboard.server.common.data.notification.template.EmailDeliveryMethodNotificationTemplate;
 import org.thingsboard.server.service.notification.NotificationProcessingContext;
 
@@ -33,11 +34,13 @@ public class EmailNotificationChannel implements NotificationChannel<User, Email
 
     @Override
     public void sendNotification(User recipient, EmailDeliveryMethodNotificationTemplate processedTemplate, NotificationProcessingContext ctx) throws Exception {
+        NotificationRequestConfig config = ctx.getRequest().getAdditionalConfig();
         mailService.send(ctx.getTenantId(), null, TbEmail.builder()
                 .to(recipient.getEmail())
                 .subject(processedTemplate.getSubject())
                 .body(processedTemplate.getBody())
                 .html(true)
+                .reports(config != null ? config.getReports() : null)
                 .build());
     }
 

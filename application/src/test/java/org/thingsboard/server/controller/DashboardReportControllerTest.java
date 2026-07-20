@@ -27,6 +27,7 @@ import org.thingsboard.server.dao.service.DaoSqlTest;
 import org.thingsboard.server.service.report.DashboardReportService;
 
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -108,6 +109,39 @@ public class DashboardReportControllerTest extends AbstractControllerTest {
         ArgumentCaptor<DashboardReportConfig> configCaptor = ArgumentCaptor.forClass(DashboardReportConfig.class);
         verify(dashboardReportService).generateReport(any(), configCaptor.capture());
         assertThat(configCaptor.getValue().getBaseUrl()).isNotBlank();
+    }
+
+    @Test
+    public void testDownloadTestReportIgnoresClientSuppliedUserIdAndBaseUrl() throws Exception {
+        loginTenantAdmin();
+        Dashboard dashboard = new Dashboard();
+        dashboard.setTitle("Test Report Dashboard - Untrusted Fields");
+        Dashboard savedDashboard = doPost("/api/dashboard", dashboard, Dashboard.class);
+
+        when(dashboardReportService.generateReport(any(), any())).thenReturn(
+                ReportData.builder().data("%PDF-z".getBytes()).name("test.pdf").contentType("application/pdf").build());
+
+        String bogusUserId = UUID.randomUUID().toString();
+        DashboardReportConfig config = new DashboardReportConfig();
+        config.setDashboardId(savedDashboard.getId().toString());
+        config.setType("pdf");
+        config.setTimezone("UTC");
+        config.setUseDashboardTimewindow(true);
+        config.setUseCurrentUserCredentials(false);
+        config.setUserId(bogusUserId);
+        config.setBaseUrl("http://evil.example.com");
+
+        doPostAsync("/api/report/test", config, 30_000L)
+                .andExpect(status().isOk())
+                .andReturn();
+
+        ArgumentCaptor<DashboardReportConfig> configCaptor = ArgumentCaptor.forClass(DashboardReportConfig.class);
+        verify(dashboardReportService).generateReport(any(), configCaptor.capture());
+        DashboardReportConfig captured = configCaptor.getValue();
+        assertThat(captured.getUserId()).isEqualTo(tenantAdminUserId.getId().toString());
+        assertThat(captured.getUserId()).isNotEqualTo(bogusUserId);
+        assertThat(captured.getBaseUrl()).isNotEqualTo("http://evil.example.com");
+        assertThat(captured.isUseCurrentUserCredentials()).isTrue();
     }
 
 }

@@ -35,7 +35,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.request.async.DeferredResult;
 import org.thingsboard.common.util.ThingsBoardExecutors;
 import org.thingsboard.server.common.data.DashboardInfo;
-import org.thingsboard.server.common.data.StringUtils;
 import org.thingsboard.server.common.data.dashboardreport.DashboardReportConfig;
 import org.thingsboard.server.common.data.exception.ThingsboardErrorCode;
 import org.thingsboard.server.common.data.exception.ThingsboardException;
@@ -156,9 +155,14 @@ public class DashboardReportController extends BaseController {
             return result;
         }
 
-        if (StringUtils.isBlank(config.getBaseUrl())) {
-            config.setBaseUrl(MiscUtils.constructBaseUrl(request));
-        }
+        // Never trust client-supplied identity/base-url fields: the client controls this request
+        // body wholesale (unlike downloadDashboardReport's server-built config), so both must be
+        // forced from the authenticated principal / request to avoid minting a token for an
+        // arbitrary userId (privilege escalation) or letting the renderer navigate to a
+        // client-chosen baseUrl carrying that token (SSRF + token exfiltration).
+        config.setUserId(currentUser.getId().getId().toString());
+        config.setUseCurrentUserCredentials(true);
+        config.setBaseUrl(MiscUtils.constructBaseUrl(request));
 
         TenantId tenantId = currentUser.getTenantId();
         offloadRender(svc, tenantId, config, result);

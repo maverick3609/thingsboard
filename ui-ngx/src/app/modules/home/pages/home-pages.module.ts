@@ -38,6 +38,7 @@ import { EdgeModule } from '@home/pages/edge/edge.module';
 import { OtaUpdateModule } from '@home/pages/ota-update/ota-update.module';
 import { VcModule } from '@home/pages/vc/vc.module';
 import { SchedulerModule } from '@home/pages/scheduler/scheduler.module';
+import { ReportModule } from '@home/pages/report/report.module';
 import { AssetProfileModule } from '@home/pages/asset-profile/asset-profile.module';
 import { ProfilesModule } from '@home/pages/profiles/profiles.module';
 import { AlarmModule } from '@home/pages/alarm/alarm.module';
@@ -84,6 +85,7 @@ import { IotHubModule } from '@home/pages/iot-hub/iot-hub.module';
     UserModule,
     VcModule,
     SchedulerModule,
+    ReportModule,
     AccountModule,
     ScadaSymbolModule,
     AiModelModule,

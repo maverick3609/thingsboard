@@ -234,6 +234,7 @@ Bakes Inferrix branding into the default build (every `yarn build:prod` output i
 | R29 | `common/data/.../job/Job.java` | add `REPORT_TEMPLATE` to `SUPPORTED_ENTITY_TYPES` so `JobType.REPORT` jobs [subject = report template] pass `DefaultJobService.saveJob` entity-type validation | without it every report job — scheduled or on-demand — throws `IllegalArgumentException: Unsupported entity type` at submit; re-add after any upstream merge that rewrites this set |
 | R30 | `ui-ngx/src/app/shared/models/entity-type.models.ts` | add `REPORT`/`REPORT_TEMPLATE` to `EntityType` enum + `entityTypeTranslations` + `entityTypeResources` (mirrors Scheduler S17) | report UI entity registration; merge-recovery: re-add the three entries after any upstream rewrite of these maps |
 | R31 | `ui-ngx/src/app/core/http/public-api.ts` | `export * from './report.service'` | exposes the report HTTP client; merge-recovery: re-add the export line |
+| R32 | `ui-ngx/src/app/modules/home/pages/home-pages.module.ts` | import + register `ReportModule` (report history page), mirroring Scheduler S21 | report history route module registration; re-add the import + array entry after any upstream rewrite of this module |
 
 ### Merge-recovery procedure
 

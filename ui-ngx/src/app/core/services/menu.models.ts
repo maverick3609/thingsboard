@@ -109,6 +109,9 @@ export enum MenuId {
   otaUpdates = 'otaUpdates',
   version_control = 'version_control',
   scheduler = 'scheduler',
+  reports = 'reports',
+  report_history = 'report_history',
+  report_templates = 'report_templates',
   api_usage = 'api_usage',
   trendz_settings = 'trendz_settings',
   ai_models = 'ai_models',
@@ -735,6 +738,36 @@ export const menuSectionMap = new Map<MenuId, MenuSection>([
     }
   ],
   [
+    MenuId.reports,
+    {
+      id: MenuId.reports,
+      name: 'report.reports',
+      type: 'toggle',
+      path: '/features/reports',
+      icon: 'assessment'
+    }
+  ],
+  [
+    MenuId.report_history,
+    {
+      id: MenuId.report_history,
+      name: 'report.report-history',
+      type: 'link',
+      path: '/features/reports/history',
+      icon: 'history'
+    }
+  ],
+  [
+    MenuId.report_templates,
+    {
+      id: MenuId.report_templates,
+      name: 'report.report-templates',
+      type: 'link',
+      path: '/features/reports/templates',
+      icon: 'description'
+    }
+  ],
+  [
     MenuId.api_usage,
     {
       id: MenuId.api_usage,
@@ -902,7 +935,14 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
         pages: [
           {id: MenuId.otaUpdates},
           {id: MenuId.version_control},
-          {id: MenuId.scheduler}
+          {id: MenuId.scheduler},
+          {
+            id: MenuId.reports,
+            pages: [
+              {id: MenuId.report_history},
+              {id: MenuId.report_templates}
+            ]
+          }
         ]
       },
       {

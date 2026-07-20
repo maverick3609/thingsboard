@@ -17,43 +17,55 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { Authority } from '@shared/models/authority.enum';
+import { MenuId } from '@core/services/menu.models';
 import { ReportHistoryTableConfigResolver } from '@home/pages/report/report-history/report-history-table-config.resolver';
 import { ReportHistoryComponent } from '@home/pages/report/report-history/report-history.component';
 import { ReportTemplatesTableConfigResolver } from '@home/pages/report/report-template/report-templates-table-config.resolver';
 import { ReportTemplatesComponent } from '@home/pages/report/report-template/report-templates.component';
 
-// Routes for the report history page ('history') and the report templates page ('templates').
-// The parent 'reports' path mounting and the left-nav menu entry are Task 25's job (they need a
-// MenuId that doesn't exist yet) - this module just has to be self-consistent, mirroring
-// SchedulerRoutingModule.
+// Routes for the report history page ('history') and the report templates page ('templates'),
+// nested under a parent 'reports' path (mirrors OtaUpdateRoutingModule's parent+children shape)
+// so that spreading this const into FeaturesRoutingModule's children lands the pages at
+// '/features/reports/history' and '/features/reports/templates'.
 export const reportRoutes: Routes = [
   {
-    path: 'history',
-    component: ReportHistoryComponent,
+    path: 'reports',
     data: {
       auth: [Authority.TENANT_ADMIN],
-      title: 'report.reports',
       breadcrumb: {
-        label: 'report.reports'
+        menuId: MenuId.reports
       }
     },
-    resolve: {
-      entitiesTableConfig: ReportHistoryTableConfigResolver
-    }
-  },
-  {
-    path: 'templates',
-    component: ReportTemplatesComponent,
-    data: {
-      auth: [Authority.TENANT_ADMIN],
-      title: 'report.report-templates',
-      breadcrumb: {
-        label: 'report.report-templates'
+    children: [
+      {
+        path: 'history',
+        component: ReportHistoryComponent,
+        data: {
+          auth: [Authority.TENANT_ADMIN],
+          title: 'report.reports',
+          breadcrumb: {
+            menuId: MenuId.report_history
+          }
+        },
+        resolve: {
+          entitiesTableConfig: ReportHistoryTableConfigResolver
+        }
+      },
+      {
+        path: 'templates',
+        component: ReportTemplatesComponent,
+        data: {
+          auth: [Authority.TENANT_ADMIN],
+          title: 'report.report-templates',
+          breadcrumb: {
+            menuId: MenuId.report_templates
+          }
+        },
+        resolve: {
+          entitiesTableConfig: ReportTemplatesTableConfigResolver
+        }
       }
-    },
-    resolve: {
-      entitiesTableConfig: ReportTemplatesTableConfigResolver
-    }
+    ]
   }
 ];
 

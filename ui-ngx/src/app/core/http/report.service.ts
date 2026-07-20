@@ -81,6 +81,14 @@ export class ReportService {
       defaultHttpOptionsFromConfig(config));
   }
 
+  public getReportTemplateById(reportTemplateId: string, config?: RequestConfig): Observable<ReportTemplate> {
+    return this.http.get<ReportTemplate>(`/api/reportTemplate/${reportTemplateId}`, defaultHttpOptionsFromConfig(config));
+  }
+
+  public deleteReportTemplate(reportTemplateId: string, config?: RequestConfig) {
+    return this.http.delete(`/api/reportTemplate/${reportTemplateId}`, defaultHttpOptionsFromConfig(config));
+  }
+
   public getReportTemplateInfos(pageLink: PageLink,
                                  params: { typeList?: Array<ReportTemplateType>; formatList?: Array<TbReportFormat>;
                                    includeCustomers?: boolean } = {},

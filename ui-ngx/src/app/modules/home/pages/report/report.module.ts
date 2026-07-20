@@ -20,10 +20,14 @@ import { SharedModule } from '@shared/shared.module';
 import { HomeComponentsModule } from '@home/components/home-components.module';
 import { ReportRoutingModule } from '@home/pages/report/report-routing.module';
 import { ReportHistoryComponent } from '@home/pages/report/report-history/report-history.component';
+import { ReportTemplatesComponent } from '@home/pages/report/report-template/report-templates.component';
+import { ReportTemplateDialogComponent } from '@home/pages/report/report-template/report-template-dialog.component';
 
 @NgModule({
   declarations: [
-    ReportHistoryComponent
+    ReportHistoryComponent,
+    ReportTemplatesComponent,
+    ReportTemplateDialogComponent
   ],
   imports: [
     CommonModule,

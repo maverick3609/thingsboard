@@ -19,10 +19,13 @@ import { RouterModule, Routes } from '@angular/router';
 import { Authority } from '@shared/models/authority.enum';
 import { ReportHistoryTableConfigResolver } from '@home/pages/report/report-history/report-history-table-config.resolver';
 import { ReportHistoryComponent } from '@home/pages/report/report-history/report-history.component';
+import { ReportTemplatesTableConfigResolver } from '@home/pages/report/report-template/report-templates-table-config.resolver';
+import { ReportTemplatesComponent } from '@home/pages/report/report-template/report-templates.component';
 
-// Route for the report history page only (path 'history'). The parent 'reports' path mounting
-// and the left-nav menu entry are Task 25's job (they need a MenuId that doesn't exist yet) -
-// this module just has to be self-consistent, mirroring SchedulerRoutingModule.
+// Routes for the report history page ('history') and the report templates page ('templates').
+// The parent 'reports' path mounting and the left-nav menu entry are Task 25's job (they need a
+// MenuId that doesn't exist yet) - this module just has to be self-consistent, mirroring
+// SchedulerRoutingModule.
 export const reportRoutes: Routes = [
   {
     path: 'history',
@@ -37,12 +40,26 @@ export const reportRoutes: Routes = [
     resolve: {
       entitiesTableConfig: ReportHistoryTableConfigResolver
     }
+  },
+  {
+    path: 'templates',
+    component: ReportTemplatesComponent,
+    data: {
+      auth: [Authority.TENANT_ADMIN],
+      title: 'report.report-templates',
+      breadcrumb: {
+        label: 'report.report-templates'
+      }
+    },
+    resolve: {
+      entitiesTableConfig: ReportTemplatesTableConfigResolver
+    }
   }
 ];
 
 @NgModule({
   imports: [RouterModule.forChild(reportRoutes)],
   exports: [RouterModule],
-  providers: [ReportHistoryTableConfigResolver]
+  providers: [ReportHistoryTableConfigResolver, ReportTemplatesTableConfigResolver]
 })
 export class ReportRoutingModule { }

@@ -148,6 +148,31 @@ public class ReportControllerTest extends AbstractControllerTest {
         doPost("/api/v2/report/request", reportRequest).andExpect(status().isForbidden());
     }
 
+    /**
+     * The renderer is OFF for this whole class (see class javadoc), so {@code tbReportService} is
+     * empty. Before the fix, {@code requestReport} skipped straight to {@code jobManager.submitJob}
+     * regardless: {@code ReportJobProcessor} (always-on) would still emit a {@code ReportTask}, but
+     * {@code ReportTaskProcessor} (the consumer) is {@code @ConditionalOnProperty
+     * (reports.renderer.enabled)} and absent when disabled - the job would enqueue and then sit
+     * PENDING/RUNNING forever, an orphan with nothing to consume it. This proves the endpoint now
+     * rejects up front instead of enqueuing that orphan.
+     */
+    @Test
+    public void testRequestReportRejectedWhenRendererDisabled() throws Exception {
+        loginTenantAdmin();
+        ReportTemplate template = new ReportTemplate();
+        template.setName("renderer-disabled-test");
+        template.setFormat(TbReportFormat.PDF);
+        template.setType(ReportTemplateType.REPORT);
+        template.setConfiguration(JacksonUtil.toJsonNode("{\"type\":\"PDF\",\"components\":[]}"));
+        ReportTemplate savedTemplate = doPost("/api/reportTemplate", template, ReportTemplate.class);
+
+        ReportRequest reportRequest = new ReportRequest();
+        reportRequest.setReportTemplateId(savedTemplate.getId());
+
+        doPost("/api/v2/report/request", reportRequest).andExpect(status().isBadRequest());
+    }
+
     private Report createReportViaDao(String name, byte[] data) {
         Report report = new Report();
         report.setTenantId(tenantId);

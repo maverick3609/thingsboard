@@ -208,6 +208,13 @@ public class ReportController extends BaseController {
         // reference tenant B's real userId. checkUserId routes through accessControlService ->
         // TenantAdminPermissions#userPermissionChecker, which actually compares tenantIds.
         checkUserId(userId, Operation.READ);
+        // Renderer gate: ReportTaskProcessor (the ReportTask consumer) is @ConditionalOnProperty
+        // (reports.renderer.enabled) and absent when disabled, while ReportJobProcessor is always
+        // on. Without this guard, submitJob below would enqueue a task nothing ever consumes,
+        // leaving an orphan Job stuck PENDING/RUNNING forever. Mirrors testReport's guard.
+        if (tbReportService.isEmpty()) {
+            throw new ThingsboardException("Report renderer is not enabled", ThingsboardErrorCode.BAD_REQUEST_PARAMS);
+        }
 
         ReportJobConfiguration jobConfiguration = ReportJobConfiguration.builder()
                 .reportTemplateId(reportTemplateId)

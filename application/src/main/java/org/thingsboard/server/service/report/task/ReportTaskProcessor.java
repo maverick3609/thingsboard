@@ -17,6 +17,7 @@ package org.thingsboard.server.service.report.task;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.thingsboard.server.common.data.job.JobType;
 import org.thingsboard.server.common.data.job.task.ReportTask;
@@ -45,7 +46,12 @@ public class ReportTaskProcessor extends TaskProcessor<ReportTask, ReportTaskRes
     @Value("${reports.generation_timeout_ms:120000}")
     private long generationTimeoutMs = 120000;
 
-    public ReportTaskProcessor(TbReportService tbReportService) {
+    // @Lazy breaks a Spring bean cycle that only forms when the renderer is enabled: DefaultTbServiceInfoProvider
+    // eagerly collects every TaskProcessor (List<TaskProcessor>), which pulls in this bean, whose TbReportService ->
+    // DefaultDashboardReportService -> SystemSecurityService -> MailService -> TbApiUsageReportClient -> HashPartitionService
+    // chain loops back to DefaultTbServiceInfoProvider ("Unable to start web server"). Deferring TbReportService to first
+    // process() call (task time, long after context start) severs the cycle at the only reporting edge on it.
+    public ReportTaskProcessor(@Lazy TbReportService tbReportService) {
         this.tbReportService = tbReportService;
     }
 

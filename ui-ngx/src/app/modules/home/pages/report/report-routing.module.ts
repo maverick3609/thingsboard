@@ -18,6 +18,7 @@ import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { Authority } from '@shared/models/authority.enum';
 import { MenuId } from '@core/services/menu.models';
+import { RouterTabsComponent } from '@home/components/router-tabs.component';
 import { ReportHistoryTableConfigResolver } from '@home/pages/report/report-history/report-history-table-config.resolver';
 import { ReportHistoryComponent } from '@home/pages/report/report-history/report-history.component';
 import { ReportTemplatesTableConfigResolver } from '@home/pages/report/report-template/report-templates-table-config.resolver';
@@ -30,6 +31,9 @@ import { ReportTemplatesComponent } from '@home/pages/report/report-template/rep
 export const reportRoutes: Routes = [
   {
     path: 'reports',
+    // RouterTabs landing: renders the History/Templates tabs in-page (menu-sections mode picks the
+    // tabs from this section's pages in the menu map), mirroring the alarms_center route.
+    component: RouterTabsComponent,
     data: {
       auth: [Authority.TENANT_ADMIN],
       breadcrumb: {
@@ -38,11 +42,23 @@ export const reportRoutes: Routes = [
     },
     children: [
       {
+        // The 'Reports' menu link points at '/features/reports', which has no page of its own —
+        // redirect to the history tab (mirrors alarms_center's empty child; auth.guard consumes
+        // data.redirectTo). Without this the landing route has no active tab and renders blank.
+        path: '',
+        children: [],
+        data: {
+          auth: [Authority.TENANT_ADMIN],
+          redirectTo: '/features/reports/history'
+        }
+      },
+      {
         path: 'history',
         component: ReportHistoryComponent,
         data: {
           auth: [Authority.TENANT_ADMIN],
           title: 'report.reports',
+          isPage: true,
           breadcrumb: {
             menuId: MenuId.report_history
           }
@@ -57,6 +73,7 @@ export const reportRoutes: Routes = [
         data: {
           auth: [Authority.TENANT_ADMIN],
           title: 'report.report-templates',
+          isPage: true,
           breadcrumb: {
             menuId: MenuId.report_templates
           }

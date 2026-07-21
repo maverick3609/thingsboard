@@ -16,10 +16,18 @@
 
 -->
 <div class="tb-scheduler-events tb-absolute-fill flex flex-col">
-  <mat-button-toggle-group class="tb-scheduler-mode-toggle" [(ngModel)]="mode" style="margin: 8px;">
-    <mat-button-toggle value="list">{{ 'scheduler.list-mode' | translate }}</mat-button-toggle>
-    <mat-button-toggle value="calendar">{{ 'scheduler.calendar-mode' | translate }}</mat-button-toggle>
-  </mat-button-toggle-group>
+  <!-- List/Calendar switch uses the app-standard tab bar (mat-tab-nav-bar + mat-tab-link, same
+       as RouterTabsComponent) instead of a button-toggle group, so it matches the rest of the UI.
+       mode is a client-side view flag (no routes), so the links drive it via (click)/[active]. -->
+  <nav mat-tab-nav-bar mat-stretch-tabs="false" class="tb-router-tabs tb-scheduler-mode-tabs" [tabPanel]="schedulerTabPanel">
+    <a mat-tab-link (click)="mode = 'list'" [active]="mode === 'list'">
+      <span>{{ 'scheduler.list-mode' | translate }}</span>
+    </a>
+    <a mat-tab-link (click)="mode = 'calendar'" [active]="mode === 'calendar'">
+      <span>{{ 'scheduler.calendar-mode' | translate }}</span>
+    </a>
+  </nav>
+  <mat-tab-nav-panel #schedulerTabPanel class="tb-scheduler-tab-panel flex flex-1 flex-col">
 
   <!-- LIST MODE: Task 9 entities table.
        Wrapper establishes a positioning + flex context so the table's internal
@@ -100,4 +108,5 @@
       </full-calendar>
     </div>
   </div>
+  </mat-tab-nav-panel>
 </div>

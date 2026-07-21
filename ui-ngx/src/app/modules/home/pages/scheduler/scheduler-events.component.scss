@@ -19,6 +19,25 @@
   height: 100%;
 }
 
+// Match RouterTabsComponent's tab-bar sizing (router-tabs.component.scss is :host-scoped to that
+// component, so its rules don't reach here) — keeps the List/Calendar tabs visually identical.
+.mat-mdc-tab-nav-bar.tb-scheduler-mode-tabs {
+  a.mat-mdc-tab-link {
+    min-width: 200px;
+    line-height: 40px;
+    border-bottom: none;
+    span {
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+}
+
+.tb-scheduler-tab-panel {
+  position: relative;
+  min-height: 0;
+}
+
 .tb-scheduler-list-container {
   // Containing block for tb-entities-table's mat-drawer-container.tb-absolute-fill,
   // so the list fills the space below the mode toggle rather than the whole page.

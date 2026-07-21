@@ -742,7 +742,11 @@ export const menuSectionMap = new Map<MenuId, MenuSection>([
     {
       id: MenuId.reports,
       name: 'report.reports',
-      type: 'toggle',
+      // 'link' (not 'toggle'): reports is nested inside the Features toggle, and the sidebar only
+      // renders two levels (toggle section -> link pages) - a nested toggle's own pages never show.
+      // So it's a link to a RouterTabs landing page whose History/Templates tabs live in-page,
+      // mirroring widget_library under Resources. See ReportRoutingModule.
+      type: 'link',
       path: '/features/reports',
       icon: 'assessment'
     }

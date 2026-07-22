@@ -64,7 +64,11 @@ export interface BaseReportTemplate extends BaseData<ReportTemplateId> {
   additionalInfo?: any;
 }
 
-// ReportTemplate.java - configuration is a raw JSON tree passthrough (design spec §2.4), not a typed bean.
+// ReportTemplate.java - configuration is the typed ReportTemplateConfig (PE shape, design spec §2.4 /
+// R2a §4): root keyed on `format` ('PDF'|'CSV'), a `components` array where each component is
+// discriminated by `type`, and the DASHBOARD component nests its dashboard settings under `config`
+// ({dashboardId, state, timewindow, ...}). Kept `any` here since the R1 dialog only edits the
+// single dashboard component; the full designer is R2c.
 export interface ReportTemplate extends BaseReportTemplate {
   configuration?: any;
 }

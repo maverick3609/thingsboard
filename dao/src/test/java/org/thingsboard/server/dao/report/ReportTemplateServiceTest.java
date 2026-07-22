@@ -27,6 +27,9 @@ import org.thingsboard.server.common.data.report.ReportTemplateInfo;
 import org.thingsboard.server.common.data.report.ReportTemplateQuery;
 import org.thingsboard.server.common.data.report.ReportTemplateType;
 import org.thingsboard.server.common.data.report.TbReportFormat;
+import org.thingsboard.server.common.data.report.configuration.ReportTemplateConfig;
+import org.thingsboard.server.common.data.report.configuration.components.DashboardComponent;
+import org.thingsboard.server.common.data.report.configuration.components.ReportComponentType;
 import org.thingsboard.server.dao.customer.CustomerService;
 import org.thingsboard.server.dao.service.AbstractServiceTest;
 import org.thingsboard.server.dao.service.DaoSqlTest;
@@ -58,7 +61,16 @@ public class ReportTemplateServiceTest extends AbstractServiceTest {
         assertTrue(saved.getCreatedTime() > 0);
 
         ReportTemplate found = reportTemplateService.findReportTemplateById(tenantId, saved.getId());
-        assertThat(found.getConfiguration().get("components").get(0).get("type").asText()).isEqualTo("DASHBOARD");
+        ReportTemplateConfig config = found.getConfiguration();
+        // typed round-trip through the jsonb column: PDF root + nested DASHBOARD config + HEADING
+        assertThat(config.getFormat()).isEqualTo(TbReportFormat.PDF);
+        assertThat(config.getComponents()).hasSize(2);
+        assertThat(config.getComponents().get(0).getType()).isEqualTo(ReportComponentType.DASHBOARD);
+        assertThat(config.getComponents().get(1).getType()).isEqualTo(ReportComponentType.HEADING);
+        DashboardComponent dashboard = (DashboardComponent) config.getComponents().get(0);
+        assertThat(dashboard.getConfig()).isNotNull();
+        assertThat(dashboard.getConfig().getDashboardId()).isEqualTo("d1");
+        assertThat(dashboard.getConfig().getState()).isEqualTo("state-blob");
     }
 
     @Test
@@ -148,7 +160,12 @@ public class ReportTemplateServiceTest extends AbstractServiceTest {
         t.setFormat(TbReportFormat.PDF);
         t.setType(ReportTemplateType.REPORT);
         t.setExternalId(externalId);
-        t.setConfiguration(JacksonUtil.toJsonNode("{\"type\":\"PDF\",\"components\":[{\"type\":\"DASHBOARD\",\"dashboardId\":\"d1\"}]}"));
+        // PE-shape (Decision D1): root keyed on `format`, DASHBOARD settings nested under `config`.
+        t.setConfiguration(JacksonUtil.fromString(
+                "{\"format\":\"PDF\",\"components\":[" +
+                        "{\"type\":\"DASHBOARD\",\"config\":{\"dashboardId\":\"d1\",\"state\":\"state-blob\"}}," +
+                        "{\"type\":\"HEADING\",\"value\":\"Weekly summary\"}]}",
+                ReportTemplateConfig.class));
         return t;
     }
 

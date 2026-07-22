@@ -34,6 +34,7 @@ import org.thingsboard.server.common.data.report.ReportData;
 import org.thingsboard.server.common.data.report.ReportTemplate;
 import org.thingsboard.server.common.data.report.ReportTemplateType;
 import org.thingsboard.server.common.data.report.TbReportFormat;
+import org.thingsboard.server.common.data.report.configuration.ReportTemplateConfig;
 import org.thingsboard.server.dao.report.ReportTemplateService;
 import org.thingsboard.server.service.report.render.ReportRenderException;
 
@@ -158,8 +159,9 @@ class TbReportServiceTest {
         template.setName("Weekly");
         template.setFormat(TbReportFormat.PDF);
         template.setType(ReportTemplateType.REPORT);
-        template.setConfiguration(JacksonUtil.toJsonNode(
-                "{\"type\":\"PDF\",\"components\":[{\"type\":\"DASHBOARD\",\"dashboardId\":\"d1\",\"state\":\"state-blob\",\"timewindow\":{\"displayValue\":\"\"},\"pageWidth\":800}]}"));
+        template.setConfiguration(JacksonUtil.fromString(
+                "{\"format\":\"PDF\",\"components\":[{\"type\":\"DASHBOARD\",\"config\":{\"dashboardId\":\"d1\",\"state\":\"state-blob\",\"timewindow\":{\"displayValue\":\"\"}}}]}",
+                ReportTemplateConfig.class));
         return template;
     }
 
@@ -169,8 +171,9 @@ class TbReportServiceTest {
         template.setName("No dashboard");
         template.setFormat(TbReportFormat.PDF);
         template.setType(ReportTemplateType.REPORT);
-        template.setConfiguration(JacksonUtil.toJsonNode(
-                "{\"type\":\"PDF\",\"components\":[{\"type\":\"RICH_TEXT\",\"content\":\"<p>hi</p>\"}]}"));
+        template.setConfiguration(JacksonUtil.fromString(
+                "{\"format\":\"PDF\",\"components\":[{\"type\":\"RICH_TEXT\",\"value\":\"<p>hi</p>\"}]}",
+                ReportTemplateConfig.class));
         return template;
     }
 

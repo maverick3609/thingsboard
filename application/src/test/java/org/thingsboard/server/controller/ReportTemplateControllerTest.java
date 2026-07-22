@@ -31,6 +31,7 @@ import org.thingsboard.server.common.data.report.ReportTemplate;
 import org.thingsboard.server.common.data.report.ReportTemplateInfo;
 import org.thingsboard.server.common.data.report.ReportTemplateType;
 import org.thingsboard.server.common.data.report.TbReportFormat;
+import org.thingsboard.server.common.data.report.configuration.ReportTemplateConfig;
 import org.thingsboard.server.common.data.security.Authority;
 import org.thingsboard.server.dao.service.DaoSqlTest;
 
@@ -98,7 +99,10 @@ public class ReportTemplateControllerTest extends AbstractControllerTest {
 
         ReportTemplate found = doGet("/api/reportTemplate/" + saved.getId().getId(), ReportTemplate.class);
         Assert.assertEquals("Renamed", found.getName());
-        Assert.assertEquals(saved.getConfiguration(), found.getConfiguration());
+        // Compare structural (tree) form: the typed config's ported Lombok equals chain is not a
+        // reliable deep-equals across instances, so assert the reserialized JSON matches instead.
+        Assert.assertEquals(JacksonUtil.valueToTree(saved.getConfiguration()),
+                JacksonUtil.valueToTree(found.getConfiguration()));
     }
 
     @Test
@@ -188,7 +192,9 @@ public class ReportTemplateControllerTest extends AbstractControllerTest {
         t.setName(name);
         t.setFormat(TbReportFormat.PDF);
         t.setType(ReportTemplateType.REPORT);
-        t.setConfiguration(JacksonUtil.toJsonNode("{\"type\":\"PDF\",\"components\":[{\"type\":\"DASHBOARD\",\"dashboardId\":\"d1\"}]}"));
+        t.setConfiguration(JacksonUtil.fromString(
+                "{\"format\":\"PDF\",\"components\":[{\"type\":\"DASHBOARD\",\"config\":{\"dashboardId\":\"d1\"}}]}",
+                ReportTemplateConfig.class));
         return t;
     }
 }

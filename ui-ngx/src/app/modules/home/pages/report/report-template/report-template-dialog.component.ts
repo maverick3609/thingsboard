@@ -62,11 +62,13 @@ export class ReportTemplateDialogComponent extends DialogComponent<ReportTemplat
     this.isAdd = data.isAdd;
 
     const template = data.reportTemplate;
-    // Appendix-A shape: {type: 'PDF', components: [{type: 'DASHBOARD', ...}]}. The DASHBOARD
-    // component is always components[0] for the R1 single-component editor.
+    // PE shape (design spec §2.4 / R2a §4): {format: 'PDF', components: [{type: 'DASHBOARD',
+    // config: {dashboardId, state, timewindow, ...}}]}. The DASHBOARD component is always
+    // components[0] for the R1 single-component editor; its settings live under `config`.
     const component = template?.configuration?.components?.[0] || {};
-    const dashboardEntity: EntityId | null = component.dashboardId
-      ? {entityType: EntityType.DASHBOARD, id: component.dashboardId}
+    const componentConfig = component.config || {};
+    const dashboardEntity: EntityId | null = componentConfig.dashboardId
+      ? {entityType: EntityType.DASHBOARD, id: componentConfig.dashboardId}
       : null;
 
     this.reportTemplateFormGroup = this.fb.group({
@@ -76,9 +78,8 @@ export class ReportTemplateDialogComponent extends DialogComponent<ReportTemplat
       description: [template ? template.description : ''],
       dashboardComponent: this.fb.group({
         dashboardEntity: [dashboardEntity, [Validators.required]],
-        state: [component.state || ''],
-        timewindow: [component.timewindow || null],
-        pageWidth: [component.pageWidth || 210, [Validators.required, Validators.min(1)]]
+        state: [componentConfig.state || ''],
+        timewindow: [componentConfig.timewindow || null]
       })
     });
   }
@@ -102,20 +103,24 @@ export class ReportTemplateDialogComponent extends DialogComponent<ReportTemplat
     const dashboardComponent = formValue.dashboardComponent;
 
     // Merge, don't rebuild: start from a deep clone of the loaded configuration (or the minimal
-    // Appendix-A skeleton for a NEW template) and set ONLY the fields this form edits, leaving
-    // every other existing top-level/component key intact.
+    // PE-shape skeleton for a NEW template) and set ONLY the fields this form edits, leaving every
+    // other existing top-level/component key intact. Per Decision D1 the wire shape is PE-nested:
+    // root keyed on `format`, the DASHBOARD component nests its settings under `config`.
     const configuration = this.data.reportTemplate?.configuration
       ? deepClone(this.data.reportTemplate.configuration)
-      : {type: TbReportFormat.PDF, components: [{type: 'DASHBOARD'}]};
+      : {format: TbReportFormat.PDF, components: [{type: 'DASHBOARD', config: {}}]};
     if (!Array.isArray(configuration.components) || !configuration.components.length) {
-      configuration.components = [{type: 'DASHBOARD'}];
+      configuration.components = [{type: 'DASHBOARD', config: {}}];
     }
-    configuration.type = TbReportFormat.PDF;
+    configuration.format = TbReportFormat.PDF;
     const dashboardComponentConfig = configuration.components[0];
-    dashboardComponentConfig.dashboardId = dashboardComponent.dashboardEntity?.id;
-    dashboardComponentConfig.state = dashboardComponent.state;
-    dashboardComponentConfig.timewindow = dashboardComponent.timewindow;
-    dashboardComponentConfig.pageWidth = dashboardComponent.pageWidth;
+    dashboardComponentConfig.type = 'DASHBOARD';
+    if (!dashboardComponentConfig.config) {
+      dashboardComponentConfig.config = {};
+    }
+    dashboardComponentConfig.config.dashboardId = dashboardComponent.dashboardEntity?.id;
+    dashboardComponentConfig.config.state = dashboardComponent.state;
+    dashboardComponentConfig.config.timewindow = dashboardComponent.timewindow;
 
     const reportTemplate: ReportTemplate = {
       ...(this.data.reportTemplate || {} as ReportTemplate),

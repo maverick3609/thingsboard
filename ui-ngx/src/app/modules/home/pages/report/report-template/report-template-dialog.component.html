@@ -71,16 +71,6 @@
                        aggregation="true"
                        formControlName="timewindow">
         </tb-timewindow>
-        <mat-form-field class="mat-block">
-          <mat-label translate>report.page-width</mat-label>
-          <input matInput type="number" min="1" step="1" formControlName="pageWidth" required>
-          <mat-error *ngIf="reportTemplateFormGroup.get('dashboardComponent.pageWidth').hasError('required')">
-            {{ 'report.page-width-required' | translate }}
-          </mat-error>
-          <mat-error *ngIf="reportTemplateFormGroup.get('dashboardComponent.pageWidth').hasError('min')">
-            {{ 'report.page-width-min' | translate }}
-          </mat-error>
-        </mat-form-field>
       </div>
     </fieldset>
   </div>

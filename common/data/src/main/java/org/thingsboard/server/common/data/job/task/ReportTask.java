@@ -15,7 +15,6 @@
  */
 package org.thingsboard.server.common.data.job.task;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -26,6 +25,7 @@ import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.id.ReportTemplateId;
 import org.thingsboard.server.common.data.id.UserId;
 import org.thingsboard.server.common.data.job.JobType;
+import org.thingsboard.server.common.data.report.configuration.ReportTemplateConfig;
 
 @Data
 @NoArgsConstructor
@@ -36,7 +36,7 @@ public class ReportTask extends Task<ReportTaskResult> {
 
     private CustomerId customerId;
     private ReportTemplateId reportTemplateId;
-    private JsonNode reportTemplateConfig; // R1: jsonb/config passthrough, not the typed ReportTemplateConfig
+    private ReportTemplateConfig reportTemplateConfig; // R2a: typed PE-shape config (was jsonb passthrough)
     private String timezone;
     private UserId userId;
     private EntityId userOwnerId;

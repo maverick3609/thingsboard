@@ -15,7 +15,6 @@
  */
 package org.thingsboard.server.controller;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ByteArrayResource;
@@ -59,6 +58,7 @@ import org.thingsboard.server.common.data.report.ReportInfo;
 import org.thingsboard.server.common.data.report.ReportInfoQuery;
 import org.thingsboard.server.common.data.report.ReportRequest;
 import org.thingsboard.server.common.data.report.ReportTemplate;
+import org.thingsboard.server.common.data.report.configuration.ReportTemplateConfig;
 import org.thingsboard.server.queue.util.TbCoreComponent;
 import org.thingsboard.server.service.report.TbReportService;
 import org.thingsboard.server.service.security.model.SecurityUser;
@@ -272,7 +272,7 @@ public class ReportController extends BaseController {
         CustomerId customerId = user.getCustomerId();
         EntityId userOwnerId = (customerId == null || customerId.isNullUid()) ? tenantId : customerId;
 
-        JsonNode configuration = reportRequest.getReportTemplateConfig();
+        ReportTemplateConfig configuration = reportRequest.getReportTemplateConfig();
         ReportTemplateId reportTemplateId = reportRequest.getReportTemplateId();
         if (reportTemplateId != null) {
             // Authorization boundary (see class javadoc): must run whenever a template id is

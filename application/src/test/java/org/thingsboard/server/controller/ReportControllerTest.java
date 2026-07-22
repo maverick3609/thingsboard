@@ -31,6 +31,7 @@ import org.thingsboard.server.common.data.report.ReportRequest;
 import org.thingsboard.server.common.data.report.ReportTemplate;
 import org.thingsboard.server.common.data.report.ReportTemplateType;
 import org.thingsboard.server.common.data.report.TbReportFormat;
+import org.thingsboard.server.common.data.report.configuration.ReportTemplateConfig;
 import org.thingsboard.server.dao.report.ReportService;
 import org.thingsboard.server.dao.service.DaoSqlTest;
 
@@ -134,7 +135,7 @@ public class ReportControllerTest extends AbstractControllerTest {
         template.setName("cross-tenant-test");
         template.setFormat(TbReportFormat.PDF);
         template.setType(ReportTemplateType.REPORT);
-        template.setConfiguration(JacksonUtil.toJsonNode("{\"type\":\"PDF\",\"components\":[]}"));
+        template.setConfiguration(JacksonUtil.fromString("{\"format\":\"PDF\",\"components\":[]}", ReportTemplateConfig.class));
         ReportTemplate savedTemplate = doPost("/api/reportTemplate", template, ReportTemplate.class);
 
         loginDifferentTenant();
@@ -164,7 +165,7 @@ public class ReportControllerTest extends AbstractControllerTest {
         template.setName("renderer-disabled-test");
         template.setFormat(TbReportFormat.PDF);
         template.setType(ReportTemplateType.REPORT);
-        template.setConfiguration(JacksonUtil.toJsonNode("{\"type\":\"PDF\",\"components\":[]}"));
+        template.setConfiguration(JacksonUtil.fromString("{\"format\":\"PDF\",\"components\":[]}", ReportTemplateConfig.class));
         ReportTemplate savedTemplate = doPost("/api/reportTemplate", template, ReportTemplate.class);
 
         ReportRequest reportRequest = new ReportRequest();

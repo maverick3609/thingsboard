@@ -16,7 +16,6 @@
 package org.thingsboard.server.service.report;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.thingsboard.server.common.data.job.task.ReportTask;
@@ -25,23 +24,24 @@ import org.thingsboard.server.common.data.report.ReportData;
 import org.thingsboard.server.common.data.report.ReportTemplate;
 import org.thingsboard.server.common.data.report.TbReportFormat;
 import org.thingsboard.server.dao.report.ReportTemplateService;
+import org.thingsboard.server.service.report.context.TbReportCtx;
+import org.thingsboard.server.service.report.context.TbReportCtxProvider;
 import org.thingsboard.server.service.report.render.ReportRenderException;
 
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 
 /**
  * PE {@code TbReportService} — the {@link ReportTask} → persisted {@link Report} dispatcher (design
- * spec §6.1). Loads the {@link ReportTemplate}, picks the {@link TbReportRenderService} registered
- * for its {@link TbReportFormat}, renders, then persists the bytes via the dao {@code ReportService}
- * ({@code createReport}). R1 registers only {@link PdfReportService} ({@link TbReportFormat#PDF});
- * {@link TbReportFormat#CSV} has no renderer yet (R2).
+ * spec §6.1). Loads the {@link ReportTemplate}, builds the per-render {@link TbReportCtx} (via {@link
+ * TbReportCtxProvider}), picks the {@link TbReportRenderService} registered for the template's {@link
+ * TbReportFormat}, renders, then persists the bytes via the dao {@code ReportService}
+ * ({@code createReport}). R2a registers only {@link PdfReportService} ({@link TbReportFormat#PDF});
+ * {@link TbReportFormat#CSV} has no renderer yet (R2b).
  * <p>
- * Guarded by the same {@code reports.renderer.enabled} property as {@code DefaultDashboardReportService}
- * / {@code PlaywrightWebReportRenderer} (Task 13): this service's constructor builds a {@link
- * PdfReportService} bound to the (conditional) {@link DashboardReportService} bean, so without the
- * guard Spring would fail to start any environment that hasn't opted into the
- * still-disabled-by-default renderer.
+ * Guarded by the same {@code reports.renderer.enabled} property as the render service and ctx provider
+ * it injects (Task 13 / R2a): all three appear/absent together, so the platform boots renderer-off.
  */
 @Service
 @Slf4j
@@ -50,20 +50,18 @@ public class TbReportService {
 
     private final org.thingsboard.server.dao.report.ReportService reportDao;
     private final ReportTemplateService reportTemplateService;
+    private final TbReportCtxProvider ctxProvider;
     private final Map<TbReportFormat, TbReportRenderService> renderServices = new EnumMap<>(TbReportFormat.class);
 
-    public TbReportService(DashboardReportService dashboardReportService,
-                            org.thingsboard.server.dao.report.ReportService reportDao,
-                            ReportTemplateService reportTemplateService,
-                            @Value("${reports.renderer.base_url:http://localhost:8080}") String rendererBaseUrl) {
+    public TbReportService(org.thingsboard.server.dao.report.ReportService reportDao,
+                           ReportTemplateService reportTemplateService,
+                           TbReportCtxProvider ctxProvider,
+                           List<TbReportRenderService> renderers) {
         this.reportDao = reportDao;
         this.reportTemplateService = reportTemplateService;
-        register(new PdfReportService(dashboardReportService, reportTemplateService, rendererBaseUrl));
-        // R2: register a CsvReportService (TbReportFormat.CSV) here once it exists.
-    }
-
-    private void register(TbReportRenderService renderService) {
-        renderServices.put(renderService.getFormat(), renderService);
+        this.ctxProvider = ctxProvider;
+        renderers.forEach(renderService -> renderServices.put(renderService.getFormat(), renderService));
+        // R2b: a CsvReportService (TbReportFormat.CSV) auto-registers here once it exists.
     }
 
     /**
@@ -117,10 +115,11 @@ public class TbReportService {
         TbReportFormat format = template.getFormat();
         TbReportRenderService renderService = renderServices.get(format);
         if (renderService == null) {
-            // R2: TbReportFormat.CSV has no renderer registered yet.
+            // R2b: TbReportFormat.CSV has no renderer registered yet.
             throw new ReportRenderException("No render service registered for report format: " + format);
         }
-        return renderService.generateReport(task);
+        TbReportCtx ctx = ctxProvider.newContext(task);
+        return renderService.generateReport(task, ctx);
     }
 
     private static Report buildReport(ReportTask task, ReportTemplate template, ReportData reportData) {

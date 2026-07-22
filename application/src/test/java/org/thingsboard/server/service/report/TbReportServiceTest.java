@@ -15,14 +15,13 @@
  */
 package org.thingsboard.server.service.report;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.thingsboard.common.util.JacksonUtil;
-import org.thingsboard.server.common.data.dashboardreport.DashboardReportConfig;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.thingsboard.server.common.data.id.CustomerId;
 import org.thingsboard.server.common.data.id.ReportId;
 import org.thingsboard.server.common.data.id.ReportTemplateId;
@@ -34,10 +33,12 @@ import org.thingsboard.server.common.data.report.ReportData;
 import org.thingsboard.server.common.data.report.ReportTemplate;
 import org.thingsboard.server.common.data.report.ReportTemplateType;
 import org.thingsboard.server.common.data.report.TbReportFormat;
-import org.thingsboard.server.common.data.report.configuration.ReportTemplateConfig;
 import org.thingsboard.server.dao.report.ReportTemplateService;
+import org.thingsboard.server.service.report.context.TbReportCtx;
+import org.thingsboard.server.service.report.context.TbReportCtxProvider;
 import org.thingsboard.server.service.report.render.ReportRenderException;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -49,69 +50,69 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Covers Task 14: {@link TbReportService} dispatches a {@link ReportTask} to the {@link
+ * Covers Task 14 / R2a: {@link TbReportService} dispatches a {@link ReportTask} to the {@link
  * TbReportRenderService} registered for its template's format ({@link PdfReportService} for {@link
- * TbReportFormat#PDF}), then persists the rendered bytes via the dao {@code ReportService}. {@link
- * DashboardReportService} and both dao collaborators are mocked — no real render or persist.
+ * TbReportFormat#PDF}), building the per-render {@link TbReportCtx} via the {@link TbReportCtxProvider}
+ * first, then persisting the rendered bytes via the dao {@code ReportService}. The render service, ctx
+ * provider and both dao collaborators are mocked — the engine itself is exercised by {@link
+ * PdfReportServiceTest}; this is the dispatch+persist contract only.
  */
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class TbReportServiceTest {
 
-    @Mock
-    private DashboardReportService dashboardReportService;
     @Mock
     private org.thingsboard.server.dao.report.ReportService reportDao;
     @Mock
     private ReportTemplateService templateDao;
+    @Mock
+    private TbReportCtxProvider ctxProvider;
+    @Mock
+    private TbReportRenderService pdfRenderService;
 
-    @InjectMocks
-    private TbReportService svc; // wires PdfReportService(dashboardReportService, templateDao)
+    private TbReportService svc;
 
     private final TenantId tenantId = TenantId.fromUUID(UUID.randomUUID());
     private final CustomerId customerId = new CustomerId(UUID.randomUUID());
     private final UserId userId = new UserId(UUID.randomUUID());
 
+    @BeforeEach
+    void setUp() {
+        when(pdfRenderService.getFormat()).thenReturn(TbReportFormat.PDF);
+        svc = new TbReportService(reportDao, templateDao, ctxProvider, List.of(pdfRenderService));
+    }
+
     @Test
-    void generatesAndPersistsDashboardTemplate() {
-        ReportTemplate tmpl = dashboardTemplate();
+    void generatesAndPersistsViaFormatRenderService() {
+        ReportTemplate tmpl = pdfTemplate();
         when(templateDao.findReportTemplateById(tenantId, tmpl.getId())).thenReturn(tmpl);
+
+        TbReportCtx ctx = TbReportCtx.builder().tenantId(tenantId).build();
+        ReportTask task = ReportTask.builder()
+                .tenantId(tenantId).customerId(customerId).reportTemplateId(tmpl.getId())
+                .timezone("Europe/Kiev").userId(userId).accessToken("jwt").build();
+        when(ctxProvider.newContext(task)).thenReturn(ctx);
+
         ReportData rendered = ReportData.builder()
                 .data("%PDF-x".getBytes()).name("r.pdf").contentType("application/pdf").build();
-        when(dashboardReportService.generateReport(eq(tenantId), any(DashboardReportConfig.class))).thenReturn(rendered);
+        when(pdfRenderService.generateReport(eq(task), eq(ctx))).thenReturn(rendered);
+
         ReportId savedId = new ReportId(UUID.randomUUID());
         when(reportDao.createReport(any(Report.class), any(byte[].class))).thenAnswer(invocation -> {
-            // Return a DISTINCT Report (copy), not the pre-save argument itself: mutating and
-            // returning the same reference can't distinguish the correct `return saved;` (the dao's
-            // response) from a `return report;` regression (TbReportService's own pre-save local),
-            // since both would then alias the very same object/id. The pre-save argument's id is
-            // left untouched (null) so only the true dao response satisfies the identity assertion
-            // on savedId below.
+            // Return a DISTINCT Report (copy) with the dao-assigned id so the identity assertion
+            // below pins TbReportService's `return saved;` (dao response), not its pre-save local.
             Report preSave = invocation.getArgument(0);
             Report saved = new Report(preSave);
             saved.setId(savedId);
             return saved;
         });
 
-        ReportTask task = ReportTask.builder()
-                .tenantId(tenantId).customerId(customerId).reportTemplateId(tmpl.getId())
-                .timezone("Europe/Kiev").userId(userId).accessToken("jwt").build();
-
         Report r = svc.generateReport(task);
 
-        ArgumentCaptor<DashboardReportConfig> configCaptor = ArgumentCaptor.forClass(DashboardReportConfig.class);
-        verify(dashboardReportService).generateReport(eq(tenantId), configCaptor.capture());
-        DashboardReportConfig config = configCaptor.getValue();
-        assertThat(config.getDashboardId()).isEqualTo("d1");
-        assertThat(config.getState()).isEqualTo("state-blob");
-        assertThat(config.getTimewindow().get("displayValue").asText()).isEqualTo("");
-        assertThat(config.getType()).isEqualTo("pdf");
-        assertThat(config.getTimezone()).isEqualTo("Europe/Kiev");
-        assertThat(config.getUserId()).isEqualTo(userId.toString());
-
+        verify(ctxProvider).newContext(task);
+        verify(pdfRenderService).generateReport(task, ctx);
         verify(reportDao).createReport(any(Report.class), eq("%PDF-x".getBytes()));
         assertThat(r).isNotNull();
-        // Pins identity to the dao's response object, not TbReportService's own pre-save bean: a
-        // `return report;` regression carries a null id here, since only the dao's copy gets savedId.
         assertThat(r.getId()).isEqualTo(savedId);
         assertThat(r.getName()).isEqualTo("r.pdf");
         assertThat(r.getFormat()).isEqualTo(TbReportFormat.PDF);
@@ -122,30 +123,16 @@ class TbReportServiceTest {
     }
 
     @Test
-    void templateWithoutDashboardComponentThrowsReportRenderException() {
-        ReportTemplate tmpl = templateWithoutDashboardComponent();
+    void generateTestReportRendersWithoutPersisting() {
+        ReportTemplate tmpl = pdfTemplate();
         when(templateDao.findReportTemplateById(tenantId, tmpl.getId())).thenReturn(tmpl);
+        TbReportCtx ctx = TbReportCtx.builder().tenantId(tenantId).build();
         ReportTask task = ReportTask.builder()
                 .tenantId(tenantId).reportTemplateId(tmpl.getId()).timezone("UTC").userId(userId).build();
-
-        assertThatThrownBy(() -> svc.generateReport(task))
-                .isInstanceOf(ReportRenderException.class)
-                .hasMessage("R1 supports dashboard-component templates only");
-
-        verify(dashboardReportService, never()).generateReport(any(), any());
-        verify(reportDao, never()).createReport(any(), any());
-    }
-
-    @Test
-    void generateTestReportRendersWithoutPersisting() {
-        ReportTemplate tmpl = dashboardTemplate();
-        when(templateDao.findReportTemplateById(tenantId, tmpl.getId())).thenReturn(tmpl);
+        when(ctxProvider.newContext(task)).thenReturn(ctx);
         ReportData rendered = ReportData.builder()
                 .data(new byte[]{1, 2, 3}).name("test.pdf").contentType("application/pdf").build();
-        when(dashboardReportService.generateReport(eq(tenantId), any(DashboardReportConfig.class))).thenReturn(rendered);
-
-        ReportTask task = ReportTask.builder()
-                .tenantId(tenantId).reportTemplateId(tmpl.getId()).timezone("UTC").userId(userId).build();
+        when(pdfRenderService.generateReport(eq(task), eq(ctx))).thenReturn(rendered);
 
         ReportData result = svc.generateTestReport(task);
 
@@ -153,27 +140,43 @@ class TbReportServiceTest {
         verify(reportDao, never()).createReport(any(), any());
     }
 
-    private ReportTemplate dashboardTemplate() {
+    @Test
+    void unknownFormatWithNoRenderServiceThrows() {
+        // CSV has no render service registered in R2a (only PDF); dispatch must reject cleanly.
+        ReportTemplate tmpl = pdfTemplate();
+        tmpl.setFormat(TbReportFormat.CSV);
+        when(templateDao.findReportTemplateById(tenantId, tmpl.getId())).thenReturn(tmpl);
+        ReportTask task = ReportTask.builder()
+                .tenantId(tenantId).reportTemplateId(tmpl.getId()).timezone("UTC").userId(userId).build();
+
+        assertThatThrownBy(() -> svc.generateReport(task))
+                .isInstanceOf(ReportRenderException.class)
+                .hasMessageContaining("No render service registered for report format: CSV");
+
+        verify(ctxProvider, never()).newContext(any());
+        verify(reportDao, never()).createReport(any(), any());
+    }
+
+    @Test
+    void missingTemplateThrows() {
+        ReportTemplateId templateId = new ReportTemplateId(UUID.randomUUID());
+        when(templateDao.findReportTemplateById(tenantId, templateId)).thenReturn(null);
+        ReportTask task = ReportTask.builder()
+                .tenantId(tenantId).reportTemplateId(templateId).userId(userId).build();
+
+        assertThatThrownBy(() -> svc.generateReport(task))
+                .isInstanceOf(ReportRenderException.class)
+                .hasMessageContaining("Report template not found");
+
+        verify(reportDao, never()).createReport(any(), any());
+    }
+
+    private ReportTemplate pdfTemplate() {
         ReportTemplate template = new ReportTemplate(new ReportTemplateId(UUID.randomUUID()));
         template.setTenantId(tenantId);
         template.setName("Weekly");
         template.setFormat(TbReportFormat.PDF);
         template.setType(ReportTemplateType.REPORT);
-        template.setConfiguration(JacksonUtil.fromString(
-                "{\"format\":\"PDF\",\"components\":[{\"type\":\"DASHBOARD\",\"config\":{\"dashboardId\":\"d1\",\"state\":\"state-blob\",\"timewindow\":{\"displayValue\":\"\"}}}]}",
-                ReportTemplateConfig.class));
-        return template;
-    }
-
-    private ReportTemplate templateWithoutDashboardComponent() {
-        ReportTemplate template = new ReportTemplate(new ReportTemplateId(UUID.randomUUID()));
-        template.setTenantId(tenantId);
-        template.setName("No dashboard");
-        template.setFormat(TbReportFormat.PDF);
-        template.setType(ReportTemplateType.REPORT);
-        template.setConfiguration(JacksonUtil.fromString(
-                "{\"format\":\"PDF\",\"components\":[{\"type\":\"RICH_TEXT\",\"value\":\"<p>hi</p>\"}]}",
-                ReportTemplateConfig.class));
         return template;
     }
 

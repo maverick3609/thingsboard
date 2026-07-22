@@ -117,7 +117,9 @@ Otherwise lossless: every polymorphic node + big value object carries `@JsonIgno
 
 **No column change.** `report_template.configuration` stays jsonb; `report.format`/`report_template.format` stay `TbReportFormat.name()`. No DDL, no overlay change.
 
-**One-time data migration (Decision D1 = adopt PE shape).** A Liquibase changeset (Inferrix overlay) rewrites existing `report_template.configuration` rows to PE-shape so typed deserialization is lossless: for each `components[]` entry with `type=="DASHBOARD"`, move the flat `dashboardId`/`state`/`timewindow` under a nested `config` object and drop `pageWidth`; ensure every config root carries `format` (default `"PDF"`). Idempotent (skip rows already nested). `.77` has ~0 real templates so the live blast radius is tiny, but the changeset ships for correctness and for any future-imported rows. R1's template-form (§10 designer) is updated to **emit PE-shape JSON** so new templates need no migration.
+**One-time data migration (Decision D1 = adopt PE shape) — via TB's `LtsMigration` mechanism (NOT Liquibase; TB does not use Liquibase).** TB migrations are `LtsMigration` beans (`@Component @TbCoreComponent`, `getVersion()` + optional `apply()`), auto-discovered by `LtsMigrationService` via `List<LtsMigration>` injection and run for each version in `(dbSchemaVersion, packageSchemaVersion]` of the same family; the runner executes `application/src/main/data/upgrade/lts/<version>/schema_update.sql` (if present) then `apply()`. Existing beans: `V4_2_2_3`/`V4_3_1_2`/`V4_3_1_3Migration`. `packageSchemaVersion` = normalized `pom` project version.
+
+R2 adds **`V4_3_1_4Migration implements LtsMigration`** (mirrors `V4_3_1_3Migration`) whose **`apply()`** rewrites existing `report_template.configuration` rows to PE-shape: for each `components[]` with `type=="DASHBOARD"` and flat fields, move `dashboardId`/`state`/`timewindow` under a nested `config` object and drop `pageWidth`; ensure the config root carries `format` (default `"PDF"`). Idempotent (skip already-nested rows). No DDL, so its `data/upgrade/lts/4.3.1.4/` dir need only satisfy the dir↔bean consistency guard (`LtsMigrationIntegrationTest`) — the transform is pure Java (Jackson), not SQL, since flat→nested array-element rewriting is impractical in raw jsonb SQL. **This rides a project version bump to `4.3.1.4`** (the same way every TB migration ships in a version) — see Decision D4 (§15). Fresh installs write PE-shape from day one (the designer emits it), so the migration only fixes pre-existing R1-shape rows. `.77` has ~0 real templates → live blast radius tiny.
 
 ---
 
@@ -201,7 +203,7 @@ Add `produceOutputMsg()` to `ReportJobProcessor` (R1-authored file → compounds
 
 New Angular component `tbActionNodeGenerateReportConfig` (form for `useConfigFromMessage` + `ReportConfig`) — small, in `ui-ngx` rule-node config module.
 
-> **V1 "generate dashboard report" is DEFERRED** (Decision D2, §15): it drags in `TbContext.getPeContext()`, `BlobEntity`/`BlobEntityId`/`BlobEntityService`, a `blob_entity` Liquibase table, and the `DashboardReportService`→`rule-engine-api` interface move — a large PE surface for one node. V2 covers the scheduled+rule-chain report path; delivery reuses R1's direct-byte email attach.
+> **V1 "generate dashboard report" is DEFERRED** (Decision D2, §15): it drags in `TbContext.getPeContext()`, `BlobEntity`/`BlobEntityId`/`BlobEntityService`, a `blob_entity` schema table, and the `DashboardReportService`→`rule-engine-api` interface move — a large PE surface for one node. V2 covers the scheduled+rule-chain report path; delivery reuses R1's direct-byte email attach.
 
 ---
 
@@ -249,7 +251,7 @@ Add to `application/pom.xml` (already Inferrix-touched by R1's Playwright line �
 | 2 | V1 + V2 rule nodes | **V2 only** | V1 needs `PeContext`/`BlobEntity`/`blob_entity` table — disproportionate (Decision D2) |
 | 3 | DASHBOARD rendered by PE's remote screenshot | R1 Playwright renderer raw-PNG adapter | reuse R1's in-process renderer; no microservice |
 | 4 | `BlobEntity` attachment channel | direct-byte email attach (R1) | no blob store; V2 doesn't need it |
-| 5 | config root discriminator `format`, nested DASHBOARD `config` | **adopt PE shape** (Decision D1 resolved) + one-time Liquibase data migration (§3); designer emits PE-shape JSON | PE byte-fidelity, supports future PE-template import |
+| 5 | config root discriminator `format`, nested DASHBOARD `config` | **adopt PE shape** (Decision D1) + one-time `LtsMigration` (`V4_3_1_4Migration.apply()`, §3) — TB's own migration mechanism, not Liquibase; designer emits PE-shape JSON | PE byte-fidelity, supports future PE-template import |
 | 6 | Microservice ctx/data (`Remote*`) | in-process `Local*` only | monolith |
 
 ---
@@ -267,8 +269,10 @@ Add to `application/pom.xml` (already Inferrix-touched by R1's Playwright line �
 | `application/pom.xml` | `application` | amend — thymeleaf/flying-saucer/openpdf/jsvg/commons-csv deps + fonts/templates resources |
 | `tbActionNodeGenerateReportConfig`, designer (~40 comps), `report.models.ts` | `ui-ngx` | new files |
 | `JwtTokenFactory.java` | `application` | **no edit** — reused as 2nd consumer of `parseAccessJwtToken` |
+| `service/install/lts/V4_3_1_4Migration.java` + `data/upgrade/lts/4.3.1.4/` | `application` | **new files** — `LtsMigration` bean (auto-discovered; `apply()` = config flat→PE-shape rewrite). Additive, no edit to `LtsMigrationService`. |
+| project `pom.xml` version → `4.3.1.4` (all modules) | root/all | **edit** — bumps `packageSchemaVersion` so the migration runs (Decision D4). Ledger row. |
 
-No DB schema change; no REST/API change. Renderer beans stay `@ConditionalOnProperty(reports.renderer.enabled)`.
+No DB schema (DDL) change; no REST/API change. Renderer beans stay `@ConditionalOnProperty(reports.renderer.enabled)`.
 
 ---
 
@@ -287,12 +291,14 @@ No DB schema change; no REST/API change. Renderer beans stay `@ConditionalOnProp
 
 ## 15. Decisions (RESOLVED 2026-07-21)
 
-**D1 — config migration strategy → ADOPT PE SHAPE.** Type the config exactly as PE (`format` root discriminator, nested DASHBOARD `config: DashboardReportConfig`, no `pageWidth`). Ship a one-time idempotent Liquibase data migration (§3) rewriting existing `report_template.configuration` rows flat→nested; the designer emits PE-shape JSON. Rationale: PE byte-fidelity, supports future PE-template import; live blast radius on `.77` is ~0 templates.
+**D1 — config migration strategy → ADOPT PE SHAPE.** Type the config exactly as PE (`format` root discriminator, nested DASHBOARD `config: DashboardReportConfig`, no `pageWidth`). Ship a one-time idempotent data migration via TB's `LtsMigration` mechanism (§3, `V4_3_1_4Migration.apply()` — not Liquibase) rewriting existing `report_template.configuration` rows flat→nested; the designer emits PE-shape JSON. Rationale: PE byte-fidelity, supports future PE-template import; live blast radius on `.77` is ~0 templates.
 
 **D2 — rule node scope → V2 ONLY.** Port `generate report` (V2) + the `produceOutputMsg` push-back. Defer V1 `generate dashboard report` (drags in `PeContext`/`BlobEntity`/`blob_entity`/`DashboardReportService`→`rule-engine-api`) until a rule-chain multi-attachment email is a hard requirement.
 
+**D4 — migration version bump (NEW, needs sign-off).** TB's `LtsMigration` runs only for versions in `(dbSchemaVersion, packageSchemaVersion]`, so the config-shape migration must ride a **project version bump `4.3.1.3 → 4.3.1.4`** (updates the root/all-module `pom.xml` `<version>`, which `getPackageSchemaVersion()` normalizes). This is exactly how every TB migration ships. *Recommendation:* **bump to 4.3.1.4** with R2a. Alternative (not recommended): a bespoke one-off startup fix outside the `LtsMigration` mechanism — diverges from TB structure, which is what we're explicitly avoiding. **Confirm the bump.**
+
 **D3 — phasing → SEQUENTIAL R2a → R2b → R2c.** Each its own plan → implement → verify → deploy to `.77` before the next (matches how R1 was run). Boundary is dependency-driven: the three **table** renderers and **CSV** fetch server-side data, so they land in R2b **with** the query context they need.
-- **R2a — Typed config (+ Liquibase migration) + HTML→PDF engine core + non-data component renderers.** Foundational; typed config blocks everything. Engine skeleton (`AbstractReportService`, `TbReportService` dispatch, the `ReportService`+`TbReportCtx` signature change, Thymeleaf/flying-saucer/openpdf/font assembly) + renderers that need **no** server query: HEADING, RICH_TEXT, DIVIDER, PAGE_BREAK, IMAGE (image fetch via `ImageService`), DASHBOARD (R1 Playwright raw-PNG adapter). Delivers a multi-component PDF minus data tables. *(plan authored next.)*
+- **R2a — Typed config (+ `LtsMigration` data migration + version bump) + HTML→PDF engine core + non-data component renderers.** Foundational; typed config blocks everything. Engine skeleton (`AbstractReportService`, `TbReportService` dispatch, the `ReportService`+`TbReportCtx` signature change, Thymeleaf/flying-saucer/openpdf/font assembly) + renderers that need **no** server query: HEADING, RICH_TEXT, DIVIDER, PAGE_BREAK, IMAGE (image fetch via `ImageService`), DASHBOARD (R1 Playwright raw-PNG adapter). Delivers a multi-component PDF minus data tables. *(plan authored next.)*
 - **R2b — Server-side query context + data component renderers + CSV + V2 rule node.** `TbReportCtx`/`ReportDataService`/`Local*` impls; the `AbstractReportService` data layer; ENTITY_TABLE / ALARM_TABLE / TIME_SERIES_TABLE PDF renderers; `CsvReportService` + CSV renderers (tables-only); the `generate report` (V2) node + `produceOutputMsg`. Depends on R2a.
 - **R2c — Designer UI** (~40 Angular components). Independent of R2a/R2b backend once the typed model exists; largest FE body.
 

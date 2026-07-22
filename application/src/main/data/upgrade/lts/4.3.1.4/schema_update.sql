@@ -1,0 +1,20 @@
+--
+-- Copyright © 2016-2026 The Inferrix Authors
+--
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
+--
+--     http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing, software
+-- distributed under the License is distributed on an "AS IS" BASIS,
+-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-- See the License for the specific language governing permissions and
+-- limitations under the License.
+--
+
+-- Reporting R2a (4.3.1.4) has NO schema change. The report_template.configuration flat->PE-shape rewrite is a
+-- pure-Java (Jackson) transform in V4_3_1_4Migration.apply(). This file exists only so the on-disk migration
+-- directory matches the registered LtsMigration bean (dir<->bean consistency guard in LtsMigrationIntegrationTest).
+-- Intentionally a no-op: a comment-only body is executed by LtsMigrationService.runSchemaUpdate as an empty query.

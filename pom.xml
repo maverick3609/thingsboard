@@ -932,6 +932,12 @@
                             <exclude>**/valkey-certs/**</exclude>
                             <exclude>**/data/certs/**</exclude>
                             <exclude>**/*.otf</exclude>
+                            <!-- Reporting R2a: PE-ported Thymeleaf templates, CSS, SVG and embedded
+                                 fonts staged as classpath resources (application/src/main/resources/
+                                 {html,svg,fonts}). Binary/asset files carry no source header. -->
+                            <exclude>**/resources/html/**</exclude>
+                            <exclude>**/resources/svg/**</exclude>
+                            <exclude>**/resources/fonts/**</exclude>
                             <exclude>**/license-header-template*.txt</exclude>
                         </excludes>
                         <mapping>

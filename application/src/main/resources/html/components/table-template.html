@@ -1,0 +1,57 @@
+<table class="tb-report-table">
+    <colgroup>
+        <col th:each="colKey : ${columns.keySet()}"
+             th:attrappend="width=${columns[colKey].width != null ? columns[colKey].width : null}">
+    </colgroup>
+    <thead>
+    <tr th:if="${showTableHeading}"
+        th:style="|height: ${headingHeight};|">
+        <th class="tb-report-table-heading"
+            th:colspan="${columns.size()}"
+            th:style="|text-align: ${headingTextAlignment};
+                 vertical-align: ${headingVerticalAlignment};
+                 color: ${headingColor};
+                 padding: 0;
+                 margin: 0;
+                 font-size: ${headingFontSize}pt;
+                 font-family: ${headingFontFamily};
+                 font-style: ${headingFontStyle};
+                 font-weight: ${headingFontWeight};|"
+            th:utext="${headingText}">Title</th>
+    </tr>
+    <tr>
+        <th th:each="label : ${columns.keySet()}"
+            th:style="|display: table-cell;
+                 ${columns[label].textAlignment != null ? 'text-align:' + columns[label].textAlignment + ';' : ''}
+                 ${columns[label].verticalAlignment != null ? 'vertical-align:' + columns[label].verticalAlignment + ';' : ''}
+                 ${columns[label].color != null ? 'color:' + columns[label].color + ';' : ''}
+                 ${columns[label].backgroundColor != null ? 'background-color:' + columns[label].backgroundColor + ';' : ''}
+                 ${columns[label].fontSize != null ? 'font-size:' + columns[label].fontSize + 'pt;' : ''}
+                 ${columns[label].fontFamily != null ? 'font-family:' + columns[label].fontFamily + ';' : ''}
+                 ${columns[label].fontStyle != null ? 'font-style:' + columns[label].fontStyle + ';' : ''}
+                 ${columns[label].fontWeight != null ? 'font-weight:' + columns[label].fontWeight + ';' : ''}|"
+            th:text="${label}">Header</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr th:each="row : ${rows}">
+        <td th:each="label : ${columns.keySet()}"
+            th:style="|display: table-cell;
+                 ${row[label].textAlignment != null ? 'text-align:' + row[label].textAlignment + ';' : ''}
+                 ${row[label].verticalAlignment != null ? 'vertical-align:' + row[label].verticalAlignment + ';' : ''}
+                 ${row[label].color != null ? 'color:' + row[label].color + ';' : ''}
+                 ${row[label].backgroundColor != null ? 'background-color:' + row[label].backgroundColor + ';' : ''}
+                 ${row[label].fontSize != null ? 'font-size:' + row[label].fontSize + 'pt;' : ''}
+                 ${row[label].fontFamily != null ? 'font-family:' + row[label].fontFamily + ';' : ''}
+                 ${row[label].fontStyle != null ? 'font-style:' + row[label].fontStyle + ';' : ''}
+                 ${row[label].fontWeight != null ? 'font-weight:' + row[label].fontWeight + ';' : ''}|"
+            th:utext="${row[label].value}">[Value]</td>
+    </tr>
+    <!-- Empty table fallback row -->
+    <tr th:if="${#lists.isEmpty(rows)}">
+        <td style="text-align: center;"
+            th:colspan="${columns.size()}"
+            th:text="${noDataMessage}">Table content is empty</td>
+    </tr>
+    </tbody>
+</table>

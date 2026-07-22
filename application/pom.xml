@@ -445,6 +445,13 @@
             <artifactId>xmlgraphics-commons</artifactId>
             <version>2.9</version>
         </dependency>
+        <!-- jsoup: lenient HTML->XHTML cleaner feeding a W3C DOM to flying-saucer.
+             Replaces PE's unmaintained JTidy (see HtmlRenderUtils). MIT-licensed. -->
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>1.17.2</version>
+        </dependency>
     </dependencies>
 
     <build>

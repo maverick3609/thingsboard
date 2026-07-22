@@ -19,7 +19,9 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 @Schema
 @Data
@@ -28,7 +30,11 @@ import lombok.NoArgsConstructor;
 public class ErrorComponent implements ReportComponent {
 
     private String errorMessage;
+    // The carried exception is transient render state (never serialized, no value semantics) — exclude it
+    // from equals/hashCode/toString so two structurally-identical configs compare equal.
     @JsonIgnore
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
     private Exception exception;
 
     @Override

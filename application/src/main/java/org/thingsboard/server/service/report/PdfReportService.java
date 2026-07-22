@@ -163,7 +163,8 @@ public class PdfReportService implements TbReportRenderService {
                     .name(reportName)
                     .build();
         } catch (ReportRenderException e) {
-            // R2b guards + hard render errors carry a clear message — surface them unwrapped.
+            // Top-level safety net: per-component failures now degrade to error boxes (renderComponent), so
+            // this only catches a fatal render error thrown outside component rendering — surface it unwrapped.
             throw e;
         } catch (Exception e) {
             throw new ReportRenderException("Failed to render PDF report for template " + task.getReportTemplateId(), e);
@@ -186,9 +187,10 @@ public class PdfReportService implements TbReportRenderService {
     private String renderComponent(TbReportCtx ctx, ReportComponent component, int usablePageWidthPx) {
         ReportComponentType type = component.getType();
         if (R2B_DATA_TYPES.contains(type)) {
-            // Hard guard: these need the server-side data layer (entity/alarm/timeseries queries,
-            // sub-report recursion). Fail clearly rather than emit an empty/broken component.
-            throw new ReportRenderException("table components are R2b");
+            // R2b components need the server-side data layer (entity/alarm/timeseries queries, sub-report
+            // recursion). Degrade to an error box instead of failing the whole report — graceful
+            // degradation, consistent with the ErrorRenderer fallback below.
+            return renderError(usablePageWidthPx, unsupportedComponentMessage(type), null);
         }
         try {
             PdfReportComponentRenderer<ReportComponent> renderer = componentRenderers.get(type);
@@ -198,11 +200,21 @@ public class PdfReportService implements TbReportRenderService {
             ComponentData componentData = buildComponentData(ctx, component, usablePageWidthPx);
             return renderer.render(component, componentData);
         } catch (ReportRenderException e) {
-            throw e;
+            // A known-unsupported feature inside a supported component (e.g. entity-key IMAGE source) or a
+            // clear render failure carrying its own message — degrade to an error box, don't fail the report.
+            log.debug("Rendering component of type [{}] as error box: {}", type, e.getMessage());
+            return renderError(usablePageWidthPx, e.getMessage(), null);
         } catch (Exception e) {
             log.error("Failed to render component of type [{}]", type, e);
             return renderError(usablePageWidthPx, "Failed to render component of type: " + type, e);
         }
+    }
+
+    /** User-facing "not supported in this version" message for a guarded R2b component type. */
+    private static String unsupportedComponentMessage(ReportComponentType type) {
+        return type == ReportComponentType.SUB_REPORT
+                ? "Sub-report components are not supported in this version"
+                : "Table components are not supported in this version";
     }
 
     /**
@@ -222,9 +234,11 @@ public class PdfReportService implements TbReportRenderService {
     /**
      * Captures the DASHBOARD component's dashboard as a PNG through R1's Playwright renderer ({@link
      * DashboardReportService}), forcing {@code type=png} (PE-verbatim). The component's own {@code config}
-     * supplies dashboard id/state/timewindow; the render user/timezone come from the ctx; the base URL from
-     * config (falling back to {@code reports.renderer.base_url}). Config problems become an error box, not
-     * a hard failure.
+     * supplies dashboard id/state/timewindow; the render user/timezone come from the ctx. The base URL is
+     * ALWAYS the trusted server value ({@code reports.renderer.base_url}) — never the component JSON: letting
+     * template config pick the host would let it steer the render access token to an attacker (token
+     * exfiltration + SSRF), the same reason {@code DashboardReportController} forces {@code
+     * constructBaseUrl(request)}. Config problems become an error box, not a hard failure.
      */
     private ComponentData buildDashboardComponentData(TbReportCtx ctx, DashboardComponent component, int usablePageWidthPx) {
         DashboardReportConfig componentConfig = component.getConfig();
@@ -242,7 +256,9 @@ public class PdfReportService implements TbReportRenderService {
         config.setUserId(ctx.getUserId() != null ? ctx.getUserId().toString() : null);
         config.setTimezone(ctx.getTimeZone());
         config.setType("png");
-        config.setBaseUrl(StringUtils.isNotBlank(componentConfig.getBaseUrl()) ? componentConfig.getBaseUrl() : rendererBaseUrl);
+        // SECURITY: always the trusted server base URL — never componentConfig.getBaseUrl(). The access
+        // token minted for this render is sent to this host, so a component must not be able to pick it.
+        config.setBaseUrl(rendererBaseUrl);
         ReportData dashboardPng = dashboardReportService.generateReport(ctx.getTenantId(), config);
         return new ComponentData(usablePageWidthPx, dashboardPng.getData());
     }
@@ -298,8 +314,16 @@ public class PdfReportService implements TbReportRenderService {
         reportVariables.put("pageHeight", pageSize.getHeight() + "pt");
         reportVariables.put("pageMarginLeft", pageMargins.getLeft() + "pt");
         reportVariables.put("pageMarginRight", pageMargins.getRight() + "pt");
-        String pageBackground = configuration.getPageBackground() != null
-                ? ColorUtils.normalizeCssColor(configuration.getPageBackground()) : "#fff";
+        // Page-level color is normalized here, outside any per-component try/catch — guard it so a bad
+        // color string degrades to the default instead of failing the entire render.
+        String pageBackground = "#fff";
+        if (configuration.getPageBackground() != null) {
+            try {
+                pageBackground = ColorUtils.normalizeCssColor(configuration.getPageBackground());
+            } catch (RuntimeException e) {
+                log.debug("Invalid page background color [{}]; using default", configuration.getPageBackground(), e);
+            }
+        }
         reportVariables.put("pageBackground", pageBackground);
         int minContentHeight = 100;
         int minHalfPageContentHeight = Math.max((pageSize.height - pageMargins.getTop() - pageMargins.getBottom() - minContentHeight) / 2, 0);

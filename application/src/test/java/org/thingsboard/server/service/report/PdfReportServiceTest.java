@@ -43,7 +43,6 @@ import org.thingsboard.server.common.data.report.configuration.style.PageSize;
 import org.thingsboard.server.common.data.report.configuration.style.TextAlignment;
 import org.thingsboard.server.common.data.report.configuration.style.VerticalAlignment;
 import org.thingsboard.server.service.report.context.TbReportCtx;
-import org.thingsboard.server.service.report.render.ReportRenderException;
 import org.thingsboard.server.service.report.util.itext.PdfReportImageResolver;
 
 import javax.imageio.ImageIO;
@@ -55,7 +54,6 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -69,7 +67,9 @@ import static org.mockito.Mockito.when;
  * PAGE_BREAK + IMAGE + DASHBOARD) plus a running header through the real component renderers and the
  * C4 flying-saucer/openpdf plumbing, with the DASHBOARD's Playwright PNG mocked. Asserts a valid
  * multi-page PDF, the dashboard captured as PNG (not PDF) and embedded, and the header on every page.
- * A table component asserts the R2b guard.
+ * Also covers the R2a security/correctness fixes: the DASHBOARD baseUrl override is ignored (#1), unsupported
+ * R2b components (tables, sub-report, entity-key image) degrade to an error box instead of failing (#7), and
+ * a bad page-background color degrades gracefully (#9).
  */
 class PdfReportServiceTest {
 
@@ -150,15 +150,92 @@ class PdfReportServiceTest {
     }
 
     @Test
-    void tableComponentRaisesR2bGuard() {
+    void tableComponentRendersErrorBoxNotFailure() throws Exception {
+        // R2a security/correctness fix #7: an unsupported R2b table must degrade to an error box, NOT fail
+        // the whole report. A HEADING + ENTITY_TABLE renders a valid PDF (heading + error box), not a 500.
         PdfReportTemplateConfig config = baseConfig();
-        config.setComponents(List.of(new EntityTableComponent()));
+        config.setComponents(List.of(heading("BODYHEADING"), new EntityTableComponent()));
 
-        assertThatThrownBy(() -> service.generateReport(task(), ctx(config)))
-                .isInstanceOf(ReportRenderException.class)
-                .hasMessageContaining("table components are R2b");
+        byte[] pdf = service.generateReport(task(), ctx(config)).getData();
 
+        assertThat(new String(pdf, 0, 5, StandardCharsets.ISO_8859_1)).as("PDF magic header").isEqualTo("%PDF-");
+        assertThat(pdf.length).as("non-trivial PDF").isGreaterThan(1000);
+        PdfReader reader = new PdfReader(pdf);
+        try {
+            String text = new PdfTextExtractor(reader).getTextFromPage(1);
+            assertThat(text).as("heading still rendered").contains("BODYHEADING");
+            assertThat(text).as("table degraded to an error box").contains("Table components are not supported");
+        } finally {
+            reader.close();
+        }
         verifyNoInteractions(dashboardReportService);
+    }
+
+    @Test
+    void subReportRendersItsOwnErrorMessage() throws Exception {
+        // SUB_REPORT gets its own message, not the generic table one.
+        PdfReportTemplateConfig config = baseConfig();
+        config.setComponents(List.of(new org.thingsboard.server.common.data.report.configuration.components.SubReportComponent()));
+
+        byte[] pdf = service.generateReport(task(), ctx(config)).getData();
+
+        PdfReader reader = new PdfReader(pdf);
+        try {
+            assertThat(new PdfTextExtractor(reader).getTextFromPage(1))
+                    .contains("Sub-report components are not supported");
+        } finally {
+            reader.close();
+        }
+    }
+
+    @Test
+    void entityKeyImageRendersErrorBoxNotFailure() {
+        // The entity-key IMAGE guard (thrown deep in ImageRenderer) must also degrade to an error box.
+        PdfReportTemplateConfig config = baseConfig();
+        ImageComponent entityKeyImage = new ImageComponent();
+        entityKeyImage.setSourceType(ImageSourceType.ENTITY_KEY);
+        config.setComponents(List.of(heading("BODYHEADING"), entityKeyImage));
+
+        byte[] pdf = service.generateReport(task(), ctx(config)).getData();
+
+        assertThat(new String(pdf, 0, 5, StandardCharsets.ISO_8859_1)).as("PDF magic header").isEqualTo("%PDF-");
+        verifyNoInteractions(dashboardReportService);
+    }
+
+    @Test
+    void dashboardComponentBaseUrlOverrideIsIgnored() {
+        // R2a security fix #1: a component-supplied baseUrl must be ignored — the render always uses the
+        // trusted server value (token-exfil / SSRF defense, mirroring DashboardReportController).
+        when(dashboardReportService.generateReport(eq(tenantId), any(DashboardReportConfig.class)))
+                .thenReturn(ReportData.builder().data(pngBytes()).name("d.png").contentType("image/png").build());
+
+        PdfReportTemplateConfig config = baseConfig();
+        DashboardReportConfig dashConfig = new DashboardReportConfig();
+        dashConfig.setDashboardId("dash-1");
+        dashConfig.setBaseUrl("http://attacker.example");
+        DashboardComponent dashboard = new DashboardComponent();
+        dashboard.setConfig(dashConfig);
+        config.setComponents(List.of(dashboard));
+
+        service.generateReport(task(), ctx(config));
+
+        ArgumentCaptor<DashboardReportConfig> captor = ArgumentCaptor.forClass(DashboardReportConfig.class);
+        verify(dashboardReportService).generateReport(eq(tenantId), captor.capture());
+        assertThat(captor.getValue().getBaseUrl())
+                .as("render must use the trusted server base URL, never the component-supplied one")
+                .isEqualTo("http://localhost:8080");
+    }
+
+    @Test
+    void invalidPageBackgroundDegradesGracefully() {
+        // R2a correctness fix #9: a bad page-background color must not fail the whole render.
+        PdfReportTemplateConfig config = baseConfig();
+        config.setPageBackground("definitely-not-a-color");
+        config.setComponents(List.of(heading("BODYHEADING")));
+
+        byte[] pdf = service.generateReport(task(), ctx(config)).getData();
+
+        assertThat(new String(pdf, 0, 5, StandardCharsets.ISO_8859_1)).as("PDF magic header").isEqualTo("%PDF-");
     }
 
     // --- fixtures ---

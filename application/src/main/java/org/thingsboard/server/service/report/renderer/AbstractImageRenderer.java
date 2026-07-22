@@ -40,7 +40,7 @@ public abstract class AbstractImageRenderer<C extends AbstractImageComponent>
     @Override
     public String renderContent(C component, ComponentData componentData) {
         String imageUrl = getImageUrl(component, componentData);
-        String layoutWidth = this.layoutWidthPx + "px";
+        String layoutWidth = componentData.getLayoutWidthPx() + "px";
         Object imageWidth;
         if (ImageWidthType.ORIGINAL == component.getWidthType()) {
             imageWidth = "auto";

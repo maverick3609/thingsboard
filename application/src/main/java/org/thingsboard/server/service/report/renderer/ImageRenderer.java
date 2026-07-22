@@ -39,8 +39,9 @@ public class ImageRenderer extends AbstractImageRenderer<ImageComponent> {
     protected String getImageUrl(ImageComponent component, ComponentData componentData) {
         if (ImageSourceType.ENTITY_KEY == component.getSourceType()) {
             // R2b: entity-key image sources resolve the URL from a DataSource/DataKey value (server-side
-            // data layer). Until that lands, fail clearly rather than silently emitting an empty image.
-            throw new ReportRenderException("entity-key image source is R2b");
+            // data layer). Until that lands, signal "unsupported" — PdfReportService catches this and
+            // degrades to an error box (graceful degradation) instead of failing the whole report.
+            throw new ReportRenderException("Entity-key image sources are not supported in this version");
         }
         String imageUrl = component.getImageUrl();
         if (imageUrl == null || imageUrl.isEmpty()) {

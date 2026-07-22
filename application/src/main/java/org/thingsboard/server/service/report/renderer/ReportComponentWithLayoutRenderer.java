@@ -31,15 +31,14 @@ import java.util.Map;
  * then wraps it in {@code html/components/component-layout} — applying the component's margins, paddings,
  * background and border. Also shortcuts to an error box when the {@link ComponentData} carries an error.
  * <p>
- * {@link #layoutWidthPx} is the inner content width (usable page width minus this component's horizontal
- * margins + paddings, converted pt→px), exposed to subclasses that must size inner content (e.g. images).
+ * The inner content width (usable page width minus this component's horizontal margins + paddings, converted
+ * pt→px) is computed per-render and stored on the per-render {@link ComponentData#getLayoutWidthPx()} — NOT
+ * on this renderer (a shared {@code @Component} singleton) — so concurrent renders can't race.
  *
  * @param <C> the concrete layout-bearing component type
  */
 public abstract class ReportComponentWithLayoutRenderer<C extends LayoutReportComponent>
         implements PdfReportComponentRenderer<C> {
-
-    protected int layoutWidthPx;
 
     @Override
     public String render(C component, ComponentData componentData) {
@@ -48,9 +47,10 @@ public abstract class ReportComponentWithLayoutRenderer<C extends LayoutReportCo
         }
         Insets margins = component.getMargins() != null ? component.getMargins() : new Insets(0);
         Insets paddings = component.getPaddings() != null ? component.getPaddings() : new Insets(0);
-        this.layoutWidthPx = componentData.getUsablePageWidthPx();
-        this.layoutWidthPx = (int) ((float) this.layoutWidthPx - (float) (margins.getLeft() + margins.getRight()) * 4.0f / 3.0f);
-        this.layoutWidthPx = (int) ((float) this.layoutWidthPx - (float) (paddings.getLeft() + paddings.getRight()) * 4.0f / 3.0f);
+        int layoutWidthPx = componentData.getUsablePageWidthPx();
+        layoutWidthPx = (int) ((float) layoutWidthPx - (float) (margins.getLeft() + margins.getRight()) * 4.0f / 3.0f);
+        layoutWidthPx = (int) ((float) layoutWidthPx - (float) (paddings.getLeft() + paddings.getRight()) * 4.0f / 3.0f);
+        componentData.setLayoutWidthPx(layoutWidthPx);
         String content = renderContent(component, componentData);
         HashMap<String, Object> layoutVariables = new HashMap<>();
         layoutVariables.put("htmlContent", content);

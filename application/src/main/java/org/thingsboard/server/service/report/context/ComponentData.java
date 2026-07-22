@@ -39,6 +39,13 @@ import java.util.Map;
 public class ComponentData {
 
     private final int usablePageWidthPx;
+    /**
+     * Inner content width (usable page width minus this component's horizontal margins + paddings, pt→px),
+     * computed per-render by {@code ReportComponentWithLayoutRenderer#render} and read back by image
+     * renderers. Lives here (not on the singleton renderer) so concurrent renders never cross-contaminate.
+     */
+    @Setter
+    private int layoutWidthPx;
     @Setter
     private List<Map<String, String>> entityDatas;
     @Setter

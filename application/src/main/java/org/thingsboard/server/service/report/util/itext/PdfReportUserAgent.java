@@ -29,6 +29,7 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.logging.Level;
 import org.apache.commons.lang3.StringUtils;
 import org.thingsboard.server.service.report.util.ImageUtils;
 import org.thingsboard.server.service.report.util.ThymeleafUtil;
@@ -90,7 +91,15 @@ extends ITextUserAgent {
                 url = PdfReportUserAgent.class.getResource("/public" + uri);
             }
             if (url == null) {
-                return super.resolveAndOpenStream(uri);
+                // R2a policy: resolve ONLY bundled classpath assets here. Do NOT fetch arbitrary URLs
+                // (http/https/file/ftp/...) via super.resolveAndOpenStream -> new URL(uri).openStream():
+                // that would be an SSRF + local-file-read sink with no scheme/host allowlist, no timeout
+                // and no byte cap. An unresolved URI returns null, so the caller substitutes the error
+                // image (same outcome as any other unresolved image today).
+                // If remote images are ever required, this is where an explicit https-only allowlist with
+                // connect/read timeouts, a max-byte cap and a private/link-local IP-range block must go.
+                XRLog.load(Level.FINE, "Refusing to resolve non-bundled resource URI (remote fetch is disabled): " + uri);
+                return null;
             }
         }
         try {

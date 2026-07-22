@@ -18,6 +18,9 @@ package org.thingsboard.server.service.report.renderer;
 import org.springframework.stereotype.Component;
 import org.thingsboard.server.common.data.report.configuration.components.HeadingComponent;
 import org.thingsboard.server.common.data.report.configuration.components.ReportComponentType;
+import org.thingsboard.server.common.data.report.configuration.style.Font;
+import org.thingsboard.server.common.data.report.configuration.style.FontStyle;
+import org.thingsboard.server.common.data.report.configuration.style.FontWeight;
 import org.thingsboard.server.common.data.report.configuration.style.TextAlignment;
 import org.thingsboard.server.common.data.report.configuration.style.VerticalAlignment;
 import org.thingsboard.server.service.report.context.ComponentData;
@@ -25,6 +28,7 @@ import org.thingsboard.server.service.report.util.ColorUtils;
 import org.thingsboard.server.service.report.util.ThymeleafUtil;
 
 import java.util.HashMap;
+import java.util.Set;
 
 /**
  * Renders a {@code HEADING} component (PE {@code report.renderer.HeadingRenderer}): a single styled text
@@ -36,15 +40,27 @@ import java.util.HashMap;
 @Component
 public class HeadingRenderer extends ReportComponentWithLayoutRenderer<HeadingComponent> {
 
+    /**
+     * Font families the bundled {@code PdfReportFontResolver} actually registers (Roboto / monospace /
+     * sans-serif / serif). Only these ever reach the template's {@code font-family:${fontFamily}} — an
+     * unknown value falls back to {@link #DEFAULT_FONT_FAMILY}, so a component cannot inject arbitrary CSS
+     * (e.g. {@code x; background-image:url(...)}) into the style attribute.
+     */
+    private static final Set<String> ALLOWED_FONT_FAMILIES = Set.of("Roboto", "monospace", "sans-serif", "serif");
+    private static final String DEFAULT_FONT_FAMILY = "Roboto";
+
     @Override
     public String renderContent(HeadingComponent component, ComponentData componentData) {
         String processedText = ThymeleafUtil.renderFromHtmlString(component.getValue(), componentData.getVariables());
+        Font font = component.getFont() != null ? component.getFont() : new Font();
+        FontWeight weight = font.getWeight() != null ? font.getWeight() : FontWeight.NORMAL;
+        FontStyle style = font.getStyle() != null ? font.getStyle() : FontStyle.NORMAL;
         HashMap<String, Object> templateVars = new HashMap<>();
         templateVars.put("color", resolveColor(component));
-        templateVars.put("fontSize", resolveFontSize(component));
-        templateVars.put("fontWeight", component.getFont().getWeight().getValue());
-        templateVars.put("fontStyle", component.getFont().getStyle().getValue());
-        templateVars.put("fontFamily", resolveFontFamily(component));
+        templateVars.put("fontSize", resolveFontSize(font));
+        templateVars.put("fontWeight", weight.getValue());
+        templateVars.put("fontStyle", style.getValue());
+        templateVars.put("fontFamily", resolveFontFamily(font));
         templateVars.put("textAlignment", resolveTextAlignment(component));
         templateVars.put("verticalAlignment", resolveVerticalAlignment(component));
         templateVars.put("height", resolveHeight(component));
@@ -56,14 +72,23 @@ public class HeadingRenderer extends ReportComponentWithLayoutRenderer<HeadingCo
         return component.getColor() != null ? ColorUtils.normalizeCssColor(component.getColor()) : "#000";
     }
 
-    private Float resolveFontSize(HeadingComponent component) {
-        Float size = component.getFont().getSize();
+    private Float resolveFontSize(Font font) {
+        Float size = font.getSize();
         return size != null && size > 0.0f ? size : 10.0f;
     }
 
-    private String resolveFontFamily(HeadingComponent component) {
-        String family = component.getFont().getFamily();
-        return family != null && !family.isEmpty() ? family : "Roboto";
+    private String resolveFontFamily(Font font) {
+        String family = font.getFamily();
+        if (family == null) {
+            return DEFAULT_FONT_FAMILY;
+        }
+        String trimmed = family.trim();
+        for (String allowed : ALLOWED_FONT_FAMILIES) {
+            if (allowed.equalsIgnoreCase(trimmed)) {
+                return allowed;
+            }
+        }
+        return DEFAULT_FONT_FAMILY;
     }
 
     private String resolveTextAlignment(HeadingComponent component) {

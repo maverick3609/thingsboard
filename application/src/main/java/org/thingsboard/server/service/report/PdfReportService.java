@@ -82,7 +82,7 @@ import java.util.Optional;
  * {@link #buildComponentData} dispatches each to the inherited F2 builder and the three table renderers lay
  * the rows out (cell values escaped by {@code table-template}). <b>Task H</b> wires SUB_REPORT: {@link
  * #renderSubReport} recursively renders a referenced child template once per resolved entity, bounded by
- * {@code MAX_SUB_REPORT_DEPTH} (an Inferrix hardening over PE — see the method). PDF keeps its own
+ * the shared {@link TbReportCtx#MAX_SUB_REPORT_DEPTH} (an Inferrix hardening over PE — see the method). PDF keeps its own
  * HTML-assembly specifics (page/header/footer layout, the DASHBOARD Playwright-PNG capture).
  * <p>
  * Gated by {@code reports.renderer.enabled} (opt-in invariant, mirrors R1): its dashboard collaborator is
@@ -97,18 +97,6 @@ public class PdfReportService extends AbstractReportService {
     /** pt→px at 96/72 dpi. */
     private static final float PT_TO_PX = 4.0f / 3.0f;
     private static final int DEFAULT_PAGE_MARGIN = 20;
-
-    /**
-     * Maximum SUB_REPORT nesting depth. <b>Inferrix hardening over PE, which has NO bound:</b> PE's {@code
-     * renderSubReport} → {@code renderContent} → (nested SUB_REPORT) → {@code renderSubReport} recurses
-     * forever on a self-referential template ({@code templateId} = its own id) or a cycle (A→B→A) —
-     * {@code StackOverflowError} plus per-level amplified DB reads (findReportTemplate + getSubReportEntities)
-     * = a DoS. {@link TbReportCtx#getSubReportDepth()} increments once per {@link
-     * TbReportCtx#createSubReportCxt}; {@link #renderSubReport} refuses to recurse at this cap, so the one
-     * check bounds self-reference, cycles AND pathologically deep nesting. Mirrors the F1-hang / R2a-baseUrl /
-     * G-fontFamily precedent of hardening PE where a faithful port would be unsafe.
-     */
-    private static final int MAX_SUB_REPORT_DEPTH = 10;
 
     private final Map<ReportComponentType, PdfReportComponentRenderer<ReportComponent>> componentRenderers =
             new EnumMap<>(ReportComponentType.class);
@@ -291,14 +279,15 @@ public class PdfReportService extends AbstractReportService {
      * entity's block is optionally wrapped in a {@code no-page-break} div per {@link
      * SubReportComponent#isAvoidPageBreakInside()}.
      * <p>
-     * <b>Inferrix hardening over PE — {@code MAX_SUB_REPORT_DEPTH} recursion bound.</b> PE's {@code
-     * renderSubReport} has NO bound, so a self-referential template ({@code templateId} = its own id), a cycle
-     * (A→B→A) or pathologically deep nesting recurses forever → {@code StackOverflowError} + per-level
-     * amplified DB reads (findReportTemplate + getSubReportEntities) = a DoS. Because {@link
-     * TbReportCtx#createSubReportCxt} increments {@link TbReportCtx#getSubReportDepth()} each level, refusing to
-     * recurse once the cap is reached bounds self-reference, cycles AND deep nesting in one check (same
-     * precedent as the F1-hang / R2a-baseUrl / G-fontFamily hardenings). The check sits before {@code
-     * findReportTemplate}, so it bounds the amplified DB reads too.
+     * <b>Inferrix hardening over PE — {@link TbReportCtx#MAX_SUB_REPORT_DEPTH} recursion bound (shared with the
+     * CSV engine).</b> PE's {@code renderSubReport} has NO bound, so a self-referential template ({@code
+     * templateId} = its own id), a cycle (A→B→A) or pathologically deep nesting recurses forever → {@code
+     * StackOverflowError} + per-level amplified DB reads (findReportTemplate + getSubReportEntities) = a DoS.
+     * Because {@link TbReportCtx#createSubReportCxt} increments {@link TbReportCtx#getSubReportDepth()} each
+     * level, {@link TbReportCtx#isSubReportDepthExceeded()} once the cap is reached bounds self-reference,
+     * cycles AND deep nesting in one check (same precedent as the F1-hang / R2a-baseUrl / G-fontFamily
+     * hardenings). {@link TbReportCtx#consumeSubReportBudget()} sits before {@code findReportTemplate}, so it
+     * bounds the amplified DB reads too. {@code CsvReportService} uses the SAME shared checks.
      * <p>
      * <b>Degradation:</b> a null/unknown template id, a non-PDF child template ({@code instanceof} guards the
      * cast, so a CSV/other-format template degrades instead of throwing {@code ClassCastException}), or any
@@ -310,14 +299,14 @@ public class PdfReportService extends AbstractReportService {
         if (templateId == null) {
             return renderError(usablePageWidthPx, "Report template id is not configured for SubReport", null);
         }
-        if (ctx.getSubReportDepth() >= MAX_SUB_REPORT_DEPTH) {
-            return renderError(usablePageWidthPx, "Sub-report nesting exceeds the maximum depth of " + MAX_SUB_REPORT_DEPTH, null);
+        if (ctx.isSubReportDepthExceeded()) {
+            return renderError(usablePageWidthPx, "Sub-report nesting exceeds the maximum depth of " + TbReportCtx.MAX_SUB_REPORT_DEPTH, null);
         }
         // The depth cap bounds a single chain, but a sub-report fans out to one child render per resolved entity,
         // so the render tree is E-ary — E^depth total renders would OOM the shared render heap even within the
         // depth cap. This shared, per-report budget (threaded by reference through createSubReportCxt) caps TOTAL
-        // sub-report renders across every branch. Decrement before findReportTemplate so it also bounds DB reads.
-        if (ctx.getSubReportBudget().decrementAndGet() < 0) {
+        // sub-report renders across every branch. Consume before findReportTemplate so it also bounds DB reads.
+        if (!ctx.consumeSubReportBudget()) {
             return renderError(usablePageWidthPx, "Sub-report render budget of " + TbReportCtx.MAX_TOTAL_SUB_REPORT_RENDERS
                     + " exceeded (too many sub-report renders in one report)", null);
         }

@@ -71,11 +71,24 @@ public class TbReportCtx implements Closeable {
     private final TbelInvokeService tbelInvokeService;
 
     /**
+     * Maximum {@code SUB_REPORT} nesting depth. <b>Inferrix hardening over PE, which has NO bound:</b> PE's
+     * {@code renderSubReport} → {@code renderContent} → (nested SUB_REPORT) → {@code renderSubReport} recurses
+     * forever on a self-referential template ({@code templateId} = its own id) or a cycle (A→B→A) — {@code
+     * StackOverflowError} plus per-level amplified DB reads = a DoS. Lives here (not private to one engine) so
+     * BOTH render engines — {@code PdfReportService} and {@code CsvReportService} — bound their sub-report
+     * recursion against the SAME constant + the SAME {@link #isSubReportDepthExceeded()} check and can't
+     * diverge. {@link #subReportDepth} increments once per {@link #createSubReportCxt}; each engine refuses to
+     * recurse at this cap, so the one check bounds self-reference, cycles AND pathologically deep nesting.
+     */
+    public static final int MAX_SUB_REPORT_DEPTH = 10;
+
+    /**
      * How many {@code SUB_REPORT} levels deep this render is (0 = the top-level report; {@link
-     * #createSubReportCxt} sets each child to parent + 1). {@code PdfReportService} caps this at its
-     * {@code MAX_SUB_REPORT_DEPTH} before recursing, so a self-referential template ({@code templateId} =
-     * its own id), a cycle (A→B→A) or pathologically deep nesting cannot recurse without bound — an Inferrix
-     * hardening over PE, which has no such cap and recurses until {@code StackOverflowError}. Defaults to 0.
+     * #createSubReportCxt} sets each child to parent + 1). Both render engines cap this at {@link
+     * #MAX_SUB_REPORT_DEPTH} (via {@link #isSubReportDepthExceeded()}) before recursing, so a self-referential
+     * template ({@code templateId} = its own id), a cycle (A→B→A) or pathologically deep nesting cannot recurse
+     * without bound — an Inferrix hardening over PE, which has no such cap and recurses until {@code
+     * StackOverflowError}. Defaults to 0.
      */
     @Builder.Default
     private final int subReportDepth = 0;
@@ -86,10 +99,10 @@ public class TbReportCtx implements Closeable {
      * counter), this bounds total WORK: a sub-report resolves E entities and renders its child once per entity,
      * so the render tree is E-ary and E^depth total renders would exhaust the shared render heap (a cross-tenant
      * OOM) even within the depth cap. Threaded BY REFERENCE through {@link #createSubReportCxt} — every child ctx
-     * shares the SAME instance — and decremented once per {@code renderSubReport} node in {@code PdfReportService};
-     * when it goes negative that node degrades to an error box instead of descending. Fresh per top-level render
-     * ({@code @Builder.Default}) so it can't leak across reports. Inferrix hardening over PE (PE bounds neither
-     * depth nor fan-out). One render thread, so a plain {@link AtomicInteger} holder suffices.
+     * shares the SAME instance — and consumed once per {@code renderSubReport} node by BOTH engines via {@link
+     * #consumeSubReportBudget()}; when it goes negative that node degrades to an error instead of descending.
+     * Fresh per top-level render ({@code @Builder.Default}) so it can't leak across reports. Inferrix hardening
+     * over PE (PE bounds neither depth nor fan-out). One render thread, so a plain {@link AtomicInteger} suffices.
      */
     public static final int MAX_TOTAL_SUB_REPORT_RENDERS = 1000;
     @Builder.Default
@@ -101,6 +114,27 @@ public class TbReportCtx implements Closeable {
     /** Per-render TBEL script cache (data-key post-func body → compiled script id), released by {@link #close()}. Never builder-set. */
     @Builder.Default
     private final Map<String, UUID> scripts = new HashMap<>();
+
+    /**
+     * Whether this render is already at/over the maximum sub-report nesting depth ({@link
+     * #MAX_SUB_REPORT_DEPTH}). Both {@code PdfReportService} and {@code CsvReportService} check this before
+     * recursing into a {@code SUB_REPORT}, so a self-referential template / cycle / pathologically deep nesting
+     * cannot recurse without bound. Pure query — no side effect.
+     */
+    public boolean isSubReportDepthExceeded() {
+        return subReportDepth >= MAX_SUB_REPORT_DEPTH;
+    }
+
+    /**
+     * Consumes one unit of the shared {@link #subReportBudget} (decrement) and reports whether a render slot
+     * remained. <b>Side-effecting</b> — call EXACTLY ONCE per {@code renderSubReport} node, and BEFORE {@code
+     * findReportTemplate}, so the budget also bounds the amplified DB reads. Returns {@code true} to proceed
+     * with the render, {@code false} once the budget is exhausted (the caller must degrade to an error instead
+     * of descending). Both render engines route through this one method so their fan-out bound can't diverge.
+     */
+    public boolean consumeSubReportBudget() {
+        return subReportBudget.decrementAndGet() >= 0;
+    }
 
     /**
      * Builds a child context for a {@code SUB_REPORT} component: same identity/security scope (tenant, user,

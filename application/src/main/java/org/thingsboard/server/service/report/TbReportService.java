@@ -37,8 +37,9 @@ import java.util.Map;
  * spec §6.1). Loads the {@link ReportTemplate}, builds the per-render {@link TbReportCtx} (via {@link
  * TbReportCtxProvider}), picks the {@link TbReportRenderService} registered for the template's {@link
  * TbReportFormat}, renders, then persists the bytes via the dao {@code ReportService}
- * ({@code createReport}). R2a registers only {@link PdfReportService} ({@link TbReportFormat#PDF});
- * {@link TbReportFormat#CSV} has no renderer yet (R2b).
+ * ({@code createReport}). Both engines auto-register by their {@link TbReportRenderService#getFormat()}:
+ * {@link PdfReportService} ({@link TbReportFormat#PDF}, R2a) and {@link CsvReportService}
+ * ({@link TbReportFormat#CSV}, R2b Task I).
  * <p>
  * Guarded by the same {@code reports.renderer.enabled} property as the render service and ctx provider
  * it injects (Task 13 / R2a): all three appear/absent together, so the platform boots renderer-off.
@@ -60,8 +61,9 @@ public class TbReportService {
         this.reportDao = reportDao;
         this.reportTemplateService = reportTemplateService;
         this.ctxProvider = ctxProvider;
+        // Both PdfReportService (PDF) and CsvReportService (CSV) auto-register here by getFormat() when the
+        // renderer is enabled — nothing format-specific to add.
         renderers.forEach(renderService -> renderServices.put(renderService.getFormat(), renderService));
-        // R2b: a CsvReportService (TbReportFormat.CSV) auto-registers here once it exists.
     }
 
     /**
@@ -115,7 +117,8 @@ public class TbReportService {
         TbReportFormat format = template.getFormat();
         TbReportRenderService renderService = renderServices.get(format);
         if (renderService == null) {
-            // R2b: TbReportFormat.CSV has no renderer registered yet.
+            // Defensive: with the renderer enabled, PDF and CSV both register — this guards a format that has
+            // no engine (e.g. a future TbReportFormat added without one), and is exercised by TbReportServiceTest.
             throw new ReportRenderException("No render service registered for report format: " + format);
         }
         // The ctx is Closeable (R2b): close() releases the per-render TBEL post-processing scripts the data

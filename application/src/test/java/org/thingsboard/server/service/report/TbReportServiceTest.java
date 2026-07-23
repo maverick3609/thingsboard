@@ -142,7 +142,9 @@ class TbReportServiceTest {
 
     @Test
     void unknownFormatWithNoRenderServiceThrows() {
-        // CSV has no render service registered in R2a (only PDF); dispatch must reject cleanly.
+        // The generic guard: a format with no registered engine must reject cleanly. This harness registers only
+        // the PDF engine (setUp) — so a CSV template exercises the guard here, even though CsvReportService
+        // registers CSV in production (R2b). See CsvReportServiceTest for the CSV-routed dispatch.
         ReportTemplate tmpl = pdfTemplate();
         tmpl.setFormat(TbReportFormat.CSV);
         when(templateDao.findReportTemplateById(tenantId, tmpl.getId())).thenReturn(tmpl);

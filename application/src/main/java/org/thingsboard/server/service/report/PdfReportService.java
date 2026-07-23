@@ -16,15 +16,18 @@
 package org.thingsboard.server.service.report;
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.thingsboard.server.common.data.StringUtils;
 import org.thingsboard.server.common.data.dashboardreport.DashboardReportConfig;
 import org.thingsboard.server.common.data.id.EntityId;
+import org.thingsboard.server.common.data.id.ReportTemplateId;
 import org.thingsboard.server.common.data.job.task.ReportTask;
 import org.thingsboard.server.common.data.query.EntityData;
 import org.thingsboard.server.common.data.report.ReportData;
+import org.thingsboard.server.common.data.report.ReportTemplate;
 import org.thingsboard.server.common.data.report.TbReportFormat;
 import org.thingsboard.server.common.data.report.configuration.DataSource;
 import org.thingsboard.server.common.data.report.configuration.HeaderFooter;
@@ -35,6 +38,7 @@ import org.thingsboard.server.common.data.report.configuration.components.DataRe
 import org.thingsboard.server.common.data.report.configuration.components.ErrorComponent;
 import org.thingsboard.server.common.data.report.configuration.components.ReportComponent;
 import org.thingsboard.server.common.data.report.configuration.components.ReportComponentType;
+import org.thingsboard.server.common.data.report.configuration.components.SubReportComponent;
 import org.thingsboard.server.common.data.report.configuration.components.TimeseriesTableComponent;
 import org.thingsboard.server.common.data.report.configuration.style.Insets;
 import org.thingsboard.server.common.data.report.configuration.style.PageOrientation;
@@ -54,12 +58,10 @@ import java.awt.Dimension;
 import java.io.ByteArrayOutputStream;
 import java.util.Date;
 import java.util.EnumMap;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * The R2a HTML→PDF render engine (PE {@code report.service.PdfReportService}, adapted). Turns one
@@ -78,9 +80,10 @@ import java.util.Set;
  * R2b: {@code extends} {@link AbstractReportService} — the shared server-side data layer (entity/alarm/
  * timeseries builds + TBEL post-processing). <b>Task G</b> wires the entity/alarm/time-series tables:
  * {@link #buildComponentData} dispatches each to the inherited F2 builder and the three table renderers lay
- * the rows out (cell values escaped by {@code table-template}). Only SUB_REPORT (recursive template rendering)
- * stays guarded until Task H and degrades to an error box. PDF keeps its own HTML-assembly specifics
- * (page/header/footer layout, the DASHBOARD Playwright-PNG capture).
+ * the rows out (cell values escaped by {@code table-template}). <b>Task H</b> wires SUB_REPORT: {@link
+ * #renderSubReport} recursively renders a referenced child template once per resolved entity, bounded by
+ * {@code MAX_SUB_REPORT_DEPTH} (an Inferrix hardening over PE — see the method). PDF keeps its own
+ * HTML-assembly specifics (page/header/footer layout, the DASHBOARD Playwright-PNG capture).
  * <p>
  * Gated by {@code reports.renderer.enabled} (opt-in invariant, mirrors R1): its dashboard collaborator is
  * likewise gated, so the platform boots renderer-off. {@link AbstractReportService} is abstract (no bean), so
@@ -96,12 +99,16 @@ public class PdfReportService extends AbstractReportService {
     private static final int DEFAULT_PAGE_MARGIN = 20;
 
     /**
-     * The only component type still awaiting its server-side path. Task G wired the entity/alarm/time-series
-     * tables to the F2 data layer, so they left this set; SUB_REPORT (recursive template rendering) stays
-     * guarded until Task H and degrades to an error box.
+     * Maximum SUB_REPORT nesting depth. <b>Inferrix hardening over PE, which has NO bound:</b> PE's {@code
+     * renderSubReport} → {@code renderContent} → (nested SUB_REPORT) → {@code renderSubReport} recurses
+     * forever on a self-referential template ({@code templateId} = its own id) or a cycle (A→B→A) —
+     * {@code StackOverflowError} plus per-level amplified DB reads (findReportTemplate + getSubReportEntities)
+     * = a DoS. {@link TbReportCtx#getSubReportDepth()} increments once per {@link
+     * TbReportCtx#createSubReportCxt}; {@link #renderSubReport} refuses to recurse at this cap, so the one
+     * check bounds self-reference, cycles AND pathologically deep nesting. Mirrors the F1-hang / R2a-baseUrl /
+     * G-fontFamily precedent of hardening PE where a faithful port would be unsafe.
      */
-    private static final Set<ReportComponentType> R2B_DATA_TYPES = EnumSet.of(
-            ReportComponentType.SUB_REPORT);
+    private static final int MAX_SUB_REPORT_DEPTH = 10;
 
     private final Map<ReportComponentType, PdfReportComponentRenderer<ReportComponent>> componentRenderers =
             new EnumMap<>(ReportComponentType.class);
@@ -192,15 +199,18 @@ public class PdfReportService extends AbstractReportService {
         if (components == null) {
             return "";
         }
+        EntityId stateEntityId = stateEntity != null ? stateEntity.getEntityId() : null;
         for (ReportComponent component : components) {
             if (component == null) {
                 continue;
             }
             if (component.getType() == ReportComponentType.TIME_SERIES_TABLE) {
-                // PE renders a time-series table once PER entity the source resolves to (each table shows one
-                // entity's series). The other components render a single fragment via renderComponent.
-                EntityId stateEntityId = stateEntity != null ? stateEntity.getEntityId() : null;
+                // PE dispatches the "render once PER resolved entity" types here, not through renderComponent: a
+                // time-series table shows one entity's series, and a sub-report renders a child template's
+                // components (recursively) per entity. Everything else renders a single fragment.
                 content.append(renderTimeseriesTables(ctx, (TimeseriesTableComponent) component, usablePageWidthPx, stateEntityId));
+            } else if (component.getType() == ReportComponentType.SUB_REPORT) {
+                content.append(renderSubReport(ctx, (SubReportComponent) component, usablePageWidthPx, stateEntityId));
             } else {
                 content.append(renderComponent(ctx, component, usablePageWidthPx, stateEntity));
             }
@@ -250,11 +260,6 @@ public class PdfReportService extends AbstractReportService {
 
     private String renderComponent(TbReportCtx ctx, ReportComponent component, int usablePageWidthPx, EntityData stateEntity) {
         ReportComponentType type = component.getType();
-        if (R2B_DATA_TYPES.contains(type)) {
-            // SUB_REPORT is the only type still without a server-side path (Task H). Degrade to an error box
-            // instead of failing the whole report — consistent with the ErrorRenderer fallback below.
-            return renderError(usablePageWidthPx, unsupportedComponentMessage(), null);
-        }
         try {
             PdfReportComponentRenderer<ReportComponent> renderer = componentRenderers.get(type);
             if (renderer == null) {
@@ -275,9 +280,64 @@ public class PdfReportService extends AbstractReportService {
         }
     }
 
-    /** User-facing "not supported in this version" message for the sole remaining guarded type (SUB_REPORT). */
-    private static String unsupportedComponentMessage() {
-        return "Sub-report components are not supported in this version";
+    /**
+     * Renders a SUB_REPORT component (PE {@code renderSubReport}): loads the referenced child template and
+     * renders its components once per resolved entity, recursively. The child template is loaded through {@link
+     * ReportDataService#findReportTemplate} — permission-scoped under {@code ctx.securityUser}, so a sub-report
+     * can only ever load a template the task user may read (cross-tenant load is already blocked in F1). The
+     * per-entity list comes from the inherited F2 {@link #getSubReportEntities} (also permission-scoped), and
+     * each entity renders through a child ctx from {@link TbReportCtx#createSubReportCxt}, which inherits the
+     * parent's {@code securityUser} — a sub-report can never escape the parent report's permission scope. Each
+     * entity's block is optionally wrapped in a {@code no-page-break} div per {@link
+     * SubReportComponent#isAvoidPageBreakInside()}.
+     * <p>
+     * <b>Inferrix hardening over PE — {@code MAX_SUB_REPORT_DEPTH} recursion bound.</b> PE's {@code
+     * renderSubReport} has NO bound, so a self-referential template ({@code templateId} = its own id), a cycle
+     * (A→B→A) or pathologically deep nesting recurses forever → {@code StackOverflowError} + per-level
+     * amplified DB reads (findReportTemplate + getSubReportEntities) = a DoS. Because {@link
+     * TbReportCtx#createSubReportCxt} increments {@link TbReportCtx#getSubReportDepth()} each level, refusing to
+     * recurse once the cap is reached bounds self-reference, cycles AND deep nesting in one check (same
+     * precedent as the F1-hang / R2a-baseUrl / G-fontFamily hardenings). The check sits before {@code
+     * findReportTemplate}, so it bounds the amplified DB reads too.
+     * <p>
+     * <b>Degradation:</b> a null/unknown template id, a non-PDF child template ({@code instanceof} guards the
+     * cast, so a CSV/other-format template degrades instead of throwing {@code ClassCastException}), or any
+     * render failure become an error box, never a whole-report failure (the F2 degradation contract). An
+     * interrupt still surfaces through {@link #renderError} rather than being swallowed into an error box.
+     */
+    private String renderSubReport(TbReportCtx ctx, SubReportComponent component, int usablePageWidthPx, EntityId stateEntityId) {
+        ReportTemplateId templateId = component.getTemplateId();
+        if (templateId == null) {
+            return renderError(usablePageWidthPx, "Report template id is not configured for SubReport", null);
+        }
+        if (ctx.getSubReportDepth() >= MAX_SUB_REPORT_DEPTH) {
+            return renderError(usablePageWidthPx, "Sub-report nesting exceeds the maximum depth of " + MAX_SUB_REPORT_DEPTH, null);
+        }
+        try {
+            ReportTemplate reportTemplate = dataService.findReportTemplate(templateId, ctx);
+            if (reportTemplate == null) {
+                return renderError(usablePageWidthPx, "Template with id " + templateId + " not found. Please check the configuration.", null);
+            }
+            if (!(reportTemplate.getConfiguration() instanceof PdfReportTemplateConfig childConfig)) {
+                return renderError(usablePageWidthPx, "Sub-report template " + templateId + " is not a PDF report template", null);
+            }
+            TbReportCtx subReportCtx = ctx.createSubReportCxt(childConfig);
+            List<EntityData> entities = getSubReportEntities(ctx, component, stateEntityId);
+            StringBuilder content = new StringBuilder();
+            for (EntityData entity : entities) {
+                if (component.isAvoidPageBreakInside()) {
+                    content.append("<div class=\"no-page-break\">");
+                }
+                content.append(renderContent(subReportCtx, childConfig.getComponents(), usablePageWidthPx, entity));
+                if (component.isAvoidPageBreakInside()) {
+                    content.append("</div>");
+                }
+            }
+            return content.toString();
+        } catch (Exception e) {
+            log.error("Failed to render sub-report, template id [{}]", templateId, e);
+            return renderError(usablePageWidthPx, "Failed to render sub-report " + templateId, e);
+        }
     }
 
     /**
@@ -357,7 +417,17 @@ public class PdfReportService extends AbstractReportService {
         return new ComponentData(usablePageWidthPx, dashboardPng.getData());
     }
 
+    /**
+     * Renders one component's failure as an inline error box (PE {@code renderError}). Restores PE's interrupt
+     * surfacing that the earlier CE port had dropped: if the failure is (or wraps) an {@link
+     * InterruptedException}, a render was cancelled/timed out — rethrow so the whole render aborts instead of
+     * silently error-boxing every component. Task H's sub-report recursion is the first path where swallowing
+     * an interrupt would matter (a cancelled deep render would otherwise emit an error box at each level).
+     */
     private String renderError(int usablePageWidthPx, String errorMessage, Exception e) {
+        if (e instanceof InterruptedException || ExceptionUtils.getRootCause(e) instanceof InterruptedException) {
+            throw new RuntimeException(e);
+        }
         return componentRenderers.get(ReportComponentType.ERROR)
                 .render(new ErrorComponent(errorMessage, e), new ComponentData(usablePageWidthPx));
     }

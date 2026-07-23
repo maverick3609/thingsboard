@@ -69,6 +69,16 @@ public class TbReportCtx implements Closeable {
     private final SecurityUser securityUser;
     private final TbelInvokeService tbelInvokeService;
 
+    /**
+     * How many {@code SUB_REPORT} levels deep this render is (0 = the top-level report; {@link
+     * #createSubReportCxt} sets each child to parent + 1). {@code PdfReportService} caps this at its
+     * {@code MAX_SUB_REPORT_DEPTH} before recursing, so a self-referential template ({@code templateId} =
+     * its own id), a cycle (A→B→A) or pathologically deep nesting cannot recurse without bound — an Inferrix
+     * hardening over PE, which has no such cap and recurses until {@code StackOverflowError}. Defaults to 0.
+     */
+    @Builder.Default
+    private final int subReportDepth = 0;
+
     /** Per-render, mutable scratch space for the data layer (e.g. the current sub-report entity). Never builder-set — always fresh. */
     @Builder.Default
     private final Map<String, Object> params = new HashMap<>();
@@ -81,7 +91,9 @@ public class TbReportCtx implements Closeable {
      * owner, token, {@link SecurityUser}, image resolver, TBEL service) but rendering a different (child)
      * {@link ReportTemplateConfig}, with its own fresh {@code params}/{@code scripts}. The child inherits this
      * ctx's {@link SecurityUser}, so a sub-report can never read outside the parent report's permission scope.
-     * (Sub-report recursion itself is R2b task H — this is the seam it renders through.)
+     * Its {@link #subReportDepth} is this ctx's + 1, so {@code PdfReportService}'s {@code MAX_SUB_REPORT_DEPTH}
+     * cap bounds recursion (self-reference / cycle / pathologically deep nesting) — R2b task H renders through
+     * this seam.
      */
     public TbReportCtx createSubReportCxt(ReportTemplateConfig subConfiguration) {
         return TbReportCtx.builder()
@@ -96,6 +108,7 @@ public class TbReportCtx implements Closeable {
                 .imageResolver(imageResolver)
                 .securityUser(securityUser)
                 .tbelInvokeService(tbelInvokeService)
+                .subReportDepth(subReportDepth + 1)
                 .build();
     }
 

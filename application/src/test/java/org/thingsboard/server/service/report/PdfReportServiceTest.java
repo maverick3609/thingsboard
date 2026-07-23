@@ -38,9 +38,11 @@ import org.thingsboard.server.common.data.query.EntityData;
 import org.thingsboard.server.common.data.query.EntityKeyType;
 import org.thingsboard.server.common.data.query.TsValue;
 import org.thingsboard.server.common.data.report.ReportData;
+import org.thingsboard.server.common.data.report.ReportTemplate;
 import org.thingsboard.server.common.data.report.configuration.AlarmFilterConfig;
 import org.thingsboard.server.common.data.report.configuration.CellSettings;
 import org.thingsboard.server.common.data.report.configuration.ColumnSettings;
+import org.thingsboard.server.common.data.report.configuration.CsvReportTemplateConfig;
 import org.thingsboard.server.common.data.report.configuration.DataKey;
 import org.thingsboard.server.common.data.report.configuration.DataSource;
 import org.thingsboard.server.common.data.report.configuration.DataSourceType;
@@ -55,6 +57,7 @@ import org.thingsboard.server.common.data.report.configuration.components.ImageC
 import org.thingsboard.server.common.data.report.configuration.components.PageBreakComponent;
 import org.thingsboard.server.common.data.report.configuration.components.ReportComponent;
 import org.thingsboard.server.common.data.report.configuration.components.RichTextComponent;
+import org.thingsboard.server.common.data.report.configuration.components.SubReportComponent;
 import org.thingsboard.server.common.data.report.configuration.components.TimeseriesTableComponent;
 import org.thingsboard.server.common.data.report.configuration.image.ImageSourceType;
 import org.thingsboard.server.common.data.report.configuration.style.Font;
@@ -91,6 +94,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -101,12 +105,17 @@ import static org.mockito.Mockito.when;
  * PAGE_BREAK + IMAGE + DASHBOARD) plus a running header through the real component renderers and the
  * C4 flying-saucer/openpdf plumbing, with the DASHBOARD's Playwright PNG mocked. Asserts a valid
  * multi-page PDF, the dashboard captured as PNG (not PDF) and embedded, and the header on every page.
- * Also covers the R2a security/correctness fixes: the DASHBOARD baseUrl override is ignored (#1), a bad
- * page-background color degrades gracefully (#9), and the still-guarded SUB_REPORT degrades to an error box.
+ * Also covers the R2a security/correctness fixes: the DASHBOARD baseUrl override is ignored (#1) and a bad
+ * page-background color degrades gracefully (#9).
  * <p>
  * R2b Task G extends it: the entity/alarm/time-series tables now render real rows (a mocked {@link
  * ReportDataService} feeds the inherited F2 builders), cell values are HTML-escaped (the injection defense),
  * and a table whose datasource can't be resolved degrades to an error box without failing the whole report.
+ * <p>
+ * R2b Task H adds SUB_REPORT recursion: a sub-report renders its child template once per resolved entity; a
+ * null/non-PDF template degrades to an error box; and — the security deliverable — a self-referential (cyclic)
+ * template is bounded by {@code MAX_SUB_REPORT_DEPTH} (findReportTemplate is invoked a bounded number of
+ * times) instead of recursing into a StackOverflowError.
  */
 class PdfReportServiceTest {
 
@@ -215,20 +224,110 @@ class PdfReportServiceTest {
     }
 
     @Test
-    void subReportRendersItsOwnErrorMessage() throws Exception {
-        // SUB_REPORT gets its own message, not the generic table one.
+    void subReportRendersChildTemplateOncePerResolvedEntity() throws Exception {
+        // Task H happy path: a SUB_REPORT loads its child template ONCE, then renders the child's components
+        // once per entity its (mocked, permission-scoped) data source resolves to. Two entities -> the child's
+        // heading appears twice in the PDF.
+        service.dataService = dataService;
+        DeviceId devA = new DeviceId(UUID.randomUUID());
+        DeviceId devB = new DeviceId(UUID.randomUUID());
+        when(dataService.findEntityDataByQuery(any(), any())).thenReturn(page(
+                entity(devA, Map.entry(EntityKeyType.ENTITY_FIELD, Map.of("name", tsv("Device A")))),
+                entity(devB, Map.entry(EntityKeyType.ENTITY_FIELD, Map.of("name", tsv("Device B"))))));
+
+        ReportTemplate childTemplate = new ReportTemplate();
+        PdfReportTemplateConfig childConfig = baseConfig();
+        childConfig.setComponents(List.of(heading("CHILDMARK")));
+        childTemplate.setConfiguration(childConfig);
+        when(dataService.findReportTemplate(eq(templateId), any())).thenReturn(childTemplate);
+
+        SubReportComponent subReport = new SubReportComponent();
+        subReport.setTemplateId(templateId);
+        subReport.setDataSources(List.of(deviceDataSource(devA, List.of(dataKey("name", "entityField", "Name")))));
         PdfReportTemplateConfig config = baseConfig();
-        config.setComponents(List.of(new org.thingsboard.server.common.data.report.configuration.components.SubReportComponent()));
+        config.setComponents(List.of(subReport));
+
+        byte[] pdf = service.generateReport(task(), ctx(config)).getData();
+
+        assertThat(new String(pdf, 0, 5, StandardCharsets.ISO_8859_1)).as("PDF magic header").isEqualTo("%PDF-");
+        String text = pdfText(pdf);
+        assertThat(occurrences(text, "CHILDMARK")).as("child template rendered once per resolved entity").isEqualTo(2);
+        // The child template is loaded once and reused for every entity, not re-fetched per entity.
+        verify(dataService, times(1)).findReportTemplate(eq(templateId), any());
+        verifyNoInteractions(dashboardReportService);
+    }
+
+    @Test
+    void subReportSelfReferenceIsBoundedByMaxDepth() throws Exception {
+        // THE security deliverable: a template whose SUB_REPORT points at itself (a self-cycle; A->B->A is the
+        // same class) must NOT recurse into a StackOverflowError. The MAX_SUB_REPORT_DEPTH cap (Inferrix
+        // hardening over PE, which is unbounded) stops it: the report completes as a valid PDF with a
+        // depth-limit error box, and findReportTemplate is invoked a BOUNDED number of times (== the cap),
+        // proving the recursion actually stopped rather than merely returning.
+        service.dataService = dataService;
+        ReportTemplate cyclicTemplate = new ReportTemplate();
+        PdfReportTemplateConfig cyclicConfig = baseConfig();
+        SubReportComponent selfRef = new SubReportComponent();
+        selfRef.setTemplateId(templateId); // no data source -> [null] entity -> exactly one recursion per level
+        cyclicConfig.setComponents(List.of(selfRef));
+        cyclicTemplate.setConfiguration(cyclicConfig);
+        when(dataService.findReportTemplate(any(), any())).thenReturn(cyclicTemplate);
+
+        SubReportComponent parentSub = new SubReportComponent();
+        parentSub.setTemplateId(templateId);
+        PdfReportTemplateConfig config = baseConfig();
+        config.setComponents(List.of(parentSub));
+
+        byte[] pdf = service.generateReport(task(), ctx(config)).getData(); // must not StackOverflowError
+
+        assertThat(new String(pdf, 0, 5, StandardCharsets.ISO_8859_1)).as("PDF magic header").isEqualTo("%PDF-");
+        // Bounded: findReportTemplate stops at the depth cap (10), it does not recurse without end.
+        verify(dataService, times(10)).findReportTemplate(any(), any());
+        assertThat(pdfText(pdf)).as("depth-limit error box rendered").contains("exceeds the maximum depth");
+        verifyNoInteractions(dashboardReportService);
+    }
+
+    @Test
+    void subReportWithNullTemplateIdRendersErrorBox() throws Exception {
+        // A SUB_REPORT with no configured template id degrades to its own error box (no throw), not the old
+        // R2a "not supported" guard (SUB_REPORT is supported as of Task H).
+        PdfReportTemplateConfig config = baseConfig();
+        config.setComponents(List.of(new SubReportComponent()));
 
         byte[] pdf = service.generateReport(task(), ctx(config)).getData();
 
         PdfReader reader = new PdfReader(pdf);
         try {
-            assertThat(new PdfTextExtractor(reader).getTextFromPage(1))
-                    .contains("Sub-report components are not supported");
+            String text = new PdfTextExtractor(reader).getTextFromPage(1);
+            assertThat(text).contains("Report template id is not configured for SubReport");
+            assertThat(text).as("no longer the R2a 'not supported' guard").doesNotContain("not supported");
         } finally {
             reader.close();
         }
+        verifyNoInteractions(dashboardReportService);
+    }
+
+    @Test
+    void subReportWithNonPdfChildTemplateRendersErrorBox() throws Exception {
+        // A SUB_REPORT pointing at a non-PDF (e.g. CSV) template must degrade to an error box, NOT throw a
+        // ClassCastException (the instanceof guard). The rest of the report still renders.
+        service.dataService = dataService;
+        ReportTemplate csvTemplate = new ReportTemplate();
+        csvTemplate.setConfiguration(new CsvReportTemplateConfig());
+        when(dataService.findReportTemplate(eq(templateId), any())).thenReturn(csvTemplate);
+
+        SubReportComponent subReport = new SubReportComponent();
+        subReport.setTemplateId(templateId);
+        PdfReportTemplateConfig config = baseConfig();
+        config.setComponents(List.of(heading("BODYHEADING"), subReport));
+
+        byte[] pdf = service.generateReport(task(), ctx(config)).getData();
+
+        assertThat(new String(pdf, 0, 5, StandardCharsets.ISO_8859_1)).as("PDF magic header").isEqualTo("%PDF-");
+        String text = pdfText(pdf);
+        assertThat(text).as("rest of the report still renders").contains("BODYHEADING");
+        assertThat(text).as("non-PDF child degraded to an error box").contains("is not a PDF report template");
+        verifyNoInteractions(dashboardReportService);
     }
 
     @Test
@@ -541,6 +640,11 @@ class PdfReportServiceTest {
         } finally {
             reader.close();
         }
+    }
+
+    /** Counts non-overlapping occurrences of {@code needle} in {@code haystack}. */
+    private static int occurrences(String haystack, String needle) {
+        return haystack.split(java.util.regex.Pattern.quote(needle), -1).length - 1;
     }
 
     @SafeVarargs

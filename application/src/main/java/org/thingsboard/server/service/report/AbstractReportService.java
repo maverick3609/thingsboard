@@ -232,7 +232,8 @@ public abstract class AbstractReportService implements TbReportRenderService {
         List<DataKey> latestDataKeys = alarmSource.getDataKeys().stream().filter(dataKey -> !dataKey.getType().equals("alarm")).collect(Collectors.toList());
         EntityId stateEntityId = stateEntity != null ? stateEntity.getEntityId() : null;
         List<EntityData> entityDataList = fetchEntities(ctx, alarmSource, stateEntityId);
-        Map<EntityId, EntityData> entityDataMap = entityDataList.stream().collect(Collectors.toMap(EntityData::getEntityId, Function.identity()));
+        // Merge fn (keep-first): a relations/search alias can surface the same EntityId twice; without it toMap throws IllegalStateException.
+        Map<EntityId, EntityData> entityDataMap = entityDataList.stream().collect(Collectors.toMap(EntityData::getEntityId, Function.identity(), (a, b) -> a));
         List<Map<String, String>> entityDatas = new ArrayList<>();
         if (entityDataMap.isEmpty()) {
             return new ComponentData(usablePageWidthPx);
@@ -432,6 +433,7 @@ public abstract class AbstractReportService implements TbReportRenderService {
         try {
             return ctx.getTbelInvokeService().invokeScript(ctx.getTenantId(), null, scriptId, new Object[]{timestamp, value}).get();
         } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             throw new RuntimeException("Failed to evaluate data: " + value, e);
         } catch (ExecutionException e) {
             String error = "Failed to evaluate data: " + value;
@@ -444,6 +446,7 @@ public abstract class AbstractReportService implements TbReportRenderService {
         try {
             return ctx.getTbelInvokeService().eval(ctx.getTenantId(), ScriptType.REPORT_DATA_KEY_SCRIPT, script, "time", "value").get();
         } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             throw new RuntimeException("Failed to compile script: " + script, e);
         } catch (ExecutionException e) {
             log.error("Failed to compile script {} ", script, e);

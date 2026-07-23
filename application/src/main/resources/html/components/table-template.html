@@ -45,7 +45,7 @@
                  ${row[label].fontFamily != null ? 'font-family:' + row[label].fontFamily + ';' : ''}
                  ${row[label].fontStyle != null ? 'font-style:' + row[label].fontStyle + ';' : ''}
                  ${row[label].fontWeight != null ? 'font-weight:' + row[label].fontWeight + ';' : ''}|"
-            th:utext="${row[label].value}">[Value]</td>
+            th:text="${row[label].value}">[Value]</td>
     </tr>
     <!-- Empty table fallback row -->
     <tr th:if="${#lists.isEmpty(rows)}">

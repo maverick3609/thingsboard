@@ -17,18 +17,24 @@ package org.thingsboard.server.service.report.render;
 
 import org.apache.commons.lang3.math.NumberUtils;
 import org.thingsboard.server.common.data.StringUtils;
+import org.thingsboard.server.common.data.report.configuration.DataKey;
 import org.thingsboard.server.common.data.report.configuration.DataSource;
+import org.thingsboard.server.common.data.report.configuration.TableSortOrder;
 import org.thingsboard.server.common.data.report.configuration.components.AlarmTableComponent;
 import org.thingsboard.server.common.data.report.configuration.components.DataReportComponent;
 import org.thingsboard.server.common.data.report.configuration.components.ReportComponentType;
 import org.thingsboard.server.service.report.context.TbReportCtx;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TimeZone;
@@ -40,9 +46,9 @@ import java.util.regex.Pattern;
  * (decompiled from {@code report-4.2.0PE.jar}). R1 needed only {@code prepareReportName}; R2b's shared data
  * layer ({@link AbstractReportService}) adds the value-formatting/data-source helpers it consumes:
  * {@link #ENTITY_TIME_FIELDS}, {@link #getSingleDataSource}, {@link #convertStringToTypedValue}, and the
- * {@link TbReportCtx}-aware {@code formatTimestamp} overloads. PE's remaining table/CSV helpers
- * ({@code formatValueWithPrecisionAndUnits}, {@code sortRowsByTableSortOrder}, …) stay out of scope until
- * the R2b table renderers (Task G) / CSV (Task I) land.
+ * {@link TbReportCtx}-aware {@code formatTimestamp} overloads. R2b Task G's table renderers add the
+ * table-presentation helpers {@link #formatValueWithPrecisionAndUnits} and {@link #sortRowsByTableSortOrder}
+ * (with {@link #compareMixedValuesNullFirst}); PE's remaining CSV helpers stay out of scope until CSV (Task I).
  */
 public final class ReportUtils {
 
@@ -58,6 +64,13 @@ public final class ReportUtils {
      * table sorting) rather than passing the raw number through.
      */
     public static final Set<String> ENTITY_TIME_FIELDS = Set.of("ts", "createdTime", "startTime", "endTime", "ackTime", "clearTime", "assignTime");
+
+    /**
+     * PE-verbatim: the data layer emits a raw epoch-millis copy of each time-field value under
+     * {@code rawTs_<label>} alongside the formatted display string, so {@link #sortRowsByTableSortOrder} can
+     * sort a time column numerically rather than by its formatted text.
+     */
+    public static final String RAW_TS_PREFIX = "rawTs_";
 
     private ReportUtils() {
     }
@@ -138,6 +151,72 @@ public final class ReportUtils {
             }
         }
         return Optional.of(dataSource);
+    }
+
+    /**
+     * PE-verbatim: applies a data key's decimal precision (HALF_UP) and appends its units to a table cell's
+     * display value. A non-numeric value is left unrounded (bad {@code new BigDecimal} is swallowed) but still
+     * gets units; blank input returns {@code ""}. The result is a plain data string — the template escapes it.
+     */
+    public static String formatValueWithPrecisionAndUnits(String value, DataKey dataKey) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        try {
+            if (dataKey.getDecimals() != null) {
+                BigDecimal decimal = new BigDecimal(value);
+                value = decimal.setScale(dataKey.getDecimals(), RoundingMode.HALF_UP).toPlainString();
+            }
+        } catch (ArithmeticException | NumberFormatException ignored) {
+            // Non-numeric value: leave it unrounded (PE-verbatim), units are still appended below.
+        }
+        if (dataKey.getUnits() != null) {
+            value = value + dataKey.getUnits();
+        }
+        return value;
+    }
+
+    /**
+     * PE-verbatim: sorts table rows in place by {@code tableSortOrder.column}, preferring the raw
+     * ({@link #RAW_TS_PREFIX}) copy of a time column so timestamps sort numerically. No-op when the sort order
+     * or its column is unset, or the rows are empty. Missing values sort first (see
+     * {@link #compareMixedValuesNullFirst}).
+     */
+    public static void sortRowsByTableSortOrder(List<Map<String, String>> rows, TableSortOrder tableSortOrder) {
+        if (tableSortOrder == null || tableSortOrder.getColumn() == null || rows.isEmpty()) {
+            return;
+        }
+        String column = tableSortOrder.getColumn();
+        if (rows.get(0).containsKey(RAW_TS_PREFIX + column)) {
+            column = RAW_TS_PREFIX + column;
+        }
+        String finalColumn = column;
+        Comparator<Map<String, String>> comparator =
+                Comparator.comparing(row -> row.getOrDefault(finalColumn, ""), ReportUtils::compareMixedValuesNullFirst);
+        if (tableSortOrder.getDirection() == TableSortOrder.Direction.DESC) {
+            comparator = comparator.reversed();
+        }
+        rows.sort(comparator);
+    }
+
+    /**
+     * PE-verbatim mixed comparator: nulls first, then numeric compare when both values parse as numbers, else
+     * case-insensitive lexicographic.
+     */
+    public static int compareMixedValuesNullFirst(String v1, String v2) {
+        if (v1 == null && v2 == null) {
+            return 0;
+        }
+        if (v1 == null) {
+            return -1;
+        }
+        if (v2 == null) {
+            return 1;
+        }
+        if (NumberUtils.isParsable(v1) && NumberUtils.isParsable(v2)) {
+            return Double.compare(Double.parseDouble(v1), Double.parseDouble(v2));
+        }
+        return v1.compareToIgnoreCase(v2);
     }
 
     /**

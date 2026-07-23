@@ -21,15 +21,21 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.thingsboard.server.common.data.StringUtils;
 import org.thingsboard.server.common.data.dashboardreport.DashboardReportConfig;
+import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.job.task.ReportTask;
+import org.thingsboard.server.common.data.query.EntityData;
 import org.thingsboard.server.common.data.report.ReportData;
 import org.thingsboard.server.common.data.report.TbReportFormat;
+import org.thingsboard.server.common.data.report.configuration.DataSource;
 import org.thingsboard.server.common.data.report.configuration.HeaderFooter;
 import org.thingsboard.server.common.data.report.configuration.PdfReportTemplateConfig;
+import org.thingsboard.server.common.data.report.configuration.components.AlarmTableComponent;
 import org.thingsboard.server.common.data.report.configuration.components.DashboardComponent;
+import org.thingsboard.server.common.data.report.configuration.components.DataReportComponent;
 import org.thingsboard.server.common.data.report.configuration.components.ErrorComponent;
 import org.thingsboard.server.common.data.report.configuration.components.ReportComponent;
 import org.thingsboard.server.common.data.report.configuration.components.ReportComponentType;
+import org.thingsboard.server.common.data.report.configuration.components.TimeseriesTableComponent;
 import org.thingsboard.server.common.data.report.configuration.style.Insets;
 import org.thingsboard.server.common.data.report.configuration.style.PageOrientation;
 import org.thingsboard.server.common.data.report.configuration.style.PageSize;
@@ -67,13 +73,13 @@ import java.util.Set;
  * The DASHBOARD component reuses R1's Playwright path: {@link #buildDashboardComponentData} captures the
  * dashboard as a PNG through {@link DashboardReportService} and the {@link
  * org.thingsboard.server.service.report.renderer.DashboardRenderer} base64-embeds it — so R1's
- * dashboard reports keep working through the new engine. Table components (entity/alarm/time-series) and
- * sub-reports need the server-side data layer and are guarded as <b>R2b</b>.
+ * dashboard reports keep working through the new engine.
  * <p>
- * R2b: now {@code extends} {@link AbstractReportService} — the shared server-side data layer (entity/alarm/
- * timeseries builds + TBEL post-processing). R2b-F2 only adds that base; PDF's render path is unchanged (the
- * table/sub-report component types stay guarded below as R2a error-boxes until Tasks G/H remove the guards and
- * wire {@link #buildComponentData} to the inherited builders). PDF keeps its own HTML-assembly specifics
+ * R2b: {@code extends} {@link AbstractReportService} — the shared server-side data layer (entity/alarm/
+ * timeseries builds + TBEL post-processing). <b>Task G</b> wires the entity/alarm/time-series tables:
+ * {@link #buildComponentData} dispatches each to the inherited F2 builder and the three table renderers lay
+ * the rows out (cell values escaped by {@code table-template}). Only SUB_REPORT (recursive template rendering)
+ * stays guarded until Task H and degrades to an error box. PDF keeps its own HTML-assembly specifics
  * (page/header/footer layout, the DASHBOARD Playwright-PNG capture).
  * <p>
  * Gated by {@code reports.renderer.enabled} (opt-in invariant, mirrors R1): its dashboard collaborator is
@@ -89,11 +95,12 @@ public class PdfReportService extends AbstractReportService {
     private static final float PT_TO_PX = 4.0f / 3.0f;
     private static final int DEFAULT_PAGE_MARGIN = 20;
 
-    /** Components that need the server-side data layer (spec §18) — guarded until R2b. */
+    /**
+     * The only component type still awaiting its server-side path. Task G wired the entity/alarm/time-series
+     * tables to the F2 data layer, so they left this set; SUB_REPORT (recursive template rendering) stays
+     * guarded until Task H and degrades to an error box.
+     */
     private static final Set<ReportComponentType> R2B_DATA_TYPES = EnumSet.of(
-            ReportComponentType.ENTITY_TABLE,
-            ReportComponentType.ALARM_TABLE,
-            ReportComponentType.TIME_SERIES_TABLE,
             ReportComponentType.SUB_REPORT);
 
     private final Map<ReportComponentType, PdfReportComponentRenderer<ReportComponent>> componentRenderers =
@@ -176,32 +183,86 @@ public class PdfReportService extends AbstractReportService {
     }
 
     private String renderContent(TbReportCtx ctx, List<ReportComponent> components, int usablePageWidthPx) {
+        // Top-level content (and header/footer) carries no state entity — sub-report / originator scoping is Task H.
+        return renderContent(ctx, components, usablePageWidthPx, null);
+    }
+
+    private String renderContent(TbReportCtx ctx, List<ReportComponent> components, int usablePageWidthPx, EntityData stateEntity) {
         StringBuilder content = new StringBuilder();
         if (components == null) {
             return "";
         }
         for (ReportComponent component : components) {
-            if (component != null) {
-                content.append(renderComponent(ctx, component, usablePageWidthPx));
+            if (component == null) {
+                continue;
+            }
+            if (component.getType() == ReportComponentType.TIME_SERIES_TABLE) {
+                // PE renders a time-series table once PER entity the source resolves to (each table shows one
+                // entity's series). The other components render a single fragment via renderComponent.
+                EntityId stateEntityId = stateEntity != null ? stateEntity.getEntityId() : null;
+                content.append(renderTimeseriesTables(ctx, (TimeseriesTableComponent) component, usablePageWidthPx, stateEntityId));
+            } else {
+                content.append(renderComponent(ctx, component, usablePageWidthPx, stateEntity));
             }
         }
         return content.toString();
     }
 
-    private String renderComponent(TbReportCtx ctx, ReportComponent component, int usablePageWidthPx) {
+    /**
+     * Renders a TIME_SERIES_TABLE as one table per entity (PE {@code renderTimeseriesTables}): it resolves the
+     * source's entities through their LATEST projection, then delegates each to {@link #renderComponent}, which
+     * builds that entity's series via the inherited F2 {@code buildTsComponentData}. The entity resolution runs
+     * inside a try/catch so a malformed source (bad device id, a filter id not in the template) degrades to a
+     * single error box rather than failing the whole report — the same graceful-degradation contract that keeps
+     * {@code buildComponentData} inside {@link #renderComponent}'s try/catch.
+     */
+    private String renderTimeseriesTables(TbReportCtx ctx, TimeseriesTableComponent component, int usablePageWidthPx, EntityId stateEntityId) {
+        try {
+            Optional<DataSource> dataSource = ReportUtils.getSingleDataSource(component);
+            if (dataSource.isEmpty()) {
+                return renderError(usablePageWidthPx, "Data source is not configured for time series table", null);
+            }
+            DataSource ds = dataSource.get();
+            if (ds.getDataKeys() == null || ds.getDataKeys().isEmpty()) {
+                return renderError(usablePageWidthPx, "At least one time series column should be specified for time series table", null);
+            }
+            DataSource latestDataSource = DataSource.builder()
+                    .type(ds.getType())
+                    .deviceId(ds.getDeviceId())
+                    .entityAliasId(ds.getEntityAliasId())
+                    .filterId(ds.getFilterId())
+                    .dataKeys(ds.getLatestDataKeys())
+                    .build();
+            List<EntityData> entities = fetchEntities(ctx, latestDataSource, stateEntityId);
+            StringBuilder content = new StringBuilder();
+            for (EntityData entity : entities) {
+                content.append(renderComponent(ctx, component, usablePageWidthPx, entity));
+            }
+            return content.toString();
+        } catch (ReportRenderException e) {
+            log.debug("Rendering time series table as error box: {}", e.getMessage());
+            return renderError(usablePageWidthPx, e.getMessage(), null);
+        } catch (Exception e) {
+            log.error("Failed to render time series table", e);
+            return renderError(usablePageWidthPx, "Failed to render component of type: " + ReportComponentType.TIME_SERIES_TABLE, e);
+        }
+    }
+
+    private String renderComponent(TbReportCtx ctx, ReportComponent component, int usablePageWidthPx, EntityData stateEntity) {
         ReportComponentType type = component.getType();
         if (R2B_DATA_TYPES.contains(type)) {
-            // R2b components need the server-side data layer (entity/alarm/timeseries queries, sub-report
-            // recursion). Degrade to an error box instead of failing the whole report — graceful
-            // degradation, consistent with the ErrorRenderer fallback below.
-            return renderError(usablePageWidthPx, unsupportedComponentMessage(type), null);
+            // SUB_REPORT is the only type still without a server-side path (Task H). Degrade to an error box
+            // instead of failing the whole report — consistent with the ErrorRenderer fallback below.
+            return renderError(usablePageWidthPx, unsupportedComponentMessage(), null);
         }
         try {
             PdfReportComponentRenderer<ReportComponent> renderer = componentRenderers.get(type);
             if (renderer == null) {
                 throw new ReportRenderException("No renderer registered for component type: " + type);
             }
-            ComponentData componentData = buildComponentData(ctx, component, usablePageWidthPx);
+            // Data fetching for the tables happens here, INSIDE the try/catch: a malformed datasource makes an
+            // F2 builder throw, which must degrade to an error box for this one component, never fail the report.
+            ComponentData componentData = buildComponentData(ctx, component, usablePageWidthPx, stateEntity);
             return renderer.render(component, componentData);
         } catch (ReportRenderException e) {
             // A known-unsupported feature inside a supported component (e.g. entity-key IMAGE source) or a
@@ -214,25 +275,54 @@ public class PdfReportService extends AbstractReportService {
         }
     }
 
-    /** User-facing "not supported in this version" message for a guarded R2b component type. */
-    private static String unsupportedComponentMessage(ReportComponentType type) {
-        return type == ReportComponentType.SUB_REPORT
-                ? "Sub-report components are not supported in this version"
-                : "Table components are not supported in this version";
+    /** User-facing "not supported in this version" message for the sole remaining guarded type (SUB_REPORT). */
+    private static String unsupportedComponentMessage() {
+        return "Sub-report components are not supported in this version";
     }
 
     /**
-     * R2a builds only what the non-data renderers read: the DASHBOARD component's captured PNG, and an
-     * empty {@link ComponentData} for everything else.
-     * <p>
-     * // R2b: server-side data queries populate {@code variables}/{@code entityDatas} here (entity/alarm/
-     * time-series data binding for HEADING/RICH_TEXT interpolation + table rows).
+     * Dispatches a component to its {@link ComponentData} build (PE {@code getComponentData}). The table types
+     * call the inherited F2 builders — permission-scoped through {@code ReportDataService} under {@code
+     * ctx.securityUser}, so a table renderer never fetches data itself; DASHBOARD keeps R1's Playwright-PNG
+     * capture; everything else (IMAGE, HEADING, RICH_TEXT, DIVIDER, PAGE_BREAK) needs no data. {@code
+     * stateEntity} is the per-entity scope threaded by {@link #renderTimeseriesTables} (null elsewhere until
+     * Task H). {@link #populateReportVars} then stamps the shared report vars (e.g. {@code reportCreatedTime}).
      */
-    private ComponentData buildComponentData(TbReportCtx ctx, ReportComponent component, int usablePageWidthPx) {
-        if (component.getType() == ReportComponentType.DASHBOARD) {
-            return buildDashboardComponentData(ctx, (DashboardComponent) component, usablePageWidthPx);
+    private ComponentData buildComponentData(TbReportCtx ctx, ReportComponent component, int usablePageWidthPx, EntityData stateEntity) {
+        ComponentData componentData = switch (component.getType()) {
+            case TIME_SERIES_TABLE -> buildTsComponentData(usablePageWidthPx, ctx, (TimeseriesTableComponent) component, stateEntity);
+            case ALARM_TABLE -> buildAlarmComponentData(usablePageWidthPx, ctx, (AlarmTableComponent) component, stateEntity);
+            case ENTITY_TABLE -> buildEntityTableComponentData(usablePageWidthPx, ctx, (DataReportComponent) component, stateEntity);
+            case DASHBOARD -> buildDashboardComponentData(ctx, (DashboardComponent) component, usablePageWidthPx);
+            default -> new ComponentData(usablePageWidthPx);
+        };
+        populateReportVars(componentData, ctx);
+        return componentData;
+    }
+
+    /**
+     * Builds an ENTITY_TABLE's rows from its single {@link DataSource} — one row per permission-scoped entity
+     * via the inherited F2 {@code collectEntityDatas}. <b>CE deviation from PE:</b> PE's {@code
+     * buildMultipleDataSourceData} iterates and merges every datasource and its {@code DataSourceType} switch
+     * also builds ENTITY_COUNT/ALARM_COUNT counts. CE resolves the one datasource the table's columns come from
+     * ({@link ReportUtils#getSingleDataSource}) and needs neither the merge nor the count builds: an entity
+     * table's rows are always DEVICE/ENTITY entities (a COUNT source produces a scalar variable, not rows — not
+     * a table concern), so {@code ComponentData#merge} and {@code toEntityCountQuery}/{@code toAlarmCountQuery}
+     * are deliberately not ported here (clean seam). A COUNT source configured on a table throws in {@code
+     * collectEntityDatas} and degrades to an error box.
+     */
+    private ComponentData buildEntityTableComponentData(int usablePageWidthPx, TbReportCtx ctx, DataReportComponent component, EntityData stateEntity) {
+        Optional<DataSource> dataSource = ReportUtils.getSingleDataSource(component);
+        if (dataSource.isEmpty()) {
+            return new ComponentData(usablePageWidthPx);
         }
-        return new ComponentData(usablePageWidthPx);
+        EntityId stateEntityId = stateEntity != null ? stateEntity.getEntityId() : null;
+        List<Map<String, String>> entityDatas = collectEntityDatas(ctx, dataSource.get(), stateEntityId);
+        Map<String, Object> variables = new HashMap<>();
+        if (stateEntityId == null && !entityDatas.isEmpty()) {
+            variables.putAll(entityDatas.get(0));
+        }
+        return new ComponentData(usablePageWidthPx, dataSource.get(), entityDatas, variables);
     }
 
     /**

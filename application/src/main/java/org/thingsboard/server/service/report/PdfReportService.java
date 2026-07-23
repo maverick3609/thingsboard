@@ -313,6 +313,14 @@ public class PdfReportService extends AbstractReportService {
         if (ctx.getSubReportDepth() >= MAX_SUB_REPORT_DEPTH) {
             return renderError(usablePageWidthPx, "Sub-report nesting exceeds the maximum depth of " + MAX_SUB_REPORT_DEPTH, null);
         }
+        // The depth cap bounds a single chain, but a sub-report fans out to one child render per resolved entity,
+        // so the render tree is E-ary — E^depth total renders would OOM the shared render heap even within the
+        // depth cap. This shared, per-report budget (threaded by reference through createSubReportCxt) caps TOTAL
+        // sub-report renders across every branch. Decrement before findReportTemplate so it also bounds DB reads.
+        if (ctx.getSubReportBudget().decrementAndGet() < 0) {
+            return renderError(usablePageWidthPx, "Sub-report render budget of " + TbReportCtx.MAX_TOTAL_SUB_REPORT_RENDERS
+                    + " exceeded (too many sub-report renders in one report)", null);
+        }
         try {
             ReportTemplate reportTemplate = dataService.findReportTemplate(templateId, ctx);
             if (reportTemplate == null) {
@@ -426,6 +434,9 @@ public class PdfReportService extends AbstractReportService {
      */
     private String renderError(int usablePageWidthPx, String errorMessage, Exception e) {
         if (e instanceof InterruptedException || ExceptionUtils.getRootCause(e) instanceof InterruptedException) {
+            // Restore the interrupt flag the JDK cleared when InterruptedException was thrown, so an upstream
+            // executor's isInterrupted() check (the task cancel path) still sees the cancellation.
+            Thread.currentThread().interrupt();
             throw new RuntimeException(e);
         }
         return componentRenderers.get(ReportComponentType.ERROR)

@@ -93,6 +93,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -285,6 +286,44 @@ class PdfReportServiceTest {
         verify(dataService, times(10)).findReportTemplate(any(), any());
         assertThat(pdfText(pdf)).as("depth-limit error box rendered").contains("exceeds the maximum depth");
         verifyNoInteractions(dashboardReportService);
+    }
+
+    @Test
+    void subReportFanOutIsBoundedByTotalRenderBudget() throws Exception {
+        // The depth cap bounds a single chain, but a sub-report renders its child once per resolved entity — so a
+        // self-reference over E>1 entities is an E-ary tree (E^depth total renders) that would exhaust the shared
+        // render heap even within the depth cap. The shared per-report render budget caps TOTAL renders across
+        // every branch: a binary (E=2) self-cycle would render 1023 nodes on the depth cap alone, but the budget
+        // holds findReportTemplate at MAX_TOTAL_SUB_REPORT_RENDERS. Proves the budget, not merely the depth cap.
+        service.dataService = dataService;
+        DeviceId devA = new DeviceId(UUID.randomUUID());
+        DeviceId devB = new DeviceId(UUID.randomUUID());
+        when(dataService.findEntityDataByQuery(any(), any())).thenReturn(page(
+                entity(devA, Map.entry(EntityKeyType.ENTITY_FIELD, Map.of("name", tsv("Device A")))),
+                entity(devB, Map.entry(EntityKeyType.ENTITY_FIELD, Map.of("name", tsv("Device B")))))); // E = 2 -> binary tree
+
+        ReportTemplate cyclicTemplate = new ReportTemplate();
+        PdfReportTemplateConfig cyclicConfig = baseConfig();
+        SubReportComponent selfRef = new SubReportComponent();
+        selfRef.setTemplateId(templateId);
+        selfRef.setDataSources(List.of(deviceDataSource(devA, List.of(dataKey("name", "entityField", "Name"))))); // fans out per level
+        cyclicConfig.setComponents(List.of(selfRef));
+        cyclicTemplate.setConfiguration(cyclicConfig);
+        when(dataService.findReportTemplate(any(), any())).thenReturn(cyclicTemplate);
+
+        SubReportComponent parentSub = new SubReportComponent();
+        parentSub.setTemplateId(templateId);
+        parentSub.setDataSources(List.of(deviceDataSource(devA, List.of(dataKey("name", "entityField", "Name")))));
+        PdfReportTemplateConfig config = baseConfig();
+        config.setComponents(List.of(parentSub));
+
+        byte[] pdf = service.generateReport(task(), ctx(config)).getData(); // must not OOM / StackOverflowError
+
+        assertThat(new String(pdf, 0, 5, StandardCharsets.ISO_8859_1)).as("PDF magic header").isEqualTo("%PDF-");
+        // Shared budget bounds TOTAL renders across the whole fan-out: without it the binary self-cycle renders
+        // 1023 nodes (> the budget); with it, findReportTemplate never exceeds MAX_TOTAL_SUB_REPORT_RENDERS.
+        verify(dataService, atMost(TbReportCtx.MAX_TOTAL_SUB_REPORT_RENDERS)).findReportTemplate(any(), any());
+        assertThat(pdfText(pdf)).as("budget-limit error box rendered").contains("render budget");
     }
 
     @Test

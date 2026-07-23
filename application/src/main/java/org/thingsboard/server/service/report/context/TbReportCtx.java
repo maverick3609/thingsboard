@@ -30,6 +30,7 @@ import java.io.Closeable;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Per-render context handed to every {@link org.thingsboard.server.service.report.TbReportRenderService}
@@ -79,6 +80,21 @@ public class TbReportCtx implements Closeable {
     @Builder.Default
     private final int subReportDepth = 0;
 
+    /**
+     * Shared, per-report budget of total {@code SUB_REPORT} renders across the WHOLE tree — header, footer,
+     * body, and every fan-out branch. Where {@link #subReportDepth} bounds only nesting DEPTH (a per-branch
+     * counter), this bounds total WORK: a sub-report resolves E entities and renders its child once per entity,
+     * so the render tree is E-ary and E^depth total renders would exhaust the shared render heap (a cross-tenant
+     * OOM) even within the depth cap. Threaded BY REFERENCE through {@link #createSubReportCxt} — every child ctx
+     * shares the SAME instance — and decremented once per {@code renderSubReport} node in {@code PdfReportService};
+     * when it goes negative that node degrades to an error box instead of descending. Fresh per top-level render
+     * ({@code @Builder.Default}) so it can't leak across reports. Inferrix hardening over PE (PE bounds neither
+     * depth nor fan-out). One render thread, so a plain {@link AtomicInteger} holder suffices.
+     */
+    public static final int MAX_TOTAL_SUB_REPORT_RENDERS = 1000;
+    @Builder.Default
+    private final AtomicInteger subReportBudget = new AtomicInteger(MAX_TOTAL_SUB_REPORT_RENDERS);
+
     /** Per-render, mutable scratch space for the data layer (e.g. the current sub-report entity). Never builder-set — always fresh. */
     @Builder.Default
     private final Map<String, Object> params = new HashMap<>();
@@ -91,9 +107,10 @@ public class TbReportCtx implements Closeable {
      * owner, token, {@link SecurityUser}, image resolver, TBEL service) but rendering a different (child)
      * {@link ReportTemplateConfig}, with its own fresh {@code params}/{@code scripts}. The child inherits this
      * ctx's {@link SecurityUser}, so a sub-report can never read outside the parent report's permission scope.
-     * Its {@link #subReportDepth} is this ctx's + 1, so {@code PdfReportService}'s {@code MAX_SUB_REPORT_DEPTH}
-     * cap bounds recursion (self-reference / cycle / pathologically deep nesting) — R2b task H renders through
-     * this seam.
+     * Its {@link #subReportDepth} is this ctx's + 1 (so {@code MAX_SUB_REPORT_DEPTH} bounds nesting depth) and it
+     * shares this ctx's {@link #subReportBudget} instance (so {@code MAX_TOTAL_SUB_REPORT_RENDERS} bounds total
+     * fan-out) — together they stop self-reference / cycles / deep nesting / E^depth fan-out. R2b task H renders
+     * through this seam.
      */
     public TbReportCtx createSubReportCxt(ReportTemplateConfig subConfiguration) {
         return TbReportCtx.builder()
@@ -109,6 +126,9 @@ public class TbReportCtx implements Closeable {
                 .securityUser(securityUser)
                 .tbelInvokeService(tbelInvokeService)
                 .subReportDepth(subReportDepth + 1)
+                // Share the SAME budget instance (do NOT let @Builder.Default mint a fresh one) so total renders
+                // are capped across the whole tree, not reset per branch — the fan-out (E^depth) bound.
+                .subReportBudget(subReportBudget)
                 .build();
     }
 

@@ -18,40 +18,102 @@ package org.thingsboard.server.service.report.context;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.ToString;
+import org.thingsboard.script.api.tbel.TbelInvokeService;
+import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.id.UserId;
 import org.thingsboard.server.common.data.report.configuration.ReportTemplateConfig;
 import org.thingsboard.server.service.report.util.itext.PdfReportImageResolver;
 import org.thingsboard.server.service.security.model.SecurityUser;
 
+import java.io.Closeable;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
 /**
  * Per-render context handed to every {@link org.thingsboard.server.service.report.TbReportRenderService}
- * (PE names this {@code TbReportCtx}, {@code report.context}). Carries everything the R2a engine needs
- * to turn one {@link ReportTask}'s typed {@link ReportTemplateConfig} into a PDF: the tenant scope, the
- * typed configuration, the render timezone, the report user, that user's minted access token, the
- * reconstructed {@link SecurityUser}, and the {@link PdfReportImageResolver} the flying-saucer user
- * agent uses to fetch tenant/system/public TB images.
+ * and, in R2b, to every {@link org.thingsboard.server.service.report.datasource.ReportDataService} query
+ * (PE names this {@code TbReportCtx}, {@code report.context}). Carries everything one {@link ReportTask}'s
+ * render needs: the tenant scope, the typed {@link ReportTemplateConfig}, the render timezone/created-time,
+ * the report user (+ owner), that user's minted access token, the reconstructed trusted {@link
+ * SecurityUser}, the {@link PdfReportImageResolver} the flying-saucer user agent fetches images through, and
+ * (R2b data layer) the {@link TbelInvokeService} + a per-render {@code scripts}/{@code params} scratch space.
  * <p>
- * <b>R2a-minimal (spec §6).</b> PE's ctx is {@code abstract}/{@code Closeable} and additionally carries
- * a {@code ReportDataService} + TBEL script cache + {@code createSubReportCxt(...)} — the whole
- * server-side data-access layer (entity/alarm/timeseries queries, sub-reports, post-processing scripts).
- * That layer is <b>R2b</b>: this class deliberately has no data-query methods and no {@code Closeable}
- * plumbing (nothing to release without the script cache). When R2b lands the {@code ReportDataService},
- * the data collaborators + {@code createSubReportCxt} seam attach here.
+ * <b>Security.</b> {@link #securityUser} is the trust anchor for the whole render: {@code
+ * ReportDataService} reads it from here (never from the query/URI) so every entity/alarm/timeseries read is
+ * permission-scoped to the report task's user. {@code accessToken} and {@code securityUser} are
+ * {@code @ToString.Exclude}d so a stray {@code log.debug(ctx)} can't leak the token or credentials.
  * <p>
- * // R2b: server-side data queries (ReportDataService: entity/alarm/timeseries + sub-report ctx) attach here.
+ * <b>Closeable.</b> The R2b data layer compiles per-render TBEL post-processing scripts into {@link
+ * #scripts}; {@link #close()} releases them from the {@link TbelInvokeService}. The render dispatcher
+ * ({@code TbReportService}) closes the ctx after each render. In R2b-F1 nothing populates {@code scripts}
+ * yet, so {@code close()} is a no-op until the post-processing layer (F2) lands.
  */
 @Getter
 @Builder
 @ToString
-public class TbReportCtx {
+public class TbReportCtx implements Closeable {
 
     private final TenantId tenantId;
     private final ReportTemplateConfig configuration;
     private final String timeZone;
     private final UserId userId;
+    private final EntityId userOwnerId;
+    @ToString.Exclude
     private final String accessToken;
+    private final long accessTokenExpTs;
+    private final String reportCreatedTime;
     private final PdfReportImageResolver imageResolver;
+    @ToString.Exclude
     private final SecurityUser securityUser;
+    private final TbelInvokeService tbelInvokeService;
+
+    /** Per-render, mutable scratch space for the data layer (e.g. the current sub-report entity). Never builder-set — always fresh. */
+    @Builder.Default
+    private final Map<String, Object> params = new HashMap<>();
+    /** Per-render TBEL script cache (data-key post-func body → compiled script id), released by {@link #close()}. Never builder-set. */
+    @Builder.Default
+    private final Map<String, UUID> scripts = new HashMap<>();
+
+    /**
+     * Builds a child context for a {@code SUB_REPORT} component: same identity/security scope (tenant, user,
+     * owner, token, {@link SecurityUser}, image resolver, TBEL service) but rendering a different (child)
+     * {@link ReportTemplateConfig}, with its own fresh {@code params}/{@code scripts}. The child inherits this
+     * ctx's {@link SecurityUser}, so a sub-report can never read outside the parent report's permission scope.
+     * (Sub-report recursion itself is R2b task H — this is the seam it renders through.)
+     */
+    public TbReportCtx createSubReportCxt(ReportTemplateConfig subConfiguration) {
+        return TbReportCtx.builder()
+                .tenantId(tenantId)
+                .configuration(subConfiguration)
+                .timeZone(timeZone)
+                .userId(userId)
+                .userOwnerId(userOwnerId)
+                .accessToken(accessToken)
+                .accessTokenExpTs(accessTokenExpTs)
+                .reportCreatedTime(reportCreatedTime)
+                .imageResolver(imageResolver)
+                .securityUser(securityUser)
+                .tbelInvokeService(tbelInvokeService)
+                .build();
+    }
+
+    /**
+     * Releases every per-render TBEL script compiled into {@link #scripts}. Narrows {@link Closeable#close()}
+     * to throw nothing so callers can use try-with-resources without an {@code IOException} clause. Null-safe:
+     * contexts built without a {@link TbelInvokeService} (unit-test/render-only ctxs) have no scripts to free.
+     */
+    @Override
+    public void close() {
+        if (tbelInvokeService == null || scripts == null || scripts.isEmpty()) {
+            return;
+        }
+        scripts.values().forEach(scriptId -> {
+            if (scriptId != null) {
+                tbelInvokeService.release(scriptId);
+            }
+        });
+    }
 
 }

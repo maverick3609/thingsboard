@@ -16,6 +16,9 @@
 package org.thingsboard.server.service.report.render;
 
 import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
@@ -56,6 +59,28 @@ public final class ReportUtils {
             name = name.replace(toReplace, replacement);
         }
         return name;
+    }
+
+    /**
+     * Formats an epoch-millis timestamp for display using a {@link DateTimeFormatter} pattern in the given
+     * IANA timezone (PE-verbatim, {@code report.util.ReportUtils}). Used to stamp a report's created-time.
+     * Returns {@code ""} for a zero timestamp, the raw millis when the pattern is empty or {@code
+     * "milliseconds"}, and a diagnostic string (never throws) on a bad pattern/timezone.
+     */
+    public static String formatTimestamp(long timestamp, String pattern, String timezone) {
+        if (timestamp == 0L) {
+            return "";
+        }
+        if (pattern == null || pattern.isEmpty() || pattern.equals("milliseconds")) {
+            return String.valueOf(timestamp);
+        }
+        try {
+            ZoneId zoneId = timezone != null && !timezone.isBlank() ? ZoneId.of(timezone) : ZoneId.systemDefault();
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern(pattern).withZone(zoneId);
+            return formatter.format(Instant.ofEpochMilli(timestamp));
+        } catch (Exception e) {
+            return "Invalid timestamp: " + timestamp;
+        }
     }
 
 }

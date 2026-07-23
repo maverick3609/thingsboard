@@ -189,8 +189,11 @@ class PdfReportServiceTest {
     }
 
     @Test
-    void entityKeyImageRendersErrorBoxNotFailure() {
-        // The entity-key IMAGE guard (thrown deep in ImageRenderer) must also degrade to an error box.
+    void entityKeyImageWithNoBoundDataRendersGracefully() throws Exception {
+        // R2b (F1): the entity-key IMAGE R2b guard is removed — ImageRenderer now resolves the URL from the
+        // component's bound entity data. With no data bound (the server-side data layer is F2), the URL is
+        // empty and AbstractImageRenderer substitutes the empty-image placeholder — a valid PDF with the
+        // heading, NOT the old "not supported" error box and NOT a failure.
         PdfReportTemplateConfig config = baseConfig();
         ImageComponent entityKeyImage = new ImageComponent();
         entityKeyImage.setSourceType(ImageSourceType.ENTITY_KEY);
@@ -199,6 +202,14 @@ class PdfReportServiceTest {
         byte[] pdf = service.generateReport(task(), ctx(config)).getData();
 
         assertThat(new String(pdf, 0, 5, StandardCharsets.ISO_8859_1)).as("PDF magic header").isEqualTo("%PDF-");
+        PdfReader reader = new PdfReader(pdf);
+        try {
+            String text = new PdfTextExtractor(reader).getTextFromPage(1);
+            assertThat(text).as("heading still rendered").contains("BODYHEADING");
+            assertThat(text).as("entity-key image no longer degrades to the R2b error box").doesNotContain("not supported");
+        } finally {
+            reader.close();
+        }
         verifyNoInteractions(dashboardReportService);
     }
 

@@ -118,8 +118,11 @@ public class TbReportService {
             // R2b: TbReportFormat.CSV has no renderer registered yet.
             throw new ReportRenderException("No render service registered for report format: " + format);
         }
-        TbReportCtx ctx = ctxProvider.newContext(task);
-        return renderService.generateReport(task, ctx);
+        // The ctx is Closeable (R2b): close() releases the per-render TBEL post-processing scripts the data
+        // layer compiles. try-with-resources guarantees that even if the render throws.
+        try (TbReportCtx ctx = ctxProvider.newContext(task)) {
+            return renderService.generateReport(task, ctx);
+        }
     }
 
     private static Report buildReport(ReportTask task, ReportTemplate template, ReportData reportData) {

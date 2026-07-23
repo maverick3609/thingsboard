@@ -36,6 +36,7 @@ import org.thingsboard.server.common.data.report.configuration.style.VerticalAli
 import org.thingsboard.server.service.report.context.ComponentData;
 import org.thingsboard.server.service.report.render.ReportUtils;
 import org.thingsboard.server.service.report.util.ColorUtils;
+import org.thingsboard.server.service.report.util.FontUtils;
 import org.thingsboard.server.service.report.util.ThymeleafUtil;
 
 import java.util.ArrayList;
@@ -153,7 +154,7 @@ public abstract class TableWithLayoutComponentRenderer<C extends TableWithLayout
         vars.put("headingFontSize", Optional.ofNullable(font.getSize()).filter(s -> s > 0.0f).orElse(10.0f));
         vars.put("headingFontWeight", Optional.ofNullable(font.getWeight()).orElse(FontWeight.NORMAL).getValue());
         vars.put("headingFontStyle", Optional.ofNullable(font.getStyle()).orElse(FontStyle.NORMAL).getValue());
-        vars.put("headingFontFamily", StringUtils.defaultString(font.getFamily(), "Roboto"));
+        vars.put("headingFontFamily", FontUtils.resolveFontFamily(font.getFamily()));
         vars.put("headingTextAlignment", Optional.ofNullable(heading.getTextAlignment()).orElse(TextAlignment.CENTER).getValue());
         vars.put("headingVerticalAlignment", Optional.ofNullable(heading.getVerticalAlignment()).orElse(VerticalAlignment.MIDDLE).getValue());
         vars.put("headingHeight", heading.getHeight() != null && heading.getHeight() > 0 ? heading.getHeight() + "pt" : "100%");
@@ -227,7 +228,7 @@ public abstract class TableWithLayoutComponentRenderer<C extends TableWithLayout
                     .fontSize(font != null && font.getSize() != null && font.getSize() > 0.0f ? font.getSize() : null)
                     .fontWeight(font != null && font.getWeight() != null ? font.getWeight().name() : null)
                     .fontStyle(font != null && font.getStyle() != null ? font.getStyle().name() : null)
-                    .fontFamily(font != null && font.getFamily() != null && !font.getFamily().isEmpty() ? font.getFamily() : null)
+                    .fontFamily(font != null && font.getFamily() != null && !font.getFamily().isEmpty() ? FontUtils.resolveFontFamily(font.getFamily()) : null)
                     .textAlignment(cellSettings.getTextAlignment() != null ? cellSettings.getTextAlignment().name() : null)
                     .verticalAlignment(cellSettings.getVerticalAlignment() != null ? cellSettings.getVerticalAlignment().name() : null)
                     .build();

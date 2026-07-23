@@ -39,6 +39,8 @@ import org.thingsboard.server.common.data.query.EntityKeyType;
 import org.thingsboard.server.common.data.query.TsValue;
 import org.thingsboard.server.common.data.report.ReportData;
 import org.thingsboard.server.common.data.report.configuration.AlarmFilterConfig;
+import org.thingsboard.server.common.data.report.configuration.CellSettings;
+import org.thingsboard.server.common.data.report.configuration.ColumnSettings;
 import org.thingsboard.server.common.data.report.configuration.DataKey;
 import org.thingsboard.server.common.data.report.configuration.DataSource;
 import org.thingsboard.server.common.data.report.configuration.DataSourceType;
@@ -399,6 +401,36 @@ class PdfReportServiceTest {
                 .contains("&lt;script&gt;")
                 .doesNotContain("<script>alert(1)</script>")
                 .doesNotContain("<img src=x onerror");
+    }
+
+    @Test
+    void entityTableCellFontFamilyIsAllowlisted() {
+        // S1 fix (G review): the config font family is concatenated raw into a `font-family:${..}` style, and CSS
+        // declarations are ';'-separated — so an un-allowlisted value must be collapsed to an allowlisted family
+        // before it reaches the template, never injected as an extra declaration (regression of R2a's allowlist).
+        Font maliciousFont = new Font();
+        maliciousFont.setFamily("Roboto; background-image:url(http://attacker/x)");
+        CellSettings cell = new CellSettings();
+        cell.setFont(maliciousFont);
+        ColumnSettings columnSettings = new ColumnSettings();
+        columnSettings.setCell(cell);
+        DataKey key = dataKey("reading", "attribute", "Reading");
+        key.setSettings(columnSettings);
+
+        EntityTableComponent table = new EntityTableComponent();
+        table.setDataSources(List.of(DataSource.builder()
+                .type(DataSourceType.DEVICE).deviceId(UUID.randomUUID().toString())
+                .dataKeys(List.of(key)).build()));
+        ComponentData componentData = new ComponentData(600);
+        componentData.setEntityDatas(List.of(Map.of("Reading", "42")));
+
+        String html = new EntityTableRenderer().render(table, componentData);
+
+        assertThat(html)
+                .as("injected CSS declaration is dropped; font-family collapses to the allowlisted default")
+                .doesNotContain("background-image")
+                .doesNotContain("url(http://attacker")
+                .contains("font-family:Roboto");
     }
 
     @Test

@@ -70,16 +70,20 @@ import java.util.Set;
  * dashboard reports keep working through the new engine. Table components (entity/alarm/time-series) and
  * sub-reports need the server-side data layer and are guarded as <b>R2b</b>.
  * <p>
- * Deliberately <b>not</b> an {@code AbstractReportService} subclass: with one implementor in R2a a shared
- * base is speculative — R2b introduces it alongside {@code CsvReportService} + the shared data layer.
+ * R2b: now {@code extends} {@link AbstractReportService} — the shared server-side data layer (entity/alarm/
+ * timeseries builds + TBEL post-processing). R2b-F2 only adds that base; PDF's render path is unchanged (the
+ * table/sub-report component types stay guarded below as R2a error-boxes until Tasks G/H remove the guards and
+ * wire {@link #buildComponentData} to the inherited builders). PDF keeps its own HTML-assembly specifics
+ * (page/header/footer layout, the DASHBOARD Playwright-PNG capture).
  * <p>
  * Gated by {@code reports.renderer.enabled} (opt-in invariant, mirrors R1): its dashboard collaborator is
- * likewise gated, so the platform boots renderer-off.
+ * likewise gated, so the platform boots renderer-off. {@link AbstractReportService} is abstract (no bean), so
+ * the gate on this concrete engine keeps the opt-in intact.
  */
 @Service
 @Slf4j
 @ConditionalOnProperty(prefix = "reports.renderer", name = "enabled", havingValue = "true")
-public class PdfReportService implements TbReportRenderService {
+public class PdfReportService extends AbstractReportService {
 
     /** pt→px at 96/72 dpi. */
     private static final float PT_TO_PX = 4.0f / 3.0f;

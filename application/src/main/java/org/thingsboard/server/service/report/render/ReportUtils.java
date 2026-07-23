@@ -15,20 +15,34 @@
  */
 package org.thingsboard.server.service.report.render;
 
+import org.apache.commons.lang3.math.NumberUtils;
+import org.thingsboard.server.common.data.StringUtils;
+import org.thingsboard.server.common.data.report.configuration.DataSource;
+import org.thingsboard.server.common.data.report.configuration.components.AlarmTableComponent;
+import org.thingsboard.server.common.data.report.configuration.components.DataReportComponent;
+import org.thingsboard.server.common.data.report.configuration.components.ReportComponentType;
+import org.thingsboard.server.service.report.context.TbReportCtx;
+
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Report-artifact naming. Ported from PE's {@code org.thingsboard.server.report.util.ReportUtils}
- * (decompiled from {@code report-4.2.0PE.jar}) — only {@code prepareReportName}, the one method
- * this port's renderer needs; PE's other ~15 methods there belong to the multi-component
- * (table/chart/text) report engine, out of R1 scope (spec §6.1).
+ * Report-rendering helpers ported from PE's {@code org.thingsboard.server.report.util.ReportUtils}
+ * (decompiled from {@code report-4.2.0PE.jar}). R1 needed only {@code prepareReportName}; R2b's shared data
+ * layer ({@link AbstractReportService}) adds the value-formatting/data-source helpers it consumes:
+ * {@link #ENTITY_TIME_FIELDS}, {@link #getSingleDataSource}, {@link #convertStringToTypedValue}, and the
+ * {@link TbReportCtx}-aware {@code formatTimestamp} overloads. PE's remaining table/CSV helpers
+ * ({@code formatValueWithPrecisionAndUnits}, {@code sortRowsByTableSortOrder}, …) stay out of scope until
+ * the R2b table renderers (Task G) / CSV (Task I) land.
  */
 public final class ReportUtils {
 
@@ -37,6 +51,13 @@ public final class ReportUtils {
 
     /** PE-verbatim default, also {@link org.thingsboard.server.common.data.dashboardreport.DashboardReportConfig}'s documented example. */
     public static final String DEFAULT_REPORT_NAME_PATTERN = "report-%d{yyyy-MM-dd_HH:mm:ss}";
+
+    /**
+     * PE-verbatim: data-key names whose value is an epoch-millis timestamp — {@link AbstractReportService}
+     * formats these through {@code formatTimestamp} (and also emits a {@code rawTs_<label>} raw copy for
+     * table sorting) rather than passing the raw number through.
+     */
+    public static final Set<String> ENTITY_TIME_FIELDS = Set.of("ts", "createdTime", "startTime", "endTime", "ackTime", "clearTime", "assignTime");
 
     private ReportUtils() {
     }
@@ -81,6 +102,85 @@ public final class ReportUtils {
         } catch (Exception e) {
             return "Invalid timestamp: " + timestamp;
         }
+    }
+
+    /**
+     * The single, fully-configured {@link DataSource} of a data component (PE-verbatim). For an ALARM_TABLE
+     * it is the alarm source; otherwise the first entry of {@code getDataSources()}. Returns empty when the
+     * source is missing or under-configured (a DEVICE source with no device id, an ENTITY source with no
+     * entity-alias id) so callers render nothing rather than issuing a bad query.
+     */
+    public static Optional<DataSource> getSingleDataSource(DataReportComponent component) {
+        DataSource dataSource = null;
+        if (ReportComponentType.ALARM_TABLE.equals(component.getType())) {
+            dataSource = ((AlarmTableComponent) component).getAlarmSource();
+        } else {
+            List<DataSource> dataSources = component.getDataSources();
+            if (dataSources != null && !dataSources.isEmpty()) {
+                dataSource = dataSources.get(0);
+            }
+        }
+        if (dataSource == null) {
+            return Optional.empty();
+        }
+        switch (dataSource.getType()) {
+            case DEVICE -> {
+                if (dataSource.getDeviceId() == null) {
+                    return Optional.empty();
+                }
+            }
+            case ENTITY -> {
+                if (dataSource.getEntityAliasId() == null) {
+                    return Optional.empty();
+                }
+            }
+            default -> {
+            }
+        }
+        return Optional.of(dataSource);
+    }
+
+    /**
+     * PE-verbatim: coerces a raw string value to the typed value TBEL post-processing expects — a {@code
+     * Double} for a numeric string, a {@code Boolean} for {@code "true"}/{@code "false"}, otherwise the
+     * string unchanged. Blank input is returned as-is.
+     */
+    public static Object convertStringToTypedValue(String value) {
+        if (StringUtils.isBlank(value)) {
+            return value;
+        }
+        if (NumberUtils.isParsable(value)) {
+            return Double.parseDouble(value);
+        }
+        if ("true".equalsIgnoreCase(value) || "false".equalsIgnoreCase(value)) {
+            return Boolean.parseBoolean(value);
+        }
+        return value;
+    }
+
+    /**
+     * {@link TbReportCtx}-aware formatter for a timestamp held as a string (PE-verbatim). Falls back to the
+     * report's {@code timeDataPattern} when {@code pattern} is empty and to the ctx timezone when {@code
+     * timezone} is blank; returns a diagnostic (never throws) when the string is not a valid epoch-millis.
+     */
+    public static String formatTimestamp(String timestampStr, String pattern, TbReportCtx ctx, String timezone) {
+        try {
+            long timestamp = Long.parseLong(timestampStr);
+            return formatTimestamp(timestamp, pattern, ctx, timezone);
+        } catch (NumberFormatException e) {
+            return "Invalid timestamp string: " + timestampStr;
+        }
+    }
+
+    /**
+     * {@link TbReportCtx}-aware formatter (PE-verbatim): resolves the effective pattern from {@code pattern}
+     * else the report's {@code timeDataPattern}, and the timezone from {@code timezone} else the ctx
+     * timezone, then delegates to {@link #formatTimestamp(long, String, String)}.
+     */
+    public static String formatTimestamp(long timestamp, String pattern, TbReportCtx ctx, String timezone) {
+        String effectivePattern = pattern != null && !pattern.isEmpty() ? pattern : ctx.getConfiguration().getTimeDataPattern();
+        String targetTimezone = StringUtils.isNotBlank(timezone) ? timezone : ctx.getTimeZone();
+        return formatTimestamp(timestamp, effectivePattern, targetTimezone);
     }
 
 }

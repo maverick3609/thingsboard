@@ -214,22 +214,29 @@ public class LocalReportDataService implements ReportDataService {
         accessValidator.validate(securityUser, Operation.READ_TELEMETRY, entityId, new FutureCallback<>() {
             @Override
             public void onSuccess(ValidationResult validationResult) {
-                if (validationResult.getResultCode() != ValidationResultCode.OK) {
-                    future.setException(ValidationCallback.getException(validationResult));
-                    return;
-                }
-                Futures.addCallback(timeseriesService.findAllByQueries(securityUser.getTenantId(), entityId, queries),
-                        new FutureCallback<>() {
-                            @Override
-                            public void onSuccess(List<ReadTsKvQueryResult> result) {
-                                future.set(result);
-                            }
+                // Wrap the whole body: a synchronous throw here (e.g. timeseriesService.findAllByQueries NPEs on
+                // null queries) would otherwise be swallowed by the validator's executor, leaving `future` never
+                // completed and getUnchecked() blocking the render thread forever. Mirror DefaultTbTelemetryService.
+                try {
+                    if (validationResult.getResultCode() != ValidationResultCode.OK) {
+                        future.setException(ValidationCallback.getException(validationResult));
+                        return;
+                    }
+                    Futures.addCallback(timeseriesService.findAllByQueries(securityUser.getTenantId(), entityId, queries),
+                            new FutureCallback<>() {
+                                @Override
+                                public void onSuccess(List<ReadTsKvQueryResult> result) {
+                                    future.set(result);
+                                }
 
-                            @Override
-                            public void onFailure(Throwable t) {
-                                future.setException(t);
-                            }
-                        }, MoreExecutors.directExecutor());
+                                @Override
+                                public void onFailure(Throwable t) {
+                                    future.setException(t);
+                                }
+                            }, MoreExecutors.directExecutor());
+                } catch (Throwable t) {
+                    future.setException(t);
+                }
             }
 
             @Override

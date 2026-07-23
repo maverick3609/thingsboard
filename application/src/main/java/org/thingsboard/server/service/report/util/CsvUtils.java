@@ -45,11 +45,12 @@ import java.util.List;
 public final class CsvUtils {
 
     /**
-     * A cell whose FIRST character is one of these is neutralised. {@code = + - @} are the classic
-     * spreadsheet-formula leads; TAB (0x09) and CR (0x0D) are included because some spreadsheet importers strip
-     * a leading control character and then treat the following {@code =}/{@code +}/… as a formula (OWASP).
+     * Formula-lead operators. {@code = + - @} are the classic spreadsheet-formula leads; the four full-width
+     * variants ({@code ＝}U+FF1D, {@code ＋}U+FF0B, {@code －}U+FF0D, {@code ＠}U+FF20) are included because
+     * CJK-locale Excel normalises them to ASCII and then evaluates them (OWASP CSV Injection). A cell whose
+     * first <b>non-whitespace</b> character is one of these is neutralised.
      */
-    private static final String FORMULA_TRIGGERS = "=+-@\t\r";
+    private static final String FORMULA_LEAD_CHARS = "=+-@＝＋－＠";
 
     private CsvUtils() {
     }
@@ -74,16 +75,22 @@ public final class CsvUtils {
     }
 
     /**
-     * Neutralises a single cell against CSV formula injection: if {@code cell} begins with a {@link
-     * #FORMULA_TRIGGERS} character, prefixes it with a single quote {@code '} so the spreadsheet renders it as
-     * literal text. Otherwise returns the cell unchanged. Null/empty pass through untouched (nothing to
-     * neutralise). Package-private so {@code CsvUtilsTest} can assert it directly.
+     * Neutralises a single cell against CSV formula injection: if the cell's first <b>non-whitespace</b>
+     * character is a {@link #FORMULA_LEAD_CHARS} operator, prefixes the cell with a single quote {@code '} so the
+     * spreadsheet renders it as literal text. Otherwise returns the cell unchanged. Null/empty (and all-whitespace)
+     * pass through untouched. Scanning past leading whitespace closes the importers that strip a leading space or
+     * control char (TAB/CR/LF) before formula detection — e.g. {@code " =1+1"}, {@code "\n=cmd"} — which a bare
+     * first-character check would miss. Package-private so {@code CsvUtilsTest} can assert it directly.
      */
     static String neutralizeFormula(String cell) {
         if (cell == null || cell.isEmpty()) {
             return cell;
         }
-        if (FORMULA_TRIGGERS.indexOf(cell.charAt(0)) >= 0) {
+        int i = 0;
+        while (i < cell.length() && Character.isWhitespace(cell.charAt(i))) {
+            i++;
+        }
+        if (i < cell.length() && FORMULA_LEAD_CHARS.indexOf(cell.charAt(i)) >= 0) {
             return "'" + cell;
         }
         return cell;

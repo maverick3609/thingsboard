@@ -41,10 +41,25 @@ class CsvUtilsTest {
     }
 
     @Test
+    void neutralizesWhitespacePrefixedAndFullWidthFormulaLeads() {
+        // A formula operator behind leading whitespace / a stripped control char (importers strip it, then
+        // evaluate the remainder) — a bare first-character check would miss these.
+        assertThat(CsvUtils.neutralizeFormula(" =1+1")).isEqualTo("' =1+1");     // leading space
+        assertThat(CsvUtils.neutralizeFormula("\n=1+1")).isEqualTo("'\n=1+1");   // leading LF
+        assertThat(CsvUtils.neutralizeFormula("  @SUM(A1)")).isEqualTo("'  @SUM(A1)");
+        // Full-width operators CJK-locale Excel normalises to ASCII and evaluates.
+        assertThat(CsvUtils.neutralizeFormula("＝1+1")).isEqualTo("'＝1+1");
+        assertThat(CsvUtils.neutralizeFormula("＋1")).isEqualTo("'＋1");
+    }
+
+    @Test
     void leavesSafeValuesUnchanged() {
         assertThat(CsvUtils.neutralizeFormula("Device A")).isEqualTo("Device A");
         assertThat(CsvUtils.neutralizeFormula("42.5")).isEqualTo("42.5");
         assertThat(CsvUtils.neutralizeFormula("a=b")).isEqualTo("a=b"); // trigger not leading -> untouched
+        assertThat(CsvUtils.neutralizeFormula(" hello")).isEqualTo(" hello"); // leading space, non-formula -> untouched
+        assertThat(CsvUtils.neutralizeFormula("   ")).isEqualTo("   "); // all-whitespace -> nothing to neutralise
+        assertThat(CsvUtils.neutralizeFormula("\tfoo")).isEqualTo("\tfoo"); // leading TAB, non-formula -> untouched
         assertThat(CsvUtils.neutralizeFormula("")).isEqualTo("");
         assertThat(CsvUtils.neutralizeFormula(null)).isNull();
     }

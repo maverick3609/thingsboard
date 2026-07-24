@@ -42,6 +42,7 @@ import { DeleteAttributesConfigComponent } from './delete-attributes-config.comp
 import { MathFunctionConfigComponent } from './math-function-config.component';
 import { DeviceStateConfigComponent } from './device-state-config.component';
 import { SendRestApiCallReplyConfigComponent } from './send-rest-api-call-reply-config.component';
+import { GenerateReportConfigComponent } from './generate-report-config.component';
 import {
   AdvancedProcessingSettingComponent
 } from '@home/components/rule-node/action/advanced-processing-setting.component';
@@ -76,6 +77,7 @@ import {
     DeviceStateConfigComponent,
     AdvancedProcessingSettingComponent,
     AdvancedProcessingSettingRowComponent,
+    GenerateReportConfigComponent,
   ],
   imports: [
     CommonModule,
@@ -106,7 +108,8 @@ import {
     PushToEdgeConfigComponent,
     PushToCloudConfigComponent,
     MathFunctionConfigComponent,
-    DeviceStateConfigComponent
+    DeviceStateConfigComponent,
+    GenerateReportConfigComponent
   ]
 })
 export class ActionRuleNodeConfigModule {

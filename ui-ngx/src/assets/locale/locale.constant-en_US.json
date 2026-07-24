@@ -6130,6 +6130,8 @@
         "metadata-dynamic-interval-hint": "Interval start and end input fields support templatization. Note that the substituted template value should be set in milliseconds. Use $[messageKey] to extract value from the message and ${metadataKey} to extract value from the metadata.",
         "use-metadata-interval-patterns-hint": "If selected, rule node use start and end interval patterns from message metadata or data assuming that intervals are in the milliseconds.",
         "use-message-alarm-data": "Use message alarm data",
+        "use-report-config-from-message": "Take report configuration from the incoming message",
+        "use-report-config-from-message-hint": "When enabled, the report configuration is read from the incoming message at runtime and the static configuration below is ignored.",
         "overwrite-alarm-details": "Overwrite alarm details",
         "use-alarm-severity-pattern": "Use alarm severity pattern",
         "check-all-keys": "Check that all specified fields are present",

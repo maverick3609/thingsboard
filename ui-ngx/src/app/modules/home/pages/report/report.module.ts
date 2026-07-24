@@ -22,12 +22,16 @@ import { ReportRoutingModule } from '@home/pages/report/report-routing.module';
 import { ReportHistoryComponent } from '@home/pages/report/report-history/report-history.component';
 import { ReportTemplatesComponent } from '@home/pages/report/report-template/report-templates.component';
 import { ReportTemplateDialogComponent } from '@home/pages/report/report-template/report-template-dialog.component';
+import { ReportTemplateEditorComponent } from '@home/pages/report/report-template/designer/report-template-editor.component';
 
 @NgModule({
   declarations: [
     ReportHistoryComponent,
     ReportTemplatesComponent,
-    ReportTemplateDialogComponent
+    // Unreferenced since C1 Task 3 (add/edit now navigate to ReportTemplateEditorComponent below
+    // instead of opening this dialog) - stays declared until a later cleanup task removes it.
+    ReportTemplateDialogComponent,
+    ReportTemplateEditorComponent
   ],
   imports: [
     CommonModule,

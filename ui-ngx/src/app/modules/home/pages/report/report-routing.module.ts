@@ -23,11 +23,20 @@ import { ReportHistoryTableConfigResolver } from '@home/pages/report/report-hist
 import { ReportHistoryComponent } from '@home/pages/report/report-history/report-history.component';
 import { ReportTemplatesTableConfigResolver } from '@home/pages/report/report-template/report-templates-table-config.resolver';
 import { ReportTemplatesComponent } from '@home/pages/report/report-template/report-templates.component';
+import { ReportTemplateEditorComponent } from '@home/pages/report/report-template/designer/report-template-editor.component';
 
 // Routes for the report history page ('history') and the report templates page ('templates'),
 // nested under a parent 'reports' path (mirrors OtaUpdateRoutingModule's parent+children shape)
 // so that spreading this const into FeaturesRoutingModule's children lands the pages at
 // '/features/reports/history' and '/features/reports/templates'.
+//
+// 'templates' is itself further nested (table at '', full-page designer at 'new'/':reportTemplateId')
+// rather than a single leaf route, mirroring widget-library-routing.module.ts's widget-types/
+// widgets-bundles "table + detail" shape: a componentless grouping route contributes no router-outlet
+// of its own, so its children still render straight into the parent 'reports' RouterTabsComponent's
+// outlet - keeping the History/Templates tab strip working unchanged for the table, while letting the
+// designer routes opt out of it via `hideTabs: true` (router-tabs.component.html reads that off the
+// deepest activated route's own data).
 export const reportRoutes: Routes = [
   {
     path: 'reports',
@@ -69,18 +78,51 @@ export const reportRoutes: Routes = [
       },
       {
         path: 'templates',
-        component: ReportTemplatesComponent,
         data: {
-          auth: [Authority.TENANT_ADMIN],
-          title: 'report.report-templates',
-          isPage: true,
           breadcrumb: {
             menuId: MenuId.report_templates
           }
         },
-        resolve: {
-          entitiesTableConfig: ReportTemplatesTableConfigResolver
-        }
+        children: [
+          {
+            path: '',
+            component: ReportTemplatesComponent,
+            data: {
+              auth: [Authority.TENANT_ADMIN],
+              title: 'report.report-templates',
+              isPage: true
+            },
+            resolve: {
+              entitiesTableConfig: ReportTemplatesTableConfigResolver
+            }
+          },
+          {
+            path: 'new',
+            component: ReportTemplateEditorComponent,
+            data: {
+              auth: [Authority.TENANT_ADMIN],
+              title: 'report.add-report-template',
+              breadcrumb: {
+                label: 'report.add-report-template',
+                icon: 'description'
+              },
+              hideTabs: true
+            }
+          },
+          {
+            path: ':reportTemplateId',
+            component: ReportTemplateEditorComponent,
+            data: {
+              auth: [Authority.TENANT_ADMIN],
+              title: 'report.edit-report-template',
+              breadcrumb: {
+                label: 'report.edit-report-template',
+                icon: 'description'
+              },
+              hideTabs: true
+            }
+          }
+        ]
       }
     ]
   }

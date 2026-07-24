@@ -5367,6 +5367,7 @@
         "report-template-details": "Report template details",
         "add-report-template": "Add Report Template",
         "edit-report-template": "Edit Report Template",
+        "preview": "Preview",
         "name-required": "Name is required.",
         "dashboard-component": "Dashboard component",
         "dashboard-required": "Dashboard is required.",

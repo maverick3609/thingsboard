@@ -1,0 +1,54 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<div class="tb-report-template-editor flex flex-1 flex-col" *ngIf="reportTemplate">
+  <mat-toolbar class="mat-elevation-z1 tb-report-template-editor-toolbar gap-4 lt-xl:gap-2">
+    <button mat-icon-button
+            matTooltip="{{ 'action.back' | translate }}"
+            matTooltipPosition="above"
+            (click)="goBack()">
+      <mat-icon>arrow_back</mat-icon>
+    </button>
+    <mat-form-field class="tb-report-template-name tb-appearance-transparent">
+      <input matInput required maxlength="255"
+             [(ngModel)]="reportTemplate.name"
+             placeholder="{{ 'report.name' | translate }}"/>
+    </mat-form-field>
+    <span class="flex-1"></span>
+    <tb-toggle-select appearance="fill"
+                       fillHeight
+                       extraPadding
+                       primaryBackground
+                       [(ngModel)]="viewMode">
+      <tb-toggle-option value="edit">{{ 'action.edit' | translate }}</tb-toggle-option>
+      <tb-toggle-option value="preview">{{ 'report.preview' | translate }}</tb-toggle-option>
+    </tb-toggle-select>
+    <button mat-raised-button color="primary"
+            [disabled]="!reportTemplate.name?.trim()"
+            (click)="save()"
+            matTooltip="{{ 'action.save' | translate }}"
+            matTooltipPosition="above">
+      <mat-icon>save</mat-icon>
+      <span translate>action.save</span>
+    </button>
+  </mat-toolbar>
+  <div class="tb-report-template-editor-body flex flex-1 flex-row">
+    <div class="tb-report-template-editor-palette"></div>
+    <div class="tb-report-template-editor-canvas flex-1"></div>
+    <div class="tb-report-template-editor-config"></div>
+  </div>
+</div>

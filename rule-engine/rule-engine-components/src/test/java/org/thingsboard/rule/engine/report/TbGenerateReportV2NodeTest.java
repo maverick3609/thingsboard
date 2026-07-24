@@ -52,6 +52,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
 class TbGenerateReportV2NodeTest {
@@ -180,6 +181,43 @@ class TbGenerateReportV2NodeTest {
 
         // The original inbound msg is failed, with the submission error.
         then(ctx).should().tellFailure(eq(msg), eq(error));
+    }
+
+    @Test
+    void givenSuccessfulSubmit_whenForceAckFalse_thenAcksTriggerMsgWithoutTellSuccess() {
+        // Default config: force_ack=false (node.init not called -> forceAck stays false, its field
+        // default). The report continues the chain OUT OF BAND via ReportJobProcessor.produceOutputMsg,
+        // so on a successful submit the trigger msg must be ACKED (terminated without routing) — never
+        // left pending (pack timeout -> retry-queue duplicate reports) and never tellSuccess'd (that
+        // would double-fire the Success relation against produceOutputMsg's later injection).
+        config.setUseConfigFromMessage(false);
+        config.setConfig(reportConfig());
+        givenJobSubmissionContext();
+        given(jobManager.submitJob(any(Job.class))).willAnswer(inv -> Futures.immediateFuture(inv.getArgument(0)));
+
+        TbMsg msg = newMsg(TbMsg.EMPTY_JSON_OBJECT);
+        node.onMsg(ctx, msg);
+
+        then(ctx).should().ack(msg);
+        then(ctx).should(never()).tellSuccess(any());
+        then(ctx).should(never()).tellFailure(any(), any());
+    }
+
+    @Test
+    void givenSuccessfulSubmit_whenForceAckTrue_thenAcksExactlyOnce() {
+        // force_ack=true: ackIfNeeded already acked the trigger msg (and returned a fresh copy); the
+        // success callback must NOT ack again (double-ack). Guards the `if (!forceAck)` in onMsg.
+        ReflectionTestUtils.setField(node, "forceAck", true);
+        config.setUseConfigFromMessage(false);
+        config.setConfig(reportConfig());
+        givenJobSubmissionContext();
+        given(jobManager.submitJob(any(Job.class))).willAnswer(inv -> Futures.immediateFuture(inv.getArgument(0)));
+
+        TbMsg msg = newMsg(TbMsg.EMPTY_JSON_OBJECT);
+        node.onMsg(ctx, msg);
+
+        then(ctx).should(times(1)).ack(any());
+        then(ctx).should(never()).tellSuccess(any());
     }
 
     @Test

@@ -112,9 +112,23 @@ public class TbGenerateReportV2Node extends TbAbstractExternalNode {
                 .build();
         Job job = new Job(tenantId, JobType.REPORT, UUID.randomUUID().toString(), reportConfig.getReportTemplateId(), jobConfiguration);
 
+        // The report renders asynchronously; the rule chain is continued OUT OF BAND by
+        // ReportJobProcessor.produceOutputMsg, which injects a FRESH msg down this node's Success/
+        // Failure relation once the job finishes. So on a successful submit the trigger msg must be
+        // TERMINATED without routing it onward — ctx.ack, NOT tellSuccess: a synchronous tellSuccess
+        // would fire the Success relation now AND again when produceOutputMsg injects, double-running
+        // the downstream chain. When forceAck is on, ackIfNeeded already acked; otherwise ack here so
+        // the msg isn't left pending until the pack times out (which on retry queues re-fires the node
+        // -> duplicate reports/emails, and on SequentialByOriginator head-of-line-blocks the originator).
+        // On submit failure, route via the external-node protected tellFailure(ctx, msg, error) so the
+        // Failure is delivered correctly under both forceAck modes (enqueue when acked, tell otherwise).
         withCallback(ctx.getJobManager().submitJob(job),
-                result -> {},
-                error -> ctx.tellFailure(tbMsg, error));
+                result -> {
+                    if (!forceAck) {
+                        ctx.ack(msg);
+                    }
+                },
+                error -> tellFailure(ctx, msg, error));
     }
 
 }

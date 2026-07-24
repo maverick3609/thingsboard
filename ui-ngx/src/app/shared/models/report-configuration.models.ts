@@ -23,7 +23,6 @@ import { AlarmSearchStatus, AlarmSeverity } from '@shared/models/alarm.models';
 import { UserId } from '@shared/models/id/user-id';
 import { ReportTemplateId } from '@shared/models/id/report-template-id';
 import { AggregationType } from '@shared/models/time/time.models';
-import { IntervalType } from '@shared/models/telemetry/telemetry.models';
 import { DashboardReportConfig } from '@shared/models/report.models';
 
 export { TbReportFormat } from '@shared/models/report.models';
@@ -177,10 +176,20 @@ export interface FixedTimeWindow {
   endTimeMs?: number;
 }
 
+// common/data/kv/IntervalType.java - 5 members, serializes by name (NO 'CUSTOM';
+// the FE telemetry IntervalType adds a CUSTOM the report Interval deserializer rejects).
+export enum ReportIntervalType {
+  MILLISECONDS = 'MILLISECONDS',
+  WEEK = 'WEEK',
+  WEEK_ISO = 'WEEK_ISO',
+  MONTH = 'MONTH',
+  QUARTER = 'QUARTER'
+}
+
 // timewindow/Interval.java has a custom Jackson (de)serializer: it writes a plain JSON number
 // (milliseconds) when intervalType is MILLISECONDS/unset, or the intervalType name as a bare
 // JSON string otherwise - on the wire this is a primitive, never `{interval, intervalType}`.
-export type ReportInterval = number | IntervalType;
+export type ReportInterval = number | ReportIntervalType;
 
 // timewindow/History.java - renamed from Java's `History` to avoid shadowing the DOM lib type of
 // the same name. `historyType` is a raw Java `int` selector with no CE-side enum declared for it.

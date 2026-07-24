@@ -17,19 +17,26 @@ package org.thingsboard.server.service.report;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.thingsboard.rule.engine.api.NotificationCenter;
+import org.thingsboard.server.actors.ActorSystemContext;
+import org.thingsboard.server.cluster.TbClusterService;
 import org.thingsboard.server.common.data.User;
 import org.thingsboard.server.common.data.id.CustomerId;
+import org.thingsboard.server.common.data.id.DeviceId;
 import org.thingsboard.server.common.data.id.JobId;
 import org.thingsboard.server.common.data.id.NotificationTemplateId;
 import org.thingsboard.server.common.data.id.ReportId;
 import org.thingsboard.server.common.data.id.ReportTemplateId;
+import org.thingsboard.server.common.data.id.RuleChainId;
+import org.thingsboard.server.common.data.id.RuleNodeId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.id.UserId;
 import org.thingsboard.server.common.data.job.Job;
@@ -40,25 +47,37 @@ import org.thingsboard.server.common.data.job.ReportJobResult;
 import org.thingsboard.server.common.data.job.task.ReportTask;
 import org.thingsboard.server.common.data.job.task.ReportTaskResult;
 import org.thingsboard.server.common.data.job.task.Task;
+import org.thingsboard.server.common.data.msg.TbMsgType;
+import org.thingsboard.server.common.data.msg.TbNodeConnectionType;
 import org.thingsboard.server.common.data.notification.NotificationRequest;
 import org.thingsboard.server.common.data.notification.info.ReportGeneratedNotificationInfo;
 import org.thingsboard.server.common.data.report.Report;
 import org.thingsboard.server.common.data.report.ReportTemplate;
 import org.thingsboard.server.common.data.report.TbReportFormat;
+import org.thingsboard.server.common.data.rule.RuleNode;
+import org.thingsboard.server.common.msg.TbMsg;
+import org.thingsboard.server.common.msg.TbMsgMetaData;
+import org.thingsboard.server.common.msg.queue.TopicPartitionInfo;
 import org.thingsboard.server.dao.report.ReportTemplateService;
 import org.thingsboard.server.dao.user.UserService;
+import org.thingsboard.server.gen.transport.TransportProtos;
+import org.thingsboard.server.queue.TbQueueCallback;
+import org.thingsboard.server.queue.discovery.PartitionService;
 import org.thingsboard.server.service.report.task.ReportTaskProcessor;
 import org.thingsboard.server.service.security.model.token.JwtTokenFactory;
 import org.thingsboard.server.service.security.system.SystemSecurityService;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -87,6 +106,12 @@ class ReportJobProcessorTest {
     @Mock
     private NotificationCenter notificationCenter;
     @Mock
+    private TbClusterService clusterService;
+    @Mock
+    private PartitionService partitionService;
+    @Mock
+    private ActorSystemContext actorSystemContext;
+    @Mock
     private Jws<Claims> jws;
     @Mock
     private Claims claims;
@@ -98,6 +123,13 @@ class ReportJobProcessorTest {
     private final CustomerId customerId = new CustomerId(UUID.randomUUID());
     private final UserId userId = new UserId(UUID.randomUUID());
     private final ReportTemplateId templateId = new ReportTemplateId(UUID.randomUUID());
+
+    @BeforeEach
+    void enableRenderer() {
+        // process() gates on this @Value flag (renderer opt-in / no orphan jobs); default it on so the
+        // existing task-emission tests exercise the happy path. The gate itself is covered below.
+        ReflectionTestUtils.setField(processor, "rendererEnabled", true);
+    }
 
     @Test
     void processEmitsOneTaskWithToken() throws Exception {
@@ -250,6 +282,120 @@ class ReportJobProcessorTest {
         processor.onJobFinished(job);
 
         verify(notificationCenter, never()).processNotificationRequest(any(), any(), any());
+    }
+
+    // --- R2b task J: renderer opt-in gate (no orphan jobs) + rule-engine push-back ---
+
+    @Test
+    void processThrowsAndEmitsNoTaskWhenRendererDisabled() {
+        ReflectionTestUtils.setField(processor, "rendererEnabled", false);
+        ReportJobConfiguration configuration = ReportJobConfiguration.builder()
+                .reportTemplateId(templateId)
+                .userId(userId)
+                .build();
+        Job job = buildJob(configuration);
+
+        assertThatThrownBy(() -> processor.process(job, task -> {
+            throw new AssertionError("no task must be emitted when the renderer is disabled");
+        }))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Report renderer is not enabled");
+        // Gate short-circuits before any template/user lookup.
+        verify(reportTemplateService, never()).findReportTemplateById(any(), any());
+    }
+
+    @Test
+    void onJobFinishedPushesSuccessRelationWithReportsMetadata() {
+        ReportId reportId = new ReportId(UUID.randomUUID());
+        Report report = new Report(reportId);
+        report.setTenantId(tenantId);
+        report.setUserId(userId);
+        report.setFormat(TbReportFormat.PDF);
+        report.setName("weekly.pdf");
+
+        ReportJobConfiguration configuration = ReportJobConfiguration.builder()
+                .reportTemplateId(templateId)
+                .userId(userId)
+                .ruleNode(ruleNode())
+                .queueName("Main")
+                .outputTbMsgProto(outputTbMsgProto())
+                .build();
+        Job job = buildJob(configuration);
+        job.setStatus(JobStatus.COMPLETED);
+        ((ReportJobResult) job.getResult()).setReport(report);
+
+        processor.onJobFinished(job);
+
+        ArgumentCaptor<TransportProtos.ToRuleEngineMsg> captor = ArgumentCaptor.forClass(TransportProtos.ToRuleEngineMsg.class);
+        verify(clusterService).pushMsgToRuleEngine(nullable(TopicPartitionInfo.class), any(UUID.class), captor.capture(), any(TbQueueCallback.class));
+        TransportProtos.ToRuleEngineMsg pushed = captor.getValue();
+        assertThat(pushed.getRelationTypesList()).containsExactly(TbNodeConnectionType.SUCCESS);
+        assertThat(pushed.getFailureMessage()).isEmpty();
+        TbMsg outputMsg = TbMsg.fromProto("Main", pushed.getTbMsgProto(), null);
+        assertThat(outputMsg.getMetaData().getValue("reports")).isEqualTo(reportId.toString());
+        // No targets/notificationTemplateId -> the rule-engine push is the only effect.
+        verify(notificationCenter, never()).processNotificationRequest(any(), any(), any());
+    }
+
+    @Test
+    void onJobFinishedPushesFailureRelationOnFailedJob() {
+        ReportJobConfiguration configuration = ReportJobConfiguration.builder()
+                .reportTemplateId(templateId)
+                .userId(userId)
+                .ruleNode(ruleNode())
+                .queueName("Main")
+                .outputTbMsgProto(outputTbMsgProto())
+                .build();
+        Job job = buildJob(configuration);
+        job.setStatus(JobStatus.FAILED);
+        ((ReportJobResult) job.getResult()).setGeneralError("render boom");
+
+        processor.onJobFinished(job);
+
+        ArgumentCaptor<TransportProtos.ToRuleEngineMsg> captor = ArgumentCaptor.forClass(TransportProtos.ToRuleEngineMsg.class);
+        verify(clusterService).pushMsgToRuleEngine(nullable(TopicPartitionInfo.class), any(UUID.class), captor.capture(), any(TbQueueCallback.class));
+        TransportProtos.ToRuleEngineMsg pushed = captor.getValue();
+        assertThat(pushed.getRelationTypesList()).containsExactly(TbNodeConnectionType.FAILURE);
+        assertThat(pushed.getFailureMessage()).isEqualTo("render boom");
+    }
+
+    @Test
+    void onJobFinishedWithoutProtoDoesNotPushToRuleEngine() {
+        Report report = new Report(new ReportId(UUID.randomUUID()));
+        report.setTenantId(tenantId);
+        report.setUserId(userId);
+        report.setFormat(TbReportFormat.PDF);
+        report.setName("weekly.pdf");
+
+        // Scheduler-originated job carries no outputTbMsgProto -> push-back is a no-op.
+        ReportJobConfiguration configuration = ReportJobConfiguration.builder()
+                .reportTemplateId(templateId)
+                .userId(userId)
+                .build();
+        Job job = buildJob(configuration);
+        job.setStatus(JobStatus.COMPLETED);
+        ((ReportJobResult) job.getResult()).setReport(report);
+
+        processor.onJobFinished(job);
+
+        verify(clusterService, never()).pushMsgToRuleEngine(any(TopicPartitionInfo.class), any(UUID.class), any(TransportProtos.ToRuleEngineMsg.class), any(TbQueueCallback.class));
+    }
+
+    private RuleNode ruleNode() {
+        RuleNode ruleNode = new RuleNode(new RuleNodeId(UUID.randomUUID()));
+        ruleNode.setRuleChainId(new RuleChainId(UUID.randomUUID()));
+        return ruleNode;
+    }
+
+    private String outputTbMsgProto() {
+        TbMsg outputMsg = TbMsg.newMsg()
+                .type(TbMsgType.POST_TELEMETRY_REQUEST)
+                .originator(new DeviceId(UUID.randomUUID()))
+                .copyMetaData(TbMsgMetaData.EMPTY)
+                .queueName("Main")
+                .data(TbMsg.EMPTY_JSON_OBJECT)
+                .build();
+        return Base64.getEncoder().encodeToString(TbMsg.toProto(outputMsg).toByteArray());
     }
 
     private Job buildJob(ReportJobConfiguration configuration) {

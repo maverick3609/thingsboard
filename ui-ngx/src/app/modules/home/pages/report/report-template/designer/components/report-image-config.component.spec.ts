@@ -98,6 +98,20 @@ describe('ReportImageConfigComponent', () => {
     }));
   });
 
+  it('emits customWidth as undefined, not null, when writeValue received it unset and widthType is not custom', () => {
+    const component = newComponent();
+    const onChange = jasmine.createSpy('onChange');
+    component.writeValue(initial); // widthType: FIT_WIDTH, customWidth: undefined
+    component.registerOnChange(onChange);
+
+    component.imageFormGroup.patchValue({ alignment: ImageAlignment.RIGHT });
+
+    expect(onChange).toHaveBeenCalledWith(jasmine.objectContaining({
+      customWidth: undefined
+    }));
+    expect(onChange.calls.mostRecent().args[0].customWidth).toBeUndefined();
+  });
+
   it('carries dataSources through untouched on every edit, even though this panel never edits it', () => {
     const component = newComponent();
     const onChange = jasmine.createSpy('onChange');

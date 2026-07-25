@@ -102,6 +102,25 @@ export class ReportTemplateEditorComponent implements OnInit {
     }
   }
 
+  // T6's canvas mutates `components` in place and re-emits the same reference for every reorder/
+  // add/delete, so reassigning config.components here is a safe no-op-or-reassign in the common
+  // case. Delete is the one mutation that can leave `selected` pointing at an object no longer in
+  // the array (an orphan the right panel would keep editing, with edits silently discarded on
+  // save), so clear it when that happens; reorder/add keep `selected` untouched.
+  onComponentsChange(components: ReportComponent[]): void {
+    this.config.components = components;
+    if (this.selected && !components.includes(this.selected)) {
+      this.selected = null;
+    }
+  }
+
+  // The 5 types with a dedicated branch in the right panel below; every other palette type (the C2
+  // table/sub-report/dashboard components) has no panel yet, so the template falls back to a
+  // placeholder rather than rendering blank.
+  hasConfigPanel(type: string): boolean {
+    return ['PAGE_BREAK', 'DIVIDER', 'HEADING', 'RICH_TEXT', 'IMAGE'].includes(type);
+  }
+
   save(): void {
     const reportTemplate: ReportTemplate = {
       ...this.reportTemplate,

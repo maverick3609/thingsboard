@@ -5454,7 +5454,8 @@
             "image-width-type-original": "Original",
             "image-width-type-custom": "Custom",
             "image-custom-width": "Custom width",
-            "image-alignment": "Alignment"
+            "image-alignment": "Alignment",
+            "component-not-configurable": "This component can't be configured in this version."
         }
     },
     "security": {

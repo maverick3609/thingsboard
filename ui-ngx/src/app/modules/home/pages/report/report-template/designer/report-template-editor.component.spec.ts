@@ -115,6 +115,40 @@ describe('ReportTemplateEditorComponent', () => {
     expect(divider.widthPx).toBe(2);
   });
 
+  it('hasConfigPanel is true for the 5 C1 types with a dedicated right-panel branch, false for C2 types that have none yet', () => {
+    const component = new ReportTemplateEditorComponent(routeWithId('new'), router, reportService);
+
+    expect(component.hasConfigPanel('PAGE_BREAK')).toBe(true);
+    expect(component.hasConfigPanel('DIVIDER')).toBe(true);
+    expect(component.hasConfigPanel('HEADING')).toBe(true);
+    expect(component.hasConfigPanel('RICH_TEXT')).toBe(true);
+    expect(component.hasConfigPanel('IMAGE')).toBe(true);
+    expect(component.hasConfigPanel('ENTITY_TABLE')).toBe(false);
+    expect(component.hasConfigPanel('DASHBOARD')).toBe(false);
+  });
+
+  it('onComponentsChange clears selected when it was deleted from the emitted array, but leaves it untouched on reorder/add', () => {
+    const component = new ReportTemplateEditorComponent(routeWithId('new'), router, reportService);
+    component.ngOnInit();
+
+    const divider: DividerComponent = { type: 'DIVIDER', color: '#000' };
+    const heading: ReportComponent = { type: 'HEADING', value: 'h' };
+    component.config.components = [divider, heading];
+    component.selected = divider;
+
+    // Reorder/add: `selected` (divider) is still in the emitted array - untouched.
+    const reordered = [heading, divider];
+    component.onComponentsChange(reordered);
+    expect(component.config.components).toBe(reordered);
+    expect(component.selected).toBe(divider);
+
+    // Delete: `selected` (divider) is no longer in the emitted array - cleared.
+    const afterDelete = [heading];
+    component.onComponentsChange(afterDelete);
+    expect(component.config.components).toBe(afterDelete);
+    expect(component.selected).toBeNull();
+  });
+
   it('save() persists the template with configuration === serialize(config) and navigates back', () => {
     reportService.saveReportTemplate.and.returnValue(of({} as ReportTemplate));
     const route = routeWithId('new');

@@ -51,7 +51,8 @@
       <tb-report-palette></tb-report-palette>
     </div>
     <div class="tb-report-template-editor-canvas flex-1">
-      <tb-report-canvas [(components)]="config.components"
+      <tb-report-canvas [components]="config.components"
+                         (componentsChange)="onComponentsChange($event)"
                          (selected)="selected = $event">
       </tb-report-canvas>
     </div>
@@ -78,6 +79,7 @@
                                [ngModel]="selected"
                                (ngModelChange)="onComponentChange($event)">
       </tb-report-image-config>
+      <div *ngIf="selected && !hasConfigPanel(selected.type)" class="tb-report-config-placeholder tb-prompt" translate>report.designer.component-not-configurable</div>
     </div>
   </div>
   <tb-report-preview *ngIf="viewMode === 'preview'" class="flex-1" [config]="config"></tb-report-preview>

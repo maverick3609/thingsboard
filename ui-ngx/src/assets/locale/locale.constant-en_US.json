@@ -5441,7 +5441,10 @@
             "border-type-dotted": "Dotted",
             "divider-width": "Divider width",
             "divider-color": "Line color",
-            "page-break-hint": "This component has no configurable options."
+            "page-break-hint": "This component has no configurable options.",
+            "heading-text": "Text",
+            "heading-color": "Text color",
+            "heading-height": "Height"
         }
     },
     "security": {

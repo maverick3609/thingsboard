@@ -39,6 +39,9 @@ import {
 import {
   ReportDividerConfigComponent
 } from '@home/pages/report/report-template/designer/components/report-divider-config.component';
+import {
+  ReportHeadingConfigComponent
+} from '@home/pages/report/report-template/designer/components/report-heading-config.component';
 
 @NgModule({
   declarations: [
@@ -66,7 +69,9 @@ import {
     // C1 Task 8: first two per-type right-panel config panels (shown when a canvas component is
     // selected), establishing the per-type switch T9-T11 extend.
     ReportPageBreakConfigComponent,
-    ReportDividerConfigComponent
+    ReportDividerConfigComponent,
+    // C1 Task 9: HEADING right-panel config panel.
+    ReportHeadingConfigComponent
   ],
   imports: [
     CommonModule,
@@ -84,7 +89,8 @@ import {
     ReportCanvasComponent,
     ReportPreviewComponent,
     ReportPageBreakConfigComponent,
-    ReportDividerConfigComponent
+    ReportDividerConfigComponent,
+    ReportHeadingConfigComponent
   ]
 })
 export class ReportModule { }

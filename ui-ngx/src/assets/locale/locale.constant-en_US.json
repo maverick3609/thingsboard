@@ -5445,7 +5445,16 @@
             "heading-text": "Text",
             "heading-color": "Text color",
             "heading-height": "Height",
-            "rich-text-value": "Content"
+            "rich-text-value": "Content",
+            "image-source-type": "Source type",
+            "image-source-type-image": "Image",
+            "image-url": "Image",
+            "image-width-type": "Width type",
+            "image-width-type-fit-width": "Fit width",
+            "image-width-type-original": "Original",
+            "image-width-type-custom": "Custom",
+            "image-custom-width": "Custom width",
+            "image-alignment": "Alignment"
         }
     },
     "security": {

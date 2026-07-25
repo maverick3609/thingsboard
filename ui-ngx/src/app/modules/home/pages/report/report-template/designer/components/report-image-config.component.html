@@ -1,0 +1,55 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<div class="tb-report-image-config flex flex-col gap-2" [formGroup]="imageFormGroup">
+  <div class="mat-subtitle-1" translate>report.designer.component-image</div>
+  <mat-form-field subscriptSizing="dynamic">
+    <mat-select formControlName="sourceType" placeholder="{{ 'report.designer.image-source-type' | translate }}">
+      <mat-option [value]="sourceTypeEnum.IMAGE" translate>report.designer.image-source-type-image</mat-option>
+    </mat-select>
+  </mat-form-field>
+  <tb-gallery-image-input formControlName="imageUrl"
+                           label="{{ 'report.designer.image-url' | translate }}">
+  </tb-gallery-image-input>
+  <mat-form-field subscriptSizing="dynamic">
+    <mat-select formControlName="widthType" placeholder="{{ 'report.designer.image-width-type' | translate }}">
+      <mat-option [value]="widthTypeEnum.FIT_WIDTH" translate>report.designer.image-width-type-fit-width</mat-option>
+      <mat-option [value]="widthTypeEnum.ORIGINAL" translate>report.designer.image-width-type-original</mat-option>
+      <mat-option [value]="widthTypeEnum.CUSTOM" translate>report.designer.image-width-type-custom</mat-option>
+    </mat-select>
+  </mat-form-field>
+  <mat-form-field *ngIf="imageFormGroup.get('widthType').value === widthTypeEnum.CUSTOM" subscriptSizing="dynamic">
+    <input matInput type="number" min="0" formControlName="customWidth"
+           placeholder="{{ 'report.designer.image-custom-width' | translate }}"/>
+  </mat-form-field>
+  <mat-form-field subscriptSizing="dynamic">
+    <mat-select formControlName="alignment" placeholder="{{ 'report.designer.image-alignment' | translate }}">
+      <mat-option [value]="alignmentEnum.LEFT" translate>report.designer.align-left</mat-option>
+      <mat-option [value]="alignmentEnum.CENTER" translate>report.designer.align-center</mat-option>
+      <mat-option [value]="alignmentEnum.RIGHT" translate>report.designer.align-right</mat-option>
+    </mat-select>
+  </mat-form-field>
+  <div class="flex flex-col gap-1">
+    <label class="mat-caption" translate>report.designer.margins</label>
+    <tb-report-insets formControlName="margins"></tb-report-insets>
+  </div>
+  <div class="flex flex-col gap-1">
+    <label class="mat-caption" translate>report.designer.paddings</label>
+    <tb-report-insets formControlName="paddings"></tb-report-insets>
+  </div>
+  <tb-report-background-border formControlName="backgroundBorder"></tb-report-background-border>
+</div>

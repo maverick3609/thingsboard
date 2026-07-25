@@ -74,6 +74,10 @@
                                    [ngModel]="selected"
                                    (ngModelChange)="onComponentChange($event)">
       </tb-report-rich-text-config>
+      <tb-report-image-config *ngIf="selected?.type === 'IMAGE'"
+                               [ngModel]="selected"
+                               (ngModelChange)="onComponentChange($event)">
+      </tb-report-image-config>
     </div>
   </div>
   <tb-report-preview *ngIf="viewMode === 'preview'" class="flex-1" [config]="config"></tb-report-preview>

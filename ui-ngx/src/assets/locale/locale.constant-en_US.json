@@ -5413,7 +5413,19 @@
             "portrait": "Portrait",
             "landscape": "Landscape",
             "page-margins": "Page margins",
-            "time-data-pattern": "Time data pattern"
+            "time-data-pattern": "Time data pattern",
+            "components": "Components",
+            "canvas-empty": "Drag components here to build your report",
+            "component-heading": "Heading",
+            "component-rich-text": "Rich Text",
+            "component-divider": "Divider",
+            "component-page-break": "Page Break",
+            "component-image": "Image",
+            "component-entity-table": "Entity Table",
+            "component-alarm-table": "Alarm Table",
+            "component-time-series-table": "Time Series Table",
+            "component-sub-report": "Sub-report",
+            "component-dashboard": "Dashboard"
         }
     },
     "security": {

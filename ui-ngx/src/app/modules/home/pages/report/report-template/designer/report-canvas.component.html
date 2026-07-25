@@ -42,6 +42,7 @@
       <span class="flex-1">{{ (componentTypeInfo(component)?.labelKey || component.type) | translate }}</span>
       <button mat-icon-button type="button"
               (click)="removeComponent(i); $event.stopPropagation()"
+              (keyup)="$event.stopPropagation()"
               matTooltip="{{ 'action.delete' | translate }}"
               matTooltipPosition="above">
         <mat-icon>delete</mat-icon>

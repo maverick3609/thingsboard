@@ -24,7 +24,7 @@ import { ReportTemplateEditorComponent } from './report-template-editor.componen
 import { serialize } from './report-configuration.serializer';
 import { ReportService } from '@core/http/report.service';
 import { ReportTemplate, ReportTemplateType, TbReportFormat } from '@shared/models/report.models';
-import { PageSize, PdfReportTemplateConfig } from '@shared/models/report-configuration.models';
+import { PageSize, PdfReportTemplateConfig, ReportComponent } from '@shared/models/report-configuration.models';
 
 describe('ReportTemplateEditorComponent', () => {
   let reportService: jasmine.SpyObj<ReportService>;
@@ -68,17 +68,31 @@ describe('ReportTemplateEditorComponent', () => {
     expect(component.config.components).toEqual([{ type: 'HEADING', value: 'Q3' }]);
   });
 
-  it('derives pageSettings from a PDF config on init, and merges an edit back into config', () => {
+  it('derives pageSettings from a PDF config on init, and merges an edit back into config without touching fields it does not own', () => {
     const component = new ReportTemplateEditorComponent(routeWithId('new'), router, reportService);
 
     component.ngOnInit();
 
     expect(component.pageSettings.pageSize).toBe((component.config as PdfReportTemplateConfig).pageSize);
 
+    // Sentinels for root config fields this panel does not edit - T6's canvas owns `components`,
+    // later tasks own entityAliases/filters. Object.assign(this.config, value) (not this.config =
+    // value) is what keeps these intact; a regression to whole-object replacement would silently
+    // wipe them while the pageSize-only assertions below stayed green, so assert both.
+    const componentsSentinel: ReportComponent[] = [{ type: 'DIVIDER' }];
+    const entityAliasesSentinel = [{ id: 'alias-1' }];
+    const filtersSentinel = [{ id: 'filter-1' }];
+    component.config.components = componentsSentinel;
+    component.config.entityAliases = entityAliasesSentinel;
+    component.config.filters = filtersSentinel;
+
     component.onPageSettingsChange({ ...component.pageSettings, pageSize: PageSize.LETTER });
 
     expect((component.config as PdfReportTemplateConfig).pageSize).toBe(PageSize.LETTER);
     expect(component.pageSettings.pageSize).toBe(PageSize.LETTER);
+    expect(component.config.components).toBe(componentsSentinel);
+    expect(component.config.entityAliases).toBe(entityAliasesSentinel);
+    expect(component.config.filters).toBe(filtersSentinel);
   });
 
   it('save() persists the template with configuration === serialize(config) and navigates back', () => {

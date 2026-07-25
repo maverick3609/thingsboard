@@ -5429,7 +5429,19 @@
             "preview-refresh": "Refresh",
             "preview-renderer-off": "Enable the report renderer to preview this template.",
             "preview-error": "Failed to generate the preview. Please try again.",
-            "preview-empty": "Click refresh to generate a preview."
+            "preview-empty": "Click refresh to generate a preview.",
+            "margins": "Margins",
+            "paddings": "Paddings",
+            "divider-length": "Length",
+            "divider-length-long": "Long",
+            "divider-length-short": "Short",
+            "border-type": "Border type",
+            "border-type-solid": "Solid",
+            "border-type-dashed": "Dashed",
+            "border-type-dotted": "Dotted",
+            "divider-width": "Divider width",
+            "divider-color": "Line color",
+            "page-break-hint": "This component has no configurable options."
         }
     },
     "security": {

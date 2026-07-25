@@ -1,0 +1,49 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<div class="tb-report-divider-config flex flex-col gap-2" [formGroup]="dividerFormGroup">
+  <div class="mat-subtitle-1" translate>report.designer.component-divider</div>
+  <mat-form-field subscriptSizing="dynamic">
+    <mat-select formControlName="length" placeholder="{{ 'report.designer.divider-length' | translate }}">
+      <mat-option [value]="borderLengthEnum.LONG" translate>report.designer.divider-length-long</mat-option>
+      <mat-option [value]="borderLengthEnum.SHORT" translate>report.designer.divider-length-short</mat-option>
+    </mat-select>
+  </mat-form-field>
+  <mat-form-field subscriptSizing="dynamic">
+    <mat-select formControlName="borderType" placeholder="{{ 'report.designer.border-type' | translate }}">
+      <mat-option [value]="borderTypeEnum.SOLID" translate>report.designer.border-type-solid</mat-option>
+      <mat-option [value]="borderTypeEnum.DASHED" translate>report.designer.border-type-dashed</mat-option>
+      <mat-option [value]="borderTypeEnum.DOTTED" translate>report.designer.border-type-dotted</mat-option>
+    </mat-select>
+  </mat-form-field>
+  <mat-form-field subscriptSizing="dynamic">
+    <input matInput type="number" min="0" formControlName="widthPx"
+           placeholder="{{ 'report.designer.divider-width' | translate }}"/>
+  </mat-form-field>
+  <tb-color-input formControlName="color" colorClearButton
+                  label="{{ 'report.designer.divider-color' | translate }}">
+  </tb-color-input>
+  <div class="flex flex-col gap-1">
+    <label class="mat-caption" translate>report.designer.margins</label>
+    <tb-report-insets formControlName="margins"></tb-report-insets>
+  </div>
+  <div class="flex flex-col gap-1">
+    <label class="mat-caption" translate>report.designer.paddings</label>
+    <tb-report-insets formControlName="paddings"></tb-report-insets>
+  </div>
+  <tb-report-background-border formControlName="backgroundBorder"></tb-report-background-border>
+</div>

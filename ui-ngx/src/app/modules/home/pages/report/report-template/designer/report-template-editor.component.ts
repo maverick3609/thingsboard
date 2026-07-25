@@ -91,6 +91,17 @@ export class ReportTemplateEditorComponent implements OnInit {
     this.pageSettings = value;
   }
 
+  // Merge-in-place, mirroring onPageSettingsChange above: config.components must keep the SAME
+  // element reference the canvas (T6) holds, so the selected card doesn't churn and `selected`
+  // stays a valid pointer into the array - replacing the array element by index would drop that
+  // reference. Every per-type panel (T8's DIVIDER, T9-T11) always emits a full ReportComponent
+  // (all fields + `type`), so Object.assign copies every field with nothing left stale.
+  onComponentChange(value: ReportComponent): void {
+    if (this.selected) {
+      Object.assign(this.selected, value);
+    }
+  }
+
   save(): void {
     const reportTemplate: ReportTemplate = {
       ...this.reportTemplate,

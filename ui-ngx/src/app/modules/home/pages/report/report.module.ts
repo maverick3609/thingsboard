@@ -33,6 +33,12 @@ import { ReportAlignmentComponent } from '@home/pages/report/report-template/des
 import { ReportPaletteComponent } from '@home/pages/report/report-template/designer/report-palette.component';
 import { ReportCanvasComponent } from '@home/pages/report/report-template/designer/report-canvas.component';
 import { ReportPreviewComponent } from '@home/pages/report/report-template/designer/report-preview.component';
+import {
+  ReportPageBreakConfigComponent
+} from '@home/pages/report/report-template/designer/components/report-page-break-config.component';
+import {
+  ReportDividerConfigComponent
+} from '@home/pages/report/report-template/designer/components/report-divider-config.component';
 
 @NgModule({
   declarations: [
@@ -56,7 +62,11 @@ import { ReportPreviewComponent } from '@home/pages/report/report-template/desig
     ReportCanvasComponent,
     // C1 Task 7: whole-template PDF preview pane, shown by the shell instead of the body above when
     // viewMode === 'preview'.
-    ReportPreviewComponent
+    ReportPreviewComponent,
+    // C1 Task 8: first two per-type right-panel config panels (shown when a canvas component is
+    // selected), establishing the per-type switch T9-T11 extend.
+    ReportPageBreakConfigComponent,
+    ReportDividerConfigComponent
   ],
   imports: [
     CommonModule,
@@ -72,7 +82,9 @@ import { ReportPreviewComponent } from '@home/pages/report/report-template/desig
     ReportAlignmentComponent,
     ReportPaletteComponent,
     ReportCanvasComponent,
-    ReportPreviewComponent
+    ReportPreviewComponent,
+    ReportPageBreakConfigComponent,
+    ReportDividerConfigComponent
   ]
 })
 export class ReportModule { }

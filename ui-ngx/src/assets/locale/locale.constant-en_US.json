@@ -5407,7 +5407,13 @@
             "align-justify": "Justify",
             "align-top": "Top",
             "align-middle": "Middle",
-            "align-bottom": "Bottom"
+            "align-bottom": "Bottom",
+            "page-size": "Page size",
+            "page-orientation": "Orientation",
+            "portrait": "Portrait",
+            "landscape": "Landscape",
+            "page-margins": "Page margins",
+            "time-data-pattern": "Time data pattern"
         }
     },
     "security": {

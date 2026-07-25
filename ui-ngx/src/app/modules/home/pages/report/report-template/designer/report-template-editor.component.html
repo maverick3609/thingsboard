@@ -49,6 +49,11 @@
   <div class="tb-report-template-editor-body flex flex-1 flex-row">
     <div class="tb-report-template-editor-palette"></div>
     <div class="tb-report-template-editor-canvas flex-1"></div>
-    <div class="tb-report-template-editor-config"></div>
+    <div class="tb-report-template-editor-config">
+      <tb-report-page-settings *ngIf="selected === null && pageSettings"
+                                [ngModel]="pageSettings"
+                                (ngModelChange)="onPageSettingsChange($event)">
+      </tb-report-page-settings>
+    </div>
   </div>
 </div>

@@ -20,11 +20,27 @@ import { ReportService } from '@core/http/report.service';
 import { ReportTemplate, ReportTemplateType, TbReportFormat } from '@shared/models/report.models';
 import { ReportComponent, ReportTemplateConfigModel, newPdfReportTemplateConfig } from '@shared/models/report-configuration.models';
 import { deserialize, serialize } from '@home/pages/report/report-template/designer/report-configuration.serializer';
+import { ReportPageSettings } from '@home/pages/report/report-template/designer/report-page-settings.component';
+
+// PDF-only projection of config's page-level fields for tb-report-page-settings (T5); null for a
+// CSV config, which has no page settings - the shell hides the panel rather than show one whose
+// edits would have nowhere to go.
+function toPageSettings(config: ReportTemplateConfigModel): ReportPageSettings | null {
+  return config?.format === 'PDF' ? {
+    pageSize: config.pageSize,
+    pageOrientation: config.pageOrientation,
+    pageMargins: config.pageMargins,
+    pageBackground: config.pageBackground,
+    namePattern: config.namePattern,
+    timeDataPattern: config.timeDataPattern
+  } : null;
+}
 
 // Full-page three-pane designer shell (design spec R2c "C1"): a toolbar (back/name/save/edit-preview
-// toggle) over a left/center/right body. This task (T3) only wires load/save + the placeholder panes;
-// the palette (left), canvas (center) and page-settings/component-config (right) panes are filled in by
-// T6/T5, and the preview overlay behind the toggle by T7 - they all bind against `config`/`selected`.
+// toggle) over a left/center/right body. T3 wired load/save + the placeholder panes; T5 fills the
+// right pane's page-settings branch (selected === null). The palette (left)/canvas (center) and
+// component-config (right, selected !== null) panes are filled in by T6/T8-T11, and the preview
+// overlay behind the toggle by T7 - they all bind against `config`/`selected`.
 // Reachable at both '/features/reports/templates/new' and '/features/reports/templates/:reportTemplateId'
 // (report-routing.module.ts); the 'new' route has no reportTemplateId param, so a missing param is
 // treated the same as the literal 'new' segment.
@@ -41,6 +57,7 @@ export class ReportTemplateEditorComponent implements OnInit {
   config: ReportTemplateConfigModel;
   selected: ReportComponent | null = null;
   viewMode: 'edit' | 'preview' = 'edit';
+  pageSettings: ReportPageSettings | null = null;
 
   constructor(private route: ActivatedRoute,
               private router: Router,
@@ -57,12 +74,21 @@ export class ReportTemplateEditorComponent implements OnInit {
         type: ReportTemplateType.REPORT
       } as ReportTemplate;
       this.config = newPdfReportTemplateConfig();
+      this.pageSettings = toPageSettings(this.config);
     } else {
       this.reportService.getReportTemplateById(reportTemplateId).subscribe(reportTemplate => {
         this.reportTemplate = reportTemplate;
         this.config = deserialize(reportTemplate.configuration);
+        this.pageSettings = toPageSettings(this.config);
       });
     }
+  }
+
+  onPageSettingsChange(value: ReportPageSettings): void {
+    if (this.config?.format === 'PDF') {
+      Object.assign(this.config, value);
+    }
+    this.pageSettings = value;
   }
 
   save(): void {

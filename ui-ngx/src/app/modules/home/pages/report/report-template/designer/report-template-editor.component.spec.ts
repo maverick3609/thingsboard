@@ -24,6 +24,7 @@ import { ReportTemplateEditorComponent } from './report-template-editor.componen
 import { serialize } from './report-configuration.serializer';
 import { ReportService } from '@core/http/report.service';
 import { ReportTemplate, ReportTemplateType, TbReportFormat } from '@shared/models/report.models';
+import { PageSize, PdfReportTemplateConfig } from '@shared/models/report-configuration.models';
 
 describe('ReportTemplateEditorComponent', () => {
   let reportService: jasmine.SpyObj<ReportService>;
@@ -65,6 +66,19 @@ describe('ReportTemplateEditorComponent', () => {
     expect(component.isAdd).toBe(false);
     expect(component.reportTemplate).toBe(stored);
     expect(component.config.components).toEqual([{ type: 'HEADING', value: 'Q3' }]);
+  });
+
+  it('derives pageSettings from a PDF config on init, and merges an edit back into config', () => {
+    const component = new ReportTemplateEditorComponent(routeWithId('new'), router, reportService);
+
+    component.ngOnInit();
+
+    expect(component.pageSettings.pageSize).toBe((component.config as PdfReportTemplateConfig).pageSize);
+
+    component.onPageSettingsChange({ ...component.pageSettings, pageSize: PageSize.LETTER });
+
+    expect((component.config as PdfReportTemplateConfig).pageSize).toBe(PageSize.LETTER);
+    expect(component.pageSettings.pageSize).toBe(PageSize.LETTER);
   });
 
   it('save() persists the template with configuration === serialize(config) and navigates back', () => {

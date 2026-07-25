@@ -1,0 +1,50 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<div class="tb-report-alignment flex flex-row items-start gap-4" [formGroup]="alignmentFormGroup">
+  <div class="flex flex-col gap-1">
+    <label class="mat-caption" translate>report.designer.text-alignment</label>
+    <mat-button-toggle-group formControlName="textAlignment">
+      <mat-button-toggle [value]="textAlignmentEnum.LEFT" matTooltip="{{ 'report.designer.align-left' | translate }}">
+        <mat-icon>format_align_left</mat-icon>
+      </mat-button-toggle>
+      <mat-button-toggle [value]="textAlignmentEnum.CENTER" matTooltip="{{ 'report.designer.align-center' | translate }}">
+        <mat-icon>format_align_center</mat-icon>
+      </mat-button-toggle>
+      <mat-button-toggle [value]="textAlignmentEnum.RIGHT" matTooltip="{{ 'report.designer.align-right' | translate }}">
+        <mat-icon>format_align_right</mat-icon>
+      </mat-button-toggle>
+      <mat-button-toggle [value]="textAlignmentEnum.JUSTIFY" matTooltip="{{ 'report.designer.align-justify' | translate }}">
+        <mat-icon>format_align_justify</mat-icon>
+      </mat-button-toggle>
+    </mat-button-toggle-group>
+  </div>
+  <div class="flex flex-col gap-1">
+    <label class="mat-caption" translate>report.designer.vertical-alignment</label>
+    <mat-button-toggle-group formControlName="verticalAlignment">
+      <mat-button-toggle [value]="verticalAlignmentEnum.TOP" matTooltip="{{ 'report.designer.align-top' | translate }}">
+        <mat-icon>vertical_align_top</mat-icon>
+      </mat-button-toggle>
+      <mat-button-toggle [value]="verticalAlignmentEnum.MIDDLE" matTooltip="{{ 'report.designer.align-middle' | translate }}">
+        <mat-icon>vertical_align_center</mat-icon>
+      </mat-button-toggle>
+      <mat-button-toggle [value]="verticalAlignmentEnum.BOTTOM" matTooltip="{{ 'report.designer.align-bottom' | translate }}">
+        <mat-icon>vertical_align_bottom</mat-icon>
+      </mat-button-toggle>
+    </mat-button-toggle-group>
+  </div>
+</div>

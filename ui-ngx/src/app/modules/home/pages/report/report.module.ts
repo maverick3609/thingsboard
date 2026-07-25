@@ -23,6 +23,12 @@ import { ReportHistoryComponent } from '@home/pages/report/report-history/report
 import { ReportTemplatesComponent } from '@home/pages/report/report-template/report-templates.component';
 import { ReportTemplateDialogComponent } from '@home/pages/report/report-template/report-template-dialog.component';
 import { ReportTemplateEditorComponent } from '@home/pages/report/report-template/designer/report-template-editor.component';
+import { ReportInsetsComponent } from '@home/pages/report/report-template/designer/widgets/report-insets.component';
+import { ReportFontComponent } from '@home/pages/report/report-template/designer/widgets/report-font.component';
+import {
+  ReportBackgroundBorderComponent
+} from '@home/pages/report/report-template/designer/widgets/report-background-border.component';
+import { ReportAlignmentComponent } from '@home/pages/report/report-template/designer/widgets/report-alignment.component';
 
 @NgModule({
   declarations: [
@@ -31,13 +37,25 @@ import { ReportTemplateEditorComponent } from '@home/pages/report/report-templat
     // Unreferenced since C1 Task 3 (add/edit now navigate to ReportTemplateEditorComponent below
     // instead of opening this dialog) - stays declared until a later cleanup task removes it.
     ReportTemplateDialogComponent,
-    ReportTemplateEditorComponent
+    ReportTemplateEditorComponent,
+    // C1 Task 4: shared ControlValueAccessor sub-editors, embedded via formControlName by the
+    // page-settings/component-config panels (T5, T8-T11).
+    ReportInsetsComponent,
+    ReportFontComponent,
+    ReportBackgroundBorderComponent,
+    ReportAlignmentComponent
   ],
   imports: [
     CommonModule,
     SharedModule,
     HomeComponentsModule,
     ReportRoutingModule
+  ],
+  exports: [
+    ReportInsetsComponent,
+    ReportFontComponent,
+    ReportBackgroundBorderComponent,
+    ReportAlignmentComponent
   ]
 })
 export class ReportModule { }

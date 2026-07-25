@@ -5385,7 +5385,30 @@
         "notification-targets": "Notification targets",
         "notification-target": "Notification target",
         "notification-template": "Notification template",
-        "report-history": "Report History"
+        "report-history": "Report History",
+        "designer": {
+            "left": "Left",
+            "right": "Right",
+            "top": "Top",
+            "bottom": "Bottom",
+            "font-size": "Size",
+            "font-weight": "Weight",
+            "font-style": "Style",
+            "font-family": "Font family",
+            "background": "Background",
+            "border-width": "Border width",
+            "border-radius": "Border radius",
+            "border-color": "Border color",
+            "text-alignment": "Text alignment",
+            "vertical-alignment": "Vertical alignment",
+            "align-left": "Left",
+            "align-center": "Center",
+            "align-right": "Right",
+            "align-justify": "Justify",
+            "align-top": "Top",
+            "align-middle": "Middle",
+            "align-bottom": "Bottom"
+        }
     },
     "security": {
         "security": "Security",

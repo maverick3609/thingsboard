@@ -1,0 +1,41 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<div class="tb-report-font flex flex-row items-center gap-2" [formGroup]="fontFormGroup">
+  <mat-form-field class="flex-1" subscriptSizing="dynamic">
+    <input matInput type="number" min="0" formControlName="size"
+           placeholder="{{ 'report.designer.font-size' | translate }}"/>
+  </mat-form-field>
+  <mat-form-field class="flex-1" subscriptSizing="dynamic">
+    <mat-select formControlName="weight" placeholder="{{ 'report.designer.font-weight' | translate }}">
+      <mat-option [value]="null"></mat-option>
+      <mat-option *ngFor="let weight of fontWeights" [value]="weight">{{ weight | titlecase }}</mat-option>
+    </mat-select>
+  </mat-form-field>
+  <mat-form-field class="flex-1" subscriptSizing="dynamic">
+    <mat-select formControlName="style" placeholder="{{ 'report.designer.font-style' | translate }}">
+      <mat-option [value]="null"></mat-option>
+      <mat-option *ngFor="let style of fontStyles" [value]="style">{{ style | titlecase }}</mat-option>
+    </mat-select>
+  </mat-form-field>
+  <mat-form-field class="flex-1" subscriptSizing="dynamic">
+    <mat-select formControlName="family" placeholder="{{ 'report.designer.font-family' | translate }}">
+      <mat-option [value]="null"></mat-option>
+      <mat-option *ngFor="let family of fontFamilies" [value]="family">{{ family }}</mat-option>
+    </mat-select>
+  </mat-form-field>
+</div>

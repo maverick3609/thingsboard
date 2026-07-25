@@ -46,7 +46,7 @@
       <span translate>action.save</span>
     </button>
   </mat-toolbar>
-  <div class="tb-report-template-editor-body flex flex-1 flex-row" cdkDropListGroup>
+  <div class="tb-report-template-editor-body flex flex-1 flex-row" cdkDropListGroup *ngIf="viewMode === 'edit'">
     <div class="tb-report-template-editor-palette">
       <tb-report-palette></tb-report-palette>
     </div>
@@ -62,4 +62,5 @@
       </tb-report-page-settings>
     </div>
   </div>
+  <tb-report-preview *ngIf="viewMode === 'preview'" class="flex-1" [config]="config"></tb-report-preview>
 </div>

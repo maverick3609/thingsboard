@@ -32,6 +32,7 @@ import {
 import { ReportAlignmentComponent } from '@home/pages/report/report-template/designer/widgets/report-alignment.component';
 import { ReportPaletteComponent } from '@home/pages/report/report-template/designer/report-palette.component';
 import { ReportCanvasComponent } from '@home/pages/report/report-template/designer/report-canvas.component';
+import { ReportPreviewComponent } from '@home/pages/report/report-template/designer/report-preview.component';
 
 @NgModule({
   declarations: [
@@ -52,7 +53,10 @@ import { ReportCanvasComponent } from '@home/pages/report/report-template/design
     // C1 Task 6: left palette (draggable component library) + center canvas (ordered, reorderable
     // cdkDropList of component cards), hosted side by side by the shell.
     ReportPaletteComponent,
-    ReportCanvasComponent
+    ReportCanvasComponent,
+    // C1 Task 7: whole-template PDF preview pane, shown by the shell instead of the body above when
+    // viewMode === 'preview'.
+    ReportPreviewComponent
   ],
   imports: [
     CommonModule,
@@ -67,7 +71,8 @@ import { ReportCanvasComponent } from '@home/pages/report/report-template/design
     ReportBackgroundBorderComponent,
     ReportAlignmentComponent,
     ReportPaletteComponent,
-    ReportCanvasComponent
+    ReportCanvasComponent,
+    ReportPreviewComponent
   ]
 })
 export class ReportModule { }

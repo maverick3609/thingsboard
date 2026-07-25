@@ -5425,7 +5425,11 @@
             "component-alarm-table": "Alarm Table",
             "component-time-series-table": "Time Series Table",
             "component-sub-report": "Sub-report",
-            "component-dashboard": "Dashboard"
+            "component-dashboard": "Dashboard",
+            "preview-refresh": "Refresh",
+            "preview-renderer-off": "Enable the report renderer to preview this template.",
+            "preview-error": "Failed to generate the preview. Please try again.",
+            "preview-empty": "Click refresh to generate a preview."
         }
     },
     "security": {

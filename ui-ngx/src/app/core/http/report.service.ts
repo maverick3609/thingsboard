@@ -131,4 +131,19 @@ export class ReportService {
       })
     );
   }
+
+  // POST /api/v2/report/test - the existing renderer-gated synchronous render endpoint
+  // (ReportController#testReport), reused here for the designer's whole-template preview pane
+  // (report-preview.component.ts). No reportTemplateId/userId in the body, so this renders the
+  // *unsaved* in-memory config as the calling user (server's resolveUserId falls back to the caller
+  // when userId is absent). ignoreErrors is forced true - not left to the caller's `config` - so the
+  // global HTTP error interceptor never pops a toast for the expected renderer-off 400; the preview
+  // pane shows its own placeholder for that case instead.
+  public previewReport(request: { reportTemplateConfig: any; timezone?: string },
+                        config?: RequestConfig): Observable<Blob> {
+    return this.http.post(`/api/v2/report/test`, request, {
+      ...defaultHttpOptionsFromConfig({...config, ignoreErrors: true}),
+      responseType: 'blob'
+    });
+  }
 }

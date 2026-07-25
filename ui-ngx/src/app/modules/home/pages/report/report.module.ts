@@ -30,6 +30,8 @@ import {
   ReportBackgroundBorderComponent
 } from '@home/pages/report/report-template/designer/widgets/report-background-border.component';
 import { ReportAlignmentComponent } from '@home/pages/report/report-template/designer/widgets/report-alignment.component';
+import { ReportPaletteComponent } from '@home/pages/report/report-template/designer/report-palette.component';
+import { ReportCanvasComponent } from '@home/pages/report/report-template/designer/report-canvas.component';
 
 @NgModule({
   declarations: [
@@ -46,7 +48,11 @@ import { ReportAlignmentComponent } from '@home/pages/report/report-template/des
     ReportInsetsComponent,
     ReportFontComponent,
     ReportBackgroundBorderComponent,
-    ReportAlignmentComponent
+    ReportAlignmentComponent,
+    // C1 Task 6: left palette (draggable component library) + center canvas (ordered, reorderable
+    // cdkDropList of component cards), hosted side by side by the shell.
+    ReportPaletteComponent,
+    ReportCanvasComponent
   ],
   imports: [
     CommonModule,
@@ -59,7 +65,9 @@ import { ReportAlignmentComponent } from '@home/pages/report/report-template/des
     ReportInsetsComponent,
     ReportFontComponent,
     ReportBackgroundBorderComponent,
-    ReportAlignmentComponent
+    ReportAlignmentComponent,
+    ReportPaletteComponent,
+    ReportCanvasComponent
   ]
 })
 export class ReportModule { }

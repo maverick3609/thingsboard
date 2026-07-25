@@ -1,0 +1,51 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<div class="tb-report-canvas flex flex-col">
+  <div *ngIf="!components.length" class="tb-report-canvas-empty flex flex-1 flex-col items-center justify-center">
+    <span translate class="tb-prompt">report.designer.canvas-empty</span>
+  </div>
+  <div *ngIf="components.length"
+       cdkDropList
+       [cdkDropListData]="components"
+       (cdkDropListDropped)="onDrop($event)"
+       class="tb-report-canvas-list tb-drop-list flex flex-col gap-2">
+    <div *ngFor="let component of components; let i = index; trackBy: trackByComponent"
+         class="tb-report-canvas-card tb-draggable flex flex-row items-center gap-2"
+         cdkDrag
+         [cdkDragData]="component"
+         role="button"
+         tabindex="0"
+         (click)="selectComponent(component)"
+         (keyup.enter)="selectComponent(component)">
+      <div class="tb-drag-handle flex items-center"
+           cdkDragHandle
+           matTooltip="{{ 'action.drag' | translate }}"
+           matTooltipPosition="above">
+        <mat-icon>drag_indicator</mat-icon>
+      </div>
+      <mat-icon>{{ componentTypeInfo(component)?.icon || 'help_outline' }}</mat-icon>
+      <span class="flex-1">{{ (componentTypeInfo(component)?.labelKey || component.type) | translate }}</span>
+      <button mat-icon-button type="button"
+              (click)="removeComponent(i); $event.stopPropagation()"
+              matTooltip="{{ 'action.delete' | translate }}"
+              matTooltipPosition="above">
+        <mat-icon>delete</mat-icon>
+      </button>
+    </div>
+  </div>
+</div>

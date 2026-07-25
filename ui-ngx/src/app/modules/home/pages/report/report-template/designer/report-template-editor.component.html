@@ -46,9 +46,15 @@
       <span translate>action.save</span>
     </button>
   </mat-toolbar>
-  <div class="tb-report-template-editor-body flex flex-1 flex-row">
-    <div class="tb-report-template-editor-palette"></div>
-    <div class="tb-report-template-editor-canvas flex-1"></div>
+  <div class="tb-report-template-editor-body flex flex-1 flex-row" cdkDropListGroup>
+    <div class="tb-report-template-editor-palette">
+      <tb-report-palette></tb-report-palette>
+    </div>
+    <div class="tb-report-template-editor-canvas flex-1">
+      <tb-report-canvas [(components)]="config.components"
+                         (selected)="selected = $event">
+      </tb-report-canvas>
+    </div>
     <div class="tb-report-template-editor-config">
       <tb-report-page-settings *ngIf="selected === null && pageSettings"
                                 [ngModel]="pageSettings"

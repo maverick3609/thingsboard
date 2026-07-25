@@ -24,7 +24,7 @@ import { ReportTemplateEditorComponent } from './report-template-editor.componen
 import { serialize } from './report-configuration.serializer';
 import { ReportService } from '@core/http/report.service';
 import { ReportTemplate, ReportTemplateType, TbReportFormat } from '@shared/models/report.models';
-import { PageSize, PdfReportTemplateConfig, ReportComponent } from '@shared/models/report-configuration.models';
+import { DividerComponent, PageSize, PdfReportTemplateConfig, ReportComponent } from '@shared/models/report-configuration.models';
 
 describe('ReportTemplateEditorComponent', () => {
   let reportService: jasmine.SpyObj<ReportService>;
@@ -93,6 +93,26 @@ describe('ReportTemplateEditorComponent', () => {
     expect(component.config.components).toBe(componentsSentinel);
     expect(component.config.entityAliases).toBe(entityAliasesSentinel);
     expect(component.config.filters).toBe(filtersSentinel);
+  });
+
+  it('merges a component edit in place, preserving the config.components element and selected references', () => {
+    const component = new ReportTemplateEditorComponent(routeWithId('new'), router, reportService);
+    component.ngOnInit();
+
+    // Same object in both places, mirroring T6's canvas: `selected` is a pointer into
+    // config.components, not a copy. onComponentChange must mutate that shared object
+    // (Object.assign) rather than replace it, or the array element and `selected` would
+    // diverge and the canvas's trackByComponent(identity) would churn the card.
+    const divider: DividerComponent = { type: 'DIVIDER', color: '#000' };
+    component.config.components = [divider];
+    component.selected = divider;
+
+    component.onComponentChange({ type: 'DIVIDER', color: '#fff', widthPx: 2 });
+
+    expect(component.config.components[0]).toBe(divider);
+    expect(component.selected).toBe(divider);
+    expect(divider.color).toBe('#fff');
+    expect(divider.widthPx).toBe(2);
   });
 
   it('save() persists the template with configuration === serialize(config) and navigates back', () => {

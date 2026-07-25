@@ -70,6 +70,10 @@
                                  [ngModel]="selected"
                                  (ngModelChange)="onComponentChange($event)">
       </tb-report-heading-config>
+      <tb-report-rich-text-config *ngIf="selected?.type === 'RICH_TEXT'"
+                                   [ngModel]="selected"
+                                   (ngModelChange)="onComponentChange($event)">
+      </tb-report-rich-text-config>
     </div>
   </div>
   <tb-report-preview *ngIf="viewMode === 'preview'" class="flex-1" [config]="config"></tb-report-preview>

@@ -42,6 +42,9 @@ import {
 import {
   ReportHeadingConfigComponent
 } from '@home/pages/report/report-template/designer/components/report-heading-config.component';
+import {
+  ReportRichTextConfigComponent
+} from '@home/pages/report/report-template/designer/components/report-rich-text-config.component';
 
 @NgModule({
   declarations: [
@@ -71,7 +74,9 @@ import {
     ReportPageBreakConfigComponent,
     ReportDividerConfigComponent,
     // C1 Task 9: HEADING right-panel config panel.
-    ReportHeadingConfigComponent
+    ReportHeadingConfigComponent,
+    // C1 Task 10: RICH_TEXT right-panel config panel.
+    ReportRichTextConfigComponent
   ],
   imports: [
     CommonModule,
@@ -90,7 +95,8 @@ import {
     ReportPreviewComponent,
     ReportPageBreakConfigComponent,
     ReportDividerConfigComponent,
-    ReportHeadingConfigComponent
+    ReportHeadingConfigComponent,
+    ReportRichTextConfigComponent
   ]
 })
 export class ReportModule { }

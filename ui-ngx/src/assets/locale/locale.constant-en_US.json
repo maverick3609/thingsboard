@@ -5444,7 +5444,8 @@
             "page-break-hint": "This component has no configurable options.",
             "heading-text": "Text",
             "heading-color": "Text color",
-            "heading-height": "Height"
+            "heading-height": "Height",
+            "rich-text-value": "Content"
         }
     },
     "security": {

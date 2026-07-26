@@ -5461,7 +5461,14 @@
             "tab-layout": "Layout",
             "column-width": "Column width",
             "column-header": "Header",
-            "column-cell": "Cell"
+            "column-cell": "Cell",
+            "show-table-heading": "Show table heading",
+            "table-heading": "Table heading",
+            "table-sort-order": "Sort order",
+            "sort-column": "Sort column",
+            "sort-direction": "Direction",
+            "sort-direction-asc": "Ascending",
+            "sort-direction-desc": "Descending"
         }
     },
     "security": {

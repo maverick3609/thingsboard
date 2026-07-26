@@ -57,6 +57,9 @@ import {
 import {
   ReportColumnSettingsComponent
 } from '@home/pages/report/report-template/designer/data/report-column-settings.component';
+import {
+  ReportTableSettingsComponent
+} from '@home/pages/report/report-template/designer/data/report-table-settings.component';
 
 @NgModule({
   declarations: [
@@ -98,7 +101,11 @@ import {
     // DataKeySettings COLUMN variant (ColumnSettings) - consumed by P1's table settings panel and
     // T7's data-keys glue.
     ReportCellSettingsComponent,
-    ReportColumnSettingsComponent
+    ReportColumnSettingsComponent,
+    // C2 Task 4: leaf CVA for the shared table-settings block (show heading / table-heading style /
+    // sort order) reused by every table-shaped component - consumed by P1's generic table config
+    // panel (Task 11).
+    ReportTableSettingsComponent
   ],
   imports: [
     CommonModule,
@@ -122,7 +129,8 @@ import {
     ReportImageConfigComponent,
     ReportConfigTabsComponent,
     ReportCellSettingsComponent,
-    ReportColumnSettingsComponent
+    ReportColumnSettingsComponent,
+    ReportTableSettingsComponent
   ]
 })
 export class ReportModule { }

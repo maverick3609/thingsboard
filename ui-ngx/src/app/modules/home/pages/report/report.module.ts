@@ -60,6 +60,9 @@ import {
 import {
   ReportTableSettingsComponent
 } from '@home/pages/report/report-template/designer/data/report-table-settings.component';
+import {
+  ReportTimewindowComponent
+} from '@home/pages/report/report-template/designer/data/report-timewindow.component';
 
 @NgModule({
   declarations: [
@@ -105,7 +108,11 @@ import {
     // C2 Task 4: leaf CVA for the shared table-settings block (show heading / table-heading style /
     // sort order) reused by every table-shaped component - consumed by P1's generic table config
     // panel (Task 11).
-    ReportTableSettingsComponent
+    ReportTableSettingsComponent,
+    // C2 Task 5: leaf CVA mapping shim between TimeWindowConfiguration (report wire model) and the
+    // platform tb-timewindow widget's Timewindow CVA value - consumed by ALARM_TABLE's and
+    // TIME_SERIES_TABLE's panels (Task 11).
+    ReportTimewindowComponent
   ],
   imports: [
     CommonModule,
@@ -130,7 +137,8 @@ import {
     ReportConfigTabsComponent,
     ReportCellSettingsComponent,
     ReportColumnSettingsComponent,
-    ReportTableSettingsComponent
+    ReportTableSettingsComponent,
+    ReportTimewindowComponent
   ]
 })
 export class ReportModule { }

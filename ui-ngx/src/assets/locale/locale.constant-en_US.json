@@ -5455,7 +5455,10 @@
             "image-width-type-custom": "Custom",
             "image-custom-width": "Custom width",
             "image-alignment": "Alignment",
-            "component-not-configurable": "This component can't be configured in this version."
+            "component-not-configurable": "This component can't be configured in this version.",
+            "tab-content": "Content",
+            "tab-data": "Data",
+            "tab-layout": "Layout"
         }
     },
     "security": {

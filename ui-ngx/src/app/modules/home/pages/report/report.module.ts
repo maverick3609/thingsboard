@@ -48,6 +48,9 @@ import {
 import {
   ReportImageConfigComponent
 } from '@home/pages/report/report-template/designer/components/report-image-config.component';
+import {
+  ReportConfigTabsComponent
+} from '@home/pages/report/report-template/designer/data/report-config-tabs.component';
 
 @NgModule({
   declarations: [
@@ -81,7 +84,10 @@ import {
     // C1 Task 10: RICH_TEXT right-panel config panel.
     ReportRichTextConfigComponent,
     // C1 Task 11: IMAGE right-panel config panel.
-    ReportImageConfigComponent
+    ReportImageConfigComponent,
+    // C2 Task 2: shared Content/Data/Layout tab shell, hosted by C2 data-component config panels
+    // (P3-P4) and retrofitted into C1 panels (report-divider-config.component.html is the first).
+    ReportConfigTabsComponent
   ],
   imports: [
     CommonModule,
@@ -102,7 +108,8 @@ import {
     ReportDividerConfigComponent,
     ReportHeadingConfigComponent,
     ReportRichTextConfigComponent,
-    ReportImageConfigComponent
+    ReportImageConfigComponent,
+    ReportConfigTabsComponent
   ]
 })
 export class ReportModule { }

@@ -17,33 +17,39 @@
 -->
 <div class="tb-report-divider-config flex flex-col gap-2" [formGroup]="dividerFormGroup">
   <div class="mat-subtitle-1" translate>report.designer.component-divider</div>
-  <mat-form-field subscriptSizing="dynamic">
-    <mat-select formControlName="length" placeholder="{{ 'report.designer.divider-length' | translate }}">
-      <mat-option [value]="borderLengthEnum.LONG" translate>report.designer.divider-length-long</mat-option>
-      <mat-option [value]="borderLengthEnum.SHORT" translate>report.designer.divider-length-short</mat-option>
-    </mat-select>
-  </mat-form-field>
-  <mat-form-field subscriptSizing="dynamic">
-    <mat-select formControlName="borderType" placeholder="{{ 'report.designer.border-type' | translate }}">
-      <mat-option [value]="borderTypeEnum.SOLID" translate>report.designer.border-type-solid</mat-option>
-      <mat-option [value]="borderTypeEnum.DASHED" translate>report.designer.border-type-dashed</mat-option>
-      <mat-option [value]="borderTypeEnum.DOTTED" translate>report.designer.border-type-dotted</mat-option>
-    </mat-select>
-  </mat-form-field>
-  <mat-form-field subscriptSizing="dynamic">
-    <input matInput type="number" min="0" formControlName="widthPx"
-           placeholder="{{ 'report.designer.divider-width' | translate }}"/>
-  </mat-form-field>
-  <tb-color-input formControlName="color" colorClearButton
-                  label="{{ 'report.designer.divider-color' | translate }}">
-  </tb-color-input>
-  <div class="flex flex-col gap-1">
-    <label class="mat-caption" translate>report.designer.margins</label>
-    <tb-report-insets formControlName="margins"></tb-report-insets>
-  </div>
-  <div class="flex flex-col gap-1">
-    <label class="mat-caption" translate>report.designer.paddings</label>
-    <tb-report-insets formControlName="paddings"></tb-report-insets>
-  </div>
-  <tb-report-background-border formControlName="backgroundBorder"></tb-report-background-border>
+  <tb-report-config-tabs [tabs]="['content', 'layout']">
+    <div tabContent class="flex flex-col gap-2">
+      <mat-form-field subscriptSizing="dynamic">
+        <mat-select formControlName="length" placeholder="{{ 'report.designer.divider-length' | translate }}">
+          <mat-option [value]="borderLengthEnum.LONG" translate>report.designer.divider-length-long</mat-option>
+          <mat-option [value]="borderLengthEnum.SHORT" translate>report.designer.divider-length-short</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field subscriptSizing="dynamic">
+        <mat-select formControlName="borderType" placeholder="{{ 'report.designer.border-type' | translate }}">
+          <mat-option [value]="borderTypeEnum.SOLID" translate>report.designer.border-type-solid</mat-option>
+          <mat-option [value]="borderTypeEnum.DASHED" translate>report.designer.border-type-dashed</mat-option>
+          <mat-option [value]="borderTypeEnum.DOTTED" translate>report.designer.border-type-dotted</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field subscriptSizing="dynamic">
+        <input matInput type="number" min="0" formControlName="widthPx"
+               placeholder="{{ 'report.designer.divider-width' | translate }}"/>
+      </mat-form-field>
+      <tb-color-input formControlName="color" colorClearButton
+                      label="{{ 'report.designer.divider-color' | translate }}">
+      </tb-color-input>
+    </div>
+    <div tabLayout class="flex flex-col gap-2">
+      <div class="flex flex-col gap-1">
+        <label class="mat-caption" translate>report.designer.margins</label>
+        <tb-report-insets formControlName="margins"></tb-report-insets>
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="mat-caption" translate>report.designer.paddings</label>
+        <tb-report-insets formControlName="paddings"></tb-report-insets>
+      </div>
+      <tb-report-background-border formControlName="backgroundBorder"></tb-report-background-border>
+    </div>
+  </tb-report-config-tabs>
 </div>

@@ -1,0 +1,30 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<div class="tb-report-cell-settings flex flex-col gap-2" [formGroup]="cellFormGroup">
+  <tb-report-font formControlName="font"></tb-report-font>
+  <!-- report.designer.heading-color/background are reused as-is ("Text color"/"Background") - same
+       concept as CellSettings.color/backgroundColor, just first introduced by the heading/
+       background-border widgets. -->
+  <tb-color-input formControlName="color" colorClearButton
+                  label="{{ 'report.designer.heading-color' | translate }}">
+  </tb-color-input>
+  <tb-color-input formControlName="backgroundColor" colorClearButton
+                  label="{{ 'report.designer.background' | translate }}">
+  </tb-color-input>
+  <tb-report-alignment formControlName="alignment"></tb-report-alignment>
+</div>

@@ -5458,7 +5458,10 @@
             "component-not-configurable": "This component can't be configured in this version.",
             "tab-content": "Content",
             "tab-data": "Data",
-            "tab-layout": "Layout"
+            "tab-layout": "Layout",
+            "column-width": "Column width",
+            "column-header": "Header",
+            "column-cell": "Cell"
         }
     },
     "security": {

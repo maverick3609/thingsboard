@@ -51,6 +51,12 @@ import {
 import {
   ReportConfigTabsComponent
 } from '@home/pages/report/report-template/designer/data/report-config-tabs.component';
+import {
+  ReportCellSettingsComponent
+} from '@home/pages/report/report-template/designer/data/report-cell-settings.component';
+import {
+  ReportColumnSettingsComponent
+} from '@home/pages/report/report-template/designer/data/report-column-settings.component';
 
 @NgModule({
   declarations: [
@@ -87,7 +93,12 @@ import {
     ReportImageConfigComponent,
     // C2 Task 2: shared Content/Data/Layout tab shell, hosted by C2 data-component config panels
     // (P3-P4) and retrofitted into C1 panels (report-divider-config.component.html is the first).
-    ReportConfigTabsComponent
+    ReportConfigTabsComponent,
+    // C2 Task 3: leaf CVAs for report table header/cell text styling (CellSettings) and the
+    // DataKeySettings COLUMN variant (ColumnSettings) - consumed by P1's table settings panel and
+    // T7's data-keys glue.
+    ReportCellSettingsComponent,
+    ReportColumnSettingsComponent
   ],
   imports: [
     CommonModule,
@@ -109,7 +120,9 @@ import {
     ReportHeadingConfigComponent,
     ReportRichTextConfigComponent,
     ReportImageConfigComponent,
-    ReportConfigTabsComponent
+    ReportConfigTabsComponent,
+    ReportCellSettingsComponent,
+    ReportColumnSettingsComponent
   ]
 })
 export class ReportModule { }

@@ -1,0 +1,31 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<div class="tb-report-column-settings flex flex-col gap-2" [formGroup]="columnFormGroup">
+  <mat-form-field subscriptSizing="dynamic">
+    <input matInput formControlName="columnWidth"
+           placeholder="{{ 'report.designer.column-width' | translate }}"/>
+  </mat-form-field>
+  <div class="flex flex-col gap-1">
+    <label class="mat-caption" translate>report.designer.column-header</label>
+    <tb-report-cell-settings formControlName="header"></tb-report-cell-settings>
+  </div>
+  <div class="flex flex-col gap-1">
+    <label class="mat-caption" translate>report.designer.column-cell</label>
+    <tb-report-cell-settings formControlName="cell"></tb-report-cell-settings>
+  </div>
+</div>

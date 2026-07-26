@@ -22,6 +22,7 @@ import { coerceBoolean } from '@shared/decorators/coercion';
 import { isDefinedAndNotNull } from '@core/utils';
 import {
   AggregationConfiguration,
+  FixedTimeWindow,
   ReportInterval,
   ReportIntervalType,
   QuickTimeInterval as ReportQuickTimeInterval,
@@ -56,7 +57,9 @@ import { IntervalType } from '@shared/models/telemetry/telemetry.models';
 //    reorder of HistoryWindowType in TB-core shows up as a diff here instead of silently
 //    corrupting persisted report timewindows. Confirmed against the PE-derived default fixture
 //    (c2-reuse-cva-notes.md): historyType 0 pairs with a timewindowMs-only window, i.e.
-//    HistoryWindowType.LAST_INTERVAL.
+//    HistoryWindowType.LAST_INTERVAL. The lookup result, not just the input int, is
+//    isDefinedAndNotNull-guarded, so an out-of-domain int (e.g. a corrupt historyType: 99) leaves
+//    historyType unset rather than writing an explicit `historyType: undefined`.
 //  - history.interval: the report's ReportInterval (a bare wire number-or-enum-name-string, per
 //    Interval.java's custom Jackson serializer - see report-configuration.models.ts) <-> the
 //    platform's identically-shaped Interval (`number | IntervalType`). ReportIntervalType's 5
@@ -74,7 +77,12 @@ import { IntervalType } from '@shared/models/telemetry/telemetry.models';
 //    imports it straight from time.models.ts) on both sides, copied directly (quickInterval needs
 //    a type-level cast only, since the report and platform QuickTimeInterval are separate, though
 //    value-identical, TS string enums).
-//  - history.timewindowMs / history.fixedTimewindow: identical shape on both sides, copied as-is.
+//  - history.timewindowMs: identical shape on both sides, copied as-is.
+//  - history.fixedTimewindow: identical {startTimeMs, endTimeMs} shape on both sides, but copied
+//    field-by-field (each individually isDefinedAndNotNull-guarded, matching the aggregation
+//    block's pattern) rather than as a single object literal, so a partial fixedTimewindow (e.g.
+//    only startTimeMs set, mid-date-pick) doesn't materialize an explicit `endTimeMs: undefined`
+//    key on the other side - review round 1 finding.
 //  - selectedTab (like C1's Font.sizeUnit) is FE-only: reportToPlatformTimewindow always sets
 //    HISTORY (this shim always renders tb-timewindow with [historyOnly]="true");
 //    platformToReportTimewindow drops it, along with every other FE-only Timewindow field
@@ -119,7 +127,10 @@ export function reportToPlatformTimewindow(tw: TimeWindowConfiguration): Timewin
   if (isDefinedAndNotNull(history)) {
     const platformHistory: HistoryWindow = {};
     if (isDefinedAndNotNull(history.historyType)) {
-      platformHistory.historyType = HISTORY_WINDOW_TYPE_BY_ORDINAL[history.historyType];
+      const mappedHistoryType = HISTORY_WINDOW_TYPE_BY_ORDINAL[history.historyType];
+      if (isDefinedAndNotNull(mappedHistoryType)) {
+        platformHistory.historyType = mappedHistoryType;
+      }
     }
     if (isDefinedAndNotNull(history.interval)) {
       platformHistory.interval = reportIntervalToPlatform(history.interval);
@@ -128,10 +139,14 @@ export function reportToPlatformTimewindow(tw: TimeWindowConfiguration): Timewin
       platformHistory.timewindowMs = history.timewindowMs;
     }
     if (isDefinedAndNotNull(history.fixedTimewindow)) {
-      platformHistory.fixedTimewindow = {
-        startTimeMs: history.fixedTimewindow.startTimeMs,
-        endTimeMs: history.fixedTimewindow.endTimeMs
-      } as FixedWindow;
+      const platformFixedTimewindow: Partial<FixedWindow> = {};
+      if (isDefinedAndNotNull(history.fixedTimewindow.startTimeMs)) {
+        platformFixedTimewindow.startTimeMs = history.fixedTimewindow.startTimeMs;
+      }
+      if (isDefinedAndNotNull(history.fixedTimewindow.endTimeMs)) {
+        platformFixedTimewindow.endTimeMs = history.fixedTimewindow.endTimeMs;
+      }
+      platformHistory.fixedTimewindow = platformFixedTimewindow as FixedWindow;
     }
     if (isDefinedAndNotNull(history.quickInterval)) {
       platformHistory.quickInterval = history.quickInterval as unknown as QuickTimeInterval;
@@ -177,10 +192,14 @@ export function platformToReportTimewindow(tw: Timewindow): TimeWindowConfigurat
       reportHistory.timewindowMs = history.timewindowMs;
     }
     if (isDefinedAndNotNull(history.fixedTimewindow)) {
-      reportHistory.fixedTimewindow = {
-        startTimeMs: history.fixedTimewindow.startTimeMs,
-        endTimeMs: history.fixedTimewindow.endTimeMs
-      };
+      const reportFixedTimewindow: FixedTimeWindow = {};
+      if (isDefinedAndNotNull(history.fixedTimewindow.startTimeMs)) {
+        reportFixedTimewindow.startTimeMs = history.fixedTimewindow.startTimeMs;
+      }
+      if (isDefinedAndNotNull(history.fixedTimewindow.endTimeMs)) {
+        reportFixedTimewindow.endTimeMs = history.fixedTimewindow.endTimeMs;
+      }
+      reportHistory.fixedTimewindow = reportFixedTimewindow;
     }
     if (isDefinedAndNotNull(history.quickInterval)) {
       reportHistory.quickInterval = history.quickInterval as unknown as ReportQuickTimeInterval;

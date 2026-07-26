@@ -103,6 +103,20 @@ describe('report-timewindow mapping', () => {
     expect(platformToReportTimewindow(platformTw)).toEqual(reportTw);
   });
 
+  it('round-trips a partial fixedTimewindow (only startTimeMs set) without materializing an undefined endTimeMs key', () => {
+    const reportTw: TimeWindowConfiguration = {
+      history: { historyType: 1, fixedTimewindow: { startTimeMs: 123 } }
+    };
+
+    const platformTw = reportToPlatformTimewindow(reportTw);
+    expect(platformTw.history.fixedTimewindow).toEqual(jasmine.objectContaining({ startTimeMs: 123 }));
+    expect('endTimeMs' in platformTw.history.fixedTimewindow).toBe(false);
+
+    const roundTripped = platformToReportTimewindow(platformTw);
+    expect(roundTripped).toEqual(reportTw);
+    expect('endTimeMs' in roundTripped.history.fixedTimewindow).toBe(false);
+  });
+
   it('round-trips a quickInterval (HistoryWindowType.INTERVAL) history window', () => {
     const reportTw: TimeWindowConfiguration = {
       history: { historyType: 2, quickInterval: ReportQuickTimeInterval.CURRENT_DAY }

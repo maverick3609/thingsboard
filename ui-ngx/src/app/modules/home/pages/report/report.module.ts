@@ -76,6 +76,12 @@ import {
 import {
   ReportDatasourcesComponent
 } from '@home/pages/report/report-template/designer/data/report-datasources.component';
+import {
+  ReportEntityAliasesComponent
+} from '@home/pages/report/report-template/designer/data/report-entity-aliases.component';
+import {
+  ReportFiltersComponent
+} from '@home/pages/report/report-template/designer/data/report-filters.component';
 
 @NgModule({
   declarations: [
@@ -139,7 +145,13 @@ import {
     // tb-filter-select) and tb-report-datasources (add/remove DataSource[] list) - consumed by
     // ENTITY_TABLE/TIME_SERIES_TABLE's dataSources and ALARM_TABLE's alarmSource (Task 11).
     ReportDatasourceComponent,
-    ReportDatasourcesComponent
+    ReportDatasourcesComponent,
+    // C2 Task 10: template-level "manage aliases"/"manage filters" lists (config.entityAliases[]/
+    // config.filters[] add/edit/delete via the platform's single-item EntityAliasDialogComponent/
+    // FilterDialogComponent, both already reachable through HomeComponentsModule below) - hosted by
+    // ReportPageSettingsComponent's two new expansion-panel entry points.
+    ReportEntityAliasesComponent,
+    ReportFiltersComponent
   ],
   imports: [
     CommonModule,
@@ -178,7 +190,9 @@ import {
     ReportAlarmFilterComponent,
     ReportDataKeysComponent,
     ReportDatasourceComponent,
-    ReportDatasourcesComponent
+    ReportDatasourcesComponent,
+    ReportEntityAliasesComponent,
+    ReportFiltersComponent
   ]
 })
 export class ReportModule { }

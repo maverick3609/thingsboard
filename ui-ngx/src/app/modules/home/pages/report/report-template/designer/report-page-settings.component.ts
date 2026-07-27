@@ -14,15 +14,25 @@
 /// limitations under the License.
 ///
 
-import { Component, forwardRef, OnDestroy, OnInit } from '@angular/core';
+import { Component, Input, forwardRef, OnDestroy, OnInit } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR, UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { PageOrientation, PageSize, PageSizeDimensions, PdfReportTemplateConfig } from '@shared/models/report-configuration.models';
+import {
+  PageOrientation,
+  PageSize,
+  PageSizeDimensions,
+  PdfReportTemplateConfig,
+  ReportTemplateConfigModel
+} from '@shared/models/report-configuration.models';
 
 // The 6 page-level fields of configuration/PdfReportTemplateConfig.java this panel edits; the rest
-// of the config (components, entityAliases, filters, header/footer) is owned by the canvas (T6) and
-// header/footer editors, not this panel.
+// of the config (components, header/footer) is owned by the canvas (T6) and header/footer editors,
+// not this panel. entityAliases/filters (Task 10) are the one exception: this panel hosts their
+// "Manage aliases"/"Manage filters" entry points (see the plain `config` Input below), but does not
+// edit them itself through this CVA's own ReportPageSettings value - they stay out of this Pick<> and
+// out of the emitted form value, so the shell's onPageSettingsChange (Object.assign(this.config,
+// value)) can never clobber them.
 export type ReportPageSettings = Pick<PdfReportTemplateConfig,
   'pageSize' | 'pageOrientation' | 'pageMargins' | 'pageBackground' | 'namePattern' | 'timeDataPattern'>;
 
@@ -47,6 +57,15 @@ export type ReportPageSettings = Pick<PdfReportTemplateConfig,
     standalone: false
 })
 export class ReportPageSettingsComponent implements ControlValueAccessor, OnInit, OnDestroy {
+
+  // Plain Input (NOT part of the CVA's ReportPageSettings value) - Task 10's "Manage aliases"/
+  // "Manage filters" expansion panels below need the whole config to hand down to
+  // tb-report-entity-aliases/tb-report-filters, which mutate config.entityAliases[]/config.filters[]
+  // directly (see those components' own headers). The shell (report-template-editor.component.html)
+  // binds [config]="config" alongside the existing [ngModel]="pageSettings" CVA binding - two
+  // independent channels into the same object, never merged.
+  @Input()
+  config: ReportTemplateConfigModel;
 
   pageSettingsFormGroup: UntypedFormGroup;
 

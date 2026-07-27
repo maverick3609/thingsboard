@@ -67,6 +67,9 @@ import {
 import {
   ReportAlarmFilterComponent
 } from '@home/pages/report/report-template/designer/data/report-alarm-filter.component';
+import {
+  ReportDataKeysComponent
+} from '@home/pages/report/report-template/designer/data/report-data-keys.component';
 
 @NgModule({
   declarations: [
@@ -120,7 +123,11 @@ import {
     // C2 Task 6: leaf CVA mapping shim between AlarmFilterConfig (report wire model) and the
     // platform tb-alarm-filter-config widget's AlarmFilterConfig CVA value - consumed by
     // ALARM_TABLE's alarmSource panel (Task 11).
-    ReportAlarmFilterComponent
+    ReportAlarmFilterComponent,
+    // C2 Task 7: wraps the platform tb-data-keys widget (base fields) + a per-key
+    // tb-report-column-settings panel (report-only ColumnSettings) behind the report DataKey[] CVA
+    // boundary - consumed by report-datasource (Task 8) and ALARM_TABLE's alarmSource (Task 11).
+    ReportDataKeysComponent
   ],
   imports: [
     CommonModule,
@@ -128,7 +135,10 @@ import {
     HomeComponentsModule,
     // C2 Task 6: tb-alarm-filter-config (wrapped by ReportAlarmFilterComponent) is declared/exported
     // by WidgetConfigComponentsModule, which HomeComponentsModule imports but does NOT re-export -
-    // needed directly here for the selector to resolve in this module's templates.
+    // needed directly here for the selector to resolve in this module's templates. Also covers
+    // C2 Task 7's tb-data-keys: it's declared/exported by WidgetSettingsCommonModule, which
+    // WidgetConfigComponentsModule imports AND re-exports (widget-config-components.module.ts's own
+    // `exports` array) - so no further module import is needed for tb-data-keys to resolve here.
     WidgetConfigComponentsModule,
     ReportRoutingModule
   ],
@@ -151,7 +161,8 @@ import {
     ReportColumnSettingsComponent,
     ReportTableSettingsComponent,
     ReportTimewindowComponent,
-    ReportAlarmFilterComponent
+    ReportAlarmFilterComponent,
+    ReportDataKeysComponent
   ]
 })
 export class ReportModule { }

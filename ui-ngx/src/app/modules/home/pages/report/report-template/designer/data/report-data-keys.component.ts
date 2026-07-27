@@ -72,10 +72,38 @@ import { WidgetConfigCallbacks } from '@home/components/widget/config/widget-con
 // untouched through every tb-data-keys-internal mutation because they attach to the object BY
 // REFERENCE, not by array position - the only approach that survives a live drag-reorder without a
 // fragile index-diff against a stale previous array.
+//
+// ## Known limitation: postFuncBody/units object forms are dropped, not preserved
+// tb-data-keys' pencil-icon dialog binds `<tb-js-func withModules>` UNCONDITIONALLY to postFuncBody
+// (data-key-config.component.html:175-183 - no @Input exists to suppress `withModules`), so a user
+// can attach ES-module imports to a post-processing function, producing a TbFunctionWithModules
+// object (`{body, modules}`) rather than a plain string. `showPostProcessing` (which gates whether
+// that whole panel is even shown) defaults true for every widgetType except `alarm`
+// (data-keys.component.ts's editDataKey(): `showPostProcessing: this.widgetType !== widgetType.
+// alarm`), and this component's OWN widgetType default is `latest` - so this path is reachable out
+// of the box, not just theoretically. Symmetrically, tb-unit-input can in principle emit a
+// TbUnitMapping object for `units` rather than a plain string. The report's postFuncBody is TBEL,
+// which has no ES-module concept, and units is plain-string-only - there is no lossless
+// representation to fall back to, and the frozen report model is NOT widened to invent one. So
+// asReportString() below correctly DROPS both non-string forms, but console.warn()s naming the
+// field and the key first, so the loss is diagnosable at the point it happens instead of silent.
 export type PlatformDataKeyCarrier = PlatformDataKey & { timewindow?: TimeWindowConfiguration };
 
-function asReportString(value: unknown): string | undefined {
-  return typeof value === 'string' ? value : undefined;
+// Drops a non-string value, warning (rather than silently discarding) when the dropped value was
+// actually present - see "Known limitation" above. `fieldName`/`keyName` make the warning
+// actionable (which key, which field) instead of a bare "something was dropped somewhere".
+function asReportString(value: unknown, fieldName: 'units' | 'postFuncBody', keyName: string): string | undefined {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (isDefinedAndNotNull(value)) {
+    console.warn(
+      `tb-report-data-keys: dropping non-string ${fieldName} for data key "${keyName ?? '(unnamed)'}" - ` +
+      `report post-processing/units are plain-string only; the object/module form is not supported ` +
+      `and has been discarded.`
+    );
+  }
+  return undefined;
 }
 
 // pure mapping functions - exported standalone so a mapping bug is directly unit-testable without
@@ -87,9 +115,10 @@ function asReportString(value: unknown): string | undefined {
 // string<->enum hop (string->enum needs a cast, enum->string doesn't); units/postFuncBody are
 // narrowed to plain strings on the way back to the report shape since the platform's TbUnit/
 // TbFunction are wider unions (`string | TbUnitMapping` / `string | TbFunctionWithModules`) the
-// report's string-only fields have no slot for. Platform-only fields (color, pattern, hidden,
-// inLegend, isAdditional, origDataKeyIndex, comparisonEnabled/timeForComparison/
-// comparisonCustomIntervalValue/comparisonResultType, funcBody) are never copied to the report shape.
+// report's string-only fields have no slot for (dropped with a console.warn - see "Known
+// limitation" above, NOT silently). Platform-only fields (color, pattern, hidden, inLegend,
+// isAdditional, origDataKeyIndex, comparisonEnabled/timeForComparison/comparisonCustomIntervalValue/
+// comparisonResultType, funcBody) are never copied to the report shape.
 // Every optional field is isDefinedAndNotNull-guarded (matching report-timewindow.component.ts's/
 // report-alarm-filter.component.ts's convention) so an absent field stays absent rather than
 // materializing an explicit `field: undefined` key - both because that's what a real backend jsonb
@@ -141,7 +170,7 @@ export function platformToReportDataKeys(keys: PlatformDataKeyCarrier[]): DataKe
     if (isDefinedAndNotNull(key.decimals)) {
       report.decimals = key.decimals;
     }
-    const units = asReportString(key.units);
+    const units = asReportString(key.units, 'units', key.name);
     if (isDefinedAndNotNull(units)) {
       report.units = units;
     }
@@ -151,7 +180,7 @@ export function platformToReportDataKeys(keys: PlatformDataKeyCarrier[]): DataKe
     if (isDefinedAndNotNull(key.usePostProcessing)) {
       report.usePostProcessing = key.usePostProcessing;
     }
-    const postFuncBody = asReportString(key.postFuncBody);
+    const postFuncBody = asReportString(key.postFuncBody, 'postFuncBody', key.name);
     if (isDefinedAndNotNull(postFuncBody)) {
       report.postFuncBody = postFuncBody;
     }
@@ -164,6 +193,18 @@ export function platformToReportDataKeys(keys: PlatformDataKeyCarrier[]): DataKe
     return report;
   });
 }
+
+// Explicit member-by-member map rather than an `as unknown as DatasourceType` cast: report
+// DataSourceType's 4 members (device/entity/entityCount/alarmCount) are a same-value subset of
+// platform DatasourceType's 5 (which adds `function`, not applicable to a report data source). A
+// `Record` keyed by every DataSourceType member means a future addition to the report enum fails to
+// compile here until mapped, instead of silently casting through unchanged.
+const REPORT_TO_PLATFORM_DATASOURCE_TYPE: Record<DataSourceType, DatasourceType> = {
+  [DataSourceType.DEVICE]: DatasourceType.device,
+  [DataSourceType.ENTITY]: DatasourceType.entity,
+  [DataSourceType.ENTITY_COUNT]: DatasourceType.entityCount,
+  [DataSourceType.ALARM_COUNT]: DatasourceType.alarmCount
+};
 
 @Component({
     selector: 'tb-report-data-keys',
@@ -214,7 +255,7 @@ export class ReportDataKeysComponent implements ControlValueAccessor, OnInit, On
   deviceId: string;
 
   get platformDatasourceType(): DatasourceType {
-    return this.dataSourceType as unknown as DatasourceType;
+    return REPORT_TO_PLATFORM_DATASOURCE_TYPE[this.dataSourceType];
   }
 
   private destroy$ = new Subject<void>();
@@ -272,8 +313,24 @@ export class ReportDataKeysComponent implements ControlValueAccessor, OnInit, On
   // array back into the `keys` control with {emitEvent:false} - re-syncing tb-data-keys' internal
   // state so a LATER, unrelated tb-data-keys-originated change (e.g. editing a different key's
   // label) reads the freshly-set `settings` back off the carrier rather than a stale copy.
+  // isDefinedAndNotNull-guarded (matching reportToPlatformDataKeys/platformToReportDataKeys'
+  // construction discipline above): a falsy `settings` REMOVES the key's `settings` property
+  // entirely rather than setting it to an explicit `undefined`, which a bare `{...key, settings}`
+  // spread would otherwise do (object-literal spread always materializes the key, even when the
+  // value being spread in is `undefined`).
   onColumnSettingsChange(index: number, settings: DataKeySettings): void {
-    this.modelValue = this.modelValue.map((key, i) => i === index ? { ...key, settings } : key);
+    this.modelValue = this.modelValue.map((key, i) => {
+      if (i !== index) {
+        return key;
+      }
+      const updatedKey = { ...key };
+      if (isDefinedAndNotNull(settings)) {
+        updatedKey.settings = settings;
+      } else {
+        delete updatedKey.settings;
+      }
+      return updatedKey;
+    });
     this.dataKeysFormGroup.get('keys').setValue(reportToPlatformDataKeys(this.modelValue), {emitEvent: false});
     this.propagateChange(this.modelValue);
   }

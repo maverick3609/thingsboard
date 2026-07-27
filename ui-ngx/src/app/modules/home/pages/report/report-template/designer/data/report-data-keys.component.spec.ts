@@ -131,18 +131,35 @@ describe('report-data-keys mapping', () => {
     expect(Object.keys(reportKey).sort()).toEqual(['name', 'type']);
   });
 
-  it('guards units/postFuncBody down to plain strings on the way back to the report shape (platform TbUnit/TbFunction are wider unions)', () => {
+  it('guards units/postFuncBody down to plain strings on the way back to the report shape, warning (not silently) when a non-string form is dropped (platform TbUnit/TbFunction are wider unions - reachable in practice via tb-js-func\'s unconditional `withModules`)', () => {
+    spyOn(console, 'warn');
     const platformKey: PlatformDataKeyCarrier = {
       name: 'k',
       type: DataKeyType.timeseries,
       units: { from: 'W', to: 'kW', formula: 'x/1000' } as any,
-      postFuncBody: { body: 'return value;', modules: {} } as any
+      postFuncBody: { body: 'return 1;', modules: {} } as any
     };
 
     const reportKey = platformToReportDataKeys([platformKey])[0];
 
+    // the drop itself is expected and correct (no lossless representation exists within the frozen
+    // report model) - what this test guards is that it is NOT silent.
     expect(reportKey.units).toBeUndefined();
     expect(reportKey.postFuncBody).toBeUndefined();
+    expect(console.warn).toHaveBeenCalledTimes(2);
+    expect(console.warn).toHaveBeenCalledWith(jasmine.stringMatching(/units.*"k"/));
+    expect(console.warn).toHaveBeenCalledWith(jasmine.stringMatching(/postFuncBody.*"k"/));
+  });
+
+  it('does not warn when units/postFuncBody are plain strings or simply absent', () => {
+    spyOn(console, 'warn');
+
+    platformToReportDataKeys([
+      { name: 'k1', type: DataKeyType.timeseries, units: '°C', postFuncBody: 'return value;' },
+      { name: 'k2', type: DataKeyType.timeseries }
+    ]);
+
+    expect(console.warn).not.toHaveBeenCalled();
   });
 
   it('treats an empty/undefined key list as an empty array in both directions', () => {
@@ -221,14 +238,30 @@ describe('ReportDataKeysComponent', () => {
     ] as any);
   });
 
-  it('maps dataSourceType (report enum) to the platform DatasourceType for tb-data-keys', () => {
+  it('onColumnSettingsChange with a falsy settings value REMOVES the settings key rather than setting it to undefined (construction discipline)', () => {
+    const component = newComponent();
+    component.writeValue([{ name: 'temperature', type: 'timeseries', settings: { type: 'COLUMN', columnWidth: '30%' } }]);
+
+    component.onColumnSettingsChange(0, undefined);
+
+    expect('settings' in component.modelValue[0]).toBe(false);
+    expect(component.modelValue[0]).toEqual({ name: 'temperature', type: 'timeseries' });
+    expect('settings' in (component.dataKeysFormGroup.value.keys[0] as PlatformDataKeyCarrier)).toBe(false);
+  });
+
+  it('maps every report DataSourceType member to its platform DatasourceType counterpart for tb-data-keys', () => {
     const component = newComponent();
 
-    component.dataSourceType = DataSourceType.ENTITY;
-    expect(component.platformDatasourceType).toBe(DatasourceType.entity);
-
-    component.dataSourceType = DataSourceType.ALARM_COUNT;
-    expect(component.platformDatasourceType).toBe(DatasourceType.alarmCount);
+    const members: Array<[DataSourceType, DatasourceType]> = [
+      [DataSourceType.DEVICE, DatasourceType.device],
+      [DataSourceType.ENTITY, DatasourceType.entity],
+      [DataSourceType.ENTITY_COUNT, DatasourceType.entityCount],
+      [DataSourceType.ALARM_COUNT, DatasourceType.alarmCount]
+    ];
+    for (const [reportType, platformType] of members) {
+      component.dataSourceType = reportType;
+      expect(component.platformDatasourceType).toBe(platformType);
+    }
   });
 
   it('exposes aliasController/callbacks/entityAliasId/deviceId/widgetType as plain pass-through Inputs (wired by Task 8/11)', () => {

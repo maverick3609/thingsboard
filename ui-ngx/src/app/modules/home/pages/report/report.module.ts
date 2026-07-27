@@ -82,6 +82,12 @@ import {
 import {
   ReportFiltersComponent
 } from '@home/pages/report/report-template/designer/data/report-filters.component';
+import { MatDialog } from '@angular/material/dialog';
+import { createReportAliasCallbacks } from '@home/pages/report/report-template/designer/data/report-alias-callbacks';
+import {
+  REPORT_ALIAS_CALLBACKS_FACTORY,
+  ReportAliasCallbacksFactory
+} from '@home/pages/report/report-template/designer/data/report-alias-callbacks.models';
 
 @NgModule({
   declarations: [
@@ -167,6 +173,21 @@ import {
     // is declared/exported by SharedModule (imported above) - already in scope.
     WidgetConfigComponentsModule,
     ReportRoutingModule
+  ],
+  providers: [
+    // C2 Task 10 fix: the ONE place that wires the REAL EntityAliasDialogComponent/
+    // FilterDialogComponent (via report-alias-callbacks.ts's createReportAliasCallbacks) into the DI
+    // token report-entity-aliases.component.ts/report-filters.component.ts depend on
+    // (report-alias-callbacks.models.ts). Deliberately kept out of those two components' own static
+    // imports - see their headers - so their specs can inject a fake factory and run under karma
+    // without dragging in HomeComponentsModule's full compilation scope. This file has no spec of
+    // its own, so nothing regresses by importing the concrete classes here.
+    {
+      provide: REPORT_ALIAS_CALLBACKS_FACTORY,
+      useFactory: (dialog: MatDialog): ReportAliasCallbacksFactory =>
+        (aliasController) => createReportAliasCallbacks(dialog, aliasController),
+      deps: [MatDialog]
+    }
   ],
   exports: [
     ReportPageSettingsComponent,

@@ -14,19 +14,30 @@
 /// limitations under the License.
 ///
 
-// Plain instantiation (no TestBed), mirroring report-alias-controller.spec.ts: a fake MatDialog spy
-// stands in for the real dialog service, and a REAL createReportAliasController wraps a REAL
-// in-memory config, so the filter tests exercise the genuine keyFilters shape conversion end to end
-// (not a mock of it) - this is the same conversion boundary report-alias-controller.spec.ts proves
-// for getFilters()/updateFilters() directly; here it's proven through the callback functions a real
-// caller (the manage-filters UI, tb-report-datasource's future callbacks Input) actually invokes.
+// Plain instantiation (no TestBed). Tests report-alias-dialog-flow.ts's dialog-class-agnostic core -
+// the SAME data-flow + keyFilters-conversion logic report-alias-callbacks.ts's
+// createReportAliasCallbacks wires the real EntityAliasDialogComponent/FilterDialogComponent into -
+// using a throwaway placeholder class in place of the real dialog component. That substitution is
+// what makes this file runnable under karma at all: importing either real dialog class here, even as
+// a bare unused value, reproducibly breaks the karma build via widget-config.component.scss (see
+// report-alias-callbacks.ts's header and task-10-report.md for the isolated repro). A REAL
+// createReportAliasController wraps a REAL in-memory config, so the filter tests exercise the
+// genuine keyFilters shape conversion end to end (not a mock of it) - this is the same conversion
+// boundary report-alias-controller.spec.ts proves for getFilters()/updateFilters() directly; here
+// it's proven through the exact functions a real caller (report-alias-callbacks.ts's production
+// wrapper) invokes.
 import { of } from 'rxjs';
-import { createReportAliasCallbacks } from './report-alias-callbacks';
+import { openEntityAliasDialog, openFilterDialog } from './report-alias-dialog-flow';
 import { createReportAliasController } from './report-alias-controller';
 import { newPdfReportTemplateConfig, ReportTemplateConfigModel } from '@shared/models/report-configuration.models';
 import { AliasFilterType } from '@shared/models/alias.models';
 import { EntityType } from '@shared/models/entity-type.models';
 import { EntityKeyType, EntityKeyValueType, Filter, KeyFilterInfo } from '@shared/models/query/query.models';
+
+// Stands in for EntityAliasDialogComponent/FilterDialogComponent - the fake MatDialog below never
+// renders anything (it just records the call and returns a canned afterClosed()), so this never
+// needs to be a real Angular component, and never needs to be imported from home/components/*.
+class FakeDialogComponent {}
 
 function configWithAliasAndFilter(): ReportTemplateConfigModel {
   return {
@@ -56,20 +67,21 @@ function fakeDialog(returnValue: any): jasmine.SpyObj<any> {
   return dialog;
 }
 
-describe('report-alias-callbacks', () => {
+describe('report-alias-dialog-flow (report-alias-callbacks conversion boundary)', () => {
 
-  describe('createEntityAlias', () => {
+  describe('openEntityAliasDialog', () => {
 
-    it('opens EntityAliasDialogComponent with isAdd true and the current entity aliases, and merges the result into config', (done) => {
+    it('opens with isAdd true and the current entity aliases, and merges the result into config', (done) => {
       const config = configWithAliasAndFilter();
       const aliasController = createReportAliasController(() => config);
       const newAlias = {id: 'a2', alias: 'Assets', filter: {type: AliasFilterType.entityType, entityType: EntityType.ASSET}};
       const dialog = fakeDialog(of(newAlias));
-      const callbacks = createReportAliasCallbacks(dialog, aliasController);
 
-      callbacks.createEntityAlias('Assets', [EntityType.ASSET]).subscribe((result) => {
+      openEntityAliasDialog(dialog, FakeDialogComponent, aliasController, true,
+        {id: null, alias: 'Assets', filter: {resolveMultiple: false}}, [EntityType.ASSET]).subscribe((result) => {
         expect(result).toBe(newAlias);
         const openArgs = dialog.open.calls.mostRecent().args;
+        expect(openArgs[0]).toBe(FakeDialogComponent);
         expect(openArgs[1].data.isAdd).toBe(true);
         expect(openArgs[1].data.allowedEntityTypes).toEqual([EntityType.ASSET]);
         expect(openArgs[1].data.entityAliases.a1).toBeTruthy();
@@ -85,27 +97,23 @@ describe('report-alias-callbacks', () => {
       const config = configWithAliasAndFilter();
       const aliasController = createReportAliasController(() => config);
       const dialog = fakeDialog(of(null));
-      const callbacks = createReportAliasCallbacks(dialog, aliasController);
 
-      callbacks.createEntityAlias('x', undefined).subscribe((result) => {
+      openEntityAliasDialog(dialog, FakeDialogComponent, aliasController, true,
+        {id: null, alias: 'x', filter: {resolveMultiple: false}}, undefined).subscribe((result) => {
         expect(result).toBeNull();
         expect(config.entityAliases.length).toBe(1);
         done();
       });
     });
-  });
 
-  describe('editEntityAlias', () => {
-
-    it('opens EntityAliasDialogComponent with isAdd false and a deep-cloned alias, and replaces the entry in config by id', (done) => {
+    it('isAdd false deep-clones the passed alias (not the same reference) and replaces the entry in config by id', (done) => {
       const config = configWithAliasAndFilter();
       const aliasController = createReportAliasController(() => config);
       const original = aliasController.getEntityAliases().a1;
       const edited = {...original, alias: 'Devices renamed'};
       const dialog = fakeDialog(of(edited));
-      const callbacks = createReportAliasCallbacks(dialog, aliasController);
 
-      callbacks.editEntityAlias(original, undefined).subscribe(() => {
+      openEntityAliasDialog(dialog, FakeDialogComponent, aliasController, false, original, undefined).subscribe(() => {
         const openArgs = dialog.open.calls.mostRecent().args;
         expect(openArgs[1].data.isAdd).toBe(false);
         expect(openArgs[1].data.alias).toEqual(original as any);
@@ -118,9 +126,9 @@ describe('report-alias-callbacks', () => {
     });
   });
 
-  describe('createFilter / editFilter - keyFilters conversion boundary', () => {
+  describe('openFilterDialog - keyFilters conversion boundary', () => {
 
-    it('createFilter opens FilterDialogComponent with an empty platform-shaped filter, and a platform-shaped result lands in config.filters[] in REPORT {predicate} shape', (done) => {
+    it('a platform-shaped result lands in config.filters[] in REPORT {predicate} keyFilters shape', (done) => {
       const config = configWithAliasAndFilter();
       const aliasController = createReportAliasController(() => config);
       const newPlatformFilter: Filter = {
@@ -136,10 +144,11 @@ describe('report-alias-callbacks', () => {
         ]
       };
       const dialog = fakeDialog(of(newPlatformFilter));
-      const callbacks = createReportAliasCallbacks(dialog, aliasController);
 
-      callbacks.createFilter('Low severity').subscribe(() => {
+      openFilterDialog(dialog, FakeDialogComponent, aliasController, true,
+        {id: null, filter: 'Low severity', keyFilters: [], editable: true}).subscribe(() => {
         const openArgs = dialog.open.calls.mostRecent().args;
+        expect(openArgs[0]).toBe(FakeDialogComponent);
         expect(openArgs[1].data.isAdd).toBe(true);
         expect(openArgs[1].data.filter).toEqual({id: null, filter: 'Low severity', keyFilters: [], editable: true} as any);
         // The uniqueness list handed to the dialog is the platform-shaped map (Task 9 shim), not a
@@ -160,15 +169,14 @@ describe('report-alias-callbacks', () => {
       });
     });
 
-    it('editFilter opens FilterDialogComponent with isAdd false and a deep-cloned platform-shaped filter (not the same reference), and writes the edited result back in REPORT shape', (done) => {
+    it('isAdd false deep-clones the passed filter (not the same reference) and writes the edited result back in REPORT shape', (done) => {
       const config = configWithAliasAndFilter();
       const aliasController = createReportAliasController(() => config);
       const platformFilter = aliasController.getFilters().f1;
       const edited: Filter = {...platformFilter, filter: 'High severity renamed'};
       const dialog = fakeDialog(of(edited));
-      const callbacks = createReportAliasCallbacks(dialog, aliasController);
 
-      callbacks.editFilter(platformFilter).subscribe(() => {
+      openFilterDialog(dialog, FakeDialogComponent, aliasController, false, platformFilter).subscribe(() => {
         const openArgs = dialog.open.calls.mostRecent().args;
         expect(openArgs[1].data.isAdd).toBe(false);
         expect(openArgs[1].data.filter).toEqual(platformFilter as any);
@@ -178,6 +186,19 @@ describe('report-alias-callbacks', () => {
         expect(config.filters[0].filter).toBe('High severity renamed');
         expect(config.filters[0].keyFilters[0].predicate).toBeDefined();
         expect((config.filters[0].keyFilters[0] as any).predicates).toBeUndefined();
+        done();
+      });
+    });
+
+    it('does not mutate config when the dialog is cancelled', (done) => {
+      const config = configWithAliasAndFilter();
+      const aliasController = createReportAliasController(() => config);
+      const dialog = fakeDialog(of(null));
+
+      openFilterDialog(dialog, FakeDialogComponent, aliasController, true,
+        {id: null, filter: 'x', keyFilters: [], editable: true}).subscribe((result) => {
+        expect(result).toBeNull();
+        expect(config.filters.length).toBe(1);
         done();
       });
     });

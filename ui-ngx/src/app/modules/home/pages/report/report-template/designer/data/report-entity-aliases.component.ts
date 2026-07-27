@@ -16,10 +16,22 @@
 
 // Template-level "manage aliases" list (Task 10, deliverable 2) - lists the report template's OWN
 // config.entityAliases[], with add/edit/delete opening the platform's single-item
-// EntityAliasDialogComponent (via report-alias-callbacks.ts's factory, deliverable 1). Hosted by
-// report-page-settings.component's "Manage aliases" entry point (an expansion panel), which is the
-// only place that has a `config` reference to hand down (the shell owns `config`; the canvas/
-// component-config panels own individual components, not the template-level entityAliases/filters).
+// EntityAliasDialogComponent (via the REPORT_ALIAS_CALLBACKS_FACTORY DI token, deliverable 1).
+// Hosted by report-page-settings.component's "Manage aliases" entry point (an expansion panel),
+// which is the only place that has a `config` reference to hand down (the shell owns `config`; the
+// canvas/component-config panels own individual components, not the template-level
+// entityAliases/filters).
+//
+// Depends on report-alias-callbacks.models.ts (interface + DI token) only - deliberately NOT on
+// report-alias-callbacks.ts (the concrete factory, which imports
+// EntityAliasDialogComponent/FilterDialogComponent). That indirection is load-bearing, not
+// cosmetic: importing either dialog class ANYWHERE in this file's module graph - even as a bare,
+// unused value - forces Angular's Ivy compiler to resolve their declaring HomeComponentsModule's
+// full scope, which drags in WidgetConfigComponent's widget-config.component.scss and breaks the
+// karma test build (confirmed via an isolated repro - see report-alias-callbacks.ts's header and
+// task-10-report.md). Going through the injected factory keeps this component (and its spec, which
+// supplies a fake factory) entirely clear of that - report.module.ts's REPORT_ALIAS_CALLBACKS_FACTORY
+// provider is the one place that pulls in the real classes for production use.
 //
 // Every mutation (add/edit/delete) goes THROUGH a local aliasController (Task 9's
 // createReportAliasController, built once here from this component's own `config` Input) rather than
@@ -42,16 +54,16 @@
 // complexity beyond this task's add/edit/delete brief. A user can currently delete an in-use alias
 // and orphan the reference; flagged as a known gap, not silently fixed here.
 
-import { Component, Input, OnInit } from '@angular/core';
-import { MatDialog } from '@angular/material/dialog';
+import { Component, Inject, Input, OnInit } from '@angular/core';
 import { EntityAlias } from '@shared/models/alias.models';
 import { IAliasController } from '@core/api/widget-api.models';
 import { ReportTemplateConfigModel } from '@shared/models/report-configuration.models';
 import { createReportAliasController } from '@home/pages/report/report-template/designer/data/report-alias-controller';
 import {
-  createReportAliasCallbacks,
-  ReportAliasCallbacks
-} from '@home/pages/report/report-template/designer/data/report-alias-callbacks';
+  REPORT_ALIAS_CALLBACKS_FACTORY,
+  ReportAliasCallbacks,
+  ReportAliasCallbacksFactory
+} from '@home/pages/report/report-template/designer/data/report-alias-callbacks.models';
 
 @Component({
     selector: 'tb-report-entity-aliases',
@@ -69,12 +81,12 @@ export class ReportEntityAliasesComponent implements OnInit {
   private aliasController: IAliasController;
   private callbacks: ReportAliasCallbacks;
 
-  constructor(private dialog: MatDialog) {
+  constructor(@Inject(REPORT_ALIAS_CALLBACKS_FACTORY) private callbacksFactory: ReportAliasCallbacksFactory) {
   }
 
   ngOnInit(): void {
     this.aliasController = createReportAliasController(() => this.config);
-    this.callbacks = createReportAliasCallbacks(this.dialog, this.aliasController);
+    this.callbacks = this.callbacksFactory(this.aliasController);
     this.refresh();
   }
 

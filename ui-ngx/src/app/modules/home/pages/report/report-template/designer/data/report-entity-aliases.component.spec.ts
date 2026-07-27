@@ -14,17 +14,23 @@
 /// limitations under the License.
 ///
 
-// Plain instantiation (no TestBed), mirroring report-alias-controller.spec.ts / report-page-settings
-// .component.spec.ts: a MatDialog spy stands in for EntityAliasDialogComponent (never actually
-// rendered), so this proves the component's own wiring (config -> aliasController -> callbacks ->
-// list) without compiling a template that would drag in the real dialog + Store/Router/
-// TranslateService.
+// Plain instantiation (no TestBed). The component takes its ReportAliasCallbacksFactory as a plain
+// constructor param (@Inject(REPORT_ALIAS_CALLBACKS_FACTORY)), so a spec can hand it a fake factory
+// directly with no DI container at all. This - not TestBed - is what matters for karma-runnability:
+// the component's own imports never reach EntityAliasDialogComponent/FilterDialogComponent (only the
+// dialog-class-agnostic report-alias-callbacks.models.ts), so this spec never does either. Whether
+// "Add alias" really opens EntityAliasDialogComponent with the right data, and the keyFilters
+// conversion for filters, is proven separately in report-alias-callbacks.spec.ts (which tests the
+// exact same data-flow code, parametrized by a fake dialog class instead of a fake callbacks object -
+// see that file's header). This spec's job is the component's OWN wiring: config -> aliasController,
+// list rendering, and add/edit/delete correctly delegating to (and reacting to) the injected
+// callbacks.
 import { of } from 'rxjs';
 import { ReportEntityAliasesComponent } from './report-entity-aliases.component';
 import { newPdfReportTemplateConfig, ReportTemplateConfigModel } from '@shared/models/report-configuration.models';
 import { AliasFilterType, EntityAlias } from '@shared/models/alias.models';
 import { EntityType } from '@shared/models/entity-type.models';
-import { EntityAliasDialogComponent } from '@home/components/alias/entity-alias-dialog.component';
+import { ReportAliasCallbacks, ReportAliasCallbacksFactory } from './report-alias-callbacks.models';
 
 function configWithOneAlias(): ReportTemplateConfigModel {
   return {
@@ -35,80 +41,86 @@ function configWithOneAlias(): ReportTemplateConfigModel {
   };
 }
 
-function newComponent(config: ReportTemplateConfigModel, dialog: jasmine.SpyObj<any>): ReportEntityAliasesComponent {
-  const component = new ReportEntityAliasesComponent(dialog);
+function newComponent(config: ReportTemplateConfigModel): {
+  component: ReportEntityAliasesComponent;
+  callbacks: jasmine.SpyObj<ReportAliasCallbacks>;
+} {
+  const callbacks: jasmine.SpyObj<ReportAliasCallbacks> =
+    jasmine.createSpyObj('ReportAliasCallbacks', ['createEntityAlias', 'editEntityAlias', 'createFilter', 'editFilter']);
+  callbacks.createEntityAlias.and.returnValue(of(null));
+  callbacks.editEntityAlias.and.returnValue(of(null));
+  const factory: ReportAliasCallbacksFactory = () => callbacks;
+  const component = new ReportEntityAliasesComponent(factory);
   component.config = config;
   component.ngOnInit();
-  return component;
-}
-
-function fakeDialog(returnValue: any): jasmine.SpyObj<any> {
-  const dialog = jasmine.createSpyObj('MatDialog', ['open']);
-  dialog.open.and.returnValue({afterClosed: () => returnValue});
-  return dialog;
+  return {component, callbacks};
 }
 
 describe('ReportEntityAliasesComponent', () => {
 
   it('lists config.entityAliases on init', () => {
-    const config = configWithOneAlias();
-    const component = newComponent(config, fakeDialog(of(null)));
+    const {component} = newComponent(configWithOneAlias());
 
     expect(component.aliases.length).toBe(1);
     expect(component.aliases[0].alias).toBe('Devices');
   });
 
-  it('addAlias() opens EntityAliasDialogComponent, and the returned EntityAlias is appended to config.entityAliases', () => {
+  it('addAlias() calls callbacks.createEntityAlias(), and when it resolves the returned EntityAlias is appended to config.entityAliases', () => {
     const config = configWithOneAlias();
+    const {component, callbacks} = newComponent(config);
     const newAlias: EntityAlias = {id: 'a2', alias: 'Assets', filter: {type: AliasFilterType.entityType, entityType: EntityType.ASSET}};
-    const dialog = fakeDialog(of(newAlias));
-    const component = newComponent(config, dialog);
+    // Mimics what the real factory (report-alias-callbacks.ts, proven separately) does on success:
+    // writes the new alias into config. This spec is about the component reacting correctly to that
+    // outcome (re-reading config via aliasController and refreshing its list), not re-proving the
+    // write-back logic itself.
+    callbacks.createEntityAlias.and.callFake(() => {
+      config.entityAliases = [...config.entityAliases, newAlias];
+      return of(newAlias);
+    });
 
     component.addAlias();
 
-    expect(dialog.open).toHaveBeenCalledWith(EntityAliasDialogComponent, jasmine.objectContaining({
-      data: jasmine.objectContaining({isAdd: true})
-    }));
-    expect(config.entityAliases.find(a => a.id === 'a2')).toEqual(newAlias as any);
+    expect(callbacks.createEntityAlias).toHaveBeenCalledWith('', undefined);
     expect(config.entityAliases.length).toBe(2);
     expect(component.aliases.length).toBe(2);
+    expect(component.aliases.find(a => a.id === 'a2').alias).toBe('Assets');
   });
 
-  it('addAlias() does not change config.entityAliases when the dialog is cancelled', () => {
+  it('addAlias() does not refresh (or change config) when the dialog is cancelled (callbacks resolves null)', () => {
     const config = configWithOneAlias();
-    const dialog = fakeDialog(of(null));
-    const component = newComponent(config, dialog);
+    const {component, callbacks} = newComponent(config);
 
     component.addAlias();
 
+    expect(callbacks.createEntityAlias).toHaveBeenCalled();
     expect(config.entityAliases.length).toBe(1);
     expect(component.aliases.length).toBe(1);
   });
 
-  it('editAlias() opens EntityAliasDialogComponent with isAdd false, and the result replaces the entry in config.entityAliases', () => {
+  it('editAlias() calls callbacks.editEntityAlias() with the selected alias, and when it resolves the result replaces the entry in config', () => {
     const config = configWithOneAlias();
+    const {component, callbacks} = newComponent(config);
     const edited: EntityAlias = {id: 'a1', alias: 'Devices renamed', filter: {type: AliasFilterType.entityType, entityType: EntityType.DEVICE}};
-    const dialog = fakeDialog(of(edited));
-    const component = newComponent(config, dialog);
+    callbacks.editEntityAlias.and.callFake(() => {
+      config.entityAliases = config.entityAliases.map(a => a.id === 'a1' ? edited : a);
+      return of(edited);
+    });
 
     component.editAlias(component.aliases[0]);
 
-    expect(dialog.open).toHaveBeenCalledWith(EntityAliasDialogComponent, jasmine.objectContaining({
-      data: jasmine.objectContaining({isAdd: false})
-    }));
-    expect(config.entityAliases.length).toBe(1);
+    expect(callbacks.editEntityAlias).toHaveBeenCalledWith(jasmine.objectContaining({id: 'a1', alias: 'Devices'}), undefined);
     expect(config.entityAliases[0].alias).toBe('Devices renamed');
     expect(component.aliases[0].alias).toBe('Devices renamed');
   });
 
-  it('deleteAlias() removes the entry from config.entityAliases without opening a dialog', () => {
+  it('deleteAlias() removes the entry from config.entityAliases without calling any callback', () => {
     const config = configWithOneAlias();
-    const dialog = fakeDialog(of(null));
-    const component = newComponent(config, dialog);
+    const {component, callbacks} = newComponent(config);
 
     component.deleteAlias(component.aliases[0]);
 
-    expect(dialog.open).not.toHaveBeenCalled();
+    expect(callbacks.createEntityAlias).not.toHaveBeenCalled();
+    expect(callbacks.editEntityAlias).not.toHaveBeenCalled();
     expect(config.entityAliases.length).toBe(0);
     expect(component.aliases.length).toBe(0);
   });

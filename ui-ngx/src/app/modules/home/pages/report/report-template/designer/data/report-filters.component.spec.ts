@@ -15,15 +15,30 @@
 ///
 
 // Plain instantiation (no TestBed) - see report-entity-aliases.component.spec.ts's header for the
-// rationale. The distinguishing concern here is the keyFilters shape boundary: FilterDialogComponent
-// operates on platform KeyFilterInfo[] ({predicates[]}), but config.filters[] must always end up
-// holding report KeyFilter[] ({predicate}) - the "createFilter lands in config.filters[] in REPORT
-// {predicate} keyFilters shape" assertion below is the load-bearing one.
+// rationale (fake ReportAliasCallbacksFactory as a plain constructor param keeps this file's own
+// imports clear of EntityAliasDialogComponent/FilterDialogComponent, which is what makes it
+// karma-runnable). The keyFilters conversion boundary (FilterDialogComponent operates on platform
+// KeyFilterInfo[]; config.filters[] must always hold report KeyFilter[]) is proven for real in
+// report-alias-callbacks.spec.ts, against the exact production data-flow code
+// (report-alias-dialog-flow.ts), parametrized by a fake dialog class. This spec's job is the
+// component's OWN wiring: config -> aliasController, list rendering, and add/edit/delete correctly
+// delegating to (and reacting to) the injected callbacks.
+//
+// ReportAliasCallbacks.createFilter/editFilter return PLATFORM Filter (query.models.ts,
+// keyFilters: KeyFilterInfo[] - matching FilterSelectCallbacks' own contract), which can't be pushed
+// directly into config.filters (report Filter[], keyFilters: KeyFilter[] - a genuinely different
+// shape, not just an optional-vs-required difference the way EntityAlias is). So the fake
+// createFilter/editFilter below route their "on success" write-back through a REAL
+// createReportAliasController (Task 9's shim - no dialog dependency, safe here) exactly as the real
+// factory does, which performs the actual KeyFilterInfo[]->KeyFilter[] conversion. That conversion
+// itself is what report-alias-callbacks.spec.ts proves in detail; reusing the real shim here (rather
+// than hand-rolling a second conversion in the test) means this spec can't silently diverge from it.
 import { of } from 'rxjs';
 import { ReportFiltersComponent } from './report-filters.component';
 import { newPdfReportTemplateConfig, ReportTemplateConfigModel } from '@shared/models/report-configuration.models';
 import { EntityKeyType, EntityKeyValueType, Filter, KeyFilterInfo } from '@shared/models/query/query.models';
-import { FilterDialogComponent } from '@home/components/filter/filter-dialog.component';
+import { ReportAliasCallbacks, ReportAliasCallbacksFactory } from './report-alias-callbacks.models';
+import { createReportAliasController } from './report-alias-controller';
 
 function configWithOneFilter(): ReportTemplateConfigModel {
   return {
@@ -44,31 +59,36 @@ function configWithOneFilter(): ReportTemplateConfigModel {
   };
 }
 
-function newComponent(config: ReportTemplateConfigModel, dialog: jasmine.SpyObj<any>): ReportFiltersComponent {
-  const component = new ReportFiltersComponent(dialog);
+function newComponent(config: ReportTemplateConfigModel): {
+  component: ReportFiltersComponent;
+  callbacks: jasmine.SpyObj<ReportAliasCallbacks>;
+} {
+  const callbacks: jasmine.SpyObj<ReportAliasCallbacks> =
+    jasmine.createSpyObj('ReportAliasCallbacks', ['createEntityAlias', 'editEntityAlias', 'createFilter', 'editFilter']);
+  callbacks.createFilter.and.returnValue(of(null));
+  callbacks.editFilter.and.returnValue(of(null));
+  const factory: ReportAliasCallbacksFactory = () => callbacks;
+  const component = new ReportFiltersComponent(factory);
   component.config = config;
   component.ngOnInit();
-  return component;
-}
-
-function fakeDialog(returnValue: any): jasmine.SpyObj<any> {
-  const dialog = jasmine.createSpyObj('MatDialog', ['open']);
-  dialog.open.and.returnValue({afterClosed: () => returnValue});
-  return dialog;
+  return {component, callbacks};
 }
 
 describe('ReportFiltersComponent', () => {
 
   it('lists config.filters on init', () => {
-    const config = configWithOneFilter();
-    const component = newComponent(config, fakeDialog(of(null)));
+    const {component} = newComponent(configWithOneFilter());
 
     expect(component.filters.length).toBe(1);
     expect(component.filters[0].filter).toBe('High severity');
   });
 
-  it('addFilter() opens FilterDialogComponent, and a platform-shaped result lands in config.filters[] in REPORT {predicate} keyFilters shape', () => {
+  it('addFilter() calls callbacks.createFilter(), and when it resolves the platform-shaped result lands in config.filters[] in REPORT {predicate} keyFilters shape', () => {
     const config = configWithOneFilter();
+    const {component, callbacks} = newComponent(config);
+    // A SEPARATE aliasController instance over the SAME config - Task 9's shim is a stateless proxy
+    // (see its header), so this is functionally identical to the one the component built internally.
+    const aliasController = createReportAliasController(() => config);
     const newPlatformFilter: Filter = {
       id: 'f2',
       filter: 'Low severity',
@@ -81,43 +101,45 @@ describe('ReportFiltersComponent', () => {
         } as KeyFilterInfo
       ]
     };
-    const dialog = fakeDialog(of(newPlatformFilter));
-    const component = newComponent(config, dialog);
+    callbacks.createFilter.and.callFake(() => {
+      const filters = aliasController.getFilters();
+      filters[newPlatformFilter.id] = newPlatformFilter;
+      aliasController.updateFilters(filters);
+      return of(newPlatformFilter);
+    });
 
     component.addFilter();
 
-    expect(dialog.open).toHaveBeenCalledWith(FilterDialogComponent, jasmine.objectContaining({
-      data: jasmine.objectContaining({isAdd: true})
-    }));
-    const stored = config.filters.find(f => f.id === 'f2');
-    expect(stored).toBeTruthy();
-    expect(stored.filter).toBe('Low severity');
-    // THE conversion boundary the brief calls out: config.filters[] must hold report {predicate}
-    // shape, never the platform {predicates[]} shape FilterDialogComponent returned.
-    expect((stored.keyFilters[0] as any).predicate).toEqual({type: 'STRING', operation: 'EQUAL', value: {defaultValue: 'LOW'}} as any);
-    expect((stored.keyFilters[0] as any).predicates).toBeUndefined();
+    expect(callbacks.createFilter).toHaveBeenCalledWith('');
+    expect(config.filters.length).toBe(2);
     expect(component.filters.length).toBe(2);
+    const stored = config.filters.find(f => f.id === 'f2');
+    expect(stored.filter).toBe('Low severity');
+    // THE conversion boundary: config.filters[] must hold report {predicate} shape, never the
+    // platform {predicates[]} shape the fake callback resolved with.
+    expect((stored.keyFilters[0] as any).predicate).toBeDefined();
+    expect((stored.keyFilters[0] as any).predicates).toBeUndefined();
+    expect(stored.keyFilters[0].predicate).toEqual({type: 'STRING', operation: 'EQUAL', value: {defaultValue: 'LOW'}} as any);
   });
 
-  it('addFilter() does not change config.filters when the dialog is cancelled', () => {
+  it('addFilter() does not refresh (or change config) when the dialog is cancelled (callbacks resolves null)', () => {
     const config = configWithOneFilter();
-    const dialog = fakeDialog(of(null));
-    const component = newComponent(config, dialog);
+    const {component, callbacks} = newComponent(config);
 
     component.addFilter();
 
+    expect(callbacks.createFilter).toHaveBeenCalled();
     expect(config.filters.length).toBe(1);
     expect(component.filters.length).toBe(1);
   });
 
-  it('editFilter() opens FilterDialogComponent with isAdd false, and the result replaces the entry in config.filters, still in REPORT keyFilters shape', () => {
+  it('editFilter() calls callbacks.editFilter() with the selected filter, and when it resolves the result replaces the entry in config, still REPORT-shaped', () => {
     const config = configWithOneFilter();
-    const component0 = newComponent(config, fakeDialog(of(null)));
-    const existing = component0.filters[0];
+    const {component, callbacks} = newComponent(config);
+    const aliasController = createReportAliasController(() => config);
     const edited: Filter = {
-      id: 'f1',
+      ...component.filters[0],
       filter: 'High severity renamed',
-      editable: false,
       keyFilters: [
         {
           key: {type: EntityKeyType.ATTRIBUTE, key: 'severity'},
@@ -126,28 +148,30 @@ describe('ReportFiltersComponent', () => {
         } as KeyFilterInfo
       ]
     };
-    const dialog = fakeDialog(of(edited));
-    const component = newComponent(config, dialog);
+    callbacks.editFilter.and.callFake(() => {
+      const filters = aliasController.getFilters();
+      filters[edited.id] = edited;
+      aliasController.updateFilters(filters);
+      return of(edited);
+    });
 
-    component.editFilter(existing);
+    component.editFilter(component.filters[0]);
 
-    expect(dialog.open).toHaveBeenCalledWith(FilterDialogComponent, jasmine.objectContaining({
-      data: jasmine.objectContaining({isAdd: false})
-    }));
+    expect(callbacks.editFilter).toHaveBeenCalledWith(jasmine.objectContaining({id: 'f1', filter: 'High severity'}));
     expect(config.filters.length).toBe(1);
     expect(config.filters[0].filter).toBe('High severity renamed');
     expect((config.filters[0].keyFilters[0] as any).predicate.operation).toBe('NOT_EQUAL');
     expect((config.filters[0].keyFilters[0] as any).predicates).toBeUndefined();
   });
 
-  it('deleteFilter() removes the entry from config.filters without opening a dialog', () => {
+  it('deleteFilter() removes the entry from config.filters without calling any callback', () => {
     const config = configWithOneFilter();
-    const dialog = fakeDialog(of(null));
-    const component = newComponent(config, dialog);
+    const {component, callbacks} = newComponent(config);
 
     component.deleteFilter(component.filters[0]);
 
-    expect(dialog.open).not.toHaveBeenCalled();
+    expect(callbacks.createFilter).not.toHaveBeenCalled();
+    expect(callbacks.editFilter).not.toHaveBeenCalled();
     expect(config.filters.length).toBe(0);
     expect(component.filters.length).toBe(0);
   });

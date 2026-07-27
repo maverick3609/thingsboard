@@ -16,24 +16,26 @@
 
 // Template-level "manage filters" list (Task 10, deliverable 2) - the config.filters[] counterpart
 // of report-entity-aliases.component.ts; see that file's header for the shared design rationale
-// (local throwaway aliasController, no in-use-on-delete guard). The one filter-specific concern is
-// the keyFilters shape boundary: config.filters[].keyFilters is report KeyFilter[] ({predicate}), but
-// FilterDialogComponent (and the platform Filters map placed into FilterDialogData.filters for its
-// duplicate-name check) both operate on KeyFilterInfo[] ({predicates[]}) - going through
-// aliasController.getFilters()/updateFilters() (Task 9's shim) for every read/write, exactly as
-// report-alias-callbacks.ts's createFilter/editFilter do internally, means this component never
-// touches keyFiltersToKeyFilterInfos/keyFilterInfosToKeyFilters directly and can't get the shape
-// wrong.
-import { Component, Input, OnInit } from '@angular/core';
-import { MatDialog } from '@angular/material/dialog';
+// (local throwaway aliasController, no in-use-on-delete guard, and why this depends on
+// report-alias-callbacks.models.ts's DI token rather than report-alias-callbacks.ts's concrete
+// factory directly - the karma-breaking dialog-class import this sidesteps). The one filter-specific
+// concern is the keyFilters shape boundary: config.filters[].keyFilters is report KeyFilter[]
+// ({predicate}), but FilterDialogComponent (and the platform Filters map placed into
+// FilterDialogData.filters for its duplicate-name check) both operate on KeyFilterInfo[]
+// ({predicates[]}) - going through aliasController.getFilters()/updateFilters() (Task 9's shim) for
+// every read/write, exactly as report-alias-dialog-flow.ts's openFilterDialog does internally, means
+// this component never touches keyFiltersToKeyFilterInfos/keyFilterInfosToKeyFilters directly and
+// can't get the shape wrong.
+import { Component, Inject, Input, OnInit } from '@angular/core';
 import { Filter } from '@shared/models/query/query.models';
 import { IAliasController } from '@core/api/widget-api.models';
 import { ReportTemplateConfigModel } from '@shared/models/report-configuration.models';
 import { createReportAliasController } from '@home/pages/report/report-template/designer/data/report-alias-controller';
 import {
-  createReportAliasCallbacks,
-  ReportAliasCallbacks
-} from '@home/pages/report/report-template/designer/data/report-alias-callbacks';
+  REPORT_ALIAS_CALLBACKS_FACTORY,
+  ReportAliasCallbacks,
+  ReportAliasCallbacksFactory
+} from '@home/pages/report/report-template/designer/data/report-alias-callbacks.models';
 
 @Component({
     selector: 'tb-report-filters',
@@ -51,12 +53,12 @@ export class ReportFiltersComponent implements OnInit {
   private aliasController: IAliasController;
   private callbacks: ReportAliasCallbacks;
 
-  constructor(private dialog: MatDialog) {
+  constructor(@Inject(REPORT_ALIAS_CALLBACKS_FACTORY) private callbacksFactory: ReportAliasCallbacksFactory) {
   }
 
   ngOnInit(): void {
     this.aliasController = createReportAliasController(() => this.config);
-    this.callbacks = createReportAliasCallbacks(this.dialog, this.aliasController);
+    this.callbacks = this.callbacksFactory(this.aliasController);
     this.refresh();
   }
 

@@ -1,0 +1,68 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<div class="tb-report-dashboard-config flex flex-col gap-2" [formGroup]="dashFormGroup">
+  <div class="mat-subtitle-1" translate>report.designer.component-dashboard</div>
+  <tb-report-config-tabs [tabs]="['content', 'data', 'layout']">
+    <div tabContent class="flex flex-col gap-2">
+      <tb-dashboard-autocomplete formControlName="dashboardId"></tb-dashboard-autocomplete>
+      <mat-form-field subscriptSizing="dynamic">
+        <mat-label translate>report.designer.dashboard-state</mat-label>
+        <input matInput formControlName="state"/>
+      </mat-form-field>
+      <tb-timewindow asButton
+                     strokedButton
+                     isEdit="true"
+                     [historyOnly]="true"
+                     formControlName="timewindow">
+      </tb-timewindow>
+      <mat-checkbox formControlName="useDashboardTimewindow" translate>report.designer.use-dashboard-timewindow</mat-checkbox>
+    </div>
+    <div tabData class="flex flex-col gap-2">
+      <tb-report-datasources [aliasController]="aliasController" formControlName="dataSources"></tb-report-datasources>
+    </div>
+    <div tabLayout class="flex flex-col gap-2">
+      <mat-form-field subscriptSizing="dynamic">
+        <mat-select formControlName="widthType" placeholder="{{ 'report.designer.image-width-type' | translate }}">
+          <mat-option [value]="widthTypeEnum.FIT_WIDTH" translate>report.designer.image-width-type-fit-width</mat-option>
+          <mat-option [value]="widthTypeEnum.ORIGINAL" translate>report.designer.image-width-type-original</mat-option>
+          <mat-option [value]="widthTypeEnum.CUSTOM" translate>report.designer.image-width-type-custom</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field *ngIf="dashFormGroup.get('widthType').value === widthTypeEnum.CUSTOM" subscriptSizing="dynamic">
+        <input matInput type="number" min="0" formControlName="customWidth"
+               placeholder="{{ 'report.designer.image-custom-width' | translate }}"/>
+      </mat-form-field>
+      <mat-form-field subscriptSizing="dynamic">
+        <mat-select formControlName="alignment" placeholder="{{ 'report.designer.image-alignment' | translate }}">
+          <mat-option [value]="alignmentEnum.LEFT" translate>report.designer.align-left</mat-option>
+          <mat-option [value]="alignmentEnum.CENTER" translate>report.designer.align-center</mat-option>
+          <mat-option [value]="alignmentEnum.RIGHT" translate>report.designer.align-right</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <div class="flex flex-col gap-1">
+        <label class="mat-caption" translate>report.designer.margins</label>
+        <tb-report-insets formControlName="margins"></tb-report-insets>
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="mat-caption" translate>report.designer.paddings</label>
+        <tb-report-insets formControlName="paddings"></tb-report-insets>
+      </div>
+      <tb-report-background-border formControlName="backgroundBorder"></tb-report-background-border>
+    </div>
+  </tb-report-config-tabs>
+</div>

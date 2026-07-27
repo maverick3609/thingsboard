@@ -93,6 +93,11 @@
                                     [ngModel]="selected"
                                     (ngModelChange)="onComponentChange($event)">
       </tb-report-sub-report-config>
+      <tb-report-dashboard-config *ngIf="selected?.type === 'DASHBOARD'"
+                                   [aliasController]="aliasController"
+                                   [ngModel]="selected"
+                                   (ngModelChange)="onComponentChange($event)">
+      </tb-report-dashboard-config>
       <div *ngIf="selected && !hasConfigPanel(selected.type)" class="tb-report-config-placeholder tb-prompt" translate>report.designer.component-not-configurable</div>
     </div>
   </div>

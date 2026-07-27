@@ -5487,7 +5487,9 @@
             "alarm-assignee-unsupported": "The 'assigned to current user' alarm filter option is not supported in reports and will be ignored.",
             "sub-report-template": "Report template",
             "avoid-page-break-inside": "Avoid page break inside",
-            "data-sources": "Data sources"
+            "data-sources": "Data sources",
+            "dashboard-state": "Dashboard state",
+            "use-dashboard-timewindow": "Use dashboard time window"
         }
     },
     "security": {

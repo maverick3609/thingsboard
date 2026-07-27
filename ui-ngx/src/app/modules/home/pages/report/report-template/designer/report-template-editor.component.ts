@@ -127,11 +127,11 @@ export class ReportTemplateEditorComponent implements OnInit {
     }
   }
 
-  // The 5 C1 types plus C2 Task 11's 3 table types plus Task 13's SUB_REPORT now have a dedicated
-  // branch in the right panel below; DASHBOARD is the only remaining palette type with no panel yet,
-  // so the template falls back to a placeholder rather than rendering blank.
+  // The 5 C1 types plus C2 Task 11's 3 table types plus Task 13's SUB_REPORT plus Task 14's
+  // DASHBOARD now have a dedicated branch in the right panel below; the remaining palette types
+  // (the C2 preset/composite cluster) fall back to a placeholder rather than rendering blank.
   hasConfigPanel(type: string): boolean {
-    return ['PAGE_BREAK', 'DIVIDER', 'HEADING', 'RICH_TEXT', 'IMAGE', 'ENTITY_TABLE', 'ALARM_TABLE', 'TIME_SERIES_TABLE', 'SUB_REPORT'].includes(type);
+    return ['PAGE_BREAK', 'DIVIDER', 'HEADING', 'RICH_TEXT', 'IMAGE', 'ENTITY_TABLE', 'ALARM_TABLE', 'TIME_SERIES_TABLE', 'SUB_REPORT', 'DASHBOARD'].includes(type);
   }
 
   save(): void {

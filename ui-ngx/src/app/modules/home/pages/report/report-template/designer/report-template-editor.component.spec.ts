@@ -119,7 +119,7 @@ describe('ReportTemplateEditorComponent', () => {
     expect(divider.widthPx).toBe(2);
   });
 
-  it('hasConfigPanel is true for the 5 C1 types plus C2 Task 11\'s 3 table types plus Task 13\'s SUB_REPORT, false only for DASHBOARD (no panel yet)', () => {
+  it('hasConfigPanel is true for all 10 real palette component types (C1\'s 5, C2 Task 11\'s 3 tables, Task 13\'s SUB_REPORT, Task 14\'s DASHBOARD); false for the renderer-only ERROR type', () => {
     const component = new ReportTemplateEditorComponent(routeWithId('new'), router, reportService);
 
     expect(component.hasConfigPanel('PAGE_BREAK')).toBe(true);
@@ -131,7 +131,10 @@ describe('ReportTemplateEditorComponent', () => {
     expect(component.hasConfigPanel('ALARM_TABLE')).toBe(true);
     expect(component.hasConfigPanel('TIME_SERIES_TABLE')).toBe(true);
     expect(component.hasConfigPanel('SUB_REPORT')).toBe(true);
-    expect(component.hasConfigPanel('DASHBOARD')).toBe(false);
+    expect(component.hasConfigPanel('DASHBOARD')).toBe(true);
+    // ERROR (components/ErrorComponent.java) is a renderer-only fallback, never palette-draggable or
+    // user-configured - the one real ReportComponentType left with no config panel.
+    expect(component.hasConfigPanel('ERROR')).toBe(false);
   });
 
   it('creates an aliasController in ngOnInit, backed by the live config (Task 11)', () => {

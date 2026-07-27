@@ -56,6 +56,9 @@ import {
   ReportSubReportConfigComponent
 } from '@home/pages/report/report-template/designer/components/report-sub-report-config.component';
 import {
+  ReportDashboardConfigComponent
+} from '@home/pages/report/report-template/designer/components/report-dashboard-config.component';
+import {
   ReportConfigTabsComponent
 } from '@home/pages/report/report-template/designer/data/report-config-tabs.component';
 import {
@@ -171,7 +174,14 @@ import {
     // C2 Task 13: right-panel config panel for SUB_REPORT - a bespoke report-template
     // mat-autocomplete (no generic-entity-query REPORT_TEMPLATE support exists) + the
     // avoidPageBreakInside CSV gate + Task 8's tb-report-datasources.
-    ReportSubReportConfigComponent
+    ReportSubReportConfigComponent,
+    // C2 Task 14: right-panel config panel for DASHBOARD - tb-dashboard-autocomplete +
+    // tb-timewindow (bound raw, no shim) + Task 8's tb-report-datasources + the inline image-sizing
+    // controls report-image-config.component.html established, all behind a security-critical
+    // allowlist that structurally excludes baseUrl/userId/useCurrentUserCredentials from the
+    // emitted DashboardReportConfig (R2a's CRITICAL SSRF/token-exfil finding, replicated here as FE
+    // defense-in-depth).
+    ReportDashboardConfigComponent
   ],
   imports: [
     CommonModule,
@@ -229,7 +239,8 @@ import {
     ReportEntityAliasesComponent,
     ReportFiltersComponent,
     ReportTableConfigComponent,
-    ReportSubReportConfigComponent
+    ReportSubReportConfigComponent,
+    ReportDashboardConfigComponent
   ]
 })
 export class ReportModule { }

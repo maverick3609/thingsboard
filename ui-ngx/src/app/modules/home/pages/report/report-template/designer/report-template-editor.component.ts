@@ -21,6 +21,8 @@ import { ReportTemplate, ReportTemplateType, TbReportFormat } from '@shared/mode
 import { ReportComponent, ReportTemplateConfigModel, newPdfReportTemplateConfig } from '@shared/models/report-configuration.models';
 import { deserialize, serialize } from '@home/pages/report/report-template/designer/report-configuration.serializer';
 import { ReportPageSettings } from '@home/pages/report/report-template/designer/report-page-settings.component';
+import { IAliasController } from '@core/api/widget-api.models';
+import { createReportAliasController } from '@home/pages/report/report-template/designer/data/report-alias-controller';
 
 // PDF-only projection of config's page-level fields for tb-report-page-settings (T5); null for a
 // CSV config, which has no page settings - the shell hides the panel rather than show one whose
@@ -58,6 +60,10 @@ export class ReportTemplateEditorComponent implements OnInit {
   selected: ReportComponent | null = null;
   viewMode: 'edit' | 'preview' = 'edit';
   pageSettings: ReportPageSettings | null = null;
+  // Bounded IAliasController shim (Task 9) backing tb-entity-alias-select/tb-filter-select inside
+  // Task 11's table panels - built once here, lazily reading `this.config` on every call, so it
+  // stays valid across the async (existing-template) load path below.
+  aliasController: IAliasController;
 
   constructor(private route: ActivatedRoute,
               private router: Router,
@@ -65,6 +71,7 @@ export class ReportTemplateEditorComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.aliasController = createReportAliasController(() => this.config);
     const reportTemplateId = this.route.snapshot.paramMap.get('reportTemplateId');
     this.isAdd = !reportTemplateId || reportTemplateId === 'new';
     if (this.isAdd) {
@@ -114,11 +121,11 @@ export class ReportTemplateEditorComponent implements OnInit {
     }
   }
 
-  // The 5 types with a dedicated branch in the right panel below; every other palette type (the C2
-  // table/sub-report/dashboard components) has no panel yet, so the template falls back to a
-  // placeholder rather than rendering blank.
+  // The 5 C1 types plus C2 Task 11's 3 table types now have a dedicated branch in the right panel
+  // below; every other palette type (SUB_REPORT/DASHBOARD) has no panel yet, so the template falls
+  // back to a placeholder rather than rendering blank.
   hasConfigPanel(type: string): boolean {
-    return ['PAGE_BREAK', 'DIVIDER', 'HEADING', 'RICH_TEXT', 'IMAGE'].includes(type);
+    return ['PAGE_BREAK', 'DIVIDER', 'HEADING', 'RICH_TEXT', 'IMAGE', 'ENTITY_TABLE', 'ALARM_TABLE', 'TIME_SERIES_TABLE'].includes(type);
   }
 
   save(): void {

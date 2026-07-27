@@ -50,6 +50,9 @@ import {
   ReportImageConfigComponent
 } from '@home/pages/report/report-template/designer/components/report-image-config.component';
 import {
+  ReportTableConfigComponent
+} from '@home/pages/report/report-template/designer/components/report-table-config.component';
+import {
   ReportConfigTabsComponent
 } from '@home/pages/report/report-template/designer/data/report-config-tabs.component';
 import {
@@ -157,7 +160,11 @@ import {
     // FilterDialogComponent, both already reachable through HomeComponentsModule below) - hosted by
     // ReportPageSettingsComponent's two new expansion-panel entry points.
     ReportEntityAliasesComponent,
-    ReportFiltersComponent
+    ReportFiltersComponent,
+    // C2 Task 11: generic right-panel config panel for the 3 table-shaped components
+    // (ENTITY_TABLE/ALARM_TABLE/TIME_SERIES_TABLE) - assembles Tasks 2/4/5/8/9's sub-editors behind
+    // one CVA shaped by `componentType`.
+    ReportTableConfigComponent
   ],
   imports: [
     CommonModule,
@@ -213,7 +220,8 @@ import {
     ReportDatasourceComponent,
     ReportDatasourcesComponent,
     ReportEntityAliasesComponent,
-    ReportFiltersComponent
+    ReportFiltersComponent,
+    ReportTableConfigComponent
   ]
 })
 export class ReportModule { }

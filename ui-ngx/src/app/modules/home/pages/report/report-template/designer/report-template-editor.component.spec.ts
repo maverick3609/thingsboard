@@ -115,7 +115,7 @@ describe('ReportTemplateEditorComponent', () => {
     expect(divider.widthPx).toBe(2);
   });
 
-  it('hasConfigPanel is true for the 5 C1 types with a dedicated right-panel branch, false for C2 types that have none yet', () => {
+  it('hasConfigPanel is true for the 5 C1 types plus C2 Task 11\'s 3 table types, false for C2 types that have none yet', () => {
     const component = new ReportTemplateEditorComponent(routeWithId('new'), router, reportService);
 
     expect(component.hasConfigPanel('PAGE_BREAK')).toBe(true);
@@ -123,8 +123,21 @@ describe('ReportTemplateEditorComponent', () => {
     expect(component.hasConfigPanel('HEADING')).toBe(true);
     expect(component.hasConfigPanel('RICH_TEXT')).toBe(true);
     expect(component.hasConfigPanel('IMAGE')).toBe(true);
-    expect(component.hasConfigPanel('ENTITY_TABLE')).toBe(false);
+    expect(component.hasConfigPanel('ENTITY_TABLE')).toBe(true);
+    expect(component.hasConfigPanel('ALARM_TABLE')).toBe(true);
+    expect(component.hasConfigPanel('TIME_SERIES_TABLE')).toBe(true);
+    expect(component.hasConfigPanel('SUB_REPORT')).toBe(false);
     expect(component.hasConfigPanel('DASHBOARD')).toBe(false);
+  });
+
+  it('creates an aliasController in ngOnInit, backed by the live config (Task 11)', () => {
+    const component = new ReportTemplateEditorComponent(routeWithId('new'), router, reportService);
+
+    component.ngOnInit();
+
+    expect(component.aliasController).toBeTruthy();
+    component.config.entityAliases = [{ id: 'a1', alias: 'Devices' }];
+    expect(component.aliasController.getEntityAliases().a1?.alias).toBe('Devices');
   });
 
   it('onComponentsChange clears selected when it was deleted from the emitted array, but leaves it untouched on reorder/add', () => {

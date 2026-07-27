@@ -80,6 +80,12 @@
                                [ngModel]="selected"
                                (ngModelChange)="onComponentChange($event)">
       </tb-report-image-config>
+      <tb-report-table-config *ngIf="selected?.type === 'ENTITY_TABLE' || selected?.type === 'ALARM_TABLE' || selected?.type === 'TIME_SERIES_TABLE'"
+                               [componentType]="selected.type"
+                               [aliasController]="aliasController"
+                               [ngModel]="selected"
+                               (ngModelChange)="onComponentChange($event)">
+      </tb-report-table-config>
       <div *ngIf="selected && !hasConfigPanel(selected.type)" class="tb-report-config-placeholder tb-prompt" translate>report.designer.component-not-configurable</div>
     </div>
   </div>

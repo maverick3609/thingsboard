@@ -236,4 +236,26 @@ describe('ReportDatasourceComponent', () => {
     component.setDisabledState(false);
     expect(component.dsFormGroup.disabled).toBe(false);
   });
+
+  // Task 11 carry: allowedDataSourceTypes gating (backward-compatible - undefined permits every
+  // type, matching every pre-existing test above that never sets this Input).
+  it('isTypeAllowed: undefined allowedDataSourceTypes (the default) permits every type', () => {
+    const component = newComponent();
+
+    expect(component.allowedDataSourceTypes).toBeUndefined();
+    expect(component.isTypeAllowed(DataSourceType.DEVICE)).toBe(true);
+    expect(component.isTypeAllowed(DataSourceType.ENTITY)).toBe(true);
+    expect(component.isTypeAllowed(DataSourceType.ENTITY_COUNT)).toBe(true);
+    expect(component.isTypeAllowed(DataSourceType.ALARM_COUNT)).toBe(true);
+  });
+
+  it('isTypeAllowed: a set allowedDataSourceTypes narrows to only those types (Task 11 table-panel gating)', () => {
+    const component = newComponent();
+    component.allowedDataSourceTypes = [DataSourceType.DEVICE, DataSourceType.ENTITY];
+
+    expect(component.isTypeAllowed(DataSourceType.DEVICE)).toBe(true);
+    expect(component.isTypeAllowed(DataSourceType.ENTITY)).toBe(true);
+    expect(component.isTypeAllowed(DataSourceType.ENTITY_COUNT)).toBe(false);
+    expect(component.isTypeAllowed(DataSourceType.ALARM_COUNT)).toBe(false);
+  });
 });

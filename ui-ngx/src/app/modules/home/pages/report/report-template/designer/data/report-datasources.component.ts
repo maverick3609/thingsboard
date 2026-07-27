@@ -19,7 +19,7 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR, UntypedFormArray, UntypedFormB
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { coerceBoolean } from '@shared/decorators/coercion';
-import { DataSource } from '@shared/models/report-configuration.models';
+import { DataSource, DataSourceType } from '@shared/models/report-configuration.models';
 import { IAliasController } from '@core/api/widget-api.models';
 import { widgetType } from '@shared/models/widget.models';
 
@@ -71,6 +71,11 @@ export class ReportDatasourcesComponent implements ControlValueAccessor, OnInit,
   @Input()
   @coerceBoolean()
   showAlarmFilter = false;
+
+  // Task 11 carry: pure pass-through to every child tb-report-datasource - see that component's own
+  // header comment for the backward-compatibility contract (undefined -> all 4 options).
+  @Input()
+  allowedDataSourceTypes?: DataSourceType[];
 
   private destroy$ = new Subject<void>();
   private propagateChange: (value: DataSource[]) => void = () => {};

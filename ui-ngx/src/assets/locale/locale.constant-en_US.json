@@ -5480,7 +5480,11 @@
             "add-datasource": "Add data source",
             "remove-datasource": "Remove data source",
             "manage-aliases": "Manage aliases",
-            "manage-filters": "Manage filters"
+            "manage-filters": "Manage filters",
+            "show-timestamp": "Show timestamp",
+            "timestamp-label": "Timestamp label",
+            "timestamp-pattern": "Timestamp pattern",
+            "alarm-assignee-unsupported": "The 'assigned to current user' alarm filter option is not supported in reports and will be ignored."
         }
     },
     "security": {

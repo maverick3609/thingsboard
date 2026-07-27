@@ -159,6 +159,14 @@ export class ReportDatasourceComponent implements ControlValueAccessor, OnInit, 
   @coerceBoolean()
   showAlarmFilter = false;
 
+  // Task 11 carry: BACKWARD-COMPATIBLE - undefined (the default) renders all 4 mat-options exactly
+  // as before this Input existed. Task 11's table config panel sets this to [device, entity] since
+  // ENTITY_COUNT/ALARM_COUNT yield no table rows in the Inferrix renderer (R2b's query builder) -
+  // an Inferrix UX-honesty narrowing over PE's generic 4-option picker, not a PE deviation in the
+  // wire model (DataSourceType itself is untouched).
+  @Input()
+  allowedDataSourceTypes?: DataSourceType[];
+
   private destroy$ = new Subject<void>();
   private propagateChange: (value: DataSource) => void = () => {};
 
@@ -235,5 +243,11 @@ export class ReportDatasourceComponent implements ControlValueAccessor, OnInit, 
 
   get showAlarmFilterControl(): boolean {
     return isAlarmFilterRelevant(this.selectedType, this.showAlarmFilter);
+  }
+
+  // Gates each `type` mat-option in the template. undefined allowedDataSourceTypes (the default)
+  // permits every type, unchanged from before this Input existed.
+  isTypeAllowed(type: DataSourceType): boolean {
+    return !this.allowedDataSourceTypes || this.allowedDataSourceTypes.includes(type);
   }
 }

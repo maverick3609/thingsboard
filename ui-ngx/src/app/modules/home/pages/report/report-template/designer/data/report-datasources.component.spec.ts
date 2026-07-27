@@ -119,4 +119,16 @@ describe('ReportDatasourcesComponent', () => {
     const component = newComponent();
     expect(component.trackByIndex(3)).toBe(3);
   });
+
+  // Task 11 carry: pure pass-through, mirroring the aliasController/widgetType/showAlarmFilter test
+  // above - undefined by default (every pre-existing test never sets this Input).
+  it('exposes allowedDataSourceTypes as a plain pass-through Input (forwarded to each child)', () => {
+    const component = newComponent();
+
+    expect(component.allowedDataSourceTypes).toBeUndefined();
+
+    component.allowedDataSourceTypes = [DataSourceType.DEVICE, DataSourceType.ENTITY];
+
+    expect(component.allowedDataSourceTypes).toEqual([DataSourceType.DEVICE, DataSourceType.ENTITY]);
+  });
 });

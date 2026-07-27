@@ -18,6 +18,7 @@ import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SharedModule } from '@shared/shared.module';
 import { HomeComponentsModule } from '@home/components/home-components.module';
+import { WidgetConfigComponentsModule } from '@home/components/widget/config/widget-config-components.module';
 import { ReportRoutingModule } from '@home/pages/report/report-routing.module';
 import { ReportHistoryComponent } from '@home/pages/report/report-history/report-history.component';
 import { ReportTemplatesComponent } from '@home/pages/report/report-template/report-templates.component';
@@ -63,6 +64,9 @@ import {
 import {
   ReportTimewindowComponent
 } from '@home/pages/report/report-template/designer/data/report-timewindow.component';
+import {
+  ReportAlarmFilterComponent
+} from '@home/pages/report/report-template/designer/data/report-alarm-filter.component';
 
 @NgModule({
   declarations: [
@@ -112,12 +116,20 @@ import {
     // C2 Task 5: leaf CVA mapping shim between TimeWindowConfiguration (report wire model) and the
     // platform tb-timewindow widget's Timewindow CVA value - consumed by ALARM_TABLE's and
     // TIME_SERIES_TABLE's panels (Task 11).
-    ReportTimewindowComponent
+    ReportTimewindowComponent,
+    // C2 Task 6: leaf CVA mapping shim between AlarmFilterConfig (report wire model) and the
+    // platform tb-alarm-filter-config widget's AlarmFilterConfig CVA value - consumed by
+    // ALARM_TABLE's alarmSource panel (Task 11).
+    ReportAlarmFilterComponent
   ],
   imports: [
     CommonModule,
     SharedModule,
     HomeComponentsModule,
+    // C2 Task 6: tb-alarm-filter-config (wrapped by ReportAlarmFilterComponent) is declared/exported
+    // by WidgetConfigComponentsModule, which HomeComponentsModule imports but does NOT re-export -
+    // needed directly here for the selector to resolve in this module's templates.
+    WidgetConfigComponentsModule,
     ReportRoutingModule
   ],
   exports: [
@@ -138,7 +150,8 @@ import {
     ReportCellSettingsComponent,
     ReportColumnSettingsComponent,
     ReportTableSettingsComponent,
-    ReportTimewindowComponent
+    ReportTimewindowComponent,
+    ReportAlarmFilterComponent
   ]
 })
 export class ReportModule { }

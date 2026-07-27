@@ -43,32 +43,76 @@
 //    Preview renders server-side (POST /api/v2/report/test, R1); the designer itself never resolves
 //    anything. Each no-op returns the emptiest value its signature allows and never throws.
 //
-// KNOWN CAST (getFilters()/updateFilters() only): report Filter.keyFilters is typed
+// keyFilters CONVERSION (getFilters()/updateFilters() only): report Filter.keyFilters is typed
 // data.query.KeyFilter[] (report-configuration.models.ts imports KeyFilter directly from
-// query.models - the `{key, valueType, predicate}` shape). The platform's FilterInfo.keyFilters
-// (query.models.ts) is instead typed KeyFilterInfo[] - a DIFFERENT, richer `{key, valueType,
-// predicates: KeyFilterPredicateInfo[]}` shape used by the template-predicate "manage filters" UI.
-// These are structurally incompatible (KeyFilterInfo has no `predicate` field at all), so building a
-// platform FilterInfo from a report Filter needs an `as unknown as` cast on this one field. Neither
-// tb-filter-select nor tb-entity-alias-select ever reads into .keyFilters (confirmed by reading both
-// components in full - they only touch .id/.filter/.alias), so in THIS shim the cast carries opaque,
-// identity-preserving cargo, never interpreted. getKeyFilters() below deliberately bypasses this cast
-// and reads config.filters[].keyFilters directly, so any REAL keyFilters consumer always sees the
-// authentic report KeyFilter[] shape, never the cast placeholder.
+// query.models - the plain `{key, valueType, value?, predicate}` shape). The platform's
+// FilterInfo.keyFilters (query.models.ts) is instead typed KeyFilterInfo[] - a DIFFERENT, richer
+// `{key, valueType, value?, predicates: KeyFilterPredicateInfo[]}` shape used by the "manage
+// filters" template-predicate UI (home/components/filter/filters-edit.component.ts, which Task 10
+// is expected to reuse - it already calls getFilters()/getFilterInfo()/isFilterEditable() at
+// filters-edit.component.ts:178-186). KeyFilterInfo has no `predicate` field at all, so
+// isFilterEditable/filterInfoToKeyFilters (query.models.ts:550-620) throw
+// "Cannot read properties of undefined (reading 'predicates'/'some')" if handed a report KeyFilter
+// mislabeled as a KeyFilterInfo. An earlier version of this file used an `as unknown as` cast here -
+// WRONG, caught in review (task-9-report.md fix section) - now replaced with the platform's own
+// bidirectional converters, used verbatim (not reimplemented): getFilters()/getFilterInfo() build a
+// genuine KeyFilterInfo[] via keyFiltersToKeyFilterInfos(); updateFilters() converts back to a
+// genuine report KeyFilter[] via keyFilterInfosToKeyFilters().
 //
-// entityAlias.filter needs NO cast: report EntityAlias.filter is data.query.EntityFilter (same
+// The conversion is real but LOSSY in two narrow, accepted ways:
+//  1. keyFiltersToKeyFilterInfos GROUPS KeyFilter entries sharing the same key+type+valueType into
+//     one KeyFilterInfo with multiple predicates[] (query.models.ts:524-548). Converting back
+//     expands each group - the AND-set of predicates round-trips faithfully, but if the ORIGINAL
+//     array interleaved same-key entries with other keys between them, their relative ARRAY ORDER
+//     can change (grouped entries end up adjacent). Harmless for KeyFilter's actual use (an AND-set,
+//     not an ordered sequence) - this is the platform's own pre-existing helper behavior, not
+//     something introduced here.
+//  2. The converted KeyFilterPredicateInfo.userInfo is always `null`
+//     (keyFilterPredicateToKeyFilterPredicateInfo, query.models.ts:582-600, never populates it from
+//     a plain KeyFilterPredicate) - report filters carry no per-predicate "user-editable value"
+//     authoring metadata to draw from.
+//
+// Point 2 is why getFilters()/getFilterInfo() set `editable: false` below, and it's load-bearing,
+// not cosmetic: isFilterEditable() only walks into filter.keyFilters (and from there into
+// isPredicateInfoEditable's `predicateInfo.userInfo.editable`) when filter.editable is true
+// (query.models.ts:602-608). Since userInfo is always null post-conversion, reaching that branch
+// null-derefs regardless of how faithfully keyFilters itself is shaped
+// ("Cannot read properties of null (reading 'editable')", query.models.ts:619).
+// `editable: false` short-circuits isFilterEditable to `false` before that line is ever reached -
+// correct anyway, since an authored report template has no "viewer can tweak this predicate's value
+// live" concept for tb-filters-edit's UserFilterDialogComponent to attach to.
+//
+// getKeyFilters() deliberately does NOT run filterInfoToKeyFilters(getFilterInfo(id)) (the "obvious"
+// idiom, now that the shape is genuinely correct) - it keeps reading config.filters[].keyFilters
+// directly. Simpler, and it sidesteps the grouping/reorder nuance in point 1 above entirely (a
+// direct read can never reorder anything) for a member whose entire job is "hand back the
+// authoritative KeyFilter[]".
+//
+// entityAlias.filter needs NO conversion: report EntityAlias.filter is data.query.EntityFilter (same
 // import-straight-from-query.models pattern), and the platform's EntityAliasInfo.filter is
 // EntityAliasFilter = EntityFilter & { resolveMultiple?: boolean } (alias.models.ts) - a strict
 // structural superset with one extra OPTIONAL field, so EntityFilter values pass through in both
-// directions without a cast.
+// directions unchanged.
+//
+// updateEntityAliases()/updateFilters() deepClone the incoming map before adopting it into config
+// (matching core/api/alias-controller.ts:117's AliasController.updateFilters, which does the same),
+// so a caller mutating its passed-in object after the call can't reach back into the report's
+// persisted config through a shared reference.
 
 import { NEVER, Observable, of, Subject } from 'rxjs';
 import { AliasInfo, IAliasController } from '@core/api/widget-api.models';
 import { Datasource, TargetDevice } from '@shared/models/widget.models';
 import { EntityInfo } from '@app/shared/models/entity.models';
 import { EntityAliases } from '@shared/models/alias.models';
-import { Filter, FilterInfo, Filters, KeyFilter } from '@shared/models/query/query.models';
-import { isEqual } from '@core/utils';
+import {
+  Filter,
+  FilterInfo,
+  Filters,
+  KeyFilter,
+  keyFilterInfosToKeyFilters,
+  keyFiltersToKeyFilterInfos
+} from '@shared/models/query/query.models';
+import { deepClone, isEqual } from '@core/utils';
 import { ReportTemplateConfigModel } from '@shared/models/report-configuration.models';
 
 class ReportAliasController implements IAliasController {
@@ -105,10 +149,11 @@ class ReportAliasController implements IAliasController {
 
   updateEntityAliases(entityAliases: EntityAliases): void {
     const changedAliasIds = diffChangedIds(this.getEntityAliases(), entityAliases);
-    this.getConfig().entityAliases = Object.keys(entityAliases).map((id) => ({
+    const cloned: EntityAliases = deepClone(entityAliases);
+    this.getConfig().entityAliases = Object.keys(cloned).map((id) => ({
       id,
-      alias: entityAliases[id].alias,
-      filter: entityAliases[id].filter
+      alias: cloned[id].alias,
+      filter: cloned[id].filter
     }));
     if (changedAliasIds.length) {
       this.entityAliasesChangedSubject.next(changedAliasIds);
@@ -135,9 +180,9 @@ class ReportAliasController implements IAliasController {
       result[id] = {
         id,
         filter: filter.filter ?? '',
-        editable: true,
-        // Opaque cast - see header KNOWN CAST note. getKeyFilters() never reads this field back.
-        keyFilters: (filter.keyFilters ?? []) as unknown as FilterInfo['keyFilters']
+        // Load-bearing, not cosmetic - see header "keyFilters CONVERSION" point 2.
+        editable: false,
+        keyFilters: keyFiltersToKeyFilterInfos(filter.keyFilters ?? [])
       };
     }
     return result;
@@ -145,11 +190,12 @@ class ReportAliasController implements IAliasController {
 
   updateFilters(filters: Filters): void {
     const changedFilterIds = diffChangedIds(this.getFilters(), filters);
-    this.getConfig().filters = Object.keys(filters).map((id) => ({
+    const cloned: Filters = deepClone(filters);
+    this.getConfig().filters = Object.keys(cloned).map((id) => ({
       id,
-      filter: filters[id].filter,
-      // Reverse of the same opaque cast (header KNOWN CAST note).
-      keyFilters: (filters[id].keyFilters ?? []) as unknown as KeyFilter[]
+      filter: cloned[id].filter,
+      // Reverse of getFilters()'s conversion (header "keyFilters CONVERSION" note).
+      keyFilters: keyFilterInfosToKeyFilters(cloned[id].keyFilters ?? [])
     }));
     if (changedFilterIds.length) {
       this.filtersChangedSubject.next(changedFilterIds);
@@ -161,8 +207,9 @@ class ReportAliasController implements IAliasController {
   }
 
   getKeyFilters(filterId: string): Array<KeyFilter> {
-    // Reads config.filters[] directly (NOT getFilterInfo()/getFilters()) so this returns the
-    // authentic report KeyFilter[] rather than round-tripping it through the FilterInfo cast above.
+    // Reads config.filters[] directly (NOT getFilterInfo()/getFilters()) - simpler than
+    // filterInfoToKeyFilters(getFilterInfo(id)) and sidesteps that conversion's grouping/reorder
+    // nuance (header "keyFilters CONVERSION" point 1). See header for the full rationale.
     const filter = (this.getConfig().filters ?? []).find((f) => f.id === filterId);
     return filter?.keyFilters ?? [];
   }

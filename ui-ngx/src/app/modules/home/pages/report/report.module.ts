@@ -53,6 +53,9 @@ import {
   ReportTableConfigComponent
 } from '@home/pages/report/report-template/designer/components/report-table-config.component';
 import {
+  ReportSubReportConfigComponent
+} from '@home/pages/report/report-template/designer/components/report-sub-report-config.component';
+import {
   ReportConfigTabsComponent
 } from '@home/pages/report/report-template/designer/data/report-config-tabs.component';
 import {
@@ -164,7 +167,11 @@ import {
     // C2 Task 11: generic right-panel config panel for the 3 table-shaped components
     // (ENTITY_TABLE/ALARM_TABLE/TIME_SERIES_TABLE) - assembles Tasks 2/4/5/8/9's sub-editors behind
     // one CVA shaped by `componentType`.
-    ReportTableConfigComponent
+    ReportTableConfigComponent,
+    // C2 Task 13: right-panel config panel for SUB_REPORT - a bespoke report-template
+    // mat-autocomplete (no generic-entity-query REPORT_TEMPLATE support exists) + the
+    // avoidPageBreakInside CSV gate + Task 8's tb-report-datasources.
+    ReportSubReportConfigComponent
   ],
   imports: [
     CommonModule,
@@ -221,7 +228,8 @@ import {
     ReportDatasourcesComponent,
     ReportEntityAliasesComponent,
     ReportFiltersComponent,
-    ReportTableConfigComponent
+    ReportTableConfigComponent,
+    ReportSubReportConfigComponent
   ]
 })
 export class ReportModule { }

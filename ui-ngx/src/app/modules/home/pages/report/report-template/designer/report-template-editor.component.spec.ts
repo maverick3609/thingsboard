@@ -48,6 +48,9 @@ describe('ReportTemplateEditorComponent', () => {
     expect(component.config.format).toBe('PDF');
     expect(component.config.components).toEqual([]);
     expect(reportService.getReportTemplateById).not.toHaveBeenCalled();
+    // null (not the literal 'new' route segment) - Task 13's SUB_REPORT panel self-exclusion has no
+    // real id to exclude for a not-yet-saved template.
+    expect(component.reportTemplateId).toBeNull();
   });
 
   it('loads and deserializes an existing template by id', () => {
@@ -66,6 +69,7 @@ describe('ReportTemplateEditorComponent', () => {
     expect(component.isAdd).toBe(false);
     expect(component.reportTemplate).toBe(stored);
     expect(component.config.components).toEqual([{ type: 'HEADING', value: 'Q3' }]);
+    expect(component.reportTemplateId).toBe('t1');
   });
 
   it('derives pageSettings from a PDF config on init, and merges an edit back into config without touching fields it does not own', () => {
@@ -115,7 +119,7 @@ describe('ReportTemplateEditorComponent', () => {
     expect(divider.widthPx).toBe(2);
   });
 
-  it('hasConfigPanel is true for the 5 C1 types plus C2 Task 11\'s 3 table types, false for C2 types that have none yet', () => {
+  it('hasConfigPanel is true for the 5 C1 types plus C2 Task 11\'s 3 table types plus Task 13\'s SUB_REPORT, false only for DASHBOARD (no panel yet)', () => {
     const component = new ReportTemplateEditorComponent(routeWithId('new'), router, reportService);
 
     expect(component.hasConfigPanel('PAGE_BREAK')).toBe(true);
@@ -126,7 +130,7 @@ describe('ReportTemplateEditorComponent', () => {
     expect(component.hasConfigPanel('ENTITY_TABLE')).toBe(true);
     expect(component.hasConfigPanel('ALARM_TABLE')).toBe(true);
     expect(component.hasConfigPanel('TIME_SERIES_TABLE')).toBe(true);
-    expect(component.hasConfigPanel('SUB_REPORT')).toBe(false);
+    expect(component.hasConfigPanel('SUB_REPORT')).toBe(true);
     expect(component.hasConfigPanel('DASHBOARD')).toBe(false);
   });
 

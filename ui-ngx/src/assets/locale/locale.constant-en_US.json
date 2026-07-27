@@ -5484,7 +5484,10 @@
             "show-timestamp": "Show timestamp",
             "timestamp-label": "Timestamp label",
             "timestamp-pattern": "Timestamp pattern",
-            "alarm-assignee-unsupported": "The 'assigned to current user' alarm filter option is not supported in reports and will be ignored."
+            "alarm-assignee-unsupported": "The 'assigned to current user' alarm filter option is not supported in reports and will be ignored.",
+            "sub-report-template": "Report template",
+            "avoid-page-break-inside": "Avoid page break inside",
+            "data-sources": "Data sources"
         }
     },
     "security": {

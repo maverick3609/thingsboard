@@ -55,6 +55,9 @@ function toPageSettings(config: ReportTemplateConfigModel): ReportPageSettings |
 export class ReportTemplateEditorComponent implements OnInit {
 
   isAdd: boolean;
+  // Exposed as a field (was a local ngOnInit const through Task 11) so Task 13's SUB_REPORT panel
+  // can receive it as `[currentTemplateId]` - a template must not be able to sub-report itself.
+  reportTemplateId: string | null;
   reportTemplate: ReportTemplate;
   config: ReportTemplateConfigModel;
   selected: ReportComponent | null = null;
@@ -72,8 +75,11 @@ export class ReportTemplateEditorComponent implements OnInit {
 
   ngOnInit(): void {
     this.aliasController = createReportAliasController(() => this.config);
-    const reportTemplateId = this.route.snapshot.paramMap.get('reportTemplateId');
-    this.isAdd = !reportTemplateId || reportTemplateId === 'new';
+    const routeReportTemplateId = this.route.snapshot.paramMap.get('reportTemplateId');
+    this.isAdd = !routeReportTemplateId || routeReportTemplateId === 'new';
+    // null (not the literal 'new' route segment) in add-mode - a not-yet-saved template has no real
+    // id for Task 13's SUB_REPORT panel to self-exclude from its picker.
+    this.reportTemplateId = this.isAdd ? null : routeReportTemplateId;
     if (this.isAdd) {
       this.reportTemplate = {
         name: '',
@@ -83,7 +89,7 @@ export class ReportTemplateEditorComponent implements OnInit {
       this.config = newPdfReportTemplateConfig();
       this.pageSettings = toPageSettings(this.config);
     } else {
-      this.reportService.getReportTemplateById(reportTemplateId).subscribe(reportTemplate => {
+      this.reportService.getReportTemplateById(this.reportTemplateId).subscribe(reportTemplate => {
         this.reportTemplate = reportTemplate;
         this.config = deserialize(reportTemplate.configuration);
         this.pageSettings = toPageSettings(this.config);
@@ -121,11 +127,11 @@ export class ReportTemplateEditorComponent implements OnInit {
     }
   }
 
-  // The 5 C1 types plus C2 Task 11's 3 table types now have a dedicated branch in the right panel
-  // below; every other palette type (SUB_REPORT/DASHBOARD) has no panel yet, so the template falls
-  // back to a placeholder rather than rendering blank.
+  // The 5 C1 types plus C2 Task 11's 3 table types plus Task 13's SUB_REPORT now have a dedicated
+  // branch in the right panel below; DASHBOARD is the only remaining palette type with no panel yet,
+  // so the template falls back to a placeholder rather than rendering blank.
   hasConfigPanel(type: string): boolean {
-    return ['PAGE_BREAK', 'DIVIDER', 'HEADING', 'RICH_TEXT', 'IMAGE', 'ENTITY_TABLE', 'ALARM_TABLE', 'TIME_SERIES_TABLE'].includes(type);
+    return ['PAGE_BREAK', 'DIVIDER', 'HEADING', 'RICH_TEXT', 'IMAGE', 'ENTITY_TABLE', 'ALARM_TABLE', 'TIME_SERIES_TABLE', 'SUB_REPORT'].includes(type);
   }
 
   save(): void {

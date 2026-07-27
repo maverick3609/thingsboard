@@ -5469,7 +5469,16 @@
             "sort-direction": "Direction",
             "sort-direction-asc": "Ascending",
             "sort-direction-desc": "Descending",
-            "unnamed-key": "Unnamed key"
+            "unnamed-key": "Unnamed key",
+            "datasource-type": "Data source type",
+            "datasource-type-device": "Device",
+            "datasource-type-entity": "Entity",
+            "datasource-type-entity-count": "Entity count",
+            "datasource-type-alarm-count": "Alarm count",
+            "data-keys": "Data keys",
+            "latest-data-keys": "Latest data keys",
+            "add-datasource": "Add data source",
+            "remove-datasource": "Remove data source"
         }
     },
     "security": {

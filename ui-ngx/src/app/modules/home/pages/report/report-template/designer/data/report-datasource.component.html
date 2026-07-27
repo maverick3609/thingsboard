@@ -1,0 +1,74 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<div class="tb-report-datasource flex flex-col gap-2" [formGroup]="dsFormGroup">
+  <mat-form-field subscriptSizing="dynamic">
+    <mat-select formControlName="type" placeholder="{{ 'report.designer.datasource-type' | translate }}">
+      <mat-option [value]="dataSourceTypeEnum.DEVICE" translate>report.designer.datasource-type-device</mat-option>
+      <mat-option [value]="dataSourceTypeEnum.ENTITY" translate>report.designer.datasource-type-entity</mat-option>
+      <mat-option [value]="dataSourceTypeEnum.ENTITY_COUNT" translate>report.designer.datasource-type-entity-count</mat-option>
+      <mat-option [value]="dataSourceTypeEnum.ALARM_COUNT" translate>report.designer.datasource-type-alarm-count</mat-option>
+    </mat-select>
+  </mat-form-field>
+
+  <tb-entity-autocomplete *ngIf="isDevice"
+                          [entityType]="entityTypeEnum.DEVICE"
+                          appearance="outline"
+                          formControlName="deviceId">
+  </tb-entity-autocomplete>
+
+  <tb-entity-alias-select *ngIf="showEntityAliasSelect"
+                          [showLabel]="true"
+                          appearance="outline"
+                          [aliasController]="aliasController"
+                          formControlName="entityAliasId">
+  </tb-entity-alias-select>
+
+  <tb-filter-select *ngIf="showFilterSelect"
+                    [showLabel]="true"
+                    appearance="outline"
+                    [aliasController]="aliasController"
+                    formControlName="filterId">
+  </tb-filter-select>
+
+  <tb-report-alarm-filter *ngIf="showAlarmFilterControl"
+                          formControlName="alarmFilterConfig">
+  </tb-report-alarm-filter>
+
+  <div class="flex flex-col gap-1" *ngIf="showDataKeys">
+    <label class="mat-caption" translate>report.designer.data-keys</label>
+    <tb-report-data-keys
+        [dataSourceType]="selectedType"
+        [widgetType]="widgetType"
+        [aliasController]="aliasController"
+        [entityAliasId]="dsFormGroup.get('entityAliasId').value"
+        [deviceId]="dsFormGroup.get('deviceId').value"
+        formControlName="dataKeys">
+    </tb-report-data-keys>
+  </div>
+  <div class="flex flex-col gap-1" *ngIf="showDataKeys">
+    <label class="mat-caption" translate>report.designer.latest-data-keys</label>
+    <tb-report-data-keys
+        [dataSourceType]="selectedType"
+        [widgetType]="widgetTypeEnum.latest"
+        [aliasController]="aliasController"
+        [entityAliasId]="dsFormGroup.get('entityAliasId').value"
+        [deviceId]="dsFormGroup.get('deviceId').value"
+        formControlName="latestDataKeys">
+    </tb-report-data-keys>
+  </div>
+</div>

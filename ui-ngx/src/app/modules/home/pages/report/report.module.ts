@@ -70,6 +70,12 @@ import {
 import {
   ReportDataKeysComponent
 } from '@home/pages/report/report-template/designer/data/report-data-keys.component';
+import {
+  ReportDatasourceComponent
+} from '@home/pages/report/report-template/designer/data/report-datasource.component';
+import {
+  ReportDatasourcesComponent
+} from '@home/pages/report/report-template/designer/data/report-datasources.component';
 
 @NgModule({
   declarations: [
@@ -127,7 +133,13 @@ import {
     // C2 Task 7: wraps the platform tb-data-keys widget (base fields) + a per-key
     // tb-report-column-settings panel (report-only ColumnSettings) behind the report DataKey[] CVA
     // boundary - consumed by report-datasource (Task 8) and ALARM_TABLE's alarmSource (Task 11).
-    ReportDataKeysComponent
+    ReportDataKeysComponent,
+    // C2 Task 8: the datasource integration hub - tb-report-datasource (single DataSource, type
+    // switch over the Task 6/7/9 leaves + tb-entity-autocomplete/tb-entity-alias-select/
+    // tb-filter-select) and tb-report-datasources (add/remove DataSource[] list) - consumed by
+    // ENTITY_TABLE/TIME_SERIES_TABLE's dataSources and ALARM_TABLE's alarmSource (Task 11).
+    ReportDatasourceComponent,
+    ReportDatasourcesComponent
   ],
   imports: [
     CommonModule,
@@ -136,9 +148,11 @@ import {
     // C2 Task 6: tb-alarm-filter-config (wrapped by ReportAlarmFilterComponent) is declared/exported
     // by WidgetConfigComponentsModule, which HomeComponentsModule imports but does NOT re-export -
     // needed directly here for the selector to resolve in this module's templates. Also covers
-    // C2 Task 7's tb-data-keys: it's declared/exported by WidgetSettingsCommonModule, which
-    // WidgetConfigComponentsModule imports AND re-exports (widget-config-components.module.ts's own
-    // `exports` array) - so no further module import is needed for tb-data-keys to resolve here.
+    // C2 Task 7's tb-data-keys AND C2 Task 8's tb-entity-alias-select/tb-filter-select: all three are
+    // declared/exported by WidgetSettingsCommonModule, which WidgetConfigComponentsModule imports AND
+    // re-exports (widget-config-components.module.ts's own `exports` array) - so no further module
+    // import is needed for any of them to resolve here. Task 8's fourth leaf, tb-entity-autocomplete,
+    // is declared/exported by SharedModule (imported above) - already in scope.
     WidgetConfigComponentsModule,
     ReportRoutingModule
   ],
@@ -162,7 +176,9 @@ import {
     ReportTableSettingsComponent,
     ReportTimewindowComponent,
     ReportAlarmFilterComponent,
-    ReportDataKeysComponent
+    ReportDataKeysComponent,
+    ReportDatasourceComponent,
+    ReportDatasourcesComponent
   ]
 })
 export class ReportModule { }

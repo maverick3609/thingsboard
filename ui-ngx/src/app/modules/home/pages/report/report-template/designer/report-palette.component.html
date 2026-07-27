@@ -27,7 +27,7 @@
          style="cursor: move;"
          cdkDrag
          [cdkDragData]="item.type">
-      <mat-icon>{{ item.icon }}</mat-icon>
+      <img [src]="item.preview" [alt]="item.labelKey | translate" class="tb-report-palette-preview">
       <span>{{ item.labelKey | translate }}</span>
     </div>
   </div>

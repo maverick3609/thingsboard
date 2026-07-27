@@ -21,6 +21,9 @@ export interface ReportComponentTypeInfo {
   type: ReportComponentType;
   icon: string;
   labelKey: string;
+  // PE preview thumbnail (Task 12), served from src/assets/report/components/**; kept alongside
+  // `icon` as a fallback (e.g. for any future non-image render path) rather than replacing it.
+  preview: string;
 }
 
 // The 10 user-authorable component types the C1 palette offers - every ReportComponentType member
@@ -28,16 +31,16 @@ export interface ReportComponentTypeInfo {
 // .java) as transient render-failure state with no JSON wire form; it never reaches the designer via
 // the palette or otherwise.
 export const REPORT_COMPONENT_PALETTE: ReportComponentTypeInfo[] = [
-  { type: ReportComponentType.HEADING, icon: 'title', labelKey: 'report.designer.component-heading' },
-  { type: ReportComponentType.RICH_TEXT, icon: 'notes', labelKey: 'report.designer.component-rich-text' },
-  { type: ReportComponentType.DIVIDER, icon: 'horizontal_rule', labelKey: 'report.designer.component-divider' },
-  { type: ReportComponentType.PAGE_BREAK, icon: 'insert_page_break', labelKey: 'report.designer.component-page-break' },
-  { type: ReportComponentType.IMAGE, icon: 'image', labelKey: 'report.designer.component-image' },
-  { type: ReportComponentType.ENTITY_TABLE, icon: 'table_chart', labelKey: 'report.designer.component-entity-table' },
-  { type: ReportComponentType.ALARM_TABLE, icon: 'warning', labelKey: 'report.designer.component-alarm-table' },
-  { type: ReportComponentType.TIME_SERIES_TABLE, icon: 'show_chart', labelKey: 'report.designer.component-time-series-table' },
-  { type: ReportComponentType.SUB_REPORT, icon: 'description', labelKey: 'report.designer.component-sub-report' },
-  { type: ReportComponentType.DASHBOARD, icon: 'dashboard', labelKey: 'report.designer.component-dashboard' }
+  { type: ReportComponentType.HEADING, icon: 'title', labelKey: 'report.designer.component-heading', preview: '/assets/report/components/heading.svg' },
+  { type: ReportComponentType.RICH_TEXT, icon: 'notes', labelKey: 'report.designer.component-rich-text', preview: '/assets/report/components/rich-text.svg' },
+  { type: ReportComponentType.DIVIDER, icon: 'horizontal_rule', labelKey: 'report.designer.component-divider', preview: '/assets/report/components/divider.svg' },
+  { type: ReportComponentType.PAGE_BREAK, icon: 'insert_page_break', labelKey: 'report.designer.component-page-break', preview: '/assets/report/components/page-break.svg' },
+  { type: ReportComponentType.IMAGE, icon: 'image', labelKey: 'report.designer.component-image', preview: '/assets/report/components/image.svg' },
+  { type: ReportComponentType.ENTITY_TABLE, icon: 'table_chart', labelKey: 'report.designer.component-entity-table', preview: '/assets/report/components/entity-table.svg' },
+  { type: ReportComponentType.ALARM_TABLE, icon: 'warning', labelKey: 'report.designer.component-alarm-table', preview: '/assets/report/components/alarm-table.svg' },
+  { type: ReportComponentType.TIME_SERIES_TABLE, icon: 'show_chart', labelKey: 'report.designer.component-time-series-table', preview: '/assets/report/components/timeseries-table.svg' },
+  { type: ReportComponentType.SUB_REPORT, icon: 'description', labelKey: 'report.designer.component-sub-report', preview: '/assets/report/components/subreport.svg' },
+  { type: ReportComponentType.DASHBOARD, icon: 'dashboard', labelKey: 'report.designer.component-dashboard', preview: '/assets/report/components/dashboard.svg' }
 ];
 
 const REPORT_COMPONENT_INFO_BY_TYPE = new Map<ReportComponentType, ReportComponentTypeInfo>(
@@ -63,7 +66,7 @@ export function reportComponentTypeInfo(type: string): ReportComponentTypeInfo |
 @Component({
   selector: 'tb-report-palette',
   templateUrl: './report-palette.component.html',
-  styleUrls: [],
+  styleUrls: ['./report-palette.component.scss'],
   standalone: false
 })
 export class ReportPaletteComponent {

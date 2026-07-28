@@ -57,9 +57,19 @@
       </tb-report-canvas>
     </div>
     <div class="tb-report-template-editor-config">
+      <button mat-icon-button
+              type="button"
+              *ngIf="selected"
+              (click)="deselect()"
+              matTooltip="{{ 'report.designer.back-to-page-settings' | translate }}"
+              matTooltipPosition="above">
+        <mat-icon>arrow_back</mat-icon>
+      </button>
       <tb-report-page-settings *ngIf="selected === null && pageSettings"
                                 [ngModel]="pageSettings"
                                 (ngModelChange)="onPageSettingsChange($event)"
+                                (componentSelected)="onComponentSelected($event)"
+                                (componentsChanged)="onHeaderFooterComponentsChanged()"
                                 [config]="config">
       </tb-report-page-settings>
       <tb-report-page-break-config *ngIf="selected?.type === 'PAGE_BREAK'">

@@ -169,6 +169,71 @@ describe('ReportTemplateEditorComponent', () => {
     expect(component.selected).toBeNull();
   });
 
+  it('onComponentSelected sets selected - the page-settings componentSelected hop, e.g. for a header/footer component click', () => {
+    const component = new ReportTemplateEditorComponent(routeWithId('new'), router, reportService);
+    component.ngOnInit();
+    const headerHeading: ReportComponent = { type: 'HEADING', value: 'in header' };
+
+    component.onComponentSelected(headerHeading);
+
+    expect(component.selected).toBe(headerHeading);
+  });
+
+  it('deselect nulls selected, giving the config pane a way back to page-settings (where header/footer live)', () => {
+    const component = new ReportTemplateEditorComponent(routeWithId('new'), router, reportService);
+    component.ngOnInit();
+    component.selected = { type: 'DIVIDER' };
+
+    component.deselect();
+
+    expect(component.selected).toBeNull();
+  });
+
+  it('onHeaderFooterComponentsChanged nulls selected when it was a header component just removed from config.header.components', () => {
+    const component = new ReportTemplateEditorComponent(routeWithId('new'), router, reportService);
+    component.ngOnInit();
+    const headerHeading: ReportComponent = { type: 'HEADING', value: 'in header' };
+    (component.config as PdfReportTemplateConfig).header = { enabled: true, components: [headerHeading] };
+    component.selected = headerHeading;
+
+    // Mirrors how tb-report-canvas deletes: splice the same array in place, then the shell's
+    // dedicated hook (wired to tb-report-header-footer's componentsChanged, via page-settings)
+    // re-runs the cross-array reachability check.
+    (component.config as PdfReportTemplateConfig).header.components = [];
+    component.onHeaderFooterComponentsChanged();
+
+    expect(component.selected).toBeNull();
+  });
+
+  it('an unrelated body change (onComponentsChange) leaves a header-selected component untouched - cross-array reachability, not just the array that changed', () => {
+    const component = new ReportTemplateEditorComponent(routeWithId('new'), router, reportService);
+    component.ngOnInit();
+    const headerHeading: ReportComponent = { type: 'HEADING', value: 'in header' };
+    (component.config as PdfReportTemplateConfig).header = { enabled: true, components: [headerHeading] };
+    component.selected = headerHeading;
+
+    // Body canvas reorders/adds - unrelated to the header array the selection actually lives in.
+    component.onComponentsChange([{ type: 'DIVIDER' }]);
+
+    expect(component.selected).toBe(headerHeading);
+  });
+
+  it('selectionStillReachable (via onHeaderFooterComponentsChanged) finds a selected component nested in footer.firstPage.components', () => {
+    const component = new ReportTemplateEditorComponent(routeWithId('new'), router, reportService);
+    component.ngOnInit();
+    const footerFirstPageDivider: ReportComponent = { type: 'DIVIDER' };
+    (component.config as PdfReportTemplateConfig).footer = {
+      enabled: true,
+      components: [],
+      firstPage: { enabled: true, components: [footerFirstPageDivider] }
+    };
+    component.selected = footerFirstPageDivider;
+
+    component.onHeaderFooterComponentsChanged();
+
+    expect(component.selected).toBe(footerFirstPageDivider);
+  });
+
   it('save() persists the template with configuration === serialize(config) and navigates back', () => {
     reportService.saveReportTemplate.and.returnValue(of({} as ReportTemplate));
     const route = routeWithId('new');

@@ -42,6 +42,30 @@
   <mat-form-field subscriptSizing="dynamic">
     <input matInput formControlName="timeDataPattern" placeholder="{{ 'report.designer.time-data-pattern' | translate }}"/>
   </mat-form-field>
+  <mat-accordion *ngIf="showHeaderFooter" class="tb-report-header-footer-panels" multi>
+    <mat-expansion-panel>
+      <mat-expansion-panel-header>
+        <mat-panel-title translate>report.designer.header</mat-panel-title>
+      </mat-expansion-panel-header>
+      <tb-report-header-footer [ngModel]="header ?? { enabled: false, components: [] }"
+                                [ngModelOptions]="{standalone: true}"
+                                (ngModelChange)="header = $event"
+                                (componentSelected)="componentSelected.emit($event)"
+                                (componentsChanged)="componentsChanged.emit()">
+      </tb-report-header-footer>
+    </mat-expansion-panel>
+    <mat-expansion-panel>
+      <mat-expansion-panel-header>
+        <mat-panel-title translate>report.designer.footer</mat-panel-title>
+      </mat-expansion-panel-header>
+      <tb-report-header-footer [ngModel]="footer ?? { enabled: false, components: [] }"
+                                [ngModelOptions]="{standalone: true}"
+                                (ngModelChange)="footer = $event"
+                                (componentSelected)="componentSelected.emit($event)"
+                                (componentsChanged)="componentsChanged.emit()">
+      </tb-report-header-footer>
+    </mat-expansion-panel>
+  </mat-accordion>
   <mat-accordion *ngIf="config" class="tb-report-manage-aliases-filters" multi>
     <mat-expansion-panel>
       <mat-expansion-panel-header>

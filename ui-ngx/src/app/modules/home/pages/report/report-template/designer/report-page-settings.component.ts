@@ -14,15 +14,17 @@
 /// limitations under the License.
 ///
 
-import { Component, Input, forwardRef, OnDestroy, OnInit } from '@angular/core';
+import { Component, EventEmitter, Input, Output, forwardRef, OnDestroy, OnInit } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR, UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import {
+  HeaderFooter,
   PageOrientation,
   PageSize,
   PageSizeDimensions,
   PdfReportTemplateConfig,
+  ReportComponent,
   ReportTemplateConfigModel
 } from '@shared/models/report-configuration.models';
 
@@ -66,6 +68,21 @@ export class ReportPageSettingsComponent implements ControlValueAccessor, OnInit
   // independent channels into the same object, never merged.
   @Input()
   config: ReportTemplateConfigModel;
+
+  // Task 15A: bubbles a selection from either hosted header/footer editor (see
+  // report-header-footer.component.ts's class header for the full 2-hop path: nested canvas/
+  // firstPage editor -> tb-report-header-footer's own componentSelected -> here -> the shell, which
+  // sets its `selected` field the same way it does for the body canvas's (selected) output).
+  @Output()
+  componentSelected = new EventEmitter<ReportComponent>();
+
+  // Task 15A: bubbles "something in a hosted header/footer editor's own component array changed, at
+  // any depth" up to the shell, which re-runs its cross-array orphan-clear
+  // (selectionStillReachable() in report-template-editor.component.ts). Deliberately NOT routed
+  // through this component's own CVA (ngModelChange) channel - see report-header-footer.component
+  // .ts's class header for why that channel has nowhere natural to hang the recompute.
+  @Output()
+  componentsChanged = new EventEmitter<void>();
 
   pageSettingsFormGroup: UntypedFormGroup;
 
@@ -131,5 +148,37 @@ export class ReportPageSettingsComponent implements ControlValueAccessor, OnInit
   dimensionsLabel(size: PageSize): string {
     const dims = size ? PageSizeDimensions[size] : null;
     return dims ? `${dims.width}×${dims.height}` : '';
+  }
+
+  // Task 15A: gates the template's Header/Footer mat-expansion-panels - config.header/config.footer
+  // only exist on PdfReportTemplateConfig (CsvReportTemplateConfig has neither field, per the
+  // frozen model). Mirrors report-sub-report-config.component.ts's showAvoidPageBreakInside getter.
+  get showHeaderFooter(): boolean {
+    return this.config?.format === 'PDF';
+  }
+
+  // Task 15A: config.header/config.footer accessor pairs, narrowed to the PDF variant internally so
+  // the TEMPLATE never has to (Angular's template type-checker does not narrow `config` from the
+  // ReportTemplateConfigModel union off a boolean getter/method call the way plain TypeScript control
+  // flow would - `config.header` inside *ngIf="showHeaderFooter" still fails to compile). Read/write
+  // through these instead of `config.header`/`config.footer` directly in the template.
+  get header(): HeaderFooter | undefined {
+    return this.config?.format === 'PDF' ? this.config.header : undefined;
+  }
+
+  set header(value: HeaderFooter) {
+    if (this.config?.format === 'PDF') {
+      this.config.header = value;
+    }
+  }
+
+  get footer(): HeaderFooter | undefined {
+    return this.config?.format === 'PDF' ? this.config.footer : undefined;
+  }
+
+  set footer(value: HeaderFooter) {
+    if (this.config?.format === 'PDF') {
+      this.config.footer = value;
+    }
   }
 }

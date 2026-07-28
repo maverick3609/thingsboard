@@ -19,7 +19,13 @@
 // form -> propagateChange wiring (and the dimensionsLabel lookup) without compiling the template.
 import { UntypedFormBuilder } from '@angular/forms';
 import { ReportPageSettings, ReportPageSettingsComponent } from './report-page-settings.component';
-import { PageOrientation, PageSize, PageSizeDimensions } from '@shared/models/report-configuration.models';
+import {
+  HeaderFooter,
+  PageOrientation,
+  PageSize,
+  PageSizeDimensions,
+  PdfReportTemplateConfig
+} from '@shared/models/report-configuration.models';
 
 describe('ReportPageSettingsComponent', () => {
 
@@ -78,5 +84,68 @@ describe('ReportPageSettingsComponent', () => {
 
     component.setDisabledState(false);
     expect(component.pageSettingsFormGroup.disabled).toBe(false);
+  });
+
+  // Task 15A: config.header/config.footer only exist on PdfReportTemplateConfig (CSV has neither
+  // field per the model) - showHeaderFooter gates the two new Header/Footer mat-expansion-panels in
+  // the template (*ngIf="showHeaderFooter"), mirroring report-sub-report-config.component.ts's own
+  // showAvoidPageBreakInside getter for the same "gate a template row off a plain getter, assert the
+  // getter directly" reason: this spec is plain instantiation (no TestBed/DOM), so the getter itself
+  // is the only testable surface for what the template conditionally renders.
+  it('showHeaderFooter is true for a PDF config and false for a CSV config (or no config at all)', () => {
+    const component = newComponent();
+
+    component.config = { format: 'PDF', components: [] } as any;
+    expect(component.showHeaderFooter).toBe(true);
+
+    component.config = { format: 'CSV', components: [] } as any;
+    expect(component.showHeaderFooter).toBe(false);
+
+    component.config = undefined;
+    expect(component.showHeaderFooter).toBe(false);
+  });
+
+  // Task 15A (discovered via the AOT build, not the design note): the template cannot read/write
+  // config.header/config.footer directly - Angular's template type-checker does not narrow `config`
+  // off a boolean getter/method call the way plain TypeScript control flow narrows off
+  // `config.format === 'PDF'`, so `config.header` inside *ngIf="showHeaderFooter" fails to compile
+  // (TS2339, "Property 'header' does not exist on type CsvReportTemplateConfig"). These accessor
+  // pairs do the SAME narrowing check internally (in .ts, where it works) and expose an
+  // already-narrowed value/setter for the template to bind instead.
+  it('header/footer getters read the PDF fields and return undefined for a CSV config (or no config at all)', () => {
+    const component = newComponent();
+    const headerFooter: HeaderFooter = { enabled: true, components: [{ type: 'DIVIDER' }] };
+
+    component.config = { format: 'PDF', components: [], header: headerFooter } as PdfReportTemplateConfig;
+    expect(component.header).toBe(headerFooter);
+    expect(component.footer).toBeUndefined();
+
+    component.config = { format: 'CSV', components: [] } as any;
+    expect(component.header).toBeUndefined();
+    expect(component.footer).toBeUndefined();
+
+    component.config = undefined;
+    expect(component.header).toBeUndefined();
+  });
+
+  it('header/footer setters write back onto a PDF config, and are a no-op for a CSV config', () => {
+    const component = newComponent();
+    const newHeader: HeaderFooter = { enabled: true, components: [] };
+    const newFooter: HeaderFooter = { enabled: false, components: [] };
+    const pdfConfig = { format: 'PDF', components: [] } as PdfReportTemplateConfig;
+    component.config = pdfConfig;
+
+    component.header = newHeader;
+    component.footer = newFooter;
+
+    expect(pdfConfig.header).toBe(newHeader);
+    expect(pdfConfig.footer).toBe(newFooter);
+
+    const csvConfig = { format: 'CSV', components: [] } as any;
+    component.config = csvConfig;
+
+    component.header = newHeader;
+
+    expect(csvConfig.header).toBeUndefined();
   });
 });

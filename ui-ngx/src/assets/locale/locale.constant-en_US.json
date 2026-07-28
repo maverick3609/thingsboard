@@ -5489,7 +5489,12 @@
             "avoid-page-break-inside": "Avoid page break inside",
             "data-sources": "Data sources",
             "dashboard-state": "Dashboard state",
-            "use-dashboard-timewindow": "Use dashboard time window"
+            "use-dashboard-timewindow": "Use dashboard time window",
+            "header": "Header",
+            "footer": "Footer",
+            "enabled": "Enabled",
+            "different-first-page": "Different first page",
+            "back-to-page-settings": "Back to page settings"
         }
     },
     "security": {

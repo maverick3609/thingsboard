@@ -104,6 +104,21 @@ export class ReportTemplateEditorComponent implements OnInit {
     this.pageSettings = value;
   }
 
+  // The page-settings componentSelected hop (Task 15A): a click on a component inside either
+  // hosted header/footer editor bubbles page-settings -> here, same as the body canvas's own
+  // (selected)="selected = $event" - the shell's single `selected` field switches the right pane to
+  // that component's config panel regardless of which array it actually lives in.
+  onComponentSelected(component: ReportComponent): void {
+    this.selected = component;
+  }
+
+  // REQUIRED deselect affordance (Task 15A): the only way back to page-settings once a component is
+  // selected - the config pane's per-type panels have no close/back control of their own, and
+  // page-settings (where header/footer live) only mounts when selected === null.
+  deselect(): void {
+    this.selected = null;
+  }
+
   // Merge-in-place, mirroring onPageSettingsChange above: config.components must keep the SAME
   // element reference the canvas (T6) holds, so the selected card doesn't churn and `selected`
   // stays a valid pointer into the array - replacing the array element by index would drop that
@@ -118,13 +133,63 @@ export class ReportTemplateEditorComponent implements OnInit {
   // T6's canvas mutates `components` in place and re-emits the same reference for every reorder/
   // add/delete, so reassigning config.components here is a safe no-op-or-reassign in the common
   // case. Delete is the one mutation that can leave `selected` pointing at an object no longer in
-  // the array (an orphan the right panel would keep editing, with edits silently discarded on
-  // save), so clear it when that happens; reorder/add keep `selected` untouched.
+  // ANY array the right panel could still be validly editing (an orphan whose edits would be
+  // silently discarded on save), so clear it when that happens; reorder/add keep `selected`
+  // untouched. selectionStillReachable() (below) checks every array a component can live in, not
+  // just `components` - a still-selected body component is always found in ITS one true array
+  // regardless of what just changed, so this is exactly as precise as the old `!components
+  // .includes(this.selected)` check for the body case, and additionally correct once header/footer
+  // exist (Task 15A).
   onComponentsChange(components: ReportComponent[]): void {
     this.config.components = components;
-    if (this.selected && !components.includes(this.selected)) {
+    if (!this.selectionStillReachable()) {
       this.selected = null;
     }
+  }
+
+  // Task 15A: fired by tb-report-page-settings's own componentsChanged (re-emitted from whichever
+  // hosted header/footer editor's own componentsChanged - a nested tb-report-canvas add/reorder/
+  // delete, at any depth). NOT routed through the page-settings CVA's (ngModelChange)
+  // ="config.header = $event" channel: that fires on every enabled/firstPage toggle too, and
+  // assigning config.header = $event is a same-reference no-op for a canvas mutation (the nested
+  // canvas already mutated config.header.components in place) - this dedicated signal is what
+  // actually triggers the recompute.
+  onHeaderFooterComponentsChanged(): void {
+    if (!this.selectionStillReachable()) {
+      this.selected = null;
+    }
+  }
+
+  // Walks every array a ReportComponent can live in - config.components (body) plus, for a PDF
+  // config only (config.header/footer don't exist on the CSV variant), config.header/footer's own
+  // components and one level of firstPage's components - and reports whether `selected` still lives
+  // in one of them. A component object has exactly one home array at a time, so checking the full
+  // set (rather than just the array that just changed) is always correct: a still-live `selected`
+  // is found in its one true array regardless of which other array just mutated, and a deleted one
+  // is found in none.
+  private selectionStillReachable(): boolean {
+    if (!this.selected) {
+      return true;
+    }
+    const config = this.config;
+    const arrays: ReportComponent[][] = [config.components];
+    if (config.format === 'PDF') {
+      const header = config.header;
+      const footer = config.footer;
+      if (header?.components) {
+        arrays.push(header.components);
+      }
+      if (header?.firstPage?.components) {
+        arrays.push(header.firstPage.components);
+      }
+      if (footer?.components) {
+        arrays.push(footer.components);
+      }
+      if (footer?.firstPage?.components) {
+        arrays.push(footer.firstPage.components);
+      }
+    }
+    return arrays.some(components => components.includes(this.selected));
   }
 
   // The 5 C1 types plus C2 Task 11's 3 table types plus Task 13's SUB_REPORT plus Task 14's

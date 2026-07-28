@@ -35,6 +35,9 @@ import { ReportPaletteComponent } from '@home/pages/report/report-template/desig
 import { ReportCanvasComponent } from '@home/pages/report/report-template/designer/report-canvas.component';
 import { ReportPreviewComponent } from '@home/pages/report/report-template/designer/report-preview.component';
 import {
+  ReportHeaderFooterComponent
+} from '@home/pages/report/report-template/designer/report-header-footer.component';
+import {
   ReportPageBreakConfigComponent
 } from '@home/pages/report/report-template/designer/components/report-page-break-config.component';
 import {
@@ -121,6 +124,11 @@ import {
     // C1 Task 7: whole-template PDF preview pane, shown by the shell instead of the body above when
     // viewMode === 'preview'.
     ReportPreviewComponent,
+    // C2 Task 15A: header/footer editor, hosted twice by ReportPageSettingsComponent (config.header/
+    // config.footer, PDF only) - a nested tb-report-canvas reusing the SAME 10-panel right pane as
+    // the body canvas (see its own class header), plus one capped level of recursion for the
+    // "different first page" variant.
+    ReportHeaderFooterComponent,
     // C1 Task 8: first two per-type right-panel config panels (shown when a canvas component is
     // selected), establishing the per-type switch T9-T11 extend.
     ReportPageBreakConfigComponent,
@@ -222,6 +230,7 @@ import {
     ReportPaletteComponent,
     ReportCanvasComponent,
     ReportPreviewComponent,
+    ReportHeaderFooterComponent,
     ReportPageBreakConfigComponent,
     ReportDividerConfigComponent,
     ReportHeadingConfigComponent,

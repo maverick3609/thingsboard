@@ -17,6 +17,19 @@
 -->
 <div class="tb-report-rich-text-config flex flex-col gap-2" [formGroup]="richTextFormGroup">
   <div class="mat-subtitle-1" translate>report.designer.component-rich-text</div>
+  <div>
+    <button type="button" mat-stroked-button color="primary" [disabled]="disabled"
+            [matMenuTriggerFor]="dynamicFieldMenu">
+      <mat-icon>add</mat-icon>
+      <span translate>report.designer.insert-dynamic-field</span>
+    </button>
+    <mat-menu #dynamicFieldMenu="matMenu">
+      <button mat-menu-item type="button" *ngFor="let field of dynamicFields"
+              (click)="insertDynamicField(field.token)">
+        {{ field.labelKey | translate }}
+      </button>
+    </mat-menu>
+  </div>
   <tb-html formControlName="value"
            label="{{ 'report.designer.rich-text-value' | translate }}">
   </tb-html>

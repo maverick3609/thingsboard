@@ -19,10 +19,11 @@
 // PALETTE/reportComponentTypeInfo() are plain data/functions with no DOM, and the C2 Task 12
 // drop-verify DoD below only needs the shell's hasConfigPanel() method, not its compiled template.
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
-import { REPORT_COMPONENT_PALETTE, reportComponentTypeInfo } from './report-palette.component';
+import { REPORT_COMPONENT_PALETTE, reportComponentTypeInfo, ReportPaletteComponent } from './report-palette.component';
 import { ReportTemplateEditorComponent } from './report-template-editor.component';
 import { ReportService } from '@core/http/report.service';
 import { newReportComponent, ReportComponentType } from '@shared/models/report-configuration.models';
+import { REPORT_COMPONENT_PRESETS } from './presets/report-component-presets';
 
 describe('ReportPaletteComponent (data)', () => {
 
@@ -66,6 +67,19 @@ describe('ReportPaletteComponent (data)', () => {
       expect(info.type).toBe(type);
       expect(info.icon).toBeTruthy();
       expect(info.preview).toBeTruthy();
+    });
+  });
+
+  describe('presetItems (C2 Task 15B)', () => {
+    it('lists the 2 HEADING presets, each with a non-empty PE preview thumbnail path', () => {
+      const palette = new ReportPaletteComponent();
+
+      expect(palette.presetItems).toBe(REPORT_COMPONENT_PRESETS);
+      expect(palette.presetItems.map(p => p.key)).toEqual(['pageNumber', 'createdTime']);
+      palette.presetItems.forEach(item => {
+        expect(item.preview).toBeTruthy();
+        expect(item.preview).toMatch(/^\/assets\/report\/components\/[a-z-]+\.svg$/);
+      });
     });
   });
 

@@ -18,9 +18,22 @@
 <div class="tb-report-heading-config flex flex-col gap-2" [formGroup]="headingFormGroup">
   <div class="mat-subtitle-1" translate>report.designer.component-heading</div>
   <mat-form-field subscriptSizing="dynamic">
-    <input matInput formControlName="value"
+    <input matInput #valueInput formControlName="value"
            placeholder="{{ 'report.designer.heading-text' | translate }}"/>
   </mat-form-field>
+  <div>
+    <button type="button" mat-stroked-button color="primary" [disabled]="disabled"
+            [matMenuTriggerFor]="dynamicFieldMenu">
+      <mat-icon>add</mat-icon>
+      <span translate>report.designer.insert-dynamic-field</span>
+    </button>
+    <mat-menu #dynamicFieldMenu="matMenu">
+      <button mat-menu-item type="button" *ngFor="let field of dynamicFields"
+              (click)="insertDynamicField(field.token)">
+        {{ field.labelKey | translate }}
+      </button>
+    </mat-menu>
+  </div>
   <tb-report-font formControlName="font"></tb-report-font>
   <tb-color-input formControlName="color" colorClearButton
                   label="{{ 'report.designer.heading-color' | translate }}">

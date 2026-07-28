@@ -5494,7 +5494,17 @@
             "footer": "Footer",
             "enabled": "Enabled",
             "different-first-page": "Different first page",
-            "back-to-page-settings": "Back to page settings"
+            "back-to-page-settings": "Back to page settings",
+            "presets": "Presets",
+            "preset-page-number": "Page number",
+            "preset-created-time": "Created time",
+            "insert-dynamic-field": "Insert dynamic field",
+            "dynamic-field-page-number": "Page number",
+            "dynamic-field-total-pages": "Total pages",
+            "dynamic-field-created-time": "Report created time",
+            "dynamic-field-entity-name": "Entity name",
+            "dynamic-field-entity-label": "Entity label",
+            "dynamic-field-id": "Entity ID"
         }
     },
     "security": {

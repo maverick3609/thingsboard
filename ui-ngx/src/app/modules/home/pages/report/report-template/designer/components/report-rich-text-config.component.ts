@@ -20,6 +20,7 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { DataSource, RichTextComponent } from '@shared/models/report-configuration.models';
 import { ReportBackgroundBorder } from '@home/pages/report/report-template/designer/widgets/report-background-border.component';
+import { REPORT_DYNAMIC_FIELDS, ReportDynamicField } from '@home/pages/report/report-template/designer/report-dynamic-fields';
 
 // CVA for components/RichTextComponent.java - the shell's right-panel content when the selected
 // canvas component is a RICH_TEXT (report-template-editor.component.html). Mirrors T9's
@@ -44,6 +45,8 @@ import { ReportBackgroundBorder } from '@home/pages/report/report-template/desig
     standalone: false
 })
 export class ReportRichTextConfigComponent implements ControlValueAccessor, OnInit, OnDestroy {
+
+  readonly dynamicFields: ReportDynamicField[] = REPORT_DYNAMIC_FIELDS;
 
   richTextFormGroup: UntypedFormGroup;
 
@@ -103,6 +106,19 @@ export class ReportRichTextConfigComponent implements ControlValueAccessor, OnIn
         borderColor: component?.borderColor ?? null
       }
     }, {emitEvent: false});
+  }
+
+  // C2 Task 15B: tb-html (the Ace-backed WYSIWYG editor bound to `value`) exposes no public
+  // insert-at-cursor API - writeValue() wholesale-replaces the editor content and resets the cursor to
+  // a fixed position rather than preserving/inserting at the user's actual selection, and the
+  // underlying Ace editor instance is a private field with no public accessor. Per
+  // task-15b-interfaces.md's own documented fallback: append the token to the end of the current HTML
+  // value string instead of fighting the editor internals. UX compromise, by design - the user
+  // repositions the inserted token by hand afterward.
+  insertDynamicField(token: string): void {
+    const control = this.richTextFormGroup.get('value');
+    const current: string = control.value ?? '';
+    control.setValue(current + token);
   }
 
   private toRichTextComponent(formValue: any): RichTextComponent {

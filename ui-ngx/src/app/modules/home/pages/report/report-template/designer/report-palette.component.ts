@@ -16,6 +16,7 @@
 
 import { Component } from '@angular/core';
 import { ReportComponentType } from '@shared/models/report-configuration.models';
+import { REPORT_COMPONENT_PRESETS } from '@home/pages/report/report-template/designer/presets/report-component-presets';
 
 export interface ReportComponentTypeInfo {
   type: ReportComponentType;
@@ -72,6 +73,13 @@ export function reportComponentTypeInfo(type: string): ReportComponentTypeInfo |
 export class ReportPaletteComponent {
 
   readonly paletteItems = REPORT_COMPONENT_PALETTE;
+
+  // C2 Task 15B: a second, source-only cdkDropList below the component-type list, offering pre-filled
+  // starting components (PE's defaultConfig fixtures) instead of a bare skeleton. Presented separately
+  // from paletteItems (own "Presets" section/title) so the two remain visually and structurally
+  // distinct even though both feed the same canvas drop target. Task 16 appends 11 more entries to
+  // REPORT_COMPONENT_PRESETS itself - nothing here needs to change for that.
+  readonly presetItems = REPORT_COMPONENT_PRESETS;
 
   readonly noEnterPredicate = (): boolean => false;
 

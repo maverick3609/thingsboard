@@ -14,13 +14,14 @@
 /// limitations under the License.
 ///
 
-import { Component, forwardRef, OnDestroy, OnInit } from '@angular/core';
+import { Component, ElementRef, forwardRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR, UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { DataSource, HeadingComponent } from '@shared/models/report-configuration.models';
 import { ReportAlignment } from '@home/pages/report/report-template/designer/widgets/report-alignment.component';
 import { ReportBackgroundBorder } from '@home/pages/report/report-template/designer/widgets/report-background-border.component';
+import { REPORT_DYNAMIC_FIELDS, ReportDynamicField } from '@home/pages/report/report-template/designer/report-dynamic-fields';
 
 // CVA for components/HeadingComponent.java - the shell's right-panel content when the selected
 // canvas component is a HEADING (report-template-editor.component.html). Mirrors T8's
@@ -44,6 +45,16 @@ import { ReportBackgroundBorder } from '@home/pages/report/report-template/desig
     standalone: false
 })
 export class ReportHeadingConfigComponent implements ControlValueAccessor, OnInit, OnDestroy {
+
+  // C2 Task 15B: the native <input> backing the `value` control (report-heading-config.component.html),
+  // used by insertDynamicField() below to insert at the current cursor position via
+  // selectionStart/selectionEnd + setRangeText. Stays undefined under this file's own
+  // plain-instantiation spec convention (no TestBed => the template is never compiled), which is
+  // exactly why insertDynamicField() has a DOM-free fallback.
+  @ViewChild('valueInput')
+  valueInput: ElementRef<HTMLInputElement>;
+
+  readonly dynamicFields: ReportDynamicField[] = REPORT_DYNAMIC_FIELDS;
 
   headingFormGroup: UntypedFormGroup;
 
@@ -114,6 +125,27 @@ export class ReportHeadingConfigComponent implements ControlValueAccessor, OnIni
         borderColor: component?.borderColor ?? null
       }
     }, {emitEvent: false});
+  }
+
+  // C2 Task 15B: inserts a dynamic-field token (e.g. '${pageNumber}') into the `value` control at the
+  // native input's current cursor position (selectionStart/selectionEnd via setRangeText - the
+  // standard DOM technique for cursor-aware text insertion; Angular's forms API has no equivalent of
+  // its own), then re-reads the mutated DOM value back into the reactive form control so
+  // valueChanges/propagateChange fire normally. Falls back to appending the token to the current
+  // value when the input isn't resolvable (see valueInput's own comment above for when that happens).
+  insertDynamicField(token: string): void {
+    const control = this.headingFormGroup.get('value');
+    const current: string = control.value ?? '';
+    const inputEl = this.valueInput?.nativeElement;
+    if (inputEl && typeof inputEl.setRangeText === 'function') {
+      const start = inputEl.selectionStart ?? current.length;
+      const end = inputEl.selectionEnd ?? current.length;
+      inputEl.setRangeText(token, start, end, 'end');
+      control.setValue(inputEl.value);
+      inputEl.focus();
+    } else {
+      control.setValue(current + token);
+    }
   }
 
   private toHeadingComponent(formValue: any): HeadingComponent {

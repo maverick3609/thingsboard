@@ -122,4 +122,28 @@ describe('ReportRichTextConfigComponent', () => {
     component.setDisabledState(false);
     expect(component.richTextFormGroup.disabled).toBe(false);
   });
+
+  // C2 Task 15B. tb-html (the WYSIWYG editor bound to `value`) exposes no public insert-at-cursor API
+  // (see report-rich-text-config.component.ts's own comment on insertDynamicField for why) - the
+  // FALLBACK per task-15b-interfaces.md is a plain append to the current HTML string, which is what
+  // this proves.
+  it('appends a dynamic-field token to the current value via insertDynamicField', () => {
+    const component = newComponent();
+    const onChange = jasmine.createSpy('onChange');
+    component.writeValue({ type: 'RICH_TEXT', value: '<p>Report body</p>' });
+    component.registerOnChange(onChange);
+
+    component.insertDynamicField('${entityName}');
+
+    expect(component.richTextFormGroup.get('value').value).toBe('<p>Report body</p>${entityName}');
+    expect(onChange).toHaveBeenCalledWith(jasmine.objectContaining({ value: '<p>Report body</p>${entityName}' }));
+  });
+
+  it('exposes the 6 dynamic-field tokens for the insert menu', () => {
+    const component = newComponent();
+
+    expect(component.dynamicFields.map(f => f.token)).toEqual([
+      '${pageNumber}', '${totalPages}', '${reportCreatedTime}', '${entityName}', '${entityLabel}', '${id}'
+    ]);
+  });
 });

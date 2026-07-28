@@ -21,8 +21,9 @@
 // compiling the cdkDropList/cdkDrag template (and the SharedModule dependency graph that would drag
 // in).
 import { CdkDragDrop, CdkDropList } from '@angular/cdk/drag-drop';
-import { ReportCanvasComponent } from './report-canvas.component';
+import { ReportCanvasComponent, ReportCanvasDragData } from './report-canvas.component';
 import { newReportComponent, ReportComponent, ReportComponentType } from '@shared/models/report-configuration.models';
+import { REPORT_COMPONENT_PRESETS } from './presets/report-component-presets';
 
 describe('ReportCanvasComponent', () => {
 
@@ -41,7 +42,7 @@ describe('ReportCanvasComponent', () => {
   // is what onDrop uses to distinguish an intra-canvas reorder from a cross-list drop from the
   // palette, so a same-vs-different object reference is all the fake needs to get right.
   function dropEvent(previousIndex: number, currentIndex: number, crossContainer: boolean,
-                      itemData?: ReportComponentType): CdkDragDrop<ReportComponent[], any, ReportComponentType> {
+                      itemData?: ReportCanvasDragData): CdkDragDrop<ReportComponent[], any, ReportCanvasDragData> {
     const container = {} as CdkDropList<ReportComponent[]>;
     const previousContainer = crossContainer ? ({} as CdkDropList<any>) : container;
     return {
@@ -76,6 +77,18 @@ describe('ReportCanvasComponent', () => {
     canvas.onDrop(dropEvent(0, 2, true, ReportComponentType.HEADING));
 
     expect(canvas.components).toEqual([componentA, componentB, newReportComponent(ReportComponentType.HEADING)]);
+    expect(onChange).toHaveBeenCalledWith(canvas.components);
+  });
+
+  it('expands a preset drop via its own factory() (not newReportComponent) and inserts the clone at the drop index, emitting componentsChange (C2 Task 15B)', () => {
+    const canvas = newCanvas();
+    const onChange = jasmine.createSpy('componentsChange');
+    canvas.componentsChange.subscribe(onChange);
+    const preset = REPORT_COMPONENT_PRESETS.find(p => p.key === 'pageNumber');
+
+    canvas.onDrop(dropEvent(0, 2, true, { preset }));
+
+    expect(canvas.components).toEqual([componentA, componentB, preset.factory()]);
     expect(onChange).toHaveBeenCalledWith(canvas.components);
   });
 

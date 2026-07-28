@@ -136,4 +136,28 @@ describe('ReportHeadingConfigComponent', () => {
     component.setDisabledState(false);
     expect(component.headingFormGroup.disabled).toBe(false);
   });
+
+  // C2 Task 15B. Plain instantiation never compiles the template, so @ViewChild('valueInput') stays
+  // undefined here - this exercises insertDynamicField()'s documented FALLBACK (append) path, not the
+  // cursor-insert path (which needs a real native <input>, out of scope for this spec convention -
+  // see report-heading-config.component.ts's own class header for the full rationale).
+  it('appends a dynamic-field token to value via insertDynamicField when no native input is resolvable', () => {
+    const component = newComponent();
+    const onChange = jasmine.createSpy('onChange');
+    component.writeValue({ type: 'HEADING', value: 'Page ' });
+    component.registerOnChange(onChange);
+
+    component.insertDynamicField('${pageNumber}');
+
+    expect(component.headingFormGroup.get('value').value).toBe('Page ${pageNumber}');
+    expect(onChange).toHaveBeenCalledWith(jasmine.objectContaining({ value: 'Page ${pageNumber}' }));
+  });
+
+  it('exposes the 6 dynamic-field tokens for the insert menu', () => {
+    const component = newComponent();
+
+    expect(component.dynamicFields.map(f => f.token)).toEqual([
+      '${pageNumber}', '${totalPages}', '${reportCreatedTime}', '${entityName}', '${entityLabel}', '${id}'
+    ]);
+  });
 });

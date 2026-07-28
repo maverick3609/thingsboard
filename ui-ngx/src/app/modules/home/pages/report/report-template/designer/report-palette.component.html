@@ -31,4 +31,19 @@
       <span>{{ item.labelKey | translate }}</span>
     </div>
   </div>
+  <div class="tb-form-panel-title" translate>report.designer.presets</div>
+  <div cdkDropList
+       [cdkDropListSortingDisabled]="true"
+       [cdkDropListData]="presetItems"
+       [cdkDropListEnterPredicate]="noEnterPredicate"
+       class="tb-report-palette-list tb-drop-list flex flex-col gap-1">
+    <div *ngFor="let item of presetItems"
+         class="tb-report-palette-item tb-draggable flex flex-row items-center gap-2 p-2"
+         style="cursor: move;"
+         cdkDrag
+         [cdkDragData]="{ preset: item }">
+      <img [src]="item.preview" [alt]="item.labelKey | translate" class="tb-report-palette-preview">
+      <span>{{ item.labelKey | translate }}</span>
+    </div>
+  </div>
 </div>

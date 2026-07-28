@@ -16,15 +16,14 @@
 
 -->
 <div class="tb-report-canvas flex flex-col">
-  <div *ngIf="!components.length" class="tb-report-canvas-empty flex flex-1 flex-col items-center justify-center">
-    <span translate class="tb-prompt">report.designer.canvas-empty</span>
-  </div>
-  <div *ngIf="components.length"
-       cdkDropList
+  <div cdkDropList
        [cdkDropListData]="components"
        [cdkDropListEnterPredicate]="paletteOnlyEnterPredicate"
        (cdkDropListDropped)="onDrop($event)"
-       class="tb-report-canvas-list tb-drop-list flex flex-col gap-2">
+       class="tb-report-canvas-list tb-drop-list flex flex-1 flex-col gap-2">
+    <div *ngIf="!components.length" class="tb-report-canvas-empty flex flex-1 flex-col items-center justify-center">
+      <span translate class="tb-prompt">report.designer.canvas-empty</span>
+    </div>
     <div *ngFor="let component of components; let i = index; trackBy: trackByComponent"
          class="tb-report-canvas-card tb-draggable flex flex-row items-center gap-2"
          cdkDrag

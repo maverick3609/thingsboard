@@ -5515,7 +5515,10 @@
             "dynamic-field-created-time": "Report created time",
             "dynamic-field-entity-name": "Entity name",
             "dynamic-field-entity-label": "Entity label",
-            "dynamic-field-id": "Entity ID"
+            "dynamic-field-id": "Entity ID",
+            "import": "Import",
+            "export": "Export",
+            "import-error": "Failed to import report template. Please check the file and try again."
         }
     },
     "security": {

@@ -16,6 +16,10 @@
 
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { Store } from '@ngrx/store';
+import { AppState } from '@core/core.state';
+import { TranslateService } from '@ngx-translate/core';
+import { ActionNotificationShow } from '@core/notification/notification.actions';
 import { ReportService } from '@core/http/report.service';
 import { ReportTemplate, ReportTemplateType, TbReportFormat } from '@shared/models/report.models';
 import { ReportComponent, ReportTemplateConfigModel, newPdfReportTemplateConfig } from '@shared/models/report-configuration.models';
@@ -23,6 +27,7 @@ import { deserialize, serialize } from '@home/pages/report/report-template/desig
 import { ReportPageSettings } from '@home/pages/report/report-template/designer/report-page-settings.component';
 import { IAliasController } from '@core/api/widget-api.models';
 import { createReportAliasController } from '@home/pages/report/report-template/designer/data/report-alias-controller';
+import { ReportImportExportService } from '@home/pages/report/report-template/designer/report-import-export';
 
 // PDF-only projection of config's page-level fields for tb-report-page-settings (T5); null for a
 // CSV config, which has no page settings - the shell hides the panel rather than show one whose
@@ -70,11 +75,13 @@ export class ReportTemplateEditorComponent implements OnInit {
 
   constructor(private route: ActivatedRoute,
               private router: Router,
-              private reportService: ReportService) {
+              private reportService: ReportService,
+              private reportImportExport: ReportImportExportService,
+              private store: Store<AppState>,
+              private translate: TranslateService) {
   }
 
   ngOnInit(): void {
-    this.aliasController = createReportAliasController(() => this.config);
     const routeReportTemplateId = this.route.snapshot.paramMap.get('reportTemplateId');
     this.isAdd = !routeReportTemplateId || routeReportTemplateId === 'new';
     // null (not the literal 'new' route segment) in add-mode - a not-yet-saved template has no real
@@ -86,13 +93,11 @@ export class ReportTemplateEditorComponent implements OnInit {
         format: TbReportFormat.PDF,
         type: ReportTemplateType.REPORT
       } as ReportTemplate;
-      this.config = newPdfReportTemplateConfig();
-      this.pageSettings = toPageSettings(this.config);
+      this.applyConfig(newPdfReportTemplateConfig());
     } else {
       this.reportService.getReportTemplateById(this.reportTemplateId).subscribe(reportTemplate => {
         this.reportTemplate = reportTemplate;
-        this.config = deserialize(reportTemplate.configuration);
-        this.pageSettings = toPageSettings(this.config);
+        this.applyConfig(deserialize(reportTemplate.configuration));
       });
     }
   }
@@ -211,5 +216,53 @@ export class ReportTemplateEditorComponent implements OnInit {
 
   goBack(): void {
     this.router.navigate(['../'], {relativeTo: this.route});
+  }
+
+  // Toolbar Export button (C2 Task 17): downloads the LIVE, possibly-unsaved config (not the stale
+  // reportTemplate.configuration) as a standalone JSON file - see report-import-export.ts.
+  exportTemplate(): void {
+    this.reportImportExport.exportTemplate(this.reportTemplate, this.config);
+  }
+
+  // Toolbar Import button (C2 Task 17): loads a previously-exported JSON file INTO the editor for
+  // review - it deliberately never calls save(); the user still has to hit Save themselves. `file`
+  // is undefined if the native file input's change event fired with no selection (e.g. the browser
+  // dialog was cancelled without picking a file).
+  importTemplate(file: File | undefined): void {
+    if (!file) {
+      return;
+    }
+    this.reportImportExport.importTemplate(file).subscribe({
+      next: (imported) => {
+        this.reportTemplate.name = imported.name;
+        this.reportTemplate.format = imported.format;
+        this.reportTemplate.type = imported.type;
+        this.applyConfig(imported.config);
+      },
+      error: (err) => {
+        console.error('Failed to import report template', err);
+        this.store.dispatch(new ActionNotificationShow({
+          message: this.translate.instant('report.designer.import-error'),
+          type: 'error'
+        }));
+      }
+    });
+  }
+
+  // Shared by ngOnInit's 2 load paths (add/existing) AND importTemplate() above, so import
+  // re-derives pageSettings/aliasController exactly like a fresh load does (DRY). aliasController
+  // is technically safe to leave untouched across a config replacement - createReportAliasController
+  // closes over `() => this.config`, i.e. over THIS component instance, not over the config object
+  // itself, so it already re-reads whatever `this.config` currently is on every call - but it's
+  // recreated here anyway for explicitness/defensiveness (cheap, and removes any doubt if
+  // report-alias-controller.ts's factory signature ever changes to capture the config value
+  // directly instead of a getter). `selected` is cleared: after import this.config is an entirely
+  // new tree, so whatever was selected before almost certainly doesn't live in it anymore - the
+  // same state a fresh ngOnInit load starts from (field initializer, never non-null yet).
+  private applyConfig(config: ReportTemplateConfigModel): void {
+    this.config = config;
+    this.pageSettings = toPageSettings(this.config);
+    this.aliasController = createReportAliasController(() => this.config);
+    this.selected = null;
   }
 }

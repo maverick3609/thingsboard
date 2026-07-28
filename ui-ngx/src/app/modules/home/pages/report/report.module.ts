@@ -100,6 +100,7 @@ import {
   REPORT_ALIAS_CALLBACKS_FACTORY,
   ReportAliasCallbacksFactory
 } from '@home/pages/report/report-template/designer/data/report-alias-callbacks.models';
+import { ReportImportExportService } from '@home/pages/report/report-template/designer/report-import-export';
 
 @NgModule({
   declarations: [
@@ -219,7 +220,11 @@ import {
       useFactory: (dialog: MatDialog): ReportAliasCallbacksFactory =>
         (aliasController) => createReportAliasCallbacks(dialog, aliasController),
       deps: [MatDialog]
-    }
+    },
+    // C2 Task 17: the shell (ReportTemplateEditorComponent) injects this for toolbar Import/Export -
+    // see report-import-export.ts for why it's a plain @Injectable() (no providedIn:'root') kept
+    // deliberately free of the platform ImportExportService/DialogService import chain.
+    ReportImportExportService
   ],
   exports: [
     ReportPageSettingsComponent,

@@ -37,6 +37,25 @@
       <tb-toggle-option value="edit">{{ 'action.edit' | translate }}</tb-toggle-option>
       <tb-toggle-option value="preview">{{ 'report.preview' | translate }}</tb-toggle-option>
     </tb-toggle-select>
+    <button mat-icon-button
+            type="button"
+            (click)="exportTemplate()"
+            matTooltip="{{ 'report.designer.export' | translate }}"
+            matTooltipPosition="above">
+      <mat-icon>file_download</mat-icon>
+    </button>
+    <input #importFileInput
+           type="file"
+           accept=".json,application/json"
+           style="display: none"
+           (change)="importTemplate(importFileInput.files[0]); importFileInput.value = ''"/>
+    <button mat-icon-button
+            type="button"
+            (click)="importFileInput.click()"
+            matTooltip="{{ 'report.designer.import' | translate }}"
+            matTooltipPosition="above">
+      <mat-icon>file_upload</mat-icon>
+    </button>
     <button mat-raised-button color="primary"
             [disabled]="!reportTemplate.name?.trim()"
             (click)="save()"

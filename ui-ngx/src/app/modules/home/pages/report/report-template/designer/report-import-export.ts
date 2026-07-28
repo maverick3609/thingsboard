@@ -81,6 +81,16 @@ export function buildExportTemplate(reportTemplate: ReportTemplate, config: Repo
   };
 }
 
+// C2 final-review Fix M2: sanitizes a template name into a filesystem-safe download filename.
+// Mirrors shared/import-export/import-export.service.ts's private prepareFilename() character
+// class EXACTLY (same regex, same global replace-with-underscore) - this file cannot import
+// ImportExportService itself (see file header above), so the one line of logic that matters is
+// replicated locally instead. Without this, a template name containing a path separator, colon, or
+// other filesystem-hostile character (or whitespace) produces a broken/mangled download.
+export function sanitizeFilename(filename: string): string {
+  return filename.replace(/[\\/<>:"|?*\s]/g, '_');
+}
+
 @Injectable()
 export class ReportImportExportService {
 
@@ -121,9 +131,13 @@ export class ReportImportExportService {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${filename}.json`;
+    a.download = `${sanitizeFilename(filename)}.json`;
     a.click();
-    URL.revokeObjectURL(url);
+    // C2 final-review Fix M1: deferred (not synchronous) - mirrors the platform's
+    // ImportExportService.downloadFile pattern (shared/import-export/import-export.service.ts).
+    // Revoking the object URL synchronously right after click() can abort the download on some
+    // browsers, since the click's navigation may not have started reading the blob yet.
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 }
 
@@ -143,10 +157,18 @@ export function parseImportedReportTemplate(json: string): ImportedReportTemplat
       throw new Error('missing "configuration"');
     }
     const config = deserialize(parsed.configuration);
-    // Belt-and-suspenders: deserialize() already defaults `components` to [] whenever
-    // parsed.configuration is a valid object (report-configuration.serializer.spec.ts), so this is
-    // currently unreachable for realistic inputs - kept as an explicit assertion of the contract
-    // this function promises callers, so a future deserialize change can't silently break it here.
+    // Belt-and-suspenders, not dead code to delete: this line protects the contract this function
+    // promises callers (a returned config.components is always an array) against a future change
+    // to deserialize(), even though it never actually fires today for any `configuration` shape
+    // JSON.parse can produce (verified empirically, not assumed - see C2 final-review Fix M6). For
+    // an object/array `configuration`, deserialize() already forces `components` into an array
+    // (report-configuration.serializer.spec.ts). For a primitive `configuration` (a bare
+    // number/string/boolean), deserialize()'s own `model.components = []` throws FIRST - assigning
+    // a new property to a primitive throws in strict-mode ES modules - so a primitive input never
+    // reaches this line at all; it surfaces via the catch below instead, as "Invalid report
+    // template file: Cannot create property 'components' on <type> '<value>'", not this guard's
+    // message. Kept so a future deserialize change (e.g. one that stops throwing on a primitive
+    // input) can't silently break that contract without a test catching it here.
     if (!Array.isArray(config.components)) {
       throw new Error('invalid "configuration" (missing components array)');
     }

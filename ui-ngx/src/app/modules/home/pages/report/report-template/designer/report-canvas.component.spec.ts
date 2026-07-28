@@ -20,7 +20,7 @@
 // `components` and the two EventEmitters, never the DOM, so a `new`'d instance proves it without
 // compiling the cdkDropList/cdkDrag template (and the SharedModule dependency graph that would drag
 // in).
-import { CdkDragDrop, CdkDropList } from '@angular/cdk/drag-drop';
+import { CdkDrag, CdkDragDrop, CdkDropList } from '@angular/cdk/drag-drop';
 import { ReportCanvasComponent, ReportCanvasDragData } from './report-canvas.component';
 import { newReportComponent, ReportComponent, ReportComponentType } from '@shared/models/report-configuration.models';
 import { REPORT_COMPONENT_PRESETS } from './presets/report-component-presets';
@@ -111,5 +111,46 @@ describe('ReportCanvasComponent', () => {
     canvas.selectComponent(componentB);
 
     expect(onSelect).toHaveBeenCalledWith(componentB);
+  });
+
+  // C2 final-review Fix F1 (merge-blocker): this canvas and the header/footer nested canvases
+  // (Task 15A) share the shell's cdkDropListGroup with no enterPredicate, so a card dragged out of
+  // one canvas used to be a validly-hovering drag over another - dropping it there reached onDrop()'s
+  // cross-container else-branch with a full ReportComponent object as event.item.data, which neither
+  // isPresetDragData nor newReportComponent()'s switch recognize, so newReportComponent() threw via
+  // its `default:` case. paletteOnlyEnterPredicate is consulted by CDK before a drag is even allowed
+  // to hover a foreign drop list, so it must accept exactly the two shapes a palette drag can carry
+  // (a bare ReportComponentType string, or a { preset } descriptor) and reject everything else -
+  // in particular a card/component object, which is what a cross-canvas card move would carry.
+  describe('paletteOnlyEnterPredicate (C2 final-review Fix F1)', () => {
+
+    // Minimal fake covering only the one field the predicate reads (drag.data) - same rationale as
+    // this file's own dropEvent() fake above: a real CdkDrag needs a live DOM + NgZone.
+    function fakeDrag(data: unknown): CdkDrag {
+      return { data } as CdkDrag;
+    }
+
+    it('accepts a palette TYPE string drag (e.g. dragging "HEADING" in from the palette)', () => {
+      const canvas = newCanvas();
+
+      expect(canvas.paletteOnlyEnterPredicate(fakeDrag('HEADING'))).toBe(true);
+    });
+
+    it('accepts a preset { preset } descriptor drag (e.g. dragging in the "pageNumber" preset)', () => {
+      const canvas = newCanvas();
+      const preset = REPORT_COMPONENT_PRESETS.find(p => p.key === 'pageNumber');
+
+      expect(canvas.paletteOnlyEnterPredicate(fakeDrag({ preset }))).toBe(true);
+    });
+
+    // The regression this fix closes: a card dragged from another canvas carries the full
+    // ReportComponent object (exactly what this canvas's own cdkDrag [cdkDragData]="component"
+    // binding puts on the drag), which must be REJECTED so it can never reach onDrop() as a
+    // cross-container drop in the first place.
+    it('rejects a card/component object drag - the F1 cross-canvas regression', () => {
+      const canvas = newCanvas();
+
+      expect(canvas.paletteOnlyEnterPredicate(fakeDrag({ type: 'HEADING', value: 'Q3' }))).toBe(false);
+    });
   });
 });

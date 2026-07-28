@@ -22,6 +22,7 @@
   <div *ngIf="components.length"
        cdkDropList
        [cdkDropListData]="components"
+       [cdkDropListEnterPredicate]="paletteOnlyEnterPredicate"
        (cdkDropListDropped)="onDrop($event)"
        class="tb-report-canvas-list tb-drop-list flex flex-col gap-2">
     <div *ngFor="let component of components; let i = index; trackBy: trackByComponent"

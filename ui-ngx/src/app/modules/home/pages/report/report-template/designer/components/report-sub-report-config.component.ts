@@ -103,8 +103,6 @@ export class ReportSubReportConfigComponent implements ControlValueAccessor, OnI
 
   filteredTemplates: Observable<BaseReportTemplate[]>;
 
-  searchText = '';
-
   private destroy$ = new Subject<void>();
   private propagateChange: (value: SubReportComponent) => void = () => {};
 
@@ -196,7 +194,6 @@ export class ReportSubReportConfigComponent implements ControlValueAccessor, OnI
   }
 
   fetchTemplates(searchText?: string): Observable<BaseReportTemplate[]> {
-    this.searchText = searchText;
     const pageLink = new PageLink(20, 0, searchText, {property: 'name', direction: Direction.ASC});
     return this.reportService.getReportTemplateInfos(pageLink, {}, {ignoreLoading: true}).pipe(
       catchError(() => of(emptyPageData<BaseReportTemplate>())),
@@ -206,10 +203,6 @@ export class ReportSubReportConfigComponent implements ControlValueAccessor, OnI
 
   clearTemplate(): void {
     this.templateInput.setValue(null);
-  }
-
-  textIsNotEmpty(text: string): boolean {
-    return !!(text && text.length > 0);
   }
 
   private toComponent(value: any): SubReportComponent {

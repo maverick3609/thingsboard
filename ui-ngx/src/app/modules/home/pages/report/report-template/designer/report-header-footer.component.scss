@@ -19,8 +19,14 @@
   flex-direction: column;
 }
 
-// Visual nesting indicator for the one allowed recursion level (the firstPage editor).
+// Visual nesting indicator for the one allowed recursion level (the firstPage editor). Themed via
+// the same Material divider token + fallback chain already used for a hairline border elsewhere in
+// ui-ngx (modules/home/components/iot-hub/device-install-dialog/device-install-dialog.component.scss)
+// - C2 final-review Fix M4: the previous hard-coded rgba(0, 0, 0, .12) didn't adapt to the .tb-dark
+// theme (theme.scss's mat.all-component-colors($tb-dark-theme)).
 .tb-report-header-footer-first-page {
   padding-left: 12px;
-  border-left: 2px solid rgba(0, 0, 0, .12);
+  border-left-style: solid;
+  border-left-width: 2px;
+  border-left-color: var(--mat-divider-color, var(--mat-app-outline));
 }

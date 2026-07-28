@@ -15,7 +15,7 @@
 ///
 
 import { Component, EventEmitter, Input, Output } from '@angular/core';
-import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
+import { CdkDrag, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { newReportComponent, ReportComponent, ReportComponentType } from '@shared/models/report-configuration.models';
 import { reportComponentTypeInfo, ReportComponentTypeInfo } from '@home/pages/report/report-template/designer/report-palette.component';
 import { ReportComponentPreset } from '@home/pages/report/report-template/designer/presets/report-component-presets';
@@ -65,6 +65,22 @@ export class ReportCanvasComponent {
   // the shell's (selected)="selected = $event" (report-template-editor.component.html).
   @Output()
   selected = new EventEmitter<ReportComponent>();
+
+  // C2 final-review Fix F1 (merge-blocker): this canvas and the shell's other canvas instances
+  // (the header/footer nested canvases, Task 15A) all share the shell's cdkDropListGroup with no
+  // enterPredicate, so a card dragged OUT of one canvas is a valid dragged-item as far as CDK is
+  // concerned when it hovers a DIFFERENT canvas. Dropping it there used to reach onDrop()'s
+  // cross-container else-branch with a full ReportComponent object as event.item.data - neither
+  // isPresetDragData (needs a `preset` key) nor newReportComponent()'s switch (needs a
+  // ReportComponentType string) recognize that shape, so newReportComponent() fell through to its
+  // `default:` case and threw, aborting the gesture with an uncaught error. Only a palette TYPE
+  // string or a preset `{ preset }` descriptor are droppable INTO a canvas from outside; a card from
+  // another canvas is rejected here before onDrop ever sees it. Intra-canvas reordering is
+  // unaffected - CDK does not consult enterPredicate when previousContainer === container.
+  readonly paletteOnlyEnterPredicate = (drag: CdkDrag): boolean => {
+    const data = drag.data;
+    return typeof data === 'string' || (!!data && typeof data === 'object' && 'preset' in data);
+  };
 
   onDrop(event: CdkDragDrop<ReportComponent[], any, ReportCanvasDragData>): void {
     if (event.previousContainer === event.container) {

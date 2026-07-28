@@ -26,10 +26,12 @@
 // specs; only the "exportTemplate (download)" and "importTemplate (FileReader wiring)" blocks
 // touch real Web APIs (Blob/URL/an anchor element, and a real File - all real, available under
 // ChromeHeadless).
+import { fakeAsync, tick } from '@angular/core/testing';
 import {
   buildExportTemplate,
   parseImportedReportTemplate,
-  ReportImportExportService
+  ReportImportExportService,
+  sanitizeFilename
 } from './report-import-export';
 import { ReportTemplate, ReportTemplateType, TbReportFormat } from '@shared/models/report.models';
 import { newPdfReportTemplateConfig, PdfReportTemplateConfig } from '@shared/models/report-configuration.models';
@@ -77,7 +79,10 @@ describe('report-import-export', () => {
       spyOn(HTMLAnchorElement.prototype, 'click');
     });
 
-    it('downloads a `<name>.json` file built from the live config and returns the built object', () => {
+    // C2 final-review Fix M1: revocation is now deferred via setTimeout(..., 0) (mirrors the
+    // platform's ImportExportService.downloadFile), so this test needs fakeAsync/tick to observe
+    // it - same convention as report-preview.component.spec.ts's debounce tests in this directory.
+    it('downloads a `<name>.json` file built from the live config and returns the built object', fakeAsync(() => {
       const rt = reportTemplate();
       const config = newPdfReportTemplateConfig();
 
@@ -89,8 +94,41 @@ describe('report-import-export', () => {
       expect(blobArg.type).toBe('application/json');
       expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledTimes(1);
       const anchor = (HTMLAnchorElement.prototype.click as jasmine.Spy).calls.mostRecent().object as HTMLAnchorElement;
-      expect(anchor.download).toBe('Q3 report.json');
+      // C2 final-review Fix M2: the name is now sanitized before becoming a filename - the space in
+      // 'Q3 report' is one of the characters sanitizeFilename() replaces, same as the platform's
+      // prepareFilename() would (see the dedicated sanitizeFilename specs below for the
+      // filesystem-hostile-character case this fix actually targets).
+      expect(anchor.download).toBe('Q3_report.json');
+      // Not yet revoked synchronously (Fix M1) ...
+      expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+      tick(0);
+      // ... but is once the deferred setTimeout(0) fires.
       expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
+    }));
+
+    // C2 final-review Fix M2: a template name containing filesystem-hostile characters (path
+    // separators, a colon, etc.) must not produce a broken/mangled download filename.
+    it('sanitizes filesystem-hostile characters out of the download filename', fakeAsync(() => {
+      const rt = { ...reportTemplate(), name: 'a/b:c' } as ReportTemplate;
+      const config = newPdfReportTemplateConfig();
+
+      service.exportTemplate(rt, config);
+
+      const anchor = (HTMLAnchorElement.prototype.click as jasmine.Spy).calls.mostRecent().object as HTMLAnchorElement;
+      expect(anchor.download).toBe('a_b_c.json');
+      tick(0);
+    }));
+  });
+
+  describe('sanitizeFilename', () => {
+    it('replaces filesystem-hostile characters and whitespace with underscores (mirrors the platform prepareFilename regex)', () => {
+      expect(sanitizeFilename('a/b:c')).toBe('a_b_c');
+      expect(sanitizeFilename('a\\b<c>d"e|f?g*h')).toBe('a_b_c_d_e_f_g_h');
+      expect(sanitizeFilename('Q3 report')).toBe('Q3_report');
+    });
+
+    it('leaves an already-safe name untouched', () => {
+      expect(sanitizeFilename('Q3-report_2026')).toBe('Q3-report_2026');
     });
   });
 

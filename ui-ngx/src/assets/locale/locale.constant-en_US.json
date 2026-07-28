@@ -5448,6 +5448,7 @@
             "rich-text-value": "Content",
             "image-source-type": "Source type",
             "image-source-type-image": "Image",
+            "image-source-type-entity-key": "Entity data key",
             "image-url": "Image source",
             "image-width-type": "Width type",
             "image-width-type-fit-width": "Fit width",

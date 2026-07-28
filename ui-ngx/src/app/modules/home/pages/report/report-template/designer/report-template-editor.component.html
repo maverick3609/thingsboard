@@ -106,6 +106,7 @@
                                    (ngModelChange)="onComponentChange($event)">
       </tb-report-rich-text-config>
       <tb-report-image-config *ngIf="selected?.type === 'IMAGE'"
+                               [aliasController]="aliasController"
                                [ngModel]="selected"
                                (ngModelChange)="onComponentChange($event)">
       </tb-report-image-config>

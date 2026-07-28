@@ -20,11 +20,18 @@
   <mat-form-field subscriptSizing="dynamic">
     <mat-select formControlName="sourceType" placeholder="{{ 'report.designer.image-source-type' | translate }}">
       <mat-option [value]="sourceTypeEnum.IMAGE" translate>report.designer.image-source-type-image</mat-option>
+      <mat-option [value]="sourceTypeEnum.ENTITY_KEY" translate>report.designer.image-source-type-entity-key</mat-option>
     </mat-select>
   </mat-form-field>
-  <tb-gallery-image-input formControlName="imageUrl"
+  <tb-gallery-image-input *ngIf="isImageSource"
+                           formControlName="imageUrl"
                            label="{{ 'report.designer.image-url' | translate }}">
   </tb-gallery-image-input>
+  <tb-report-datasource *ngIf="isEntityKeySource"
+                        [aliasController]="aliasController"
+                        [allowedDataSourceTypes]="imageDataSourceTypes"
+                        formControlName="dataSource">
+  </tb-report-datasource>
   <mat-form-field subscriptSizing="dynamic">
     <mat-select formControlName="widthType" placeholder="{{ 'report.designer.image-width-type' | translate }}">
       <mat-option [value]="widthTypeEnum.FIT_WIDTH" translate>report.designer.image-width-type-fit-width</mat-option>

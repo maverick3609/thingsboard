@@ -33,13 +33,20 @@ export interface ReportComponentPreset {
   factory: () => ReportComponent;
 }
 
-// The 2 HEADING presets (Task 15B). Task 16 APPENDS the 11 RICH_TEXT composite presets to this same
-// array - report-palette.component.ts/report-canvas.component.ts are written preset-count-agnostic
-// so that later addition needs no further change here.
+// The 2 HEADING presets (Task 15B) followed by the 11 RICH_TEXT composite presets (Task 16), in PE's
+// own palette order (confirmed against the PE jar's Map insertion order). report-palette.component.ts
+// /report-canvas.component.ts are written preset-count-agnostic, so appending here needed no other
+// change.
 //
 // factory() deep-clones the PE fixture on every call (never returns a shared reference) so that two
 // separate drops of the same preset - or a canvas.onDrop() insertion followed by an in-designer edit
 // of one dropped card - can never let one instance's edits leak into another's.
+//
+// The 7 logo-variant RICH_TEXT presets (logoHeading/headingLogo/logoText/textLogo/logoText2/footer2/
+// footer3) embed <img src="tb-image;/assets/report/components/logo-placeholder.svg"> in their cloned
+// `value`. This is PE's own shipped PLACEHOLDER, not a real logo - the user swaps it for their own
+// image via the platform's image picker after dropping the preset. Kept verbatim on purpose; do NOT
+// repoint it to any bundled Inferrix logo asset here.
 export const REPORT_COMPONENT_PRESETS: ReportComponentPreset[] = [
   {
     key: 'pageNumber',
@@ -54,5 +61,82 @@ export const REPORT_COMPONENT_PRESETS: ReportComponentPreset[] = [
     preview: '/assets/report/components/created-time.svg',
     labelKey: 'report.designer.preset-created-time',
     factory: () => deepClone(PE_DEFAULT_CONFIGS.createdTime)
+  },
+  {
+    key: 'textSection',
+    type: ReportComponentType.RICH_TEXT,
+    preview: '/assets/report/components/text-section.svg',
+    labelKey: 'report.designer.preset-text-section',
+    factory: () => deepClone(PE_DEFAULT_CONFIGS.textSection)
+  },
+  {
+    key: 'textImage',
+    type: ReportComponentType.RICH_TEXT,
+    preview: '/assets/report/components/text-image.svg',
+    labelKey: 'report.designer.preset-text-image',
+    factory: () => deepClone(PE_DEFAULT_CONFIGS.textImage)
+  },
+  {
+    key: 'imageText',
+    type: ReportComponentType.RICH_TEXT,
+    preview: '/assets/report/components/image-text.svg',
+    labelKey: 'report.designer.preset-image-text',
+    factory: () => deepClone(PE_DEFAULT_CONFIGS.imageText)
+  },
+  {
+    key: 'logoHeading',
+    type: ReportComponentType.RICH_TEXT,
+    preview: '/assets/report/components/logo-heading.svg',
+    labelKey: 'report.designer.preset-logo-heading',
+    factory: () => deepClone(PE_DEFAULT_CONFIGS.logoHeading)
+  },
+  {
+    key: 'headingLogo',
+    type: ReportComponentType.RICH_TEXT,
+    preview: '/assets/report/components/heading-logo.svg',
+    labelKey: 'report.designer.preset-heading-logo',
+    factory: () => deepClone(PE_DEFAULT_CONFIGS.headingLogo)
+  },
+  {
+    key: 'logoText',
+    type: ReportComponentType.RICH_TEXT,
+    preview: '/assets/report/components/logo-text.svg',
+    labelKey: 'report.designer.preset-logo-text',
+    factory: () => deepClone(PE_DEFAULT_CONFIGS.logoText)
+  },
+  {
+    key: 'textLogo',
+    type: ReportComponentType.RICH_TEXT,
+    preview: '/assets/report/components/text-logo.svg',
+    labelKey: 'report.designer.preset-text-logo',
+    factory: () => deepClone(PE_DEFAULT_CONFIGS.textLogo)
+  },
+  {
+    key: 'logoText2',
+    type: ReportComponentType.RICH_TEXT,
+    preview: '/assets/report/components/logo-text-2.svg',
+    labelKey: 'report.designer.preset-logo-text-2',
+    factory: () => deepClone(PE_DEFAULT_CONFIGS.logoText2)
+  },
+  {
+    key: 'footer1',
+    type: ReportComponentType.RICH_TEXT,
+    preview: '/assets/report/components/footer-1.svg',
+    labelKey: 'report.designer.preset-footer-1',
+    factory: () => deepClone(PE_DEFAULT_CONFIGS.footer1)
+  },
+  {
+    key: 'footer2',
+    type: ReportComponentType.RICH_TEXT,
+    preview: '/assets/report/components/footer-2.svg',
+    labelKey: 'report.designer.preset-footer-2',
+    factory: () => deepClone(PE_DEFAULT_CONFIGS.footer2)
+  },
+  {
+    key: 'footer3',
+    type: ReportComponentType.RICH_TEXT,
+    preview: '/assets/report/components/footer-3.svg',
+    labelKey: 'report.designer.preset-footer-3',
+    factory: () => deepClone(PE_DEFAULT_CONFIGS.footer3)
   }
 ];

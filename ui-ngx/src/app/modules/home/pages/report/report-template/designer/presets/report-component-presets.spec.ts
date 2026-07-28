@@ -23,14 +23,31 @@ import { REPORT_COMPONENT_PRESETS } from './report-component-presets';
 import { PE_DEFAULT_CONFIGS } from '@home/pages/report/report-template/designer/fixtures/pe-default-configs';
 import { ReportComponentType } from '@shared/models/report-configuration.models';
 
+// Task 16's 11 RICH_TEXT composite presets, in PE palette order (confirmed against the PE jar's own
+// Map insertion order: textSection/textImage/imageText, then the 5 logo variants, then the 3
+// footers - see task-16-interfaces.md).
+const RICH_TEXT_PRESET_KEYS = [
+  'textSection', 'textImage', 'imageText',
+  'logoHeading', 'headingLogo', 'logoText', 'textLogo', 'logoText2',
+  'footer1', 'footer2', 'footer3'
+];
+
 describe('REPORT_COMPONENT_PRESETS', () => {
 
-  it('lists exactly the 2 HEADING presets (pageNumber, createdTime) with a preview + labelKey', () => {
-    expect(REPORT_COMPONENT_PRESETS.map(p => p.key)).toEqual(['pageNumber', 'createdTime']);
+  it('lists exactly the 13 presets (2 HEADING + 11 RICH_TEXT composites) with a preview + labelKey', () => {
+    expect(REPORT_COMPONENT_PRESETS.map(p => p.key)).toEqual(['pageNumber', 'createdTime', ...RICH_TEXT_PRESET_KEYS]);
     REPORT_COMPONENT_PRESETS.forEach(preset => {
-      expect(preset.type).toBe(ReportComponentType.HEADING);
-      expect(preset.preview).toMatch(/^\/assets\/report\/components\/[a-z-]+\.svg$/);
+      expect(preset.preview).toMatch(/^\/assets\/report\/components\/[a-z0-9-]+\.svg$/);
       expect(preset.labelKey).toBeTruthy();
+    });
+  });
+
+  it('the 2 HEADING presets keep type HEADING; the 11 composite presets are type RICH_TEXT', () => {
+    ['pageNumber', 'createdTime'].forEach(key => {
+      expect(REPORT_COMPONENT_PRESETS.find(p => p.key === key).type).toBe(ReportComponentType.HEADING);
+    });
+    RICH_TEXT_PRESET_KEYS.forEach(key => {
+      expect(REPORT_COMPONENT_PRESETS.find(p => p.key === key).type).toBe(ReportComponentType.RICH_TEXT);
     });
   });
 
@@ -50,6 +67,23 @@ describe('REPORT_COMPONENT_PRESETS', () => {
 
     expect(cloned).toEqual(PE_DEFAULT_CONFIGS.createdTime);
     expect(cloned.value).toBe('Created: ${reportCreatedTime}');
+  });
+
+  it("footer1's factory() clones PE_DEFAULT_CONFIGS.footer1 verbatim", () => {
+    const preset = REPORT_COMPONENT_PRESETS.find(p => p.key === 'footer1');
+
+    const cloned: any = preset.factory();
+
+    expect(cloned).toEqual(PE_DEFAULT_CONFIGS.footer1);
+    expect(cloned.value).toBe(PE_DEFAULT_CONFIGS.footer1.value);
+  });
+
+  it("logoHeading's factory() keeps PE's logo-placeholder tb-image ref VERBATIM (the user swaps it via the image picker at authoring time - not repointed here)", () => {
+    const preset = REPORT_COMPONENT_PRESETS.find(p => p.key === 'logoHeading');
+
+    const cloned: any = preset.factory();
+
+    expect(cloned.value).toContain('tb-image;/assets/report/components/logo-placeholder.svg');
   });
 
   it('returns a fresh, distinct object from every factory() call - never a shared reference', () => {

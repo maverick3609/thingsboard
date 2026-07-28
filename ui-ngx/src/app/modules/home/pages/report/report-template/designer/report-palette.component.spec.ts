@@ -70,15 +70,20 @@ describe('ReportPaletteComponent (data)', () => {
     });
   });
 
-  describe('presetItems (C2 Task 15B)', () => {
-    it('lists the 2 HEADING presets, each with a non-empty PE preview thumbnail path', () => {
+  describe('presetItems (C2 Task 15B/16)', () => {
+    it('lists all 13 presets (2 HEADING + 11 RICH_TEXT composites), each with a non-empty PE preview thumbnail path', () => {
       const palette = new ReportPaletteComponent();
 
       expect(palette.presetItems).toBe(REPORT_COMPONENT_PRESETS);
-      expect(palette.presetItems.map(p => p.key)).toEqual(['pageNumber', 'createdTime']);
+      expect(palette.presetItems.map(p => p.key)).toEqual([
+        'pageNumber', 'createdTime',
+        'textSection', 'textImage', 'imageText',
+        'logoHeading', 'headingLogo', 'logoText', 'textLogo', 'logoText2',
+        'footer1', 'footer2', 'footer3'
+      ]);
       palette.presetItems.forEach(item => {
         expect(item.preview).toBeTruthy();
-        expect(item.preview).toMatch(/^\/assets\/report\/components\/[a-z-]+\.svg$/);
+        expect(item.preview).toMatch(/^\/assets\/report\/components\/[a-z0-9-]+\.svg$/);
       });
     });
   });

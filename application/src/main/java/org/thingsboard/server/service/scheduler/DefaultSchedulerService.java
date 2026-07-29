@@ -283,8 +283,9 @@ public class DefaultSchedulerService extends AbstractPartitionBasedService<Tenan
                     if ("generateReport".equals(event.getType())) {
                         schedulerReportExecutor.ifPresentOrElse(
                                 executor -> executor.executeReport(tenantId, event),
-                                () -> log.warn("[{}][{}] 'generateReport' event fired but no SchedulerReportExecutor is available. " +
-                                        "Install the Inferrix Reporting module to enable report generation.", tenantId, eventId));
+                                () -> log.warn("[{}][{}] 'generateReport' event fired but the report renderer is disabled. " +
+                                        "Set reports.renderer.enabled=true (env REPORTS_RENDERER_ENABLED=true) on a " +
+                                        "headless-Chromium-capable host to enable scheduled report generation.", tenantId, eventId));
                     } else {
                         TbMsgMetaData tbMsgMD = this.getTbMsgMetaData(event, configuration);
                         TbMsg tbMsg = TbMsg.newMsg().type(msgType).originator(originatorId).metaData(tbMsgMD).dataType(TbMsgDataType.JSON).data(this.getMsgBody(event.getConfiguration())).build();

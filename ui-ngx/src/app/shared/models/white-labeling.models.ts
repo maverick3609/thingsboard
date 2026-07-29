@@ -14,6 +14,8 @@
 /// limitations under the License.
 ///
 
+import { DomainId } from '@shared/models/id/domain-id';
+
 export interface Favicon {
   url: string;
 }
@@ -51,6 +53,6 @@ export interface LoginWhiteLabelingParams extends WhiteLabelingParams {
   darkForeground: boolean;
   showNameBottom: boolean;
   loginCardColor: string;
-  domainId: string;
+  domainId: DomainId;
   baseUrl: string;
 }

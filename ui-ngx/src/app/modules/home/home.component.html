@@ -31,6 +31,9 @@
     <mat-toolbar color="primary" class="tb-side-menu-toolbar flex flex-1 flex-col" role="navigation">
       <tb-side-menu></tb-side-menu>
     </mat-toolbar>
+    <div class="tb-nav-footer" *ngIf="(showNameVersion$ | async) && (platformName$ | async) as platformName">
+      <small>{{platformName}}<ng-container *ngIf="platformVersion$ | async as platformVersion"> v.{{platformVersion}}</ng-container></small>
+    </div>
   </mat-sidenav>
   <mat-sidenav-content>
     <div class="flex flex-col" role="main" style="height: 100%;">

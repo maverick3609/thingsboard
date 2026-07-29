@@ -56,6 +56,10 @@ export class HomeComponent extends PageComponent implements AfterViewInit, OnIni
 
   logo = 'assets/logo_title_white.svg';
 
+  showNameVersion$ = this.wlRuntime.showNameVersion$;
+  platformName$ = this.wlRuntime.platformName$;
+  platformVersion$ = this.wlRuntime.platformVersion$;
+
   @ViewChild('sidenav')
   sidenav: MatSidenav;
 

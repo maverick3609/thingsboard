@@ -23,6 +23,8 @@ import { WhiteLabelingHttpService } from '@core/http/white-labeling.service';
 import { WhiteLabelingRuntimeService } from '@core/services/white-labeling-runtime.service';
 import { LoginWhiteLabelingParams, WhiteLabelingParams } from '@shared/models/white-labeling.models';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { DialogService } from '@core/services/dialog.service';
+import { TranslateService } from '@ngx-translate/core';
 
 @Component({
   standalone: false,
@@ -44,7 +46,9 @@ export class WhiteLabelingComponent implements OnInit {
     private store: Store<AppState>,
     private wlHttp: WhiteLabelingHttpService,
     private wlRuntime: WhiteLabelingRuntimeService,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private dialogService: DialogService,
+    private translate: TranslateService
   ) {}
 
   ngOnInit(): void {
@@ -107,6 +111,19 @@ export class WhiteLabelingComponent implements OnInit {
   }
 
   deleteSettings(): void {
+    this.dialogService.confirm(
+      this.translate.instant('white-labeling.reset-white-label-title'),
+      this.translate.instant('white-labeling.reset-white-label-text'),
+      this.translate.instant('action.no'),
+      this.translate.instant('action.yes')
+    ).subscribe(result => {
+      if (result) {
+        this.resetSettings();
+      }
+    });
+  }
+
+  private resetSettings(): void {
     this.loading = true;
     const customerId = this.isCustomerScope ? this.selectedCustomerId : undefined;
     this.wlHttp.deleteCurrentWhiteLabelParams(customerId).subscribe({

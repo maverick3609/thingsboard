@@ -55,7 +55,7 @@ If any of the above show as conflicted or reverted after merging `upstream/relea
   - `ui-ngx/.../shared/models/white-labeling.models.ts`
 - **Status:** 15 commits on `inferrix-release-4.3` — fully committed. Latest: `2248c8bc55 feat(wl): add permission wiring, transactional cache, and legal-content support`.
 
-### TB-core files modified (23)
+### TB-core files modified (24)
 
 #### Backend (10)
 
@@ -72,7 +72,7 @@ If any of the above show as conflicted or reverted after merging `upstream/relea
 | 9 | `dao/src/main/java/org/thingsboard/server/dao/model/ModelConstants.java` | Add a `White labeling constants.` block with `WHITE_LABELING_TABLE_NAME`, `WHITE_LABELING_SETTINGS_PROPERTY`, `WHITE_LABELING_TYPE_PROPERTY`, `WHITE_LABELING_DOMAIN_ID_PROPERTY`, after the API key constants block (~line 762) | Schema constants for the JPA entity |
 | 10 | `dao/src/main/resources/sql/schema-entities.sql` | Append `CREATE TABLE IF NOT EXISTS white_labeling (...)` at end of file | Schema for fresh installs |
 
-#### Frontend (13)
+#### Frontend (14)
 
 | # | File | Change | Why |
 |---|------|--------|-----|
@@ -90,6 +90,7 @@ If any of the above show as conflicted or reverted after merging `upstream/relea
 | 21 | `ui-ngx/src/app/shared/components/footer.component.html` | Replace single `<small>Copyright © {{year}} The ThingsBoard Authors</small>` with a conditional `*ngIf="(showNameVersion$ \| async) && (platformName$ \| async) as name; else defaultFooter"` and a `#defaultFooter` template that preserves the original | Footer text comes from WL settings when available |
 | 22 | `ui-ngx/src/app/shared/components/footer.component.ts` | (a) import + inject `WhiteLabelingRuntimeService`; (b) expose `showNameVersion$ = wlRuntime.showNameVersion$` and `platformName$ = wlRuntime.platformName$` as fields | Bind the observables consumed by the template |
 | 23 | `ui-ngx/src/assets/locale/locale.constant-en_US.json` | Add the top-level `"white-labeling": { ... }` i18n section (inserted between `version-control` and `widget`) containing the menu label key `white-labeling.white-labeling` plus all WL page labels | i18n for the White-labeling menu entry, breadcrumb, and settings page. (Was dropped once already — 2026-07 merge — and rediscovered on the deployed server as raw `white-labeling.white-labeling` text. The earlier row text wrongly said a single key in a `functions` section; the code references `white-labeling.*` keys.) This is the ONLY Inferrix content in a 10k-line file upstream churns constantly, so it is trivially dropped on merge — the merge guard must grep this file's "ours" side for `white-labeling` before take-theirs |
+| 24 | `ui-ngx/src/app/modules/home/home.component.ts` + `.html` + `.scss` | **P2 / BUG 4 fix** — (a) `.ts`: add three public fields `showNameVersion$ = wlRuntime.showNameVersion$`, `platformName$ = wlRuntime.platformName$`, `platformVersion$ = wlRuntime.platformVersion$` (the `WhiteLabelingRuntimeService` injection already exists per row 16, for the logo binding), inserted right after the `logo` field; (b) `.html`: insert a `<div class="tb-nav-footer" *ngIf="(showNameVersion$ \| async) && (platformName$ \| async) as platformName">` block rendering `{{platformName}} v.{{platformVersion}}` as a new sibling immediately after the `<mat-toolbar class="tb-side-menu-toolbar ...">` closing tag, before the closing `</mat-sidenav>`; (c) `.scss`: add a `.tb-nav-footer { flex-shrink:0; ... }` rule nested inside `mat-sidenav.tb-site-sidenav`, as a sibling of the existing `.tb-nav-header`/`.tb-side-menu-toolbar` rules | The WL "Platform Info" toggle (`showNameVersion`/`platformName`/`platformVersion`) had no render site anywhere in the app — `FooterComponent` is the only consumer of those observables and `<tb-footer>` is never mounted (0 usages). This adds a small render slot at the bottom of the left nav, reusing the SAME runtime observables `FooterComponent` already exposes (rows 21/22) via the SAME `WhiteLabelingRuntimeService`, without mounting or modifying `FooterComponent` itself |
 
 ### Merge-recovery procedure (WL-specific notes)
 
@@ -98,7 +99,8 @@ If any of the above show as conflicted or reverted after merging `upstream/relea
 - **`admin-routing.module.ts`** — three sub-changes on the same `/settings` route. Verify all three (`auth` array, `redirectTo` map, new child route).
 - **`Resource.java`** — upstream adds enum values here regularly. Verify `WHITE_LABELING,` survives in its expected position (between `MOBILE_APP_SETTINGS` and `JOB`).
 - **`schema_update.sql`** and **`schema-entities.sql`** both create the `white_labeling` table — confirm both still contain the block (upstream may rewrite ordering).
-- **`locale.constant-en_US.json`** — the `functions.white-labeling` key is the only Inferrix content in this 10k-line file; upstream churns it every release and it does NOT stand out by name in a big diff. The merge procedure greps each Bucket-B "ours" side for `inferrix|whitelabel|white-labeling|...` precisely to catch this file before a blind take-theirs. Keep that guard.
+- **`locale.constant-en_US.json`** — the `functions.white-labeling` key is the only Inferrix content in this 10k-line file; upstream churns it every release and it does NOT stand out by name in a big diff. The merge procedure greps each Bucket-B "ours" side for `inferrix|whitelabel|white-labeling|...` precisely to catch this file before a blind take-theirs. Keep that guard. (P2 added more keys — `reset-white-label-title/-text`, `login-domain-settings`, `domain-name`, `no-domain`, `domain-name-hint`, `base-url`, `base-url-invalid` — under the SAME guarded block; no new guard needed.)
+- **`home.component.ts`/`.html`/`.scss` (row 24)** — **silent-drop risk**: losing the `.tb-nav-footer` block (or the 3 observable fields) does NOT fail the build — the app just silently regresses to BUG 4's original symptom (Platform Info toggle does nothing, visible only by manual QA). Recovery check: `grep -n "tb-nav-footer" ui-ngx/src/app/modules/home/home.component.html ui-ngx/src/app/modules/home/home.component.scss` and `grep -n "platformVersion\$" ui-ngx/src/app/modules/home/home.component.ts`. `home.component.ts` carries TWO independent concerns (row 16's logo binding + row 24's platform-info fields) — verify both survive separately since upstream may touch `ngOnInit`/the field list for unrelated reasons.
 
 ---
 

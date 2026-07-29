@@ -7980,7 +7980,15 @@
         "show-name-bottom": "Show platform name at bottom",
         "settings-saved": "White labeling settings saved",
         "settings-deleted": "White labeling settings deleted",
-        "preview-applied": "Preview applied"
+        "preview-applied": "Preview applied",
+        "reset-white-label-title": "Reset white labeling settings?",
+        "reset-white-label-text": "This will remove all general and login page branding customizations and restore the platform defaults. This action cannot be undone.",
+        "login-domain-settings": "Domain",
+        "domain-name": "Domain name",
+        "no-domain": "None",
+        "domain-name-hint": "Registered login domain this branding applies to (configured under OAuth2 domains)",
+        "base-url": "Base URL",
+        "base-url-invalid": "Enter a valid URL"
     },
     "widget": {
         "widget-library": "Widgets library",

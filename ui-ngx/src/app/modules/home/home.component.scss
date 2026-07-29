@@ -55,6 +55,18 @@
       height: inherit;
       padding: 0;
     }
+    .tb-nav-footer {
+      flex-shrink: 0;
+      padding: 6px 16px;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      small {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.7);
+      }
+    }
   }
   .tb-primary-toolbar {
     z-index: 2;

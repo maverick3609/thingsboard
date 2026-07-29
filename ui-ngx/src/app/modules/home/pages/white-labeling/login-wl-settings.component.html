@@ -26,14 +26,14 @@
       <mat-label translate>white-labeling.logo-image-height</mat-label>
       <input matInput type="number" formControlName="logoImageHeight">
     </mat-form-field>
-    <mat-form-field class="full-width">
-      <mat-label translate>white-labeling.login-card-color</mat-label>
-      <input matInput type="color" formControlName="loginCardColor">
-    </mat-form-field>
-    <mat-form-field class="full-width">
-      <mat-label translate>white-labeling.page-background-color</mat-label>
-      <input matInput type="color" formControlName="pageBackgroundColor">
-    </mat-form-field>
+    <div class="form-row">
+      <label translate>white-labeling.login-card-color</label>
+      <tb-color-input asBoxInput colorClearButton formControlName="loginCardColor"></tb-color-input>
+    </div>
+    <div class="form-row">
+      <label translate>white-labeling.page-background-color</label>
+      <tb-color-input asBoxInput colorClearButton formControlName="pageBackgroundColor"></tb-color-input>
+    </div>
     <mat-slide-toggle formControlName="darkForeground">{{ 'white-labeling.dark-foreground' | translate }}</mat-slide-toggle>
     <mat-slide-toggle formControlName="showNameBottom">{{ 'white-labeling.show-name-bottom' | translate }}</mat-slide-toggle>
   </section>

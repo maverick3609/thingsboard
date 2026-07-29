@@ -15,7 +15,7 @@
 ///
 
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
-import { FormBuilder, FormGroup } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { WhiteLabelingParams } from '@shared/models/white-labeling.models';
 
 @Component({
@@ -47,6 +47,9 @@ export class GeneralWlSettingsComponent implements OnInit, OnChanges {
       hideConnectivityDialog: [false],
       paletteSettings: [null]
     });
+    this.form.get('showNameVersion').valueChanges.subscribe((showNameVersion: boolean) => {
+      this.updatePlatformNameValidators(showNameVersion);
+    });
     this.form.valueChanges.subscribe(() => this.emitParams());
     this.patchForm();
   }
@@ -74,6 +77,13 @@ export class GeneralWlSettingsComponent implements OnInit, OnChanges {
       hideConnectivityDialog: this.params.hideConnectivityDialog ?? false,
       paletteSettings: this.params.paletteSettings
     }, { emitEvent: false });
+    this.updatePlatformNameValidators(this.params.showNameVersion ?? false);
+  }
+
+  private updatePlatformNameValidators(showNameVersion: boolean): void {
+    const platformNameControl = this.form.get('platformName');
+    platformNameControl.setValidators(showNameVersion ? [Validators.required] : []);
+    platformNameControl.updateValueAndValidity({ emitEvent: false });
   }
 
   private emitParams(): void {

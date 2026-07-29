@@ -60,6 +60,7 @@
     <mat-form-field class="full-width">
       <mat-label translate>white-labeling.platform-name</mat-label>
       <input matInput formControlName="platformName">
+      <mat-error *ngIf="form.get('platformName').hasError('required')" translate>white-labeling.platform-name-required</mat-error>
     </mat-form-field>
     <mat-form-field class="full-width">
       <mat-label translate>white-labeling.platform-version</mat-label>

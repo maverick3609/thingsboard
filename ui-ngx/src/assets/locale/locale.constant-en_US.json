@@ -7969,6 +7969,7 @@
         "show-platform-name-version": "Show platform name and version",
         "platform-name": "Platform name",
         "platform-version": "Platform version",
+        "platform-name-required": "Platform name is required when \"Show platform name and version\" is enabled",
         "advanced": "Advanced",
         "custom-css": "Custom CSS",
         "hide-connectivity-dialog": "Hide connectivity dialog",

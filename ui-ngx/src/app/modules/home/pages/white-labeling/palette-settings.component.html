@@ -26,7 +26,7 @@
   <div class="shade-grid">
     <div *ngFor="let shade of shades" class="shade-item">
       <label>{{shade}}</label>
-      <input type="color" [formControlName]="'primary_' + shade">
+      <tb-color-input asBoxInput colorClearButton [formControlName]="'primary_' + shade"></tb-color-input>
     </div>
   </div>
 
@@ -40,7 +40,7 @@
   <div class="shade-grid">
     <div *ngFor="let shade of shades" class="shade-item">
       <label>{{shade}}</label>
-      <input type="color" [formControlName]="'accent_' + shade">
+      <tb-color-input asBoxInput colorClearButton [formControlName]="'accent_' + shade"></tb-color-input>
     </div>
   </div>
 </div>

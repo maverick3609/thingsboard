@@ -17,10 +17,6 @@
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { LoginWhiteLabelingParams } from '@shared/models/white-labeling.models';
-import { DomainId } from '@shared/models/id/domain-id';
-import { DomainInfo } from '@shared/models/oauth2.models';
-import { DomainService } from '@core/http/domain.service';
-import { PageLink } from '@shared/models/page/page-link';
 import { WEB_URL_REGEX } from '@shared/models/mobile-app.models';
 
 @Component({
@@ -34,14 +30,9 @@ export class LoginWlSettingsComponent implements OnInit, OnChanges {
 
   form: FormGroup;
 
-  // Populated best-effort: listing Domain entities is a SYS_ADMIN-only endpoint
-  // (see DomainController#getDomainInfos), so this stays empty for TENANT_ADMIN /
-  // CUSTOMER_USER sessions and the select simply offers the "none" option.
-  domains: DomainInfo[] = [];
-
   readonly webUrlPattern = WEB_URL_REGEX;
 
-  constructor(private fb: FormBuilder, private domainService: DomainService) {}
+  constructor(private fb: FormBuilder) {}
 
   ngOnInit(): void {
     this.form = this.fb.group({
@@ -51,29 +42,16 @@ export class LoginWlSettingsComponent implements OnInit, OnChanges {
       pageBackgroundColor: [null],
       darkForeground: [false],
       showNameBottom: [false],
-      domainId: [null],
       baseUrl: [null, [Validators.pattern(this.webUrlPattern)]]
     });
     this.form.valueChanges.subscribe(() => this.emitParams());
     this.patchForm();
-    this.loadDomains();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes.params && this.form) {
       this.patchForm();
     }
-  }
-
-  compareDomainIds(a: DomainId, b: DomainId): boolean {
-    return a?.id === b?.id;
-  }
-
-  private loadDomains(): void {
-    this.domainService.getTenantDomainInfos(new PageLink(100), { ignoreErrors: true }).subscribe({
-      next: page => { this.domains = page.data; },
-      error: () => { this.domains = []; }
-    });
   }
 
   private patchForm(): void {
@@ -85,7 +63,6 @@ export class LoginWlSettingsComponent implements OnInit, OnChanges {
       pageBackgroundColor: this.params.pageBackgroundColor || null,
       darkForeground: this.params.darkForeground ?? false,
       showNameBottom: this.params.showNameBottom ?? false,
-      domainId: this.params.domainId || null,
       baseUrl: this.params.baseUrl || null
     }, { emitEvent: false });
   }
@@ -93,6 +70,12 @@ export class LoginWlSettingsComponent implements OnInit, OnChanges {
   private emitParams(): void {
     const v = this.form.value;
     this.paramsChange.emit({
+      // `domainId` is intentionally NOT listed below: there is no form control for
+      // it (the SYS_ADMIN-only Domain picker was dropped as a follow-up — it
+      // degraded to a useless "None" for TENANT_ADMIN/CUSTOMER_USER). This spread
+      // carries over whatever domainId value was loaded from the backend
+      // untouched, so an existing value keeps round-tripping through save even
+      // though it is no longer user-editable from this form.
       ...this.params,
       logoImageUrl: v.logoImageUrl,
       logoImageHeight: v.logoImageHeight,
@@ -100,7 +83,6 @@ export class LoginWlSettingsComponent implements OnInit, OnChanges {
       pageBackgroundColor: v.pageBackgroundColor,
       darkForeground: v.darkForeground,
       showNameBottom: v.showNameBottom,
-      domainId: v.domainId,
       baseUrl: v.baseUrl
     });
   }

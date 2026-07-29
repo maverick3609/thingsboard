@@ -36,18 +36,6 @@
     </div>
     <mat-slide-toggle formControlName="darkForeground">{{ 'white-labeling.dark-foreground' | translate }}</mat-slide-toggle>
     <mat-slide-toggle formControlName="showNameBottom">{{ 'white-labeling.show-name-bottom' | translate }}</mat-slide-toggle>
-  </section>
-
-  <section>
-    <h3 translate>white-labeling.login-domain-settings</h3>
-    <mat-form-field class="full-width">
-      <mat-label translate>white-labeling.domain-name</mat-label>
-      <mat-select formControlName="domainId" [compareWith]="compareDomainIds">
-        <mat-option [value]="null" translate>white-labeling.no-domain</mat-option>
-        <mat-option *ngFor="let domain of domains" [value]="domain.id">{{domain.name}}</mat-option>
-      </mat-select>
-      <mat-hint translate>white-labeling.domain-name-hint</mat-hint>
-    </mat-form-field>
     <mat-form-field class="full-width">
       <mat-label translate>white-labeling.base-url</mat-label>
       <input matInput formControlName="baseUrl" placeholder="https://example.com">

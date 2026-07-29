@@ -161,6 +161,7 @@ import {
 } from '@home/components/dashboard-page/layout/move-widgets-dialog.component';
 import { HttpStatusCode } from '@angular/common/http';
 import { WhiteLabelingRuntimeService } from '@core/services/white-labeling-runtime.service';
+import { buildReportStateParam } from '@home/components/dashboard-page/report/report-state-param';
 
 // @dynamic
 @Component({
@@ -913,7 +914,7 @@ export class DashboardPageComponent extends PageComponent implements IDashboardC
       disableClose: true,
       panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
       data: {
-        state: this.dashboardCtx.state,
+        state: buildReportStateParam(this.dashboardCtx.state, this.dashboardCtx.stateController?.getStateParams()),
         timewindow: this.dashboardCtx.dashboardTimewindow
       }
     }).afterClosed().subscribe((params) => {

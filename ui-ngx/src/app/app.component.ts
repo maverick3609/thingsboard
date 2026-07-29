@@ -106,7 +106,16 @@ export class AppComponent {
       }),
       skip(1),
     ).subscribe((data) => {
-      this.authService.gotoDefaultPlace(data.isAuthenticated);
+      // BUG 1 (report-view auth-redirect guard): during a headless report render, the report-view
+      // tab's own openReport re-authentication (setUserFromJwtToken) re-fires this same
+      // selectUserReady stream past the skip(1) budget (see report.service.ts#loadUser), which
+      // would otherwise send gotoDefaultPlace() racing against openReport's own navigateByUrl to
+      // the target dashboard. reportService.active is true only for that ?reportView=true tab
+      // (set once in loadReportParams(), never toggled), so normal login/logout flows are
+      // unaffected - gotoDefaultPlace still fires exactly as before for every real user session.
+      if (!this.reportService.active) {
+        this.authService.gotoDefaultPlace(data.isAuthenticated);
+      }
     });
     // Report-view bootstrap (headless Playwright renderer, ?reportView=true&accessToken=<JWT>):
     // installs the postMessage protocol listener once the user-ready signal below settles.

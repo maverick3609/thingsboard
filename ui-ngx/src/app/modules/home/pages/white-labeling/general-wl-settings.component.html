@@ -20,7 +20,20 @@
     <h3 translate>white-labeling.branding</h3>
     <div class="form-row">
       <label translate>white-labeling.logo-image</label>
+      <!--
+        BUG 5 (image gallery picker): kept as base64 file upload. This "general" logoImageUrl is
+        NOT exclusively post-auth: when no login-specific logo is set,
+        DefaultWhiteLabelingService#getMergedLoginWhiteLabelingParams falls back onto it
+        (base.merge(general) -> WhiteLabelingParams#merge: "if (this.logoImageUrl == null)
+        this.logoImageUrl = parent.logoImageUrl"), and LoginComponent applies that value on the
+        pre-auth /login page before any authentication happens. A gallery pick would emit a gated
+        "tb-image;/api/images/..." reference that a logged-out browser cannot fetch
+        (ImageController#downloadImage requires an authenticated principal). This control is
+        reused for System/Tenant/Customer scope and the System-scope value is the one that
+        reaches /login, so it must stay base64 for all scopes.
+      -->
       <tb-wl-image-input formControlName="logoImageUrl"></tb-wl-image-input>
+      <div class="field-hint" translate>white-labeling.pre-auth-image-hint</div>
     </div>
     <mat-form-field class="full-width">
       <mat-label translate>white-labeling.logo-image-height</mat-label>
@@ -32,7 +45,18 @@
     </mat-form-field>
     <div class="form-row">
       <label translate>white-labeling.favicon</label>
+      <!--
+        BUG 5 (image gallery picker): kept as base64 file upload. There is no login-specific
+        favicon override anywhere in this feature (login-wl-settings has no favicon control), so
+        the favicon is unconditionally sourced from this field. The pre-auth noauth endpoint
+        (DefaultWhiteLabelingService#getMergedLoginWhiteLabelingParams) always merges the
+        System-scope favicon into the /login response, and
+        WhiteLabelingRuntimeService#applyFavicon sets <link rel="icon"> from it before login. A
+        gated gallery reference can't be fetched by that logged-out browser. Must stay a
+        self-contained base64 data URL.
+      -->
       <tb-wl-image-input formControlName="faviconUrl"></tb-wl-image-input>
+      <div class="field-hint" translate>white-labeling.pre-auth-image-hint</div>
     </div>
   </section>
 

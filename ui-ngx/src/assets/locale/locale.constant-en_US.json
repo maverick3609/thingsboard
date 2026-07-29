@@ -7957,6 +7957,7 @@
         "logo-image-height": "Logo image height (px)",
         "application-title": "Application title",
         "favicon": "Favicon",
+        "pre-auth-image-hint": "Uploaded as a file (not the gallery) so it also renders on the sign-in page before login.",
         "color-palette": "Color palette",
         "primary-palette": "Primary palette",
         "accent-palette": "Accent palette",

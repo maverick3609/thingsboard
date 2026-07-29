@@ -15,7 +15,7 @@
 ///
 
 import { buildReportStateParam } from './report-state-param';
-import { base64toObj } from '@app/core/utils';
+import { base64toObj, objToBase64 } from '@app/core/utils';
 
 /**
  * BUG 1 (empty-data dashboard-report download) regression spec.
@@ -25,15 +25,24 @@ import { base64toObj } from '@app/core/utils';
  * (`default-state-controller.component.ts#parseState` -> `base64toObj`), so a plain id fails to
  * decode and silently falls back to the dashboard's root state - an empty root state yields a
  * produced-but-empty PDF. `buildReportStateParam` is a pure function (no DashboardPageComponent
- * import) so this can be asserted directly against the same `base64toObj` the consumer uses.
+ * import) so this can be asserted directly against the same decode chain the consumer uses.
+ *
+ * `buildReportStateParam` returns the URL-safe `objToBase64URI` form (not plain `objToBase64`):
+ * `ReportService#openReport` (`report.service.ts:278-281`) concatenates this value RAW into a URL
+ * string that `router.navigateByUrl` then parses. Angular's router query-string decoder rewrites a
+ * literal `+` to a space before `decodeURIComponent`, so a plain-base64 payload containing `+` (a
+ * normal, common base64 character) would come out corrupted - reproducing the exact empty-data bug
+ * for those payloads. The specs below therefore decode via `decodeURIComponent(...)` first (what
+ * the router's parse step, and separately `default-state-controller.component.ts`'s own
+ * `decodeStateParam`, both do) before handing the result to `base64toObj` - the same two-step
+ * chain the real consumer applies.
  */
 describe('buildReportStateParam', () => {
 
-  it('encodes {id, params} in the base64 form the report-view route decodes via base64toObj', () => {
+  it('encodes {id, params} in the base64url form the report-view route decodes (decodeURIComponent then base64toObj)', () => {
     const encoded = buildReportStateParam('state_two', {entityName: 'Boiler 1'});
 
-    // Round-trip through the exact decode function default-state-controller.component.ts uses.
-    const decoded = base64toObj(encoded);
+    const decoded = base64toObj(decodeURIComponent(encoded));
 
     expect(decoded).toEqual([{id: 'state_two', params: {entityName: 'Boiler 1'}}]);
   });
@@ -41,7 +50,7 @@ describe('buildReportStateParam', () => {
   it('defaults params to {} when none are supplied (still a valid parseState() result)', () => {
     const encoded = buildReportStateParam('state_two');
 
-    const decoded = base64toObj(encoded);
+    const decoded = base64toObj(decodeURIComponent(encoded));
 
     expect(decoded).toEqual([{id: 'state_two', params: {}}]);
   });
@@ -71,8 +80,30 @@ describe('buildReportStateParam', () => {
     const rootStateId = 'default';
 
     const encoded = buildReportStateParam(rootStateId, {});
-    const decoded = base64toObj(encoded);
+    const decoded = base64toObj(decodeURIComponent(encoded));
 
     expect(decoded[0].id).toBe(rootStateId);
+  });
+
+  it('URL-safe-encodes the payload so a raw "+" never survives being concatenated into a router-parsed URL', () => {
+    // report.service.ts:278-281 concatenates this value RAW into `?state=${command.state}`, which
+    // router.navigateByUrl(url) then re-parses (same pattern as the established precedent at
+    // widget.component.ts:1157-1176's WidgetActionType.openDashboard handler, which also uses
+    // objToBase64URI for exactly this reason). A raw '+' surviving into that string is misread by
+    // Angular's router query-string decoder as an encoded space ('+' -> '%20' -> ' ') before
+    // decodeURIComponent, corrupting the payload before base64toObj/atob ever sees it - the exact
+    // empty-data regression this guards against.
+    const stateId = 'state_two';
+    const stateParams = {entityName: 'k.D<cw^>m6s?y'}; // constructed: its PLAIN base64 contains '+'
+
+    const plain = objToBase64([{id: stateId, params: stateParams}]);
+    expect(plain).toContain('+'); // precondition: proves this input actually exercises the hazard
+
+    const encoded = buildReportStateParam(stateId, stateParams);
+
+    expect(encoded).not.toContain('+');
+    expect(encoded).toContain('%2B');
+    // still round-trips correctly end to end
+    expect(base64toObj(decodeURIComponent(encoded))).toEqual([{id: stateId, params: stateParams}]);
   });
 });

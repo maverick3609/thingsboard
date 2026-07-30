@@ -49,6 +49,12 @@ import { WidgetHeaderActionButtonType } from '@shared/models/widget.models';
 import ITooltipsterInstance = JQueryTooltipster.ITooltipsterInstance;
 import ITooltipsterGeoHelper = JQueryTooltipster.ITooltipsterGeoHelper;
 import { WidgetComponent } from '@home/components/widget/widget.component';
+import {
+  exportWidgetTableData,
+  WidgetExportType,
+  widgetExportTypeTranslations
+} from '@core/utils/widget-data-export';
+import { buildWidgetExportTable, widgetExportFilename } from '@core/utils/widget-export-data-source';
 
 export enum WidgetComponentActionType {
   MOUSE_DOWN,
@@ -134,6 +140,10 @@ export class WidgetContainerComponent extends PageComponent implements OnInit, O
   }
 
   widgetHeaderActionButtonType = WidgetHeaderActionButtonType;
+
+  // Generic "Export widget data" (PE port, BUG 2) — table exposed for the header mat-menu template.
+  widgetExportType = WidgetExportType;
+  widgetExportTypeTranslations = widgetExportTypeTranslations;
 
   private cssClass: string;
 
@@ -272,6 +282,16 @@ export class WidgetContainerComponent extends PageComponent implements OnInit, O
       event,
       actionType: WidgetComponentActionType.EXPORT
     });
+  }
+
+  onExportWidgetData(format: WidgetExportType, event: MouseEvent) {
+    if (event) {
+      event.stopPropagation();
+    }
+    const ctx = this.widget.widgetContext;
+    const table = buildWidgetExportTable(ctx, this.widget.widget.type);
+    exportWidgetTableData(table, widgetExportFilename(ctx), format).catch(e =>
+      console.warn('Failed to export widget data', e));
   }
 
   onRemove(event: MouseEvent) {

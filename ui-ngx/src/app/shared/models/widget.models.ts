@@ -929,6 +929,7 @@ export interface WidgetConfig {
   titleTooltip?: string;
   dropShadow?: boolean;
   enableFullscreen?: boolean;
+  enableDataExport?: boolean;
   useDashboardTimewindow?: boolean;
   displayTimewindow?: boolean;
   timewindow?: Timewindow;

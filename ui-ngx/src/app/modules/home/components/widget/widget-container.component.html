@@ -100,6 +100,26 @@
     </button>
     <button mat-icon-button
             type="button"
+            [class.!hidden]="isEdit || !widget.enableDataExport"
+            [matMenuTriggerFor]="widgetExportMenu"
+            (click)="$event.stopPropagation()"
+            matTooltip="{{ 'widget.export-data' | translate }}"
+            matTooltipPosition="above">
+      <tb-icon>file_download</tb-icon>
+    </button>
+    <mat-menu #widgetExportMenu="matMenu">
+      <button mat-menu-item type="button" (click)="onExportWidgetData(widgetExportType.csv, $event)">
+        {{ widgetExportTypeTranslations.get(widgetExportType.csv) | translate }}
+      </button>
+      <button mat-menu-item type="button" (click)="onExportWidgetData(widgetExportType.xls, $event)">
+        {{ widgetExportTypeTranslations.get(widgetExportType.xls) | translate }}
+      </button>
+      <button mat-menu-item type="button" (click)="onExportWidgetData(widgetExportType.xlsx, $event)">
+        {{ widgetExportTypeTranslations.get(widgetExportType.xlsx) | translate }}
+      </button>
+    </mat-menu>
+    <button mat-icon-button
+            type="button"
             [class.!hidden]="isEdit || !widget.enableFullscreen"
             (click)="$event.stopPropagation(); widget.isFullscreen = !widget.isFullscreen; updateEditWidgetActionsTooltipState()"
             matTooltip="{{(widget.isFullscreen ? 'fullscreen.exit' : 'fullscreen.expand') | translate}}"

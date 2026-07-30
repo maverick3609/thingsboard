@@ -235,6 +235,7 @@ export class WidgetConfigComponent extends PageComponent implements OnInit, OnDe
       showTitle: [null, []],
       dropShadow: [null, []],
       enableFullscreen: [null, []],
+      enableDataExport: [null, []],
       backgroundColor: [null, []],
       color: [null, []],
       padding: [null, []],
@@ -513,6 +514,9 @@ export class WidgetConfigComponent extends PageComponent implements OnInit, OnDe
           showTitle: displayWidgetTitle,
           dropShadow: isDefined(config.dropShadow) ? config.dropShadow : true,
           enableFullscreen: isDefined(config.enableFullscreen) ? config.enableFullscreen : true,
+          enableDataExport: isDefined(config.enableDataExport) ? config.enableDataExport :
+            (this.widgetType === widgetType.timeseries || this.widgetType === widgetType.latest ||
+              this.widgetType === widgetType.alarm),
           backgroundColor: config.backgroundColor,
           color: config.color,
           padding: config.padding,

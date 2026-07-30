@@ -16,11 +16,19 @@
 
 import { Component, forwardRef } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
+import { MatDialog } from '@angular/material/dialog';
+import { ImageService } from '@core/http/image.service';
+import { ImageResourceInfo, ResourceSubType } from '@shared/models/resource.models';
+import {
+  ImageGalleryDialogComponent,
+  ImageGalleryDialogData
+} from '@shared/components/image/image-gallery-dialog.component';
 
 @Component({
   standalone: false,
   selector: 'tb-wl-image-input',
   templateUrl: './image-input.component.html',
+  styleUrls: ['./image-input.component.scss'],
   providers: [{
     provide: NG_VALUE_ACCESSOR,
     useExisting: forwardRef(() => ImageInputComponent),
@@ -28,11 +36,19 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
   }]
 })
 export class ImageInputComponent implements ControlValueAccessor {
+  // The stored value is always an anonymously-fetchable image URL: a public-image
+  // link (/api/images/public/{publicResourceKey}) produced by the gallery pick
+  // below, or a legacy base64 data URL / external URL loaded from previously-saved
+  // params. It is bound raw into an <img [src]> preview.
   value: string = null;
   disabled = false;
+  makingPublic = false;
 
   private onChange: (val: string) => void = () => {};
   private onTouched: () => void = () => {};
+
+  constructor(private imageService: ImageService,
+              private dialog: MatDialog) {}
 
   writeValue(val: string): void {
     this.value = val ?? null;
@@ -50,22 +66,21 @@ export class ImageInputComponent implements ControlValueAccessor {
     this.disabled = isDisabled;
   }
 
-  onFileSelected(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    if (input.files?.length) {
-      this.readFile(input.files[0]);
+  browseGallery(event: Event): void {
+    if (event) {
+      event.stopPropagation();
     }
-  }
-
-  onDrop(event: DragEvent): void {
-    event.preventDefault();
-    if (event.dataTransfer?.files?.length) {
-      this.readFile(event.dataTransfer.files[0]);
-    }
-  }
-
-  onDragOver(event: DragEvent): void {
-    event.preventDefault();
+    this.dialog.open<ImageGalleryDialogComponent, ImageGalleryDialogData, ImageResourceInfo>(
+      ImageGalleryDialogComponent, {
+        autoFocus: false,
+        disableClose: false,
+        panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
+        data: { imageSubType: ResourceSubType.IMAGE }
+      }).afterClosed().subscribe((image) => {
+        if (image) {
+          this.storePublicLink(image);
+        }
+      });
   }
 
   clear(): void {
@@ -74,16 +89,42 @@ export class ImageInputComponent implements ControlValueAccessor {
     this.onTouched();
   }
 
-  private readFile(file: File): void {
-    if (file.size > 1024 * 1024) {
-      return; // Max 1MB
+  // All three white-labeling image fields (login logo, general logo, favicon) render
+  // on the pre-auth /login page — the logo via <tb-logo> ( raw <img [src]> ) and the
+  // favicon via WhiteLabelingRuntimeService#applyFavicon ( raw <link href> ) — where
+  // the browser holds no auth token. The platform GalleryImageInputComponent's value
+  // accessor would emit the gated private reference tb-image;/api/images/{tenant|
+  // system}/{key} (ImageController#downloadImage requires an authenticated principal),
+  // which a logged-out browser cannot fetch. Instead we mark the picked image public
+  // and persist its anonymous publicLink (/api/images/public/{publicResourceKey},
+  // allow-listed in ThingsboardSecurityConfiguration and served by
+  // ImageController#downloadPublicImage without @PreAuthorize) — the same mechanism
+  // ThingsBoard / PE use for branding assets. Only the single image the admin
+  // explicitly picks for this field is made public; nothing else in the gallery is
+  // touched.
+  private storePublicLink(image: ImageResourceInfo): void {
+    if (image.public && image.publicLink) {
+      this.setValue(image.publicLink);
+    } else {
+      // Making an image public requires SYS_ADMIN / TENANT_ADMIN. A CUSTOMER_USER
+      // editing white labeling can therefore only reuse images that are already
+      // public; on 403 the platform surfaces the error and the field is left as-is.
+      this.makingPublic = true;
+      this.imageService.updateImagePublicStatus(image, true).subscribe({
+        next: (updated) => {
+          this.makingPublic = false;
+          this.setValue(updated.publicLink);
+        },
+        error: () => {
+          this.makingPublic = false;
+        }
+      });
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      this.value = reader.result as string;
-      this.onChange(this.value);
-      this.onTouched();
-    };
-    reader.readAsDataURL(file);
+  }
+
+  private setValue(url: string): void {
+    this.value = url;
+    this.onChange(url);
+    this.onTouched();
   }
 }

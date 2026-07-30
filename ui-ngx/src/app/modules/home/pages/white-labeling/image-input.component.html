@@ -15,29 +15,26 @@
     limitations under the License.
 
 -->
-<div class="image-input-container">
-  <div class="drop-zone"
-       (drop)="onDrop($event)"
-       (dragover)="onDragOver($event)"
-       [class.has-image]="value"
-       [class.disabled]="disabled">
-    <img *ngIf="value" [src]="value" class="image-preview" alt="Preview">
-    <div *ngIf="!value" class="placeholder">
-      <mat-icon>cloud_upload</mat-icon>
-      <span>Drop image here or click to browse</span>
-    </div>
-    <input type="file"
-           accept=".png,.jpg,.jpeg,.svg,.ico"
-           (change)="onFileSelected($event)"
-           [disabled]="disabled"
-           class="file-input">
+<div class="wl-image-input">
+  <div class="wl-image-preview" [class.disabled]="disabled">
+    <img *ngIf="value" [src]="value" class="wl-image" alt="Preview">
+    <span *ngIf="!value" class="wl-no-image" translate>image.no-image-selected</span>
   </div>
-  <button mat-icon-button
-          *ngIf="value && !disabled"
-          (click)="clear()"
-          matTooltip="Clear image"
-          class="clear-btn"
-          type="button">
-    <mat-icon>close</mat-icon>
-  </button>
+  <div class="wl-image-actions" *ngIf="!disabled">
+    <button mat-stroked-button
+            type="button"
+            color="primary"
+            [disabled]="makingPublic"
+            (click)="browseGallery($event)">
+      <mat-icon>filter</mat-icon>
+      <span translate>image.browse-from-gallery</span>
+    </button>
+    <button mat-icon-button
+            type="button"
+            *ngIf="value"
+            matTooltip="{{ 'image.clear-image' | translate }}"
+            (click)="clear()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
 </div>

@@ -21,17 +21,15 @@
     <div class="form-row">
       <label translate>white-labeling.logo-image</label>
       <!--
-        BUG 5 (image gallery picker): kept as base64 file upload, NOT <tb-gallery-image-input>.
-        This logo renders on the pre-auth /login page (LoginComponent.ngOnInit fetches it via the
-        anonymous GET /api/noauth/whiteLabel/loginWhiteLabelParams). A gallery pick would emit a
-        gated "tb-image;/api/images/{tenant|system}/{key}" reference
-        (GalleryImageInputComponent -> prependTbImagePrefix); ImageController#downloadImage
-        requires an authenticated SYS_ADMIN/TENANT_ADMIN/CUSTOMER_USER principal and that path is
-        not in ThingsboardSecurityConfiguration's anonymous allowlist, so a logged-out browser can
-        never resolve it. Must stay a self-contained base64 data URL.
+        BUG 5 (image gallery picker): this login logo renders on the pre-auth /login page
+        (LoginComponent.ngOnInit fetches it via the anonymous GET
+        /api/noauth/whiteLabel/loginWhiteLabelParams and binds it into a raw <tb-logo> <img>).
+        tb-wl-image-input therefore stores the picked image's public link
+        (/api/images/public/{key}, allow-listed + served anonymously by
+        ImageController#downloadPublicImage), NOT the gated tb-image; reference, so a logged-out
+        browser can fetch it.
       -->
       <tb-wl-image-input formControlName="logoImageUrl"></tb-wl-image-input>
-      <div class="field-hint" translate>white-labeling.pre-auth-image-hint</div>
     </div>
     <mat-form-field class="full-width">
       <mat-label translate>white-labeling.logo-image-height</mat-label>

@@ -45,6 +45,11 @@ describe('widget-data-export', () => {
       expect(neutralizeFormulaInjection('  @SUM(A1)')).toBe('\'  @SUM(A1)');
       expect(neutralizeFormulaInjection('＝1+1')).toBe('\'＝1+1');
       expect(neutralizeFormulaInjection('＋1')).toBe('\'＋1');
+      // C0 information separators U+001C–U+001F: Java Character.isWhitespace treats these as leading
+      // whitespace (JS /\s/ does not) — a spreadsheet importer may strip them before formula detection,
+      // so they must be scanned past and the lead neutralized, matching the backend CsvUtils guard.
+      expect(neutralizeFormulaInjection('\u001C=HYPERLINK("http://x")')).toBe('\'\u001C=HYPERLINK("http://x")');
+      expect(neutralizeFormulaInjection('\u001F@SUM(A1)')).toBe('\'\u001F@SUM(A1)');
     });
 
     it('leaves safe values unchanged', () => {

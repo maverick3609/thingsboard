@@ -81,12 +81,19 @@ const FILE_EXTENSIONS: {[format in WidgetExportType]: string} = {
  */
 export const FORMULA_LEAD_CHARS = '=+-@＝＋－＠';
 
+// Matches Java Character.isWhitespace for the leading scan: JS /\s/ covers tab/LF/VT/FF/CR/space and the
+// Unicode space separators, but NOT the C0 information separators U+001C–U+001F (FS/GS/RS/US), which Java
+// treats as whitespace and which some spreadsheet importers strip before formula detection — include them
+// so a `<U+001C>=cmd` lead is neutralized here exactly as the backend CsvUtils#neutralizeFormula does.
+const isLeadWhitespace = (c: string): boolean =>
+  /\s/.test(c) || (c.charCodeAt(0) >= 0x1C && c.charCodeAt(0) <= 0x1F);
+
 export function neutralizeFormulaInjection(cell: string): string {
   if (!cell) {
     return cell;
   }
   let i = 0;
-  while (i < cell.length && /\s/.test(cell.charAt(i))) {
+  while (i < cell.length && isLeadWhitespace(cell.charAt(i))) {
     i++;
   }
   if (i < cell.length && FORMULA_LEAD_CHARS.indexOf(cell.charAt(i)) >= 0) {

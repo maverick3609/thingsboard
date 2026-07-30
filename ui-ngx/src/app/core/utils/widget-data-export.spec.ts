@@ -92,6 +92,13 @@ describe('widget-data-export', () => {
       expect(csv).toContain('\'=cmd|calc');
       expect(csv.split('\r\n')[1].startsWith('=')).toBeFalse();
     });
+
+    it('emits genuine numbers verbatim but still guards look-numeric strings', () => {
+      // A genuine negative number is not an injection vector — stays numeric, not apostrophe-prefixed text.
+      expect(widgetTableToCsv({columns: ['Delta'], rows: [[-5.2]]}).split('\r\n')[1]).toBe('-5.2');
+      // A string that merely looks numeric is still neutralized (the boundary is typeof number, not appearance).
+      expect(widgetTableToCsv({columns: ['S'], rows: [['-5.2']]}).split('\r\n')[1]).toBe('\'-5.2');
+    });
   });
 
   describe('widgetTableToHtmlXls', () => {
@@ -106,6 +113,12 @@ describe('widget-data-export', () => {
       const html = widgetTableToHtmlXls({columns: ['Name'], rows: [['=cmd']]});
       expect(html).toContain('&#39;=cmd');
       expect(html).not.toContain('<td>=cmd</td>');
+    });
+
+    it('renders genuine negative numbers verbatim so Excel treats them as numbers', () => {
+      const html = widgetTableToHtmlXls({columns: ['Delta'], rows: [[-5.2]]});
+      expect(html).toContain('<td>-5.2</td>');
+      expect(html).not.toContain('&#39;-5.2');
     });
   });
 

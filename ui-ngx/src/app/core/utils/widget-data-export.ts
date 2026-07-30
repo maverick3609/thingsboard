@@ -110,6 +110,13 @@ function cellToText(value: WidgetExportCellValue): string {
 }
 
 function safeCellText(value: WidgetExportCellValue): string {
+  // A genuine finite number can never be a formula-injection vector, so emit it verbatim (consistent with the
+  // numeric <v> cells the XLSX writer produces via the same typeof/isFinite predicate) rather than
+  // apostrophe-prefixing a leading '-' into text. The string formula-guard still applies to every string cell,
+  // including strings that merely look numeric.
+  if (typeof value === 'number' && isFinite(value)) {
+    return String(value);
+  }
   return neutralizeFormulaInjection(cellToText(value));
 }
 

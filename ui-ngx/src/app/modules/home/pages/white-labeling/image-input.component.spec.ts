@@ -17,7 +17,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { ImageService } from '@core/http/image.service';
 import { ImageResourceInfo } from '@shared/models/resource.models';
 import { ImageInputComponent } from './image-input.component';
@@ -120,5 +120,24 @@ describe('ImageInputComponent (white-labeling gallery picker)', () => {
     component.browseGallery(new Event('click'));
     expect(emitted).toEqual([]);
     expect(imageService.updateImagePublicStatus).not.toHaveBeenCalled();
+  });
+
+  it('leaves the value unchanged and resets the loading flag when make-public fails (e.g. CUSTOMER_USER 403)', () => {
+    component.writeValue('/api/images/public/existing');
+    emitted = [];
+    imageService.updateImagePublicStatus.and.returnValue(throwError(() => ({ status: 403 })));
+    openReturns(privateImage);
+    component.browseGallery(new Event('click'));
+    expect(imageService.updateImagePublicStatus).toHaveBeenCalledWith(privateImage, true);
+    expect(component.value).toBe('/api/images/public/existing');
+    expect(emitted).toEqual([]);
+    expect(component.makingPublic).toBeFalse();
+  });
+
+  it('writeValue surfaces an existing base64 config for display without emitting (round-trip lock)', () => {
+    const base64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNgAAAAAgAB4iG8MwAAAABJRU5ErkJggg==';
+    component.writeValue(base64);
+    expect(component.value).toBe(base64);
+    expect(emitted).toEqual([]);
   });
 });

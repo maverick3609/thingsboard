@@ -67,7 +67,7 @@
   </mat-toolbar>
   <div class="tb-report-template-editor-body flex flex-1 flex-row" cdkDropListGroup *ngIf="viewMode === 'edit'">
     <div class="tb-report-template-editor-palette">
-      <tb-report-palette></tb-report-palette>
+      <tb-report-palette [format]="config?.format"></tb-report-palette>
     </div>
     <div class="tb-report-template-editor-canvas flex-1">
       <tb-report-canvas [components]="config.components"

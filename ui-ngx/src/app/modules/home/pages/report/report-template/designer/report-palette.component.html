@@ -15,35 +15,54 @@
     limitations under the License.
 
 -->
-<div class="tb-report-palette flex flex-col gap-2 p-2">
-  <div class="tb-form-panel-title" translate>report.designer.components</div>
-  <div cdkDropList
-       [cdkDropListSortingDisabled]="true"
-       [cdkDropListData]="paletteItems"
-       [cdkDropListEnterPredicate]="noEnterPredicate"
-       class="tb-report-palette-list tb-drop-list flex flex-col gap-1">
-    <div *ngFor="let item of paletteItems"
-         class="tb-report-palette-item tb-draggable flex flex-row items-center gap-2 p-2"
-         style="cursor: move;"
-         cdkDrag
-         [cdkDragData]="item.type">
-      <img [src]="item.preview" [alt]="item.labelKey | translate" class="tb-report-palette-preview">
-      <span>{{ item.labelKey | translate }}</span>
+<div class="tb-report-palette">
+  <mat-form-field class="tb-report-palette-search tb-appearance-transparent" subscriptSizing="dynamic">
+    <mat-icon matPrefix>search</mat-icon>
+    <input matInput
+           [formControl]="searchControl"
+           placeholder="{{ 'report.designer.search-components' | translate }}"/>
+    <button mat-icon-button matSuffix class="tb-small"
+            *ngIf="searchControl.value !== ''"
+            (click)="clearSearch()"
+            matTooltip="{{ 'action.clear-search' | translate }}"
+            matTooltipPosition="above">
+      <mat-icon>close</mat-icon>
+    </button>
+  </mat-form-field>
+
+  <div class="tb-report-palette-group" *ngIf="filteredComponents.length">
+    <div class="tb-form-panel-title" translate>report.designer.components</div>
+    <div cdkDropList
+         [cdkDropListSortingDisabled]="true"
+         [cdkDropListData]="filteredComponents"
+         [cdkDropListEnterPredicate]="noEnterPredicate"
+         class="tb-report-palette-list tb-drop-list">
+      <div *ngFor="let item of filteredComponents"
+           class="tb-report-palette-item tb-draggable"
+           cdkDrag
+           [cdkDragData]="item.type">
+        <img [src]="item.preview" [alt]="item.labelKey | translate" class="tb-report-palette-preview">
+        <span class="tb-report-palette-item-title">{{ item.labelKey | translate }}</span>
+      </div>
     </div>
   </div>
-  <div class="tb-form-panel-title" translate>report.designer.presets</div>
-  <div cdkDropList
-       [cdkDropListSortingDisabled]="true"
-       [cdkDropListData]="presetItems"
-       [cdkDropListEnterPredicate]="noEnterPredicate"
-       class="tb-report-palette-list tb-drop-list flex flex-col gap-1">
-    <div *ngFor="let item of presetItems"
-         class="tb-report-palette-item tb-draggable flex flex-row items-center gap-2 p-2"
-         style="cursor: move;"
-         cdkDrag
-         [cdkDragData]="{ preset: item }">
-      <img [src]="item.preview" [alt]="item.labelKey | translate" class="tb-report-palette-preview">
-      <span>{{ item.labelKey | translate }}</span>
+
+  <div class="tb-report-palette-group" *ngIf="filteredPresets.length">
+    <div class="tb-form-panel-title" translate>report.designer.presets</div>
+    <div cdkDropList
+         [cdkDropListSortingDisabled]="true"
+         [cdkDropListData]="filteredPresets"
+         [cdkDropListEnterPredicate]="noEnterPredicate"
+         class="tb-report-palette-list tb-drop-list">
+      <div *ngFor="let item of filteredPresets"
+           class="tb-report-palette-item tb-draggable"
+           cdkDrag
+           [cdkDragData]="{ preset: item }">
+        <img [src]="item.preview" [alt]="item.labelKey | translate" class="tb-report-palette-preview">
+        <span class="tb-report-palette-item-title">{{ item.labelKey | translate }}</span>
+      </div>
     </div>
   </div>
+
+  <div class="tb-report-palette-no-results" *ngIf="!hasResults" translate>report.designer.no-results</div>
 </div>

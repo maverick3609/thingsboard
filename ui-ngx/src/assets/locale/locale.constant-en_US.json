@@ -5415,6 +5415,8 @@
             "page-margins": "Page margins",
             "time-data-pattern": "Time data pattern",
             "components": "Components",
+            "search-components": "Search components",
+            "no-results": "No components found",
             "canvas-empty": "Drag components here to build your report",
             "component-heading": "Heading",
             "component-rich-text": "Rich Text",

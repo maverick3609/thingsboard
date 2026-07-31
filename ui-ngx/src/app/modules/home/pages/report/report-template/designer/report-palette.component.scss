@@ -14,11 +14,80 @@
  * limitations under the License.
  */
 
-// Task 12: PE preview thumbnail sizing - a tidy thumbnail+label row, not pixel-perfect PE CSS
-// (out of scope, non-verifiable per interfaces.md).
+// PE's tb-report-component-library, adapted (chunk-UILY2NXB.js). Structure: a search box, then titled
+// groups, each a vertical stack of preview tiles. Colours are themed via the same Material tokens the
+// sibling designer panels use (report-header-footer.component.scss's C2 Fix M4) so both the light and
+// the .tb-dark theme (theme.scss's mat.all-component-colors($tb-dark-theme)) render correctly - PE's
+// hard-coded light-mode #000000c2 / rgba(0,0,0,.12) are deliberately NOT copied verbatim.
+:host {
+  display: block;
+  height: 100%;
+}
+
+.tb-report-palette {
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 8px;
+}
+
+.tb-report-palette-search {
+  width: 100%;
+}
+
+.tb-report-palette-group {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tb-report-palette-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+// PE pins each tile to a fixed 234px (box-sizing:content-box). Our left pane is a fixed 280px
+// (report-template-editor.component.scss) minus this list's 16px horizontal padding minus the
+// scrollbar, so a fixed 234px would offset/clip; width:100% fills the pane's content box, keeps the
+// tiles symmetric, and can never overflow. Each tile stacks its preview thumbnail over the label.
+.tb-report-palette-item {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: move;
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  &:hover .tb-report-palette-preview {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, .1);
+  }
+}
+
 .tb-report-palette-preview {
-  width: 48px;
-  height: 48px;
-  object-fit: contain;
-  flex-shrink: 0;
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--mat-divider-color, var(--mat-app-outline));
+  border-radius: 4px;
+}
+
+.tb-report-palette-item-title {
+  font-size: 14px;
+  color: var(--mat-app-on-surface);
+}
+
+.tb-report-palette-no-results {
+  padding: 4px 8px;
+  font-size: 14px;
+  color: var(--mat-app-on-surface);
+  opacity: .6;
 }

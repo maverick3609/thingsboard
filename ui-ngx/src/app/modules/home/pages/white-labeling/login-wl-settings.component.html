@@ -18,6 +18,25 @@
 <form [formGroup]="form" class="wl-settings-form">
   <section>
     <h3 translate>white-labeling.login-page-settings</h3>
+    <mat-form-field class="full-width">
+      <mat-label translate>white-labeling.base-url</mat-label>
+      <input matInput formControlName="baseUrl" placeholder="https://example.com">
+      <mat-error *ngIf="form.get('baseUrl').hasError('pattern')" translate>white-labeling.base-url-invalid</mat-error>
+    </mat-form-field>
+    <mat-form-field class="full-width">
+      <mat-label translate>white-labeling.application-title</mat-label>
+      <input matInput formControlName="appTitle">
+    </mat-form-field>
+    <div class="form-row">
+      <label translate>white-labeling.favicon</label>
+      <!--
+        BUG 5 (image gallery picker): a login-scope favicon wins over the general one
+        (WhiteLabelingParams#merge only fills nulls from the parent) and is applied pre-auth by
+        WhiteLabelingRuntimeService#applyFavicon via applyLoginParams, so it must be an
+        anonymously-fetchable public link exactly like the login logo below.
+      -->
+      <tb-wl-image-input formControlName="faviconUrl"></tb-wl-image-input>
+    </div>
     <div class="form-row">
       <label translate>white-labeling.logo-image</label>
       <!--
@@ -35,20 +54,45 @@
       <mat-label translate>white-labeling.logo-image-height</mat-label>
       <input matInput type="number" formControlName="logoImageHeight">
     </mat-form-field>
-    <div class="form-row">
-      <label translate>white-labeling.login-card-color</label>
-      <tb-color-input asBoxInput colorClearButton formControlName="loginCardColor"></tb-color-input>
-    </div>
+  </section>
+
+  <section>
+    <h3 translate>white-labeling.color-palette</h3>
+    <tb-palette-settings formControlName="paletteSettings"></tb-palette-settings>
+    <button mat-raised-button color="primary" type="button" (click)="openAdvancedCss()">
+      {{ 'white-labeling.advanced-css' | translate }}
+    </button>
+    <mat-slide-toggle formControlName="darkForeground">{{ 'white-labeling.dark-foreground' | translate }}</mat-slide-toggle>
     <div class="form-row">
       <label translate>white-labeling.page-background-color</label>
       <tb-color-input asBoxInput colorClearButton formControlName="pageBackgroundColor"></tb-color-input>
     </div>
-    <mat-slide-toggle formControlName="darkForeground">{{ 'white-labeling.dark-foreground' | translate }}</mat-slide-toggle>
-    <mat-slide-toggle formControlName="showNameBottom">{{ 'white-labeling.show-name-bottom' | translate }}</mat-slide-toggle>
-    <mat-form-field class="full-width">
-      <mat-label translate>white-labeling.base-url</mat-label>
-      <input matInput formControlName="baseUrl" placeholder="https://example.com">
-      <mat-error *ngIf="form.get('baseUrl').hasError('pattern')" translate>white-labeling.base-url-invalid</mat-error>
-    </mat-form-field>
+    <div class="form-row">
+      <label translate>white-labeling.login-card-color</label>
+      <tb-color-input asBoxInput colorClearButton formControlName="loginCardColor"></tb-color-input>
+    </div>
+  </section>
+
+  <section>
+    <h3 translate>white-labeling.platform-info</h3>
+    <mat-slide-toggle formControlName="showNameVersion">{{ 'white-labeling.show-platform-name-version' | translate }}</mat-slide-toggle>
+    <ng-container *ngIf="form.get('showNameVersion').value">
+      <mat-form-field class="full-width">
+        <mat-label translate>white-labeling.platform-name</mat-label>
+        <input matInput formControlName="platformName">
+      </mat-form-field>
+      <mat-form-field class="full-width">
+        <mat-label translate>white-labeling.platform-version</mat-label>
+        <input matInput formControlName="platformVersion">
+      </mat-form-field>
+      <mat-form-field class="full-width">
+        <mat-label translate>white-labeling.position.label</mat-label>
+        <mat-select formControlName="namePosition">
+          <mat-option *ngFor="let position of positions" [value]="position">
+            {{ positionTranslations.get(position) | translate }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </ng-container>
   </section>
 </form>

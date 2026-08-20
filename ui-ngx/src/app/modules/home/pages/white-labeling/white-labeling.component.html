@@ -31,10 +31,13 @@
       <mat-slide-toggle [checked]="isCustomerScope" (change)="toggleCustomerScope()">
         {{ 'white-labeling.edit-customer-settings' | translate }}
       </mat-slide-toggle>
-      <mat-form-field *ngIf="isCustomerScope" class="customer-select" subscriptSizing="dynamic">
-        <mat-label>{{ 'white-labeling.customer-id' | translate }}</mat-label>
-        <input matInput [(ngModel)]="selectedCustomerId" (blur)="loadParams()">
-      </mat-form-field>
+      <tb-entity-autocomplete *ngIf="isCustomerScope"
+                              class="customer-select"
+                              [entityType]="entityType.CUSTOMER"
+                              [labelText]="'white-labeling.customer' | translate"
+                              [(ngModel)]="selectedCustomerId"
+                              (ngModelChange)="loadParams()">
+      </tb-entity-autocomplete>
     </div>
 
     <mat-tab-group *ngIf="!loading">
@@ -43,12 +46,40 @@
           [params]="generalParams"
           (paramsChange)="onGeneralParamsChange($event)">
         </tb-general-wl-settings>
+        <div class="wl-actions">
+          <button mat-button color="warn" type="button" [disabled]="loading" (click)="resetSettings('GENERAL')">
+            <mat-icon>settings_backup_restore</mat-icon>
+            {{ 'white-labeling.reset-to-default' | translate }}
+          </button>
+          <span class="flex-1"></span>
+          <button mat-button color="primary" type="button" [disabled]="loading" (click)="preview()">
+            {{ 'white-labeling.preview' | translate }}
+          </button>
+          <button mat-raised-button color="primary" type="button"
+                  [disabled]="loading || !generalDirty" (click)="saveGeneral()">
+            {{ 'action.save' | translate }}
+          </button>
+        </div>
       </mat-tab>
       <mat-tab label="{{ 'white-labeling.login-page' | translate }}">
         <tb-login-wl-settings
           [params]="loginParams"
           (paramsChange)="onLoginParamsChange($event)">
         </tb-login-wl-settings>
+        <div class="wl-actions">
+          <button mat-button color="warn" type="button" [disabled]="loading" (click)="resetSettings('LOGIN')">
+            <mat-icon>settings_backup_restore</mat-icon>
+            {{ 'white-labeling.reset-to-default' | translate }}
+          </button>
+          <span class="flex-1"></span>
+          <button mat-raised-button color="primary" type="button"
+                  [disabled]="loading || !loginDirty" (click)="saveLogin()">
+            {{ 'action.save' | translate }}
+          </button>
+        </div>
+      </mat-tab>
+      <mat-tab *ngIf="isSysAdmin" label="{{ 'white-labeling.mail-templates' | translate }}">
+        <tb-mail-templates></tb-mail-templates>
       </mat-tab>
       <mat-tab *ngIf="canEditLegal" label="{{ 'white-labeling.privacy-policy' | translate }}">
         <tb-legal-content
@@ -67,17 +98,5 @@
         </tb-legal-content>
       </mat-tab>
     </mat-tab-group>
-
-    <div class="flex flex-row flex-wrap items-center justify-end gap-2">
-      <button mat-button color="warn" (click)="deleteSettings()" [disabled]="loading" type="button">
-        {{ 'action.delete' | translate }}
-      </button>
-      <button mat-button color="primary" (click)="preview()" [disabled]="loading" type="button">
-        {{ 'white-labeling.preview' | translate }}
-      </button>
-      <button mat-raised-button color="primary" (click)="save()" [disabled]="loading" type="button">
-        {{ 'action.save' | translate }}
-      </button>
-    </div>
   </mat-card-content>
 </mat-card>

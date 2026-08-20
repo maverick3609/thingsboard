@@ -48,6 +48,37 @@ export interface WhiteLabelingParams {
   hideConnectivityDialog: boolean;
 }
 
+export interface MailTemplate {
+  subject: string;
+  body: string;
+}
+
+export type MailTemplates = { [name: string]: MailTemplate };
+
+// keys are the template names served by GET /api/whiteLabel/mailTemplates
+export const mailTemplateTranslations = new Map<string, string>([
+  ['test', 'white-labeling.mail-template.test'],
+  ['activation', 'white-labeling.mail-template.activation'],
+  ['account.activated', 'white-labeling.mail-template.account-activated'],
+  ['account.lockout', 'white-labeling.mail-template.account-lockout'],
+  ['reset.password', 'white-labeling.mail-template.reset-password'],
+  ['password.was.reset', 'white-labeling.mail-template.password-was-reset'],
+  ['2fa.verification.code', 'white-labeling.mail-template.two-fa-verification'],
+  ['state.enabled', 'white-labeling.mail-template.api-usage-state-enabled'],
+  ['state.warning', 'white-labeling.mail-template.api-usage-state-warning'],
+  ['state.disabled', 'white-labeling.mail-template.api-usage-state-disabled']
+]);
+
+export enum PlatformVersionPosition {
+  UNDER_LOGO = 'underLogo',
+  BOTTOM = 'bottom'
+}
+
+export const platformVersionPositionTranslations = new Map<PlatformVersionPosition, string>([
+  [PlatformVersionPosition.UNDER_LOGO, 'white-labeling.position.under-logo'],
+  [PlatformVersionPosition.BOTTOM, 'white-labeling.position.bottom']
+]);
+
 export interface LoginWhiteLabelingParams extends WhiteLabelingParams {
   pageBackgroundColor: string;
   darkForeground: boolean;

@@ -16,25 +16,34 @@
 
 -->
 <div class="wl-image-input">
-  <div class="wl-image-preview" [class.disabled]="disabled">
-    <img *ngIf="value" [src]="value" class="wl-image" alt="Preview">
-    <span *ngIf="!value" class="wl-no-image" translate>image.no-image-selected</span>
-  </div>
-  <div class="wl-image-actions" *ngIf="!disabled">
-    <button mat-stroked-button
-            type="button"
-            color="primary"
-            [disabled]="makingPublic"
-            (click)="browseGallery($event)">
-      <mat-icon>filter</mat-icon>
-      <span translate>image.browse-from-gallery</span>
-    </button>
+  <div class="wl-image-card" *ngIf="value; else noImage">
+    <div class="wl-image-preview" [class.disabled]="disabled">
+      <img [src]="value" class="wl-image" alt="Preview" (load)="onImageLoad($event)">
+    </div>
+    <div class="wl-image-info">
+      <span class="wl-image-name">{{ imageName }}</span>
+      <span class="wl-image-meta">{{ imageMeta }}</span>
+    </div>
     <button mat-icon-button
             type="button"
-            *ngIf="value"
+            *ngIf="!disabled"
             matTooltip="{{ 'image.clear-image' | translate }}"
             (click)="clear()">
       <mat-icon>close</mat-icon>
     </button>
   </div>
+  <ng-template #noImage>
+    <div class="wl-image-card wl-image-empty">
+      <span class="wl-no-image" translate>image.no-image-selected</span>
+      <button mat-stroked-button
+              type="button"
+              color="primary"
+              *ngIf="!disabled"
+              [disabled]="makingPublic"
+              (click)="browseGallery($event)">
+        <mat-icon>filter</mat-icon>
+        <span translate>image.browse-from-gallery</span>
+      </button>
+    </div>
+  </ng-template>
 </div>

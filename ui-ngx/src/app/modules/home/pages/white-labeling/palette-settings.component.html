@@ -15,32 +15,23 @@
     limitations under the License.
 
 -->
-<div [formGroup]="form" class="palette-settings">
-  <h4 translate>white-labeling.primary-palette</h4>
-  <mat-form-field>
-    <mat-label translate>white-labeling.extends-palette</mat-label>
-    <mat-select formControlName="primaryExtends">
-      <mat-option *ngFor="let p of paletteOptions" [value]="p">{{p}}</mat-option>
-    </mat-select>
-  </mat-form-field>
-  <div class="shade-grid">
-    <div *ngFor="let shade of shades" class="shade-item">
-      <label>{{shade}}</label>
-      <tb-color-input asBoxInput colorClearButton [formControlName]="'primary_' + shade"></tb-color-input>
-    </div>
-  </div>
-
-  <h4 translate>white-labeling.accent-palette</h4>
-  <mat-form-field>
-    <mat-label translate>white-labeling.extends-palette</mat-label>
-    <mat-select formControlName="accentExtends">
-      <mat-option *ngFor="let p of paletteOptions" [value]="p">{{p}}</mat-option>
-    </mat-select>
-  </mat-form-field>
-  <div class="shade-grid">
-    <div *ngFor="let shade of shades" class="shade-item">
-      <label>{{shade}}</label>
-      <tb-color-input asBoxInput colorClearButton [formControlName]="'accent_' + shade"></tb-color-input>
-    </div>
+<div class="palette-settings">
+  <div class="palette-row" *ngFor="let type of ['primary', 'accent']">
+    <mat-form-field class="palette-select">
+      <mat-label>{{ (type === 'primary' ? 'white-labeling.primary-palette' : 'white-labeling.accent-palette') | translate }}</mat-label>
+      <mat-select [value]="palette(type)?.extendsPalette"
+                  [disabled]="disabled"
+                  (valueChange)="setExtends(type, $event)">
+        <mat-option *ngFor="let name of paletteOptions" [value]="name">
+          <span class="palette-swatch" [style.background]="paletteColors[name]"></span>
+          {{ name | uppercase }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+    <button mat-raised-button color="primary" type="button"
+            [disabled]="disabled || !palette(type)?.extendsPalette"
+            (click)="customize(type)">
+      {{ 'white-labeling.customize-palette' | translate }}
+    </button>
   </div>
 </div>

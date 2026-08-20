@@ -58,6 +58,10 @@ public interface WhiteLabelingService {
     JsonNode getWebTermsOfUse(String serverName);
     JsonNode saveTermsOfUse(TenantId tenantId, JsonNode terms);
 
+    // Mail templates (system scope only - the mail service has no tenant context at send time)
+    JsonNode getSystemMailTemplates();
+    JsonNode saveSystemMailTemplates(JsonNode templates);
+
     // Delete
     void deleteWhiteLabeling(TenantId tenantId, CustomerId customerId, WhiteLabelingType type);
     void deleteAllTenantWhiteLabeling(TenantId tenantId);

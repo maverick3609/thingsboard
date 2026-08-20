@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -36,6 +37,7 @@ import org.thingsboard.server.common.data.wl.LoginWhiteLabelingParams;
 import org.thingsboard.server.common.data.wl.WhiteLabelingParams;
 import org.thingsboard.server.common.data.wl.WhiteLabelingType;
 import org.thingsboard.server.queue.util.TbCoreComponent;
+import org.thingsboard.server.service.mail.MailTemplates;
 import org.thingsboard.server.service.security.model.SecurityUser;
 import org.thingsboard.server.service.security.permission.Operation;
 import org.thingsboard.server.service.security.permission.Resource;
@@ -48,6 +50,9 @@ import java.util.UUID;
 @Tag(name = "White Labeling", description = "White Labeling configuration endpoints")
 @Slf4j
 public class WhiteLabelingController extends BaseController {
+
+    @Autowired
+    private MailTemplates mailTemplates;
 
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @GetMapping(value = "/whiteLabel/whiteLabelParams", produces = "application/json")
@@ -284,6 +289,23 @@ public class WhiteLabelingController extends BaseController {
         checkWhiteLabelingPermissions(Operation.WRITE);
         SecurityUser user = getCurrentUser();
         return whiteLabelingService.saveTermsOfUse(user.getTenantId(), terms);
+    }
+
+    // --- Mail templates ---
+
+    @PreAuthorize("hasAuthority('SYS_ADMIN')")
+    @GetMapping(value = "/whiteLabel/mailTemplates", produces = "application/json")
+    public JsonNode getMailTemplates() throws ThingsboardException {
+        checkWhiteLabelingPermissions(Operation.READ);
+        return mailTemplates.getTemplates();
+    }
+
+    @PreAuthorize("hasAuthority('SYS_ADMIN')")
+    @PostMapping(value = "/whiteLabel/mailTemplates")
+    @ResponseStatus(HttpStatus.OK)
+    public JsonNode saveMailTemplates(@RequestBody JsonNode templates) throws ThingsboardException {
+        checkWhiteLabelingPermissions(Operation.WRITE);
+        return mailTemplates.save(templates);
     }
 
     // --- Private helpers ---

@@ -22,6 +22,7 @@ import { Authority } from '@shared/models/authority.enum';
 import { WhiteLabelingHttpService } from '@core/http/white-labeling.service';
 import { WhiteLabelingRuntimeService } from '@core/services/white-labeling-runtime.service';
 import { LoginWhiteLabelingParams, WhiteLabelingParams } from '@shared/models/white-labeling.models';
+import { EntityType } from '@shared/models/entity-type.models';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { DialogService } from '@core/services/dialog.service';
 import { TranslateService } from '@ngx-translate/core';
@@ -41,6 +42,10 @@ export class WhiteLabelingComponent implements OnInit {
   loading = false;
   selectedCustomerId: string = null;
   isCustomerScope = false;
+  generalDirty = false;
+  loginDirty = false;
+
+  readonly entityType = EntityType;
 
   constructor(
     private store: Store<AppState>,
@@ -59,10 +64,11 @@ export class WhiteLabelingComponent implements OnInit {
 
   loadParams(): void {
     this.loading = true;
-    const customerId = this.isCustomerScope ? this.selectedCustomerId : undefined;
+    const customerId = this.customerIdParam();
     this.wlHttp.getCurrentWhiteLabelParams(customerId, { ignoreErrors: true }).subscribe({
       next: params => {
         this.generalParams = params || {} as WhiteLabelingParams;
+        this.generalDirty = false;
         this.loading = false;
       },
       error: () => {
@@ -73,6 +79,7 @@ export class WhiteLabelingComponent implements OnInit {
     this.wlHttp.getCurrentLoginWhiteLabelParams(customerId, { ignoreErrors: true }).subscribe({
       next: params => {
         this.loginParams = params || {} as LoginWhiteLabelingParams;
+        this.loginDirty = false;
       },
       error: () => {
         this.loginParams = {} as LoginWhiteLabelingParams;
@@ -90,52 +97,62 @@ export class WhiteLabelingComponent implements OnInit {
     }
   }
 
-  save(): void {
+  saveGeneral(): void {
     this.loading = true;
-    const customerId = this.isCustomerScope ? this.selectedCustomerId : undefined;
-    this.wlHttp.saveWhiteLabelParams(this.generalParams, customerId).subscribe({
+    this.wlHttp.saveWhiteLabelParams(this.generalParams, this.customerIdParam()).subscribe({
       next: saved => {
         this.generalParams = saved;
+        this.generalDirty = false;
         this.wlRuntime.applyParams(saved);
-        this.wlHttp.saveLoginWhiteLabelParams(this.loginParams, customerId).subscribe({
-          next: savedLogin => {
-            this.loginParams = savedLogin;
-            this.loading = false;
-            this.snackBar.open('White labeling settings saved', 'OK', { duration: 3000 });
-          },
-          error: () => { this.loading = false; }
-        });
+        this.loading = false;
+        this.showMessage('white-labeling.settings-saved');
       },
       error: () => { this.loading = false; }
     });
   }
 
-  deleteSettings(): void {
+  saveLogin(): void {
+    this.loading = true;
+    this.wlHttp.saveLoginWhiteLabelParams(this.loginParams, this.customerIdParam()).subscribe({
+      next: saved => {
+        this.loginParams = saved;
+        this.loginDirty = false;
+        this.loading = false;
+        this.showMessage('white-labeling.settings-saved');
+      },
+      error: () => { this.loading = false; }
+    });
+  }
+
+  resetSettings(scope: 'GENERAL' | 'LOGIN'): void {
+    const titleKey = scope === 'LOGIN' ? 'white-labeling.reset-login-white-label-title'
+                                       : 'white-labeling.reset-white-label-title';
+    const textKey = scope === 'LOGIN' ? 'white-labeling.reset-login-white-label-text'
+                                      : 'white-labeling.reset-white-label-text';
     this.dialogService.confirm(
-      this.translate.instant('white-labeling.reset-white-label-title'),
-      this.translate.instant('white-labeling.reset-white-label-text'),
+      this.translate.instant(titleKey),
+      this.translate.instant(textKey),
       this.translate.instant('action.no'),
       this.translate.instant('action.yes')
     ).subscribe(result => {
       if (result) {
-        this.resetSettings();
+        this.doReset(scope);
       }
     });
   }
 
-  private resetSettings(): void {
+  private doReset(scope: 'GENERAL' | 'LOGIN'): void {
     this.loading = true;
-    const customerId = this.isCustomerScope ? this.selectedCustomerId : undefined;
-    this.wlHttp.deleteCurrentWhiteLabelParams(customerId).subscribe({
+    const customerId = this.customerIdParam();
+    const request = scope === 'LOGIN' ? this.wlHttp.deleteCurrentLoginWhiteLabelParams(customerId)
+                                      : this.wlHttp.deleteCurrentWhiteLabelParams(customerId);
+    request.subscribe({
       next: () => {
-        this.wlHttp.deleteCurrentLoginWhiteLabelParams(customerId).subscribe({
-          next: () => {
-            this.snackBar.open('White labeling settings deleted', 'OK', { duration: 3000 });
-            this.wlRuntime.reset();
-            this.loadParams();
-          },
-          error: () => { this.loading = false; }
-        });
+        this.showMessage('white-labeling.settings-deleted');
+        if (scope === 'GENERAL') {
+          this.wlRuntime.reset();
+        }
+        this.loadParams();
       },
       error: () => { this.loading = false; }
     });
@@ -145,21 +162,27 @@ export class WhiteLabelingComponent implements OnInit {
     this.wlHttp.previewWhiteLabelParams(this.generalParams).subscribe({
       next: merged => {
         this.wlRuntime.applyParams(merged);
-        this.snackBar.open('Preview applied', 'OK', { duration: 2000 });
+        this.showMessage('white-labeling.preview-applied');
       }
     });
   }
 
   onGeneralParamsChange(params: WhiteLabelingParams): void {
     this.generalParams = params;
+    this.generalDirty = true;
   }
 
   onLoginParamsChange(params: LoginWhiteLabelingParams): void {
     this.loginParams = params;
+    this.loginDirty = true;
   }
 
   get isTenantAdmin(): boolean {
     return this.authority === Authority.TENANT_ADMIN;
+  }
+
+  get isSysAdmin(): boolean {
+    return this.authority === Authority.SYS_ADMIN;
   }
 
   get canEditLegal(): boolean {
@@ -170,7 +193,7 @@ export class WhiteLabelingComponent implements OnInit {
     this.wlHttp.savePrivacyPolicy(this.privacyPolicy).subscribe({
       next: saved => {
         this.privacyPolicy = saved;
-        this.snackBar.open('Privacy policy saved', 'OK', { duration: 3000 });
+        this.showMessage('white-labeling.privacy-policy-saved');
       }
     });
   }
@@ -179,9 +202,17 @@ export class WhiteLabelingComponent implements OnInit {
     this.wlHttp.saveTermsOfUse(this.termsOfUse).subscribe({
       next: saved => {
         this.termsOfUse = saved;
-        this.snackBar.open('Terms of use saved', 'OK', { duration: 3000 });
+        this.showMessage('white-labeling.terms-of-use-saved');
       }
     });
+  }
+
+  private customerIdParam(): string | undefined {
+    return this.isCustomerScope ? this.selectedCustomerId : undefined;
+  }
+
+  private showMessage(key: string): void {
+    this.snackBar.open(this.translate.instant(key), this.translate.instant('action.ok'), { duration: 3000 });
   }
 
   toggleCustomerScope(): void {

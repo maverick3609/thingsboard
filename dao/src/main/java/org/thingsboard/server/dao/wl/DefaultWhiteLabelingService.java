@@ -235,6 +235,20 @@ public class DefaultWhiteLabelingService
         return terms;
     }
 
+    // --- Mail templates ---
+
+    @Override
+    public JsonNode getSystemMailTemplates() {
+        return loadSettingsCached(WhiteLabelingCompositeKey.forSystem(WhiteLabelingType.MAIL_TEMPLATES));
+    }
+
+    @Override
+    public JsonNode saveSystemMailTemplates(JsonNode templates) {
+        saveRawSettingsAndEvict(TenantId.SYS_TENANT_ID, new CustomerId(EntityId.NULL_UUID),
+                WhiteLabelingType.MAIL_TEMPLATES, templates);
+        return templates;
+    }
+
     // --- Delete ---
 
     @Override

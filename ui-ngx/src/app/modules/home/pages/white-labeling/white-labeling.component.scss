@@ -61,6 +61,37 @@
     }
   }
 
+  .wl-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0 16px;
+  }
+
+  .palette-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 8px;
+  }
+
+  .palette-select {
+    flex: 1;
+
+    .mat-mdc-select-value {
+      color: inherit;
+    }
+  }
+
+  .palette-swatch {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    vertical-align: middle;
+    border-radius: 2px;
+  }
+
   .shade-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));

@@ -43,6 +43,16 @@ export class ImageInputComponent implements ControlValueAccessor {
   value: string = null;
   disabled = false;
   makingPublic = false;
+  imageName: string = null;
+  // "1024x768 | 9.4 KB" - the byte size is only known for an image picked in this
+  // session; a reloaded value carries the URL alone, so only the dimensions show
+  imageMeta: string = null;
+
+  private sizeBytes: number = null;
+  private dimensions: string = null;
+
+  private pickedName: string = null;
+  private pickedSize: number = null;
 
   private onChange: (val: string) => void = () => {};
   private onTouched: () => void = () => {};
@@ -52,6 +62,16 @@ export class ImageInputComponent implements ControlValueAccessor {
 
   writeValue(val: string): void {
     this.value = val ?? null;
+    this.imageName = this.value ? this.fileNameOf(this.value) : null;
+    this.sizeBytes = null;
+    this.dimensions = null;
+    this.imageMeta = null;
+  }
+
+  onImageLoad(event: Event): void {
+    const img = event.target as HTMLImageElement;
+    this.dimensions = `${img.naturalWidth}x${img.naturalHeight}`;
+    this.updateMeta();
   }
 
   registerOnChange(fn: (val: string) => void): void {
@@ -78,13 +98,15 @@ export class ImageInputComponent implements ControlValueAccessor {
         data: { imageSubType: ResourceSubType.IMAGE }
       }).afterClosed().subscribe((image) => {
         if (image) {
+          this.pickedName = image.title;
+          this.pickedSize = image.descriptor?.size;
           this.storePublicLink(image);
         }
       });
   }
 
   clear(): void {
-    this.value = null;
+    this.writeValue(null);
     this.onChange(null);
     this.onTouched();
   }
@@ -123,8 +145,27 @@ export class ImageInputComponent implements ControlValueAccessor {
   }
 
   private setValue(url: string): void {
-    this.value = url;
+    this.writeValue(url);
+    this.imageName = this.pickedName || this.imageName;
+    this.sizeBytes = this.pickedSize ?? null;
+    this.updateMeta();
     this.onChange(url);
     this.onTouched();
+  }
+
+  private fileNameOf(url: string): string {
+    const name = url.split('?')[0].split('/').pop();
+    try {
+      // a stored value can be any URL (or a legacy base64 data URL); a stray '%'
+      // would make decodeURIComponent throw and blank the whole field
+      return decodeURIComponent(name);
+    } catch {
+      return name;
+    }
+  }
+
+  private updateMeta(): void {
+    const parts = [this.dimensions, this.sizeBytes ? `${(this.sizeBytes / 1024).toFixed(1)} KB` : null];
+    this.imageMeta = parts.filter(part => !!part).join(' | ');
   }
 }

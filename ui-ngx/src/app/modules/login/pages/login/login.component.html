@@ -23,7 +23,12 @@
     <mat-card-content class="!p-6">
       <form class="tb-login-form flex flex-col" [formGroup]="loginFormGroup" (ngSubmit)="login()">
         <div class="flex flex-col items-center justify-start" style="padding: 16px 0;">
-          <tb-logo [src]="loginLogo" target="_blank" class="login-logo"
+          <!--
+            `link` must stay set: with no link, LogoComponent#ngOnInit falls back to
+            AuthService#defaultUrl(true, authState), which dereferences authState.authUser —
+            null on this pre-auth page, so the logo's ngOnInit throws on every login render.
+          -->
+          <tb-logo [src]="loginLogo" link="/" class="login-logo"
                    [style.height.px]="loginLogoHeight"></tb-logo>
         </div>
         <mat-progress-bar color="warn" mode="indeterminate" *ngIf="isLoading || (isLoading$ | async)">

@@ -18,6 +18,22 @@
 <form [formGroup]="form" class="wl-settings-form">
   <section>
     <h3 translate>white-labeling.branding</h3>
+    <mat-form-field class="full-width">
+      <mat-label translate>white-labeling.application-title</mat-label>
+      <input matInput formControlName="appTitle">
+    </mat-form-field>
+    <div class="form-row">
+      <label translate>white-labeling.favicon</label>
+      <!--
+        BUG 5 (image gallery picker): the favicon is unconditionally sourced from this field (no
+        login-specific favicon override exists). The pre-auth noauth endpoint always merges the
+        System-scope favicon into the /login response, and WhiteLabelingRuntimeService#applyFavicon
+        sets <link rel="icon"> href from it raw before login. tb-wl-image-input therefore stores
+        the picked image's public link (/api/images/public/{key}, served anonymously), which a
+        logged-out browser can fetch; a gated tb-image; reference could not be fetched.
+      -->
+      <tb-wl-image-input formControlName="faviconUrl"></tb-wl-image-input>
+    </div>
     <div class="form-row">
       <label translate>white-labeling.logo-image</label>
       <!--
@@ -35,62 +51,49 @@
       <mat-label translate>white-labeling.logo-image-height</mat-label>
       <input matInput type="number" formControlName="logoImageHeight">
     </mat-form-field>
-    <mat-form-field class="full-width">
-      <mat-label translate>white-labeling.application-title</mat-label>
-      <input matInput formControlName="appTitle">
-    </mat-form-field>
-    <div class="form-row">
-      <label translate>white-labeling.favicon</label>
-      <!--
-        BUG 5 (image gallery picker): the favicon is unconditionally sourced from this field (no
-        login-specific favicon override exists). The pre-auth noauth endpoint always merges the
-        System-scope favicon into the /login response, and WhiteLabelingRuntimeService#applyFavicon
-        sets <link rel="icon"> href from it raw before login. tb-wl-image-input therefore stores
-        the picked image's public link (/api/images/public/{key}, served anonymously), which a
-        logged-out browser can fetch; a gated tb-image; reference could not be fetched.
-      -->
-      <tb-wl-image-input formControlName="faviconUrl"></tb-wl-image-input>
-    </div>
+  </section>
+
+  <section>
+    <h3 translate>white-labeling.help-links</h3>
+    <mat-slide-toggle formControlName="enableHelpLinks">{{ 'white-labeling.enable-help-links' | translate }}</mat-slide-toggle>
+    <ng-container *ngIf="form.get('enableHelpLinks').value">
+      <mat-form-field class="full-width">
+        <mat-label translate>white-labeling.help-link-base-url</mat-label>
+        <input matInput formControlName="helpLinkBaseUrl">
+      </mat-form-field>
+      <mat-form-field class="full-width">
+        <mat-label translate>white-labeling.ui-help-base-url</mat-label>
+        <input matInput formControlName="uiHelpBaseUrl">
+      </mat-form-field>
+    </ng-container>
   </section>
 
   <section>
     <h3 translate>white-labeling.color-palette</h3>
     <tb-palette-settings formControlName="paletteSettings"></tb-palette-settings>
-  </section>
-
-  <section>
-    <h3 translate>white-labeling.help-links</h3>
-    <mat-form-field class="full-width">
-      <mat-label translate>white-labeling.help-link-base-url</mat-label>
-      <input matInput formControlName="helpLinkBaseUrl">
-    </mat-form-field>
-    <mat-form-field class="full-width">
-      <mat-label translate>white-labeling.ui-help-base-url</mat-label>
-      <input matInput formControlName="uiHelpBaseUrl">
-    </mat-form-field>
-    <mat-slide-toggle formControlName="enableHelpLinks">{{ 'white-labeling.enable-help-links' | translate }}</mat-slide-toggle>
+    <button mat-raised-button color="primary" type="button" (click)="openAdvancedCss()">
+      {{ 'white-labeling.advanced-css' | translate }}
+    </button>
   </section>
 
   <section>
     <h3 translate>white-labeling.platform-info</h3>
     <mat-slide-toggle formControlName="showNameVersion">{{ 'white-labeling.show-platform-name-version' | translate }}</mat-slide-toggle>
-    <mat-form-field class="full-width">
-      <mat-label translate>white-labeling.platform-name</mat-label>
-      <input matInput formControlName="platformName">
-      <mat-error *ngIf="form.get('platformName').hasError('required')" translate>white-labeling.platform-name-required</mat-error>
-    </mat-form-field>
-    <mat-form-field class="full-width">
-      <mat-label translate>white-labeling.platform-version</mat-label>
-      <input matInput formControlName="platformVersion">
-    </mat-form-field>
+    <ng-container *ngIf="form.get('showNameVersion').value">
+      <mat-form-field class="full-width">
+        <mat-label translate>white-labeling.platform-name</mat-label>
+        <input matInput formControlName="platformName">
+        <mat-error *ngIf="form.get('platformName').hasError('required')" translate>white-labeling.platform-name-required</mat-error>
+      </mat-form-field>
+      <mat-form-field class="full-width">
+        <mat-label translate>white-labeling.platform-version</mat-label>
+        <input matInput formControlName="platformVersion">
+      </mat-form-field>
+    </ng-container>
   </section>
 
   <section>
     <h3 translate>white-labeling.advanced</h3>
-    <mat-form-field class="full-width">
-      <mat-label translate>white-labeling.custom-css</mat-label>
-      <textarea matInput formControlName="customCss" rows="6"></textarea>
-    </mat-form-field>
     <mat-slide-toggle formControlName="hideConnectivityDialog">{{ 'white-labeling.hide-connectivity-dialog' | translate }}</mat-slide-toggle>
   </section>
 </form>

@@ -16,7 +16,9 @@
 
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { MatDialog } from '@angular/material/dialog';
 import { WhiteLabelingParams } from '@shared/models/white-labeling.models';
+import { AdvancedCssDialogComponent } from './advanced-css-dialog.component';
 
 @Component({
   standalone: false,
@@ -29,7 +31,20 @@ export class GeneralWlSettingsComponent implements OnInit, OnChanges {
 
   form: FormGroup;
 
-  constructor(private fb: FormBuilder) {}
+  constructor(private fb: FormBuilder,
+              private dialog: MatDialog) {}
+
+  openAdvancedCss(): void {
+    this.dialog.open<AdvancedCssDialogComponent, { css: string }, string>(AdvancedCssDialogComponent, {
+      disableClose: true,
+      panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
+      data: { css: this.form.get('customCss').value }
+    }).afterClosed().subscribe(css => {
+      if (css !== undefined) {
+        this.form.get('customCss').setValue(css);
+      }
+    });
+  }
 
   ngOnInit(): void {
     this.form = this.fb.group({

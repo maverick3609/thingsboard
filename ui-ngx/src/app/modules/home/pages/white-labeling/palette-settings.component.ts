@@ -14,69 +14,48 @@
 /// limitations under the License.
 ///
 
-import { Component, forwardRef, OnInit } from '@angular/core';
-import { ControlValueAccessor, FormBuilder, FormGroup, NG_VALUE_ACCESSOR } from '@angular/forms';
-import { PaletteSettings } from '@shared/models/white-labeling.models';
+import { Component, forwardRef } from '@angular/core';
+import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
+import { MatDialog } from '@angular/material/dialog';
+import { TranslateService } from '@ngx-translate/core';
+import { Palette, PaletteSettings } from '@shared/models/white-labeling.models';
+import { PaletteDialogComponent, PaletteDialogData } from './palette-dialog.component';
 
 @Component({
   standalone: false,
   selector: 'tb-palette-settings',
   templateUrl: './palette-settings.component.html',
+  styleUrls: ['./white-labeling.component.scss'],
   providers: [{
     provide: NG_VALUE_ACCESSOR,
     useExisting: forwardRef(() => PaletteSettingsComponent),
     multi: true
   }]
 })
-export class PaletteSettingsComponent implements ControlValueAccessor, OnInit {
-  form: FormGroup;
-  disabled = false;
+export class PaletteSettingsComponent implements ControlValueAccessor {
 
-  readonly shades = ['50', '100', '200', '300', '400', '500', '600', '700', '800', '900', 'A100', 'A200', 'A400', 'A700'];
-  readonly paletteOptions = [
-    'indigo', 'blue', 'red', 'green', 'purple', 'orange', 'teal', 'pink',
-    'cyan', 'amber', 'deep-purple', 'light-blue', 'lime', 'yellow',
-    'light-green', 'brown', 'grey', 'blue-grey'
-  ];
+  // material palette name -> its 500 shade, used to preview the palette in the selector
+  readonly paletteColors: { [name: string]: string } = {
+    red: '#F44336', pink: '#E91E63', purple: '#9C27B0', 'deep-purple': '#673AB7',
+    indigo: '#3F51B5', blue: '#2196F3', 'light-blue': '#03A9F4', cyan: '#00BCD4',
+    teal: '#009688', green: '#4CAF50', 'light-green': '#8BC34A', lime: '#CDDC39',
+    yellow: '#FFEB3B', amber: '#FFC107', orange: '#FF9800', brown: '#795548',
+    grey: '#9E9E9E', 'blue-grey': '#607D8B'
+  };
+
+  readonly paletteOptions = Object.keys(this.paletteColors);
+
+  value: PaletteSettings = null;
+  disabled = false;
 
   private onChange: (val: PaletteSettings) => void = () => {};
   private onTouched: () => void = () => {};
 
-  constructor(private fb: FormBuilder) {}
-
-  ngOnInit(): void {
-    const controls: { [key: string]: any } = {
-      primaryExtends: ['indigo'],
-      accentExtends: ['pink']
-    };
-    for (const shade of this.shades) {
-      controls['primary_' + shade] = [''];
-      controls['accent_' + shade] = [''];
-    }
-    this.form = this.fb.group(controls);
-    this.form.valueChanges.subscribe(() => this.emitValue());
-  }
+  constructor(private dialog: MatDialog,
+              private translate: TranslateService) {}
 
   writeValue(val: PaletteSettings): void {
-    if (!val || !this.form) { return; }
-    const patch: { [key: string]: any } = {};
-    if (val.primaryPalette) {
-      patch.primaryExtends = val.primaryPalette.extendsPalette || 'indigo';
-      if (val.primaryPalette.colors) {
-        for (const shade of this.shades) {
-          patch['primary_' + shade] = val.primaryPalette.colors[shade] || '';
-        }
-      }
-    }
-    if (val.accentPalette) {
-      patch.accentExtends = val.accentPalette.extendsPalette || 'pink';
-      if (val.accentPalette.colors) {
-        for (const shade of this.shades) {
-          patch['accent_' + shade] = val.accentPalette.colors[shade] || '';
-        }
-      }
-    }
-    this.form.patchValue(patch, { emitEvent: false });
+    this.value = val || null;
   }
 
   registerOnChange(fn: (val: PaletteSettings) => void): void {
@@ -89,30 +68,41 @@ export class PaletteSettingsComponent implements ControlValueAccessor, OnInit {
 
   setDisabledState(isDisabled: boolean): void {
     this.disabled = isDisabled;
-    isDisabled ? this.form.disable({ emitEvent: false }) : this.form.enable({ emitEvent: false });
   }
 
-  private emitValue(): void {
-    const v = this.form.value;
-    const primaryColors: { [key: string]: string } = {};
-    const accentColors: { [key: string]: string } = {};
-    for (const shade of this.shades) {
-      if (v['primary_' + shade]) { primaryColors[shade] = v['primary_' + shade]; }
-      if (v['accent_' + shade]) { accentColors[shade] = v['accent_' + shade]; }
-    }
-    const settings: PaletteSettings = {
-      primaryPalette: {
-        type: null,
-        extendsPalette: v.primaryExtends || null,
-        colors: Object.keys(primaryColors).length > 0 ? primaryColors : null
-      },
-      accentPalette: {
-        type: null,
-        extendsPalette: v.accentExtends || null,
-        colors: Object.keys(accentColors).length > 0 ? accentColors : null
-      }
+  palette(type: 'primary' | 'accent'): Palette {
+    return type === 'primary' ? this.value?.primaryPalette : this.value?.accentPalette;
+  }
+
+  setExtends(type: 'primary' | 'accent', extendsPalette: string): void {
+    this.update(type, { extendsPalette, colors: this.palette(type)?.colors });
+  }
+
+  customize(type: 'primary' | 'accent'): void {
+    const labelKey = type === 'primary' ? 'white-labeling.primary-palette' : 'white-labeling.accent-palette';
+    this.dialog.open<PaletteDialogComponent, PaletteDialogData, { [shade: string]: string }>(
+      PaletteDialogComponent, {
+        disableClose: true,
+        panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
+        data: {
+          title: this.translate.instant(labelKey),
+          colors: this.palette(type)?.colors
+        }
+      }).afterClosed().subscribe(colors => {
+        if (colors) {
+          this.update(type, { extendsPalette: this.palette(type)?.extendsPalette, colors });
+        }
+      });
+  }
+
+  private update(type: 'primary' | 'accent', changes: { extendsPalette: string; colors: { [shade: string]: string } }): void {
+    const colors = changes.colors && Object.keys(changes.colors).length ? changes.colors : null;
+    const palette: Palette = { type: null, extendsPalette: changes.extendsPalette || null, colors };
+    this.value = {
+      primaryPalette: type === 'primary' ? palette : this.value?.primaryPalette,
+      accentPalette: type === 'accent' ? palette : this.value?.accentPalette
     };
-    this.onChange(settings);
+    this.onChange(this.value);
     this.onTouched();
   }
 }

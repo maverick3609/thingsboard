@@ -1,0 +1,45 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<form [formGroup]="form" class="wl-settings-form">
+  <section>
+    <h3 translate>white-labeling.mail-templates-settings</h3>
+    <mat-form-field class="full-width">
+      <mat-label translate>white-labeling.mail-template.mail-template</mat-label>
+      <mat-select [value]="selectedTemplate" (valueChange)="selectTemplate($event)">
+        <mat-option *ngFor="let name of templateNames" [value]="name">
+          {{ mailTemplateTranslations.get(name) | translate }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field class="full-width">
+      <mat-label translate>white-labeling.mail-subject</mat-label>
+      <input matInput formControlName="subject">
+    </mat-form-field>
+    <div class="form-row">
+      <label translate>white-labeling.mail-body</label>
+    </div>
+    <editor [init]="tinyMceOptions" formControlName="body"></editor>
+  </section>
+
+  <div class="wl-actions">
+    <button mat-raised-button color="primary" type="button"
+            [disabled]="loading" (click)="save()">
+      {{ 'action.save' | translate }}
+    </button>
+  </div>
+</form>

@@ -19,5 +19,6 @@ public enum WhiteLabelingType {
     GENERAL,
     LOGIN,
     TERMS_OF_USE,
-    PRIVACY_POLICY
+    PRIVACY_POLICY,
+    MAIL_TEMPLATES
 }

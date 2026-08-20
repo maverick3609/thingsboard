@@ -17,6 +17,7 @@ package org.thingsboard.server.service.mail;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.util.concurrent.Futures;
+import freemarker.core.TemplateClassResolver;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import jakarta.annotation.PostConstruct;
@@ -27,7 +28,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.core.NestedRuntimeException;
 import org.springframework.core.io.InputStreamSource;
@@ -61,8 +61,8 @@ import org.thingsboard.server.dao.settings.AdminSettingsService;
 import org.thingsboard.server.service.apiusage.TbApiUsageStateService;
 
 import java.io.ByteArrayInputStream;
+import java.io.StringReader;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -79,7 +79,7 @@ public class DefaultMailService implements MailService {
 
     private final ScheduledExecutorService timeoutScheduler = ThingsBoardExecutors.newSingleThreadScheduledExecutor("mail-service-watchdog");
 
-    private final MessageSource messages;
+    private final MailTemplates mailTemplates;
     private final Configuration freemarkerConfig;
     private final AdminSettingsService adminSettingsService;
     private final TbApiUsageReportClient apiUsageClient;
@@ -132,27 +132,27 @@ public class DefaultMailService implements MailService {
     public void sendTestMail(JsonNode jsonConfig, String email) throws ThingsboardException {
         TbMailSender testMailSender = new TbMailSender(ctx, jsonConfig);
         String mailFrom = jsonConfig.get("mailFrom").asText();
-        String subject = messages.getMessage("test.message.subject", null, Locale.US);
+        String subject = mailTemplates.subject(MailTemplates.TEST);
         long timeout = jsonConfig.get("timeout").asLong(DEFAULT_TIMEOUT);
 
         Map<String, Object> model = new HashMap<>();
         model.put(TARGET_EMAIL, email);
 
-        String message = mergeTemplateIntoString("test.ftl", model);
+        String message = mergeTemplateIntoString(MailTemplates.TEST, model);
 
         sendMail(testMailSender, mailFrom, email, subject, message, timeout);
     }
 
     @Override
     public void sendActivationEmail(String activationLink, long ttlMs, String email) throws ThingsboardException {
-        String subject = messages.getMessage("activation.subject", null, Locale.US);
+        String subject = mailTemplates.subject(MailTemplates.ACTIVATION);
 
         Map<String, Object> model = new HashMap<>();
         model.put("activationLink", activationLink);
         model.put("activationLinkTtlInHours", (int) Math.ceil(ttlMs / 3600000.0));
         model.put(TARGET_EMAIL, email);
 
-        String message = mergeTemplateIntoString("activation.ftl", model);
+        String message = mergeTemplateIntoString(MailTemplates.ACTIVATION, model);
 
         sendMail(mailSender, mailFrom, email, subject, message, timeout);
     }
@@ -160,13 +160,13 @@ public class DefaultMailService implements MailService {
     @Override
     public void sendAccountActivatedEmail(String loginLink, String email) throws ThingsboardException {
 
-        String subject = messages.getMessage("account.activated.subject", null, Locale.US);
+        String subject = mailTemplates.subject(MailTemplates.ACCOUNT_ACTIVATED);
 
         Map<String, Object> model = new HashMap<>();
         model.put("loginLink", loginLink);
         model.put(TARGET_EMAIL, email);
 
-        String message = mergeTemplateIntoString("account.activated.ftl", model);
+        String message = mergeTemplateIntoString(MailTemplates.ACCOUNT_ACTIVATED, model);
 
         sendMail(mailSender, mailFrom, email, subject, message, timeout);
     }
@@ -174,14 +174,14 @@ public class DefaultMailService implements MailService {
     @Override
     public void sendResetPasswordEmail(String passwordResetLink, long ttlMs, String email) throws ThingsboardException {
 
-        String subject = messages.getMessage("reset.password.subject", null, Locale.US);
+        String subject = mailTemplates.subject(MailTemplates.RESET_PASSWORD);
 
         Map<String, Object> model = new HashMap<>();
         model.put("passwordResetLink", passwordResetLink);
         model.put("passwordResetLinkTtlInHours", (int) Math.ceil(ttlMs / 3600000.0));
         model.put(TARGET_EMAIL, email);
 
-        String message = mergeTemplateIntoString("reset.password.ftl", model);
+        String message = mergeTemplateIntoString(MailTemplates.RESET_PASSWORD, model);
 
         sendMail(mailSender, mailFrom, email, subject, message, timeout);
     }
@@ -200,13 +200,13 @@ public class DefaultMailService implements MailService {
     @Override
     public void sendPasswordWasResetEmail(String loginLink, String email) throws ThingsboardException {
 
-        String subject = messages.getMessage("password.was.reset.subject", null, Locale.US);
+        String subject = mailTemplates.subject(MailTemplates.PASSWORD_WAS_RESET);
 
         Map<String, Object> model = new HashMap<>();
         model.put("loginLink", loginLink);
         model.put(TARGET_EMAIL, email);
 
-        String message = mergeTemplateIntoString("password.was.reset.ftl", model);
+        String message = mergeTemplateIntoString(MailTemplates.PASSWORD_WAS_RESET, model);
 
         sendMail(mailSender, mailFrom, email, subject, message, timeout);
     }
@@ -281,22 +281,22 @@ public class DefaultMailService implements MailService {
 
     @Override
     public void sendAccountLockoutEmail(String lockoutEmail, String email, Integer maxFailedLoginAttempts) throws ThingsboardException {
-        String subject = messages.getMessage("account.lockout.subject", null, Locale.US);
+        String subject = mailTemplates.subject(MailTemplates.ACCOUNT_LOCKOUT);
 
         Map<String, Object> model = new HashMap<>();
         model.put("lockoutAccount", lockoutEmail);
         model.put("maxFailedLoginAttempts", maxFailedLoginAttempts);
         model.put(TARGET_EMAIL, email);
 
-        String message = mergeTemplateIntoString("account.lockout.ftl", model);
+        String message = mergeTemplateIntoString(MailTemplates.ACCOUNT_LOCKOUT, model);
 
         sendMail(mailSender, mailFrom, email, subject, message, timeout);
     }
 
     @Override
     public void sendTwoFaVerificationEmail(String email, String verificationCode, int expirationTimeSeconds) throws ThingsboardException {
-        String subject = messages.getMessage("2fa.verification.code.subject", null, Locale.US);
-        String message = mergeTemplateIntoString("2fa.verification.code.ftl", Map.of(
+        String subject = mailTemplates.subject(MailTemplates.TWO_FA_VERIFICATION);
+        String message = mergeTemplateIntoString(MailTemplates.TWO_FA_VERIFICATION, Map.of(
                 TARGET_EMAIL, email,
                 "code", verificationCode,
                 "expirationTimeSeconds", expirationTimeSeconds
@@ -307,7 +307,7 @@ public class DefaultMailService implements MailService {
 
     @Override
     public void sendApiFeatureStateEmail(ApiFeature apiFeature, ApiUsageStateValue stateValue, String email, ApiUsageRecordState recordState) throws ThingsboardException {
-        String subject = messages.getMessage("api.usage.state", null, Locale.US);
+        String subject = mailTemplates.subject(MailTemplates.API_USAGE_STATE_ENABLED);
 
         Map<String, Object> model = new HashMap<>();
         model.put("apiFeature", apiFeature.getLabel());
@@ -316,15 +316,15 @@ public class DefaultMailService implements MailService {
         String message = switch (stateValue) {
             case ENABLED -> {
                 model.put("apiLabel", toEnabledValueLabel(apiFeature));
-                yield mergeTemplateIntoString("state.enabled.ftl", model);
+                yield mergeTemplateIntoString(MailTemplates.API_USAGE_STATE_ENABLED, model);
             }
             case WARNING -> {
                 model.put("apiValueLabel", toDisabledValueLabel(apiFeature) + " " + toWarningValueLabel(recordState));
-                yield mergeTemplateIntoString("state.warning.ftl", model);
+                yield mergeTemplateIntoString(MailTemplates.API_USAGE_STATE_WARNING, model);
             }
             case DISABLED -> {
                 model.put("apiLimitValueLabel", toDisabledValueLabel(apiFeature) + " " + toDisabledValueLabel(recordState));
-                yield mergeTemplateIntoString("state.disabled.ftl", model);
+                yield mergeTemplateIntoString(MailTemplates.API_USAGE_STATE_DISABLED, model);
             }
         };
 
@@ -422,10 +422,13 @@ public class DefaultMailService implements MailService {
         }
     }
 
-    private String mergeTemplateIntoString(String templateLocation,
+    private String mergeTemplateIntoString(String templateName,
                                            Map<String, Object> model) throws ThingsboardException {
         try {
-            Template template = freemarkerConfig.getTemplate(templateLocation);
+            Template template = new Template(templateName, new StringReader(mailTemplates.body(templateName)), freemarkerConfig);
+            // bodies are operator-editable (White labeling -> Mail templates); deny ?new() so a
+            // template can never instantiate arbitrary classes
+            template.setNewBuiltinClassResolver(TemplateClassResolver.ALLOWS_NOTHING_RESOLVER);
             return FreeMarkerTemplateUtils.processTemplateIntoString(template, model);
         } catch (Exception e) {
             log.warn("Failed to process mail template: {}", ExceptionUtils.getRootCauseMessage(e));

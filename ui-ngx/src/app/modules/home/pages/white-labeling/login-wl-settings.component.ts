@@ -16,8 +16,14 @@
 
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { LoginWhiteLabelingParams } from '@shared/models/white-labeling.models';
+import { MatDialog } from '@angular/material/dialog';
+import {
+  LoginWhiteLabelingParams,
+  PlatformVersionPosition,
+  platformVersionPositionTranslations
+} from '@shared/models/white-labeling.models';
 import { WEB_URL_REGEX } from '@shared/models/mobile-app.models';
+import { AdvancedCssDialogComponent } from './advanced-css-dialog.component';
 
 @Component({
   standalone: false,
@@ -31,17 +37,27 @@ export class LoginWlSettingsComponent implements OnInit, OnChanges {
   form: FormGroup;
 
   readonly webUrlPattern = WEB_URL_REGEX;
+  readonly positions = Object.values(PlatformVersionPosition);
+  readonly positionTranslations = platformVersionPositionTranslations;
 
-  constructor(private fb: FormBuilder) {}
+  constructor(private fb: FormBuilder,
+              private dialog: MatDialog) {}
 
   ngOnInit(): void {
     this.form = this.fb.group({
       logoImageUrl: [null],
       logoImageHeight: [null],
+      appTitle: [null],
+      faviconUrl: [null],
+      paletteSettings: [null],
+      customCss: [null],
       loginCardColor: [null],
       pageBackgroundColor: [null],
       darkForeground: [false],
-      showNameBottom: [false],
+      showNameVersion: [false],
+      platformName: [null],
+      platformVersion: [null],
+      namePosition: [PlatformVersionPosition.UNDER_LOGO],
       baseUrl: [null, [Validators.pattern(this.webUrlPattern)]]
     });
     this.form.valueChanges.subscribe(() => this.emitParams());
@@ -54,15 +70,34 @@ export class LoginWlSettingsComponent implements OnInit, OnChanges {
     }
   }
 
+  openAdvancedCss(): void {
+    this.dialog.open<AdvancedCssDialogComponent, { css: string }, string>(AdvancedCssDialogComponent, {
+      disableClose: true,
+      panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
+      data: { css: this.form.get('customCss').value }
+    }).afterClosed().subscribe(css => {
+      if (css !== undefined) {
+        this.form.get('customCss').setValue(css);
+      }
+    });
+  }
+
   private patchForm(): void {
     if (!this.params) { return; }
     this.form.patchValue({
       logoImageUrl: this.params.logoImageUrl || null,
       logoImageHeight: this.params.logoImageHeight || null,
+      appTitle: this.params.appTitle || null,
+      faviconUrl: this.params.favicon?.url || null,
+      paletteSettings: this.params.paletteSettings || null,
+      customCss: this.params.customCss || null,
       loginCardColor: this.params.loginCardColor || null,
       pageBackgroundColor: this.params.pageBackgroundColor || null,
       darkForeground: this.params.darkForeground ?? false,
-      showNameBottom: this.params.showNameBottom ?? false,
+      showNameVersion: this.params.showNameVersion ?? false,
+      platformName: this.params.platformName || null,
+      platformVersion: this.params.platformVersion || null,
+      namePosition: this.params.showNameBottom ? PlatformVersionPosition.BOTTOM : PlatformVersionPosition.UNDER_LOGO,
       baseUrl: this.params.baseUrl || null
     }, { emitEvent: false });
   }
@@ -79,10 +114,17 @@ export class LoginWlSettingsComponent implements OnInit, OnChanges {
       ...this.params,
       logoImageUrl: v.logoImageUrl,
       logoImageHeight: v.logoImageHeight,
+      appTitle: v.appTitle,
+      favicon: v.faviconUrl ? { url: v.faviconUrl } : null,
+      paletteSettings: v.paletteSettings,
+      customCss: v.customCss,
       loginCardColor: v.loginCardColor,
       pageBackgroundColor: v.pageBackgroundColor,
       darkForeground: v.darkForeground,
-      showNameBottom: v.showNameBottom,
+      showNameVersion: v.showNameVersion,
+      platformName: v.platformName,
+      platformVersion: v.platformVersion,
+      showNameBottom: v.namePosition === PlatformVersionPosition.BOTTOM,
       baseUrl: v.baseUrl
     });
   }

@@ -18,7 +18,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { defaultHttpOptionsFromConfig, RequestConfig } from './http-utils';
-import { LoginWhiteLabelingParams, WhiteLabelingParams } from '@shared/models/white-labeling.models';
+import { LoginWhiteLabelingParams, MailTemplates, WhiteLabelingParams } from '@shared/models/white-labeling.models';
 
 @Injectable({ providedIn: 'root' })
 export class WhiteLabelingHttpService {
@@ -112,5 +112,16 @@ export class WhiteLabelingHttpService {
 
   saveTermsOfUse(terms: any, config?: RequestConfig): Observable<any> {
     return this.http.post<any>('/api/whiteLabel/termsOfUse', terms, defaultHttpOptionsFromConfig(config));
+  }
+
+  // Mail templates (system scope)
+
+  getMailTemplates(config?: RequestConfig): Observable<MailTemplates> {
+    return this.http.get<MailTemplates>('/api/whiteLabel/mailTemplates', defaultHttpOptionsFromConfig(config));
+  }
+
+  saveMailTemplates(templates: MailTemplates, config?: RequestConfig): Observable<MailTemplates> {
+    return this.http.post<MailTemplates>('/api/whiteLabel/mailTemplates', templates,
+      defaultHttpOptionsFromConfig(config));
   }
 }

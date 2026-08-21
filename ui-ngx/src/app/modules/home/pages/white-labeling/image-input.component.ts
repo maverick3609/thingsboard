@@ -51,8 +51,12 @@ export class ImageInputComponent implements ControlValueAccessor {
   private sizeBytes: number = null;
   private dimensions: string = null;
 
-  private pickedName: string = null;
-  private pickedSize: number = null;
+  // Gallery metadata for the image picked in this session, keyed by the URL it produced.
+  // writeValue runs again right after the pick - the parent form re-patches this control
+  // with the value we just emitted - so the title/size must be recoverable from the URL
+  // alone, otherwise the card falls back to showing the bare resource key.
+  private picked: { url: string; title: string; size: number; dimensions: string } = null;
+  private pendingPick: { title: string; size: number; dimensions: string } = null;
 
   private onChange: (val: string) => void = () => {};
   private onTouched: () => void = () => {};
@@ -61,11 +65,16 @@ export class ImageInputComponent implements ControlValueAccessor {
               private dialog: MatDialog) {}
 
   writeValue(val: string): void {
+    // A re-patch with the value we already hold must not wipe what we know about it: the
+    // <img> only fires (load) when its src actually changes, so cleared dimensions would
+    // never come back.
+    const unchanged = this.value === (val ?? null);
     this.value = val ?? null;
-    this.imageName = this.value ? this.fileNameOf(this.value) : null;
-    this.sizeBytes = null;
-    this.dimensions = null;
-    this.imageMeta = null;
+    const fromGallery = this.value && this.picked?.url === this.value ? this.picked : null;
+    this.imageName = this.value ? (fromGallery?.title || this.fileNameOf(this.value)) : null;
+    this.sizeBytes = fromGallery?.size ?? (unchanged ? this.sizeBytes : null);
+    this.dimensions = fromGallery?.dimensions ?? (unchanged ? this.dimensions : null);
+    this.updateMeta();
   }
 
   onImageLoad(event: Event): void {
@@ -98,8 +107,13 @@ export class ImageInputComponent implements ControlValueAccessor {
         data: { imageSubType: ResourceSubType.IMAGE }
       }).afterClosed().subscribe((image) => {
         if (image) {
-          this.pickedName = image.title;
-          this.pickedSize = image.descriptor?.size;
+          const width = image.descriptor?.width;
+          const height = image.descriptor?.height;
+          this.pendingPick = {
+            title: image.title,
+            size: image.descriptor?.size,
+            dimensions: width && height ? `${width}x${height}` : null
+          };
           this.storePublicLink(image);
         }
       });
@@ -145,10 +159,11 @@ export class ImageInputComponent implements ControlValueAccessor {
   }
 
   private setValue(url: string): void {
+    if (this.pendingPick) {
+      this.picked = { url, ...this.pendingPick };
+      this.pendingPick = null;
+    }
     this.writeValue(url);
-    this.imageName = this.pickedName || this.imageName;
-    this.sizeBytes = this.pickedSize ?? null;
-    this.updateMeta();
     this.onChange(url);
     this.onTouched();
   }

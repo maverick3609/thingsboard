@@ -95,21 +95,32 @@ public class WhiteLabelingController extends BaseController {
     ) throws ThingsboardException {
         checkWhiteLabelingPermissions(Operation.READ);
         SecurityUser user = getCurrentUser();
+        WhiteLabelingParams params;
         switch (user.getAuthority()) {
             case SYS_ADMIN:
-                return whiteLabelingService.getSystemWhiteLabelingParams();
+                params = whiteLabelingService.getSystemWhiteLabelingParams();
+                break;
             case TENANT_ADMIN:
                 if (strCustomerId != null && !strCustomerId.isEmpty()) {
                     CustomerId customerId = new CustomerId(UUID.fromString(strCustomerId));
-                    return whiteLabelingService.getCustomerWhiteLabelingParams(user.getTenantId(), customerId);
+                    params = whiteLabelingService.getCustomerWhiteLabelingParams(user.getTenantId(), customerId);
+                } else {
+                    params = whiteLabelingService.getTenantWhiteLabelingParams(user.getTenantId());
                 }
-                return whiteLabelingService.getTenantWhiteLabelingParams(user.getTenantId());
+                break;
             case CUSTOMER_USER:
-                return whiteLabelingService.getCustomerWhiteLabelingParams(
+                params = whiteLabelingService.getCustomerWhiteLabelingParams(
                         user.getTenantId(), user.getCustomerId());
+                break;
             default:
-                return null;
+                params = null;
         }
+        // Nothing stored for this scope (fresh install, or right after "Reset to default")
+        // must still answer with JSON: returning null makes Spring send an empty 200 body,
+        // which a client that asked for application/json cannot parse. An empty params
+        // object carries the same meaning — no override at this scope — and matches what
+        // this endpoint already returned whenever a row existed with unset fields.
+        return params != null ? params : new WhiteLabelingParams();
     }
 
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
@@ -119,21 +130,28 @@ public class WhiteLabelingController extends BaseController {
     ) throws ThingsboardException {
         checkWhiteLabelingPermissions(Operation.READ);
         SecurityUser user = getCurrentUser();
+        LoginWhiteLabelingParams params;
         switch (user.getAuthority()) {
             case SYS_ADMIN:
-                return whiteLabelingService.getSystemLoginWhiteLabelingParams();
+                params = whiteLabelingService.getSystemLoginWhiteLabelingParams();
+                break;
             case TENANT_ADMIN:
                 if (strCustomerId != null && !strCustomerId.isEmpty()) {
                     CustomerId customerId = new CustomerId(UUID.fromString(strCustomerId));
-                    return whiteLabelingService.getCustomerLoginWhiteLabelingParams(user.getTenantId(), customerId);
+                    params = whiteLabelingService.getCustomerLoginWhiteLabelingParams(user.getTenantId(), customerId);
+                } else {
+                    params = whiteLabelingService.getTenantLoginWhiteLabelingParams(user.getTenantId());
                 }
-                return whiteLabelingService.getTenantLoginWhiteLabelingParams(user.getTenantId());
+                break;
             case CUSTOMER_USER:
-                return whiteLabelingService.getCustomerLoginWhiteLabelingParams(
+                params = whiteLabelingService.getCustomerLoginWhiteLabelingParams(
                         user.getTenantId(), user.getCustomerId());
+                break;
             default:
-                return null;
+                params = null;
         }
+        // See getCurrentWhiteLabelParams: an empty 200 body is not parseable JSON.
+        return params != null ? params : new LoginWhiteLabelingParams();
     }
 
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")

@@ -50,6 +50,10 @@ export class LoginComponent extends PageComponent implements OnInit {
   loginCardColor: string = null;
   pageBackgroundColor: string = null;
   darkForeground: boolean = false;
+  showNameVersion = false;
+  platformName: string = null;
+  platformVersion: string = null;
+  showNameBottom = false;
 
   constructor(private authService: AuthService,
               public fb: UntypedFormBuilder,
@@ -69,6 +73,14 @@ export class LoginComponent extends PageComponent implements OnInit {
         if (params.loginCardColor) { this.loginCardColor = params.loginCardColor; }
         if (params.pageBackgroundColor) { this.pageBackgroundColor = params.pageBackgroundColor; }
         this.darkForeground = params.darkForeground;
+        // Login-scope "Platform info": the WL Login tab lets an admin show the platform
+        // name/version on this page and choose the slot (under the logo / bottom of the
+        // form). Nothing else renders it pre-auth — the platform-info slot added for the
+        // post-auth app lives in home.component's side nav.
+        this.showNameVersion = !!params.showNameVersion;
+        this.platformName = params.platformName;
+        this.platformVersion = params.platformVersion;
+        this.showNameBottom = !!params.showNameBottom;
       },
       () => {}
     );

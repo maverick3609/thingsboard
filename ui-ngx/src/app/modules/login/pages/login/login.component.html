@@ -30,6 +30,9 @@
           -->
           <tb-logo [src]="loginLogo" link="/" class="login-logo"
                    [style.height.px]="loginLogoHeight"></tb-logo>
+          <div class="tb-login-platform-info" *ngIf="showNameVersion && platformName && !showNameBottom">
+            {{ platformName }} v.{{ platformVersion }}
+          </div>
         </div>
         <mat-progress-bar color="warn" mode="indeterminate" *ngIf="isLoading || (isLoading$ | async)">
         </mat-progress-bar>
@@ -86,6 +89,9 @@
               {{ (passwordViolation ? 'login.reset-password' : 'login.forgot-password') | translate }}
             </button>
           </div>
+        </div>
+        <div class="tb-login-platform-info" *ngIf="showNameVersion && platformName && showNameBottom">
+          {{ platformName }} v.{{ platformVersion }}
         </div>
       </form>
     </mat-card-content>

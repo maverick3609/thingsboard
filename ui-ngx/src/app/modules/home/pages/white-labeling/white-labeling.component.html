@@ -41,7 +41,11 @@
     </div>
 
     <mat-tab-group *ngIf="!loading">
-      <mat-tab label="{{ 'white-labeling.general' | translate }}">
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon class="tabs-icon">format_paint</mat-icon>
+          {{ 'white-labeling.general' | translate }}
+        </ng-template>
         <tb-general-wl-settings
           [params]="generalParams"
           (paramsChange)="onGeneralParamsChange($event)">
@@ -61,7 +65,11 @@
           </button>
         </div>
       </mat-tab>
-      <mat-tab label="{{ 'white-labeling.login-page' | translate }}">
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon class="tabs-icon">login</mat-icon>
+          {{ 'white-labeling.login-page' | translate }}
+        </ng-template>
         <tb-login-wl-settings
           [params]="loginParams"
           (paramsChange)="onLoginParamsChange($event)">
@@ -78,10 +86,18 @@
           </button>
         </div>
       </mat-tab>
-      <mat-tab *ngIf="isSysAdmin" label="{{ 'white-labeling.mail-templates' | translate }}">
+      <mat-tab *ngIf="isSysAdmin">
+        <ng-template mat-tab-label>
+          <mat-icon class="tabs-icon">mail</mat-icon>
+          {{ 'white-labeling.mail-templates' | translate }}
+        </ng-template>
         <tb-mail-templates></tb-mail-templates>
       </mat-tab>
-      <mat-tab *ngIf="canEditLegal" label="{{ 'white-labeling.privacy-policy' | translate }}">
+      <mat-tab *ngIf="canEditLegal">
+        <ng-template mat-tab-label>
+          <mat-icon class="tabs-icon">policy</mat-icon>
+          {{ 'white-labeling.privacy-policy' | translate }}
+        </ng-template>
         <tb-legal-content
           [content]="privacyPolicy"
           [label]="'white-labeling.privacy-policy' | translate"
@@ -89,7 +105,11 @@
           (save)="savePrivacyPolicy()">
         </tb-legal-content>
       </mat-tab>
-      <mat-tab *ngIf="canEditLegal" label="{{ 'white-labeling.terms-of-use' | translate }}">
+      <mat-tab *ngIf="canEditLegal">
+        <ng-template mat-tab-label>
+          <mat-icon class="tabs-icon">gavel</mat-icon>
+          {{ 'white-labeling.terms-of-use' | translate }}
+        </ng-template>
         <tb-legal-content
           [content]="termsOfUse"
           [label]="'white-labeling.terms-of-use' | translate"

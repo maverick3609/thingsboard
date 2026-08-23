@@ -798,7 +798,7 @@ export const menuSectionMap = new Map<MenuId, MenuSection>([
       id: MenuId.white_labeling,
       name: 'white-labeling.white-labeling',
       type: 'link',
-      path: '/settings/whiteLabeling',
+      path: '/white-labeling',
       icon: 'format_paint'
     }
   ],
@@ -868,14 +868,14 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
           {id: MenuId.mobile_qr_code_widget}
         ]
       },
+      {id: MenuId.white_labeling},
       {
         id: MenuId.settings,
         pages: [
           {id: MenuId.general},
           {id: MenuId.mail_server},
           {id: MenuId.notification_settings},
-          {id: MenuId.queues},
-          {id: MenuId.white_labeling}
+          {id: MenuId.queues}
         ]
       },
       {
@@ -983,6 +983,7 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
         ]
       },
       {id: MenuId.api_usage},
+      {id: MenuId.white_labeling},
       {
         id: MenuId.settings,
         pages: [
@@ -991,8 +992,7 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
           {id: MenuId.repository_settings},
           {id: MenuId.auto_commit_settings},
           {id: MenuId.trendz_settings},
-          {id: MenuId.ai_models},
-          {id: MenuId.white_labeling}
+          {id: MenuId.ai_models}
         ]
       },
       {
@@ -1031,12 +1031,7 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
         ]
       },
       {id: MenuId.scheduler},
-      {
-        id: MenuId.settings,
-        pages: [
-          {id: MenuId.white_labeling}
-        ]
-      }
+      {id: MenuId.white_labeling}
     ]
   ]
 ]);

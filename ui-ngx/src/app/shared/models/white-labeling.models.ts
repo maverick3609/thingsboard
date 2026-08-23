@@ -69,6 +69,12 @@ export const mailTemplateTranslations = new Map<string, string>([
   ['state.disabled', 'white-labeling.mail-template.api-usage-state-disabled']
 ]);
 
+// An emptied text field must be persisted as null, not as "". WhiteLabelingParams#merge
+// (server side) fills only null fields from the parent scope, so a stored "" reads as a
+// deliberate override and blocks inheritance — clearing a field would silently blank it
+// for everyone below instead of falling back to the system/tenant value above.
+export const blankToNull = (value: string): string => value?.trim() ? value : null;
+
 export enum PlatformVersionPosition {
   UNDER_LOGO = 'underLogo',
   BOTTOM = 'bottom'

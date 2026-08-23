@@ -17,7 +17,7 @@
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
-import { WhiteLabelingParams } from '@shared/models/white-labeling.models';
+import { blankToNull, WhiteLabelingParams } from '@shared/models/white-labeling.models';
 import { AdvancedCssDialogComponent } from './advanced-css-dialog.component';
 
 @Component({
@@ -78,17 +78,17 @@ export class GeneralWlSettingsComponent implements OnInit, OnChanges {
   private patchForm(): void {
     if (!this.params) { return; }
     this.form.patchValue({
-      logoImageUrl: this.params.logoImageUrl,
+      logoImageUrl: this.params.logoImageUrl || null,
       logoImageHeight: this.params.logoImageHeight,
-      appTitle: this.params.appTitle,
+      appTitle: this.params.appTitle || null,
       faviconUrl: this.params.favicon?.url || null,
-      helpLinkBaseUrl: this.params.helpLinkBaseUrl,
-      uiHelpBaseUrl: this.params.uiHelpBaseUrl,
+      helpLinkBaseUrl: this.params.helpLinkBaseUrl || null,
+      uiHelpBaseUrl: this.params.uiHelpBaseUrl || null,
       enableHelpLinks: this.params.enableHelpLinks ?? true,
       showNameVersion: this.params.showNameVersion ?? false,
-      platformName: this.params.platformName,
-      platformVersion: this.params.platformVersion,
-      customCss: this.params.customCss,
+      platformName: this.params.platformName || null,
+      platformVersion: this.params.platformVersion || null,
+      customCss: this.params.customCss || null,
       hideConnectivityDialog: this.params.hideConnectivityDialog ?? false,
       paletteSettings: this.params.paletteSettings
     }, { emitEvent: false });
@@ -105,17 +105,17 @@ export class GeneralWlSettingsComponent implements OnInit, OnChanges {
     const v = this.form.value;
     const params: WhiteLabelingParams = {
       ...this.params,
-      logoImageUrl: v.logoImageUrl,
+      logoImageUrl: blankToNull(v.logoImageUrl),
       logoImageHeight: v.logoImageHeight,
-      appTitle: v.appTitle,
+      appTitle: blankToNull(v.appTitle),
       favicon: v.faviconUrl ? { url: v.faviconUrl } : null,
-      helpLinkBaseUrl: v.helpLinkBaseUrl,
-      uiHelpBaseUrl: v.uiHelpBaseUrl,
+      helpLinkBaseUrl: blankToNull(v.helpLinkBaseUrl),
+      uiHelpBaseUrl: blankToNull(v.uiHelpBaseUrl),
       enableHelpLinks: v.enableHelpLinks,
       showNameVersion: v.showNameVersion,
-      platformName: v.platformName,
-      platformVersion: v.platformVersion,
-      customCss: v.customCss,
+      platformName: blankToNull(v.platformName),
+      platformVersion: blankToNull(v.platformVersion),
+      customCss: blankToNull(v.customCss),
       hideConnectivityDialog: v.hideConnectivityDialog,
       paletteSettings: v.paletteSettings
     };

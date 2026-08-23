@@ -18,6 +18,7 @@ import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChange
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import {
+  blankToNull,
   LoginWhiteLabelingParams,
   PlatformVersionPosition,
   platformVersionPositionTranslations
@@ -60,6 +61,12 @@ export class LoginWlSettingsComponent implements OnInit, OnChanges {
       namePosition: [PlatformVersionPosition.UNDER_LOGO],
       baseUrl: [null, [Validators.pattern(this.webUrlPattern)]]
     });
+    // Same rule as the General tab: with the toggle on, an empty name renders nothing
+    // on /login (the slot is guarded by `platformName`), so the toggle would look
+    // enabled while doing nothing at all.
+    this.form.get('showNameVersion').valueChanges.subscribe((showNameVersion: boolean) => {
+      this.updatePlatformNameValidators(showNameVersion);
+    });
     this.form.valueChanges.subscribe(() => this.emitParams());
     this.patchForm();
   }
@@ -100,6 +107,13 @@ export class LoginWlSettingsComponent implements OnInit, OnChanges {
       namePosition: this.params.showNameBottom ? PlatformVersionPosition.BOTTOM : PlatformVersionPosition.UNDER_LOGO,
       baseUrl: this.params.baseUrl || null
     }, { emitEvent: false });
+    this.updatePlatformNameValidators(this.params.showNameVersion ?? false);
+  }
+
+  private updatePlatformNameValidators(showNameVersion: boolean): void {
+    const platformNameControl = this.form.get('platformName');
+    platformNameControl.setValidators(showNameVersion ? [Validators.required] : []);
+    platformNameControl.updateValueAndValidity({ emitEvent: false });
   }
 
   private emitParams(): void {
@@ -112,20 +126,20 @@ export class LoginWlSettingsComponent implements OnInit, OnChanges {
       // untouched, so an existing value keeps round-tripping through save even
       // though it is no longer user-editable from this form.
       ...this.params,
-      logoImageUrl: v.logoImageUrl,
+      logoImageUrl: blankToNull(v.logoImageUrl),
       logoImageHeight: v.logoImageHeight,
-      appTitle: v.appTitle,
+      appTitle: blankToNull(v.appTitle),
       favicon: v.faviconUrl ? { url: v.faviconUrl } : null,
       paletteSettings: v.paletteSettings,
-      customCss: v.customCss,
-      loginCardColor: v.loginCardColor,
-      pageBackgroundColor: v.pageBackgroundColor,
+      customCss: blankToNull(v.customCss),
+      loginCardColor: blankToNull(v.loginCardColor),
+      pageBackgroundColor: blankToNull(v.pageBackgroundColor),
       darkForeground: v.darkForeground,
       showNameVersion: v.showNameVersion,
-      platformName: v.platformName,
-      platformVersion: v.platformVersion,
+      platformName: blankToNull(v.platformName),
+      platformVersion: blankToNull(v.platformVersion),
       showNameBottom: v.namePosition === PlatformVersionPosition.BOTTOM,
-      baseUrl: v.baseUrl
+      baseUrl: blankToNull(v.baseUrl)
     });
   }
 }

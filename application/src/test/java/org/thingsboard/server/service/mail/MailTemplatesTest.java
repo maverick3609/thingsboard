@@ -52,12 +52,12 @@ class MailTemplatesTest {
 
         assertThat(templates.size()).isEqualTo(10);
         assertThat(templates.get(MailTemplates.TEST).get("subject").asText())
-                .isEqualTo("Test message from Thingsboard");
+                .isEqualTo("Test message from Inferrix Cortex");
         assertThat(templates.get(MailTemplates.TEST).get("body").asText())
                 .doesNotContain("<#--")
                 .contains("${targetEmail}");
         assertThat(mailTemplates.subject(MailTemplates.ACTIVATION))
-                .isEqualTo("Your account activation on Thingsboard");
+                .isEqualTo("Your account activation on Inferrix Cortex");
     }
 
     @Test
@@ -75,7 +75,24 @@ class MailTemplatesTest {
         assertThat(mailTemplates.body(MailTemplates.TEST)).contains("${targetEmail}");
         // an untouched template keeps both defaults
         assertThat(mailTemplates.subject(MailTemplates.ACCOUNT_LOCKOUT))
-                .isEqualTo("Thingsboard - User account has been lockout");
+                .isEqualTo("Inferrix Cortex - User account has been lockout");
+    }
+
+    @Test
+    void givenNoOverrides_whenGetTemplates_thenNothingNamesTheUpstreamProduct() {
+        when(whiteLabelingService.getSystemMailTemplates()).thenReturn(null);
+
+        ObjectNode templates = mailTemplates.getTemplates();
+
+        // The bundled .ftl bodies and their subjects are what a recipient sees; a merge that
+        // restores an upstream template would silently put the upstream brand — and an image
+        // fetched from its CDN — back into outgoing mail.
+        templates.fields().forEachRemaining(entry -> {
+            String subject = entry.getValue().get("subject").asText();
+            String body = entry.getValue().get("body").asText();
+            assertThat(subject).as("subject of %s", entry.getKey()).doesNotContainIgnoringCase("thingsboard");
+            assertThat(body).as("body of %s", entry.getKey()).doesNotContainIgnoringCase("thingsboard");
+        });
     }
 
     @Test
@@ -94,7 +111,7 @@ class MailTemplatesTest {
         stored.putObject(MailTemplates.TEST).put("subject", "").put("body", "");
         when(whiteLabelingService.getSystemMailTemplates()).thenReturn(stored);
 
-        assertThat(mailTemplates.subject(MailTemplates.TEST)).isEqualTo("Test message from Thingsboard");
+        assertThat(mailTemplates.subject(MailTemplates.TEST)).isEqualTo("Test message from Inferrix Cortex");
         assertThat(mailTemplates.body(MailTemplates.TEST)).contains("${targetEmail}");
     }
 }

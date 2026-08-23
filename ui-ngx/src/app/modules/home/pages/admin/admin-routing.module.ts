@@ -367,15 +367,10 @@ const routes: Routes = [
       },
       ...aiModelRoutes,
       {
+        // White labeling moved out of the settings tab shell to its own top-level
+        // page; keep the old URL working for bookmarks and saved links.
         path: 'whiteLabeling',
-        component: WhiteLabelingComponent,
-        data: {
-          auth: [Authority.SYS_ADMIN, Authority.TENANT_ADMIN, Authority.CUSTOMER_USER],
-          title: 'white-labeling.white-labeling',
-          breadcrumb: {
-            menuId: MenuId.white_labeling
-          }
-        }
+        redirectTo: '/white-labeling'
       },
       {
         path: 'security-settings',
@@ -403,6 +398,19 @@ const routes: Routes = [
         redirectTo: '/settings/notifications'
       }
     ]
+  },
+  {
+    // Top-level page (not a settings tab): white labeling is its own left-menu item,
+    // sitting above Settings for every authority that may brand its own scope.
+    path: 'white-labeling',
+    component: WhiteLabelingComponent,
+    data: {
+      auth: [Authority.SYS_ADMIN, Authority.TENANT_ADMIN, Authority.CUSTOMER_USER],
+      title: 'white-labeling.white-labeling',
+      breadcrumb: {
+        menuId: MenuId.white_labeling
+      }
+    }
   },
   {
     path: 'security-settings',

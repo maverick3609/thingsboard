@@ -59,6 +59,10 @@
       display: block;
       margin-bottom: 12px;
     }
+
+    button + mat-slide-toggle {
+      margin-top: 16px;
+    }
   }
 
   .wl-actions {

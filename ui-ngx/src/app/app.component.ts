@@ -51,7 +51,7 @@ export class AppComponent {
               private authService: AuthService,
               private reportService: ReportService) {
 
-    console.log(`ThingsBoard Version: ${env.tbVersion}`);
+    console.log(`Inferrix Cortex Version: ${env.tbVersion}`);
 
     this.matIconRegistry.addSvgIconResolver((name, namespace) => {
       if (namespace === 'mdi') {

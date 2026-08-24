@@ -1114,49 +1114,6 @@
         "col": 0,
         "id": "ed33e56f-293b-aaaa-ad19-0cf499dc926f",
         "typeFullFqn": "system.home_page_widgets.getting_started"
-      },
-      "8c5207d8-7103-4dc2-db48-d61c0c8c61fd": {
-        "typeFullFqn": "system.mobile_app_qr_code",
-        "type": "static",
-        "sizeX": 6,
-        "sizeY": 3,
-        "config": {
-          "showTitle": true,
-          "backgroundColor": "rgb(255, 255, 255)",
-          "color": "rgba(0, 0, 0, 0.87)",
-          "padding": "16px",
-          "settings": {
-            "useSystemSettings": true,
-            "qrCodeConfig": {
-              "badgeEnabled": true,
-              "badgePosition": "RIGHT",
-              "qrCodeLabelEnabled": true,
-              "qrCodeLabel": "Scan to connect or download mobile app"
-            },
-            "background": {
-              "type": "color",
-              "color": "#fff",
-              "overlay": {
-                "enabled": false,
-                "color": "rgba(255,255,255,0.72)",
-                "blur": 3
-              }
-            }
-          },
-          "title": "{i18n:admin.mobile-app.connect-mobile-app}",
-          "dropShadow": false,
-          "enableFullscreen": false,
-          "widgetStyle": {},
-          "widgetCss": " .tb-widget-container > .tb-widget > .tb-widget-content .tb-widget-title > .title-row > .title {\n    padding: 0;\n}\n\n .tb-widget-container > .tb-widget > .tb-widget-content .tb-widget-title > .title-row > .title {\n    padding-bottom: 8px;\n    font-weight: 600;\n    font-size: 20px;\n    line-height: 24px;\n    letter-spacing: 0.1px;\n    color: rgba(0, 0, 0, 0.76);\n}\n\n.tb-widget-container > .tb-widget > .tb-widget-content > .tb-widget .tb-mobile-app-qrcode-panel {\n    padding: 0;\n}\n\n@media screen and (min-width: 960px) and (max-width: 1819px) {\n    .tb-widget-container > .tb-widget > .tb-widget-content .tb-widget-title > .title-row > .title {\n        padding-bottom: 0;\n        font-weight: 500;\n        font-size: 14px;\n        line-height: 20px;\n        letter-spacing: 0.25px;\n  }\n}\n\n@media screen and (min-width: 960px) and (max-width: 1182px) {\n    .tb-widget-container > .tb-widget > .tb-widget-content > .tb-widget .tb-mobile-app-qrcode-panel {\n        gap: 0;\n    }\n    .tb-widget-container > .tb-widget > .tb-widget-content > .tb-widget .tb-mobile-app-qrcode-panel .tb-qrcode {\n        min-width: 150px;\n    }\n}\n\n@media screen and (max-width: 960px) {\n    .tb-widget-container > .tb-widget > .tb-widget-content > .tb-widget .tb-mobile-app-qrcode-panel .tb-qrcode {\n        max-width: 120px;\n    }\n    \n    .tb-widget-container > .tb-widget > .tb-widget-content > .tb-widget .tb-mobile-app-qrcode-panel .tb-badges {\n        max-width: 160px;\n    }\n}\n\n@media screen and (min-width: 1819px) {\n    .tb-widget-container > .tb-widget > .tb-widget-content > .tb-widget .tb-mobile-app-qrcode-panel .tb-qrcode {\n        max-width: 125px;\n    }\n    \n    .tb-widget-container > .tb-widget > .tb-widget-content > .tb-widget .tb-mobile-app-qrcode-panel .tb-badges {\n        max-width: 160px;\n    }\n}\n\n@media screen and (min-width: 960px) and (max-height: 990px) {\n    .tb-widget-container > .tb-widget > .tb-widget-content > .tb-widget .tb-mobile-app-qrcode-panel .tb-qrcode-label {\n        display: none;\n    }\n}",
-          "showTitleIcon": false,
-          "titleTooltip": "",
-          "titleStyle": null,
-          "borderRadius": "12px",
-          "datasources": []
-        },
-        "row": 0,
-        "col": 0,
-        "id": "8c5207d8-7103-4dc2-db48-d61c0c8c61fd"
       }
     },
     "states": {
@@ -1316,16 +1273,10 @@
             "widgets": {
               "ed33e56f-293b-aaaa-ad19-0cf499dc926f": {
                 "sizeX": 120,
-                "sizeY": 44,
+                "sizeY": 58,
                 "row": 0,
                 "col": 0,
-                "mobileHide": true
-              },
-              "8c5207d8-7103-4dc2-db48-d61c0c8c61fd": {
-                "sizeX": 120,
-                "sizeY": 14,
-                "row": 44,
-                "col": 0
+                "mobileHide": false
               }
             },
             "gridSettings": {

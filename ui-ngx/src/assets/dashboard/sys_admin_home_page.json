@@ -107,44 +107,6 @@
         "id": "4b5e47ed-c197-a937-d727-041ba8decec2",
         "typeFullFqn": "system.cards.markdown_card"
       },
-      "8acbf5df-f9fc-114d-216f-86f081aa4779": {
-        "type": "latest",
-        "sizeX": 5,
-        "sizeY": 3.5,
-        "config": {
-          "datasources": [],
-          "showTitle": false,
-          "backgroundColor": "#fff",
-          "color": "rgba(0, 0, 0, 0.87)",
-          "padding": "16px",
-          "settings": {
-            "useMarkdownTextFunction": false,
-            "markdownTextPattern": "<div style=\"height: 100%;\" class=\"flex flex-col\">\n    <div class=\"tb-card-header\">\n        <div class=\"tb-card-title\">\n            <div class=\"tb-home-widget-title\" translate>widgets.functions.title</div>\n        </div>\n        <a mat-stroked-button color=\"primary\" class=\"tb-switch-to-pe\"\n        href=\"https://thingsboard.io/pricing/?product=thingsboard-pe&solution=pe-pay-as-you-go\" target=\"_blank\">{{ 'widgets.functions.switch-to-pe' | translate }}</a>\n    </div>\n    <div class=\"tb-card-content flex-1\">\n        <div class=\"tb-card-column\">\n            <div class=\"feature\" translate>widgets.functions.alarms</div>\n            <div class=\"feature\" translate>widgets.functions.dashboards</div>\n            <div class=\"feature\" translate>widgets.functions.entities-and-relations</div>\n            <div class=\"feature\" translate>widgets.functions.profiles</div>\n            <div class=\"feature\" translate>widgets.functions.advanced-features</div>\n        </div>\n        <div class=\"tb-card-column\">\n            <div class=\"feature\" translate>widgets.functions.notification-center</div>\n            <div class=\"feature\" translate>widgets.functions.api-usage</div>\n            <div class=\"feature\" translate>widgets.functions.customers</div>\n            <div matTooltip=\"{{ 'widgets.functions.pe-feature-tooltip' | translate }}\" matTooltipPosition=\"above\" class=\"feature pe\" translate>widgets.functions.customers-hierarchy</div>\n            <div matTooltip=\"{{ 'widgets.functions.pe-feature-tooltip' | translate }}\" matTooltipPosition=\"above\" class=\"feature pe\" translate>widgets.functions.roles-and-permissions</div>\n        </div>\n        <div class=\"tb-card-column\">\n            <div matTooltip=\"{{ 'widgets.functions.pe-feature-tooltip' | translate }}\" matTooltipPosition=\"above\" class=\"feature pe\" translate>widgets.functions.groups</div>\n            <div matTooltip=\"{{ 'widgets.functions.pe-feature-tooltip' | translate }}\" matTooltipPosition=\"above\" class=\"feature pe\" translate>widgets.functions.integrations</div>\n            <div matTooltip=\"{{ 'widgets.functions.pe-feature-tooltip' | translate }}\" matTooltipPosition=\"above\" class=\"feature pe\" translate>widgets.functions.solution-templates</div>\n            <div matTooltip=\"{{ 'widgets.functions.pe-feature-tooltip' | translate }}\" matTooltipPosition=\"above\" class=\"feature pe\" translate>widgets.functions.scheduler</div>\n            <div matTooltip=\"{{ 'widgets.functions.pe-feature-tooltip' | translate }}\" matTooltipPosition=\"above\" class=\"feature pe\" translate>widgets.functions.white-labeling</div>\n        </div>\n    </div>\n</div>",
-            "applyDefaultMarkdownStyle": false,
-            "markdownCss": ".tb-card-header {\n    display: flex;\n    flex-direction: row;\n    justify-content: space-between;\n    align-items: center;\n}\n\n.tb-card-content {\n    width: 100%;\n    height: 100%;\n    display: flex;\n    flex-direction: row;\n    margin-top: 4px;\n    overflow: auto;\n}\n\n.tb-card-column {\n    min-width: 0px;\n    flex: 1;\n    display: flex;\n    flex-direction: column;\n}\n\n.feature {\n    position: relative;\n    cursor: default;\n    font-weight: 400;\n    font-size: 14px;\n    line-height: 28px;\n    letter-spacing: 0.2px;\n    color: rgba(0, 0, 0, 0.76);\n    white-space: nowrap;\n    overflow: hidden;\n    text-overflow: ellipsis;\n}\n\n.feature:before {\n    content: \"check\";\n    font-family: 'Material Icons Round';\n    display: inline-block;\n    font-size: 20px;\n    line-height: 20px;\n    color: #198038;\n    font-weight: 600;\n    position: relative;\n    background: #F3F6FA;\n    border-radius: 4px;\n    width: 20px;\n    height: 20px;\n    padding: 2px;\n    vertical-align: sub;\n    margin-right: 8px;\n}\n\n.feature.pe:before {\n    content: \"close\";\n    background: #F4F4F4;\n    color: rgba(0, 0, 0, 0.12);\n}\n\n.feature.pe:after {\n    position: relative;\n    display: inline-block;\n    margin-left: 4px;\n    vertical-align: baseline;\n    top: -0.5em;\n    content: \"PE\";\n    color: #305680;\n    font-weight: 700;\n    font-size: 12px;\n    line-height: 12px;\n    letter-spacing: 0.0015em;\n}\n\n.feature+.feature {\n    margin-top: 4px;\n}\n\n@media screen and (min-width: 960px) and (max-width: 1819px) {\n    .tb-switch-to-pe {\n        height: 24px;\n        font-size: 12px;\n        padding: 0 4px;\n    }\n    \n    .feature+.feature {\n        margin-top: 2px;\n    }\n    \n    .feature {\n        font-size: 11px;\n        line-height: 18px;\n    }\n\n    .feature:before {\n      font-size: 14px;\n      line-height: 14px;\n      width: 14px;\n      height: 14px;\n      margin-right: 4px;\n    }\n    .feature.pe:after {\n        margin-left: 2px;\n        top: -0.5em;\n        content: \"PE\";\n        font-size: 8px;\n        line-height: 8px;\n    }\n    \n}\n\n"
-          },
-          "title": "Functions",
-          "showTitleIcon": false,
-          "iconColor": "rgba(0, 0, 0, 0.87)",
-          "iconSize": "24px",
-          "titleTooltip": "",
-          "dropShadow": false,
-          "enableFullscreen": false,
-          "widgetStyle": {},
-          "titleStyle": {
-            "fontSize": "16px",
-            "fontWeight": 400
-          },
-          "showLegend": false,
-          "widgetCss": "",
-          "pageSize": 1024,
-          "noDataDisplayMessage": ""
-        },
-        "row": 0,
-        "col": 0,
-        "id": "8acbf5df-f9fc-114d-216f-86f081aa4779",
-        "typeFullFqn": "system.cards.markdown_card"
-      },
       "d2784f6c-0518-fd95-1d28-b21f70bdcb10": {
         "type": "latest",
         "sizeX": 5,
@@ -180,43 +142,6 @@
         "row": 0,
         "col": 0,
         "id": "d2784f6c-0518-fd95-1d28-b21f70bdcb10",
-        "typeFullFqn": "system.cards.markdown_card"
-      },
-      "66dcf1a2-9d83-6873-c693-d6a5d989b3f8": {
-        "type": "latest",
-        "sizeX": 5,
-        "sizeY": 3.5,
-        "config": {
-          "datasources": [],
-          "showTitle": false,
-          "backgroundColor": "#fff",
-          "color": "rgba(0, 0, 0, 0.87)",
-          "padding": "16px",
-          "settings": {
-            "useMarkdownTextFunction": false,
-            "markdownTextPattern": "<div style=\"height: 100%;\">\n    <tb-version-info></tb-version-info>\n</div>",
-            "applyDefaultMarkdownStyle": false
-          },
-          "title": "Version",
-          "showTitleIcon": false,
-          "iconColor": "rgba(0, 0, 0, 0.87)",
-          "iconSize": "24px",
-          "titleTooltip": "",
-          "dropShadow": false,
-          "enableFullscreen": false,
-          "widgetStyle": {},
-          "titleStyle": {
-            "fontSize": "16px",
-            "fontWeight": 400
-          },
-          "showLegend": false,
-          "widgetCss": "",
-          "pageSize": 1024,
-          "noDataDisplayMessage": ""
-        },
-        "row": 0,
-        "col": 0,
-        "id": "66dcf1a2-9d83-6873-c693-d6a5d989b3f8",
         "typeFullFqn": "system.cards.markdown_card"
       },
       "867f82cf-ecf2-2d5c-35cb-08c6f2edc3a4": {
@@ -2138,49 +2063,6 @@
         "id": "c02d59a0-c979-5ec6-7f58-a5d89ff66236",
         "typeFullFqn": "system.home_page_widgets.getting_started"
       },
-      "53d5f2dd-d432-5362-745f-63bf4487dc96": {
-        "typeFullFqn": "system.mobile_app_qr_code",
-        "type": "static",
-        "sizeX": 6,
-        "sizeY": 3,
-        "config": {
-          "showTitle": true,
-          "backgroundColor": "rgb(255, 255, 255)",
-          "color": "rgba(0, 0, 0, 0.87)",
-          "padding": "16px",
-          "settings": {
-            "useSystemSettings": true,
-            "qrCodeConfig": {
-              "badgeEnabled": true,
-              "badgePosition": "RIGHT",
-              "qrCodeLabelEnabled": true,
-              "qrCodeLabel": "Scan to connect or download mobile app"
-            },
-            "background": {
-              "type": "color",
-              "color": "#fff",
-              "overlay": {
-                "enabled": false,
-                "color": "rgba(255,255,255,0.72)",
-                "blur": 3
-              }
-            }
-          },
-          "title": "{i18n:admin.mobile-app.connect-mobile-app}",
-          "dropShadow": false,
-          "enableFullscreen": false,
-          "widgetStyle": {},
-          "widgetCss": " .tb-widget-container > .tb-widget > .tb-widget-content .tb-widget-title > .title-row > .title {\n    padding: 0;\n}\n\n .tb-widget-container > .tb-widget > .tb-widget-content .tb-widget-title > .title-row > .title {\n    padding-bottom: 8px;\n    font-weight: 600;\n    font-size: 20px;\n    line-height: 24px;\n    letter-spacing: 0.1px;\n    color: rgba(0, 0, 0, 0.76);\n}\n\n.tb-widget-container > .tb-widget > .tb-widget-content > .tb-widget .tb-mobile-app-qrcode-panel {\n    padding: 0;\n}\n\n@media screen and (min-width: 960px) and (max-width: 1819px) {\n    .tb-widget-container > .tb-widget > .tb-widget-content .tb-widget-title > .title-row > .title {\n        padding-bottom: 0;\n        font-weight: 500;\n        font-size: 14px;\n        line-height: 20px;\n        letter-spacing: 0.25px;\n  }\n}\n\n@media screen and (min-width: 960px) and (max-width: 1190px) {\n    .tb-widget-container > .tb-widget > .tb-widget-content > .tb-widget .tb-mobile-app-qrcode-panel {\n        gap: 0;\n    }\n    .tb-widget-container > .tb-widget > .tb-widget-content > .tb-widget .tb-mobile-app-qrcode-panel .tb-qrcode {\n        min-width: 150px;\n    }\n}\n\n@media screen and (max-width: 960px) {\n    .tb-widget-container > .tb-widget > .tb-widget-content > .tb-widget .tb-mobile-app-qrcode-panel .tb-qrcode {\n        max-width: 110px;\n    }\n    \n    .tb-widget-container > .tb-widget > .tb-widget-content > .tb-widget .tb-mobile-app-qrcode-panel .tb-badges {\n        max-width: 140px;\n    }\n}\n\n@media screen and (min-width: 1819px) {\n    .tb-widget-container > .tb-widget > .tb-widget-content > .tb-widget .tb-mobile-app-qrcode-panel .tb-qrcode {\n        max-width: 125px;\n    }\n    \n    .tb-widget-container > .tb-widget > .tb-widget-content > .tb-widget .tb-mobile-app-qrcode-panel .tb-badges {\n        max-width: 160px;\n    }\n}\n\n@media screen and (min-width: 960px) and (max-height: 960px) {\n    .tb-widget-container > .tb-widget > .tb-widget-content > .tb-widget .tb-mobile-app-qrcode-panel .tb-qrcode-label {\n        display: none;\n    }\n}",
-          "showTitleIcon": false,
-          "titleTooltip": "",
-          "titleStyle": null,
-          "borderRadius": "12px",
-          "datasources": []
-        },
-        "row": 0,
-        "col": 0,
-        "id": "53d5f2dd-d432-5362-745f-63bf4487dc96"
-      },
       "0d34fa85-914f-30de-e3dd-7b7879f8d593": {
         "typeFullFqn": "system.cards.markdown_card",
         "type": "latest",
@@ -2246,13 +2128,6 @@
                 "mobileOrder": 6,
                 "mobileHeight": 11
               },
-              "8acbf5df-f9fc-114d-216f-86f081aa4779": {
-                "sizeX": 52,
-                "sizeY": 16,
-                "row": 42,
-                "col": 33,
-                "mobileHide": true
-              },
               "d2784f6c-0518-fd95-1d28-b21f70bdcb10": {
                 "sizeX": 44,
                 "sizeY": 13,
@@ -2260,14 +2135,6 @@
                 "col": 0,
                 "mobileOrder": 8,
                 "mobileHeight": 8
-              },
-              "66dcf1a2-9d83-6873-c693-d6a5d989b3f8": {
-                "sizeX": 33,
-                "sizeY": 16,
-                "row": 42,
-                "col": 0,
-                "mobileOrder": 9,
-                "mobileHeight": 7
               },
               "867f82cf-ecf2-2d5c-35cb-08c6f2edc3a4": {
                 "sizeX": 44,
@@ -2286,7 +2153,7 @@
               },
               "0d34fa85-914f-30de-e3dd-7b7879f8d593": {
                 "sizeX": 35,
-                "sizeY": 58,
+                "sizeY": 42,
                 "row": 0,
                 "col": 85,
                 "mobileHide": false,
@@ -2534,16 +2401,10 @@
             "widgets": {
               "c02d59a0-c979-5ec6-7f58-a5d89ff66236": {
                 "sizeX": 120,
-                "sizeY": 45,
+                "sizeY": 62,
                 "row": 0,
                 "col": 0,
-                "mobileHide": true
-              },
-              "53d5f2dd-d432-5362-745f-63bf4487dc96": {
-                "sizeX": 120,
-                "sizeY": 17,
-                "row": 45,
-                "col": 0
+                "mobileHide": false
               }
             },
             "gridSettings": {

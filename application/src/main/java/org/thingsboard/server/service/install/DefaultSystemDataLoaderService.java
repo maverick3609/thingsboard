@@ -172,7 +172,7 @@ public class DefaultSystemDataLoaderService implements SystemDataLoaderService {
     private Integer tokenExpirationTime;
     @Value("${security.jwt.refreshTokenExpTime:604800}")
     private Integer refreshTokenExpTime;
-    @Value("${security.jwt.tokenIssuer:thingsboard.io}")
+    @Value("${security.jwt.tokenIssuer:inferrix.com}")
     private String tokenIssuer;
     @Value("${security.jwt.tokenSigningKey:thingsboardDefaultSigningKey}")
     private String tokenSigningKey;
@@ -260,7 +260,7 @@ public class DefaultSystemDataLoaderService implements SystemDataLoaderService {
         mailSettings.setTenantId(TenantId.SYS_TENANT_ID);
         mailSettings.setKey("mail");
         node = JacksonUtil.newObjectNode();
-        node.put("mailFrom", "ThingsBoard <sysadmin@localhost.localdomain>");
+        node.put("mailFrom", "Inferrix Cortex <sysadmin@localhost.localdomain>");
         node.put("smtpProtocol", "smtp");
         node.put("smtpHost", "localhost");
         node.put("smtpPort", "25");

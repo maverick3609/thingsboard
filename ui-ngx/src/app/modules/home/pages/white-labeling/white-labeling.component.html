@@ -19,7 +19,7 @@
   <mat-card-header>
     <mat-card-title>
       <div class="flex flex-row">
-        <span class="mat-headline-5" translate>white-labeling.white-labeling</span>
+        <span class="mat-headline-5">{{ titleKey | translate }}</span>
       </div>
     </mat-card-title>
   </mat-card-header>
@@ -27,7 +27,7 @@
   </mat-progress-bar>
   <div style="height: 4px;" *ngIf="!loading"></div>
   <mat-card-content>
-    <div *ngIf="isTenantAdmin" class="scope-selector">
+    <div *ngIf="showScopeSelector" class="scope-selector">
       <mat-slide-toggle [checked]="isCustomerScope" (change)="toggleCustomerScope()">
         {{ 'white-labeling.edit-customer-settings' | translate }}
       </mat-slide-toggle>
@@ -40,12 +40,8 @@
       </tb-entity-autocomplete>
     </div>
 
-    <mat-tab-group *ngIf="!loading">
-      <mat-tab>
-        <ng-template mat-tab-label>
-          <mat-icon class="tabs-icon">format_paint</mat-icon>
-          {{ 'white-labeling.general' | translate }}
-        </ng-template>
+    <ng-container [ngSwitch]="tab">
+      <ng-container *ngSwitchCase="'general'">
         <tb-general-wl-settings
           [params]="generalParams"
           (paramsChange)="onGeneralParamsChange($event)">
@@ -64,12 +60,9 @@
             {{ 'action.save' | translate }}
           </button>
         </div>
-      </mat-tab>
-      <mat-tab>
-        <ng-template mat-tab-label>
-          <mat-icon class="tabs-icon">login</mat-icon>
-          {{ 'white-labeling.login-page' | translate }}
-        </ng-template>
+      </ng-container>
+
+      <ng-container *ngSwitchCase="'login'">
         <tb-login-wl-settings
           [params]="loginParams"
           (paramsChange)="onLoginParamsChange($event)">
@@ -85,38 +78,29 @@
             {{ 'action.save' | translate }}
           </button>
         </div>
-      </mat-tab>
-      <mat-tab *ngIf="isSysAdmin">
-        <ng-template mat-tab-label>
-          <mat-icon class="tabs-icon">mail</mat-icon>
-          {{ 'white-labeling.mail-templates' | translate }}
-        </ng-template>
+      </ng-container>
+
+      <ng-container *ngSwitchCase="'mail-templates'">
         <tb-mail-templates></tb-mail-templates>
-      </mat-tab>
-      <mat-tab *ngIf="canEditLegal">
-        <ng-template mat-tab-label>
-          <mat-icon class="tabs-icon">policy</mat-icon>
-          {{ 'white-labeling.privacy-policy' | translate }}
-        </ng-template>
+      </ng-container>
+
+      <ng-container *ngSwitchCase="'privacy-policy'">
         <tb-legal-content
           [content]="privacyPolicy"
           [label]="'white-labeling.privacy-policy' | translate"
           (contentChange)="privacyPolicy = $event"
           (save)="savePrivacyPolicy()">
         </tb-legal-content>
-      </mat-tab>
-      <mat-tab *ngIf="canEditLegal">
-        <ng-template mat-tab-label>
-          <mat-icon class="tabs-icon">gavel</mat-icon>
-          {{ 'white-labeling.terms-of-use' | translate }}
-        </ng-template>
+      </ng-container>
+
+      <ng-container *ngSwitchCase="'terms-of-use'">
         <tb-legal-content
           [content]="termsOfUse"
           [label]="'white-labeling.terms-of-use' | translate"
           (contentChange)="termsOfUse = $event"
           (save)="saveTermsOfUse()">
         </tb-legal-content>
-      </mat-tab>
-    </mat-tab-group>
+      </ng-container>
+    </ng-container>
   </mat-card-content>
 </mat-card>

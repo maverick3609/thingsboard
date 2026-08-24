@@ -401,16 +401,94 @@ const routes: Routes = [
   },
   {
     // Top-level page (not a settings tab): white labeling is its own left-menu item,
-    // sitting above Settings for every authority that may brand its own scope.
+    // sitting above Settings for every authority that may brand its own scope. Tabs are
+    // child routes rendered by RouterTabsComponent, so the tab bar sits at the top of the
+    // page rather than inside the card — the same shape /account and /settings use.
     path: 'white-labeling',
-    component: WhiteLabelingComponent,
+    component: RouterTabsComponent,
     data: {
       auth: [Authority.SYS_ADMIN, Authority.TENANT_ADMIN, Authority.CUSTOMER_USER],
-      title: 'white-labeling.white-labeling',
+      showMainLoadingBar: false,
       breadcrumb: {
         menuId: MenuId.white_labeling
+      },
+      useChildrenRoutesForTabs: true
+    },
+    children: [
+      {
+        path: '',
+        children: [],
+        data: {
+          auth: [Authority.SYS_ADMIN, Authority.TENANT_ADMIN, Authority.CUSTOMER_USER],
+          redirectTo: '/white-labeling/general'
+        }
+      },
+      {
+        path: 'general',
+        component: WhiteLabelingComponent,
+        data: {
+          auth: [Authority.SYS_ADMIN, Authority.TENANT_ADMIN, Authority.CUSTOMER_USER],
+          title: 'white-labeling.white-labeling',
+          wlTab: 'general',
+          breadcrumb: {
+            label: 'white-labeling.general',
+            icon: 'format_paint'
+          }
+        }
+      },
+      {
+        path: 'login',
+        component: WhiteLabelingComponent,
+        data: {
+          auth: [Authority.SYS_ADMIN, Authority.TENANT_ADMIN, Authority.CUSTOMER_USER],
+          title: 'white-labeling.white-labeling',
+          wlTab: 'login',
+          breadcrumb: {
+            label: 'white-labeling.login-page',
+            icon: 'login'
+          }
+        }
+      },
+      {
+        path: 'mail-templates',
+        component: WhiteLabelingComponent,
+        data: {
+          auth: [Authority.SYS_ADMIN],
+          title: 'white-labeling.white-labeling',
+          wlTab: 'mail-templates',
+          breadcrumb: {
+            label: 'white-labeling.mail-templates',
+            icon: 'mail'
+          }
+        }
+      },
+      {
+        path: 'privacy-policy',
+        component: WhiteLabelingComponent,
+        data: {
+          auth: [Authority.SYS_ADMIN, Authority.TENANT_ADMIN],
+          title: 'white-labeling.white-labeling',
+          wlTab: 'privacy-policy',
+          breadcrumb: {
+            label: 'white-labeling.privacy-policy',
+            icon: 'policy'
+          }
+        }
+      },
+      {
+        path: 'terms-of-use',
+        component: WhiteLabelingComponent,
+        data: {
+          auth: [Authority.SYS_ADMIN, Authority.TENANT_ADMIN],
+          title: 'white-labeling.white-labeling',
+          wlTab: 'terms-of-use',
+          breadcrumb: {
+            label: 'white-labeling.terms-of-use',
+            icon: 'gavel'
+          }
+        }
       }
-    }
+    ]
   },
   {
     path: 'security-settings',

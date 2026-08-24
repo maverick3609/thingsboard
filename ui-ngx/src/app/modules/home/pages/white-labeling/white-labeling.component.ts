@@ -15,6 +15,7 @@
 ///
 
 import { Component, OnInit } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { Store } from '@ngrx/store';
 import { AppState } from '@core/core.state';
 import { getCurrentAuthUser } from '@core/auth/auth.selectors';
@@ -26,6 +27,12 @@ import { EntityType } from '@shared/models/entity-type.models';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { DialogService } from '@core/services/dialog.service';
 import { TranslateService } from '@ngx-translate/core';
+import { WhiteLabelingScopeService } from './white-labeling-scope.service';
+
+/// One route per tab, so RouterTabsComponent can render the tab bar at the top of the
+/// page like every other tabbed section of the platform. This component backs all five
+/// routes and renders the section named by the route's `wlTab` data.
+export type WhiteLabelingTab = 'general' | 'login' | 'mail-templates' | 'privacy-policy' | 'terms-of-use';
 
 @Component({
   standalone: false,
@@ -40,8 +47,7 @@ export class WhiteLabelingComponent implements OnInit {
   termsOfUse: any = null;
   authority: Authority;
   loading = false;
-  selectedCustomerId: string = null;
-  isCustomerScope = false;
+  tab: WhiteLabelingTab = 'general';
   generalDirty = false;
   loginDirty = false;
 
@@ -53,47 +59,76 @@ export class WhiteLabelingComponent implements OnInit {
     private wlRuntime: WhiteLabelingRuntimeService,
     private snackBar: MatSnackBar,
     private dialogService: DialogService,
-    private translate: TranslateService
+    private translate: TranslateService,
+    private route: ActivatedRoute,
+    private scope: WhiteLabelingScopeService
   ) {}
+
+  get isCustomerScope(): boolean {
+    return this.scope.isCustomerScope;
+  }
+
+  get selectedCustomerId(): string {
+    return this.scope.customerId;
+  }
+
+  set selectedCustomerId(customerId: string) {
+    this.scope.customerId = customerId;
+  }
 
   ngOnInit(): void {
     const authUser = getCurrentAuthUser(this.store);
     this.authority = authUser?.authority;
-    this.loadParams();
+    this.route.data.subscribe(data => {
+      this.tab = data.wlTab ?? 'general';
+      this.loadParams();
+    });
   }
 
+  // Each tab is its own route, so only fetch what the visible tab renders.
   loadParams(): void {
-    this.loading = true;
     const customerId = this.customerIdParam();
-    this.wlHttp.getCurrentWhiteLabelParams(customerId, { ignoreErrors: true }).subscribe({
-      next: params => {
-        this.generalParams = params || {} as WhiteLabelingParams;
-        this.generalDirty = false;
-        this.loading = false;
-      },
-      error: () => {
-        this.generalParams = {} as WhiteLabelingParams;
-        this.loading = false;
-      }
-    });
-    this.wlHttp.getCurrentLoginWhiteLabelParams(customerId, { ignoreErrors: true }).subscribe({
-      next: params => {
-        this.loginParams = params || {} as LoginWhiteLabelingParams;
-        this.loginDirty = false;
-      },
-      error: () => {
-        this.loginParams = {} as LoginWhiteLabelingParams;
-      }
-    });
-    if (this.canEditLegal) {
-      this.wlHttp.getPrivacyPolicy({ ignoreErrors: true }).subscribe({
-        next: data => this.privacyPolicy = data || { content: '' },
-        error: () => this.privacyPolicy = { content: '' }
-      });
-      this.wlHttp.getTermsOfUse({ ignoreErrors: true }).subscribe({
-        next: data => this.termsOfUse = data || { content: '' },
-        error: () => this.termsOfUse = { content: '' }
-      });
+    switch (this.tab) {
+      case 'general':
+        this.loading = true;
+        this.wlHttp.getCurrentWhiteLabelParams(customerId, { ignoreErrors: true }).subscribe({
+          next: params => {
+            this.generalParams = params || {} as WhiteLabelingParams;
+            this.generalDirty = false;
+            this.loading = false;
+          },
+          error: () => {
+            this.generalParams = {} as WhiteLabelingParams;
+            this.loading = false;
+          }
+        });
+        break;
+      case 'login':
+        this.loading = true;
+        this.wlHttp.getCurrentLoginWhiteLabelParams(customerId, { ignoreErrors: true }).subscribe({
+          next: params => {
+            this.loginParams = params || {} as LoginWhiteLabelingParams;
+            this.loginDirty = false;
+            this.loading = false;
+          },
+          error: () => {
+            this.loginParams = {} as LoginWhiteLabelingParams;
+            this.loading = false;
+          }
+        });
+        break;
+      case 'privacy-policy':
+        this.wlHttp.getPrivacyPolicy({ ignoreErrors: true }).subscribe({
+          next: data => this.privacyPolicy = data || { content: '' },
+          error: () => this.privacyPolicy = { content: '' }
+        });
+        break;
+      case 'terms-of-use':
+        this.wlHttp.getTermsOfUse({ ignoreErrors: true }).subscribe({
+          next: data => this.termsOfUse = data || { content: '' },
+          error: () => this.termsOfUse = { content: '' }
+        });
+        break;
     }
   }
 
@@ -216,10 +251,32 @@ export class WhiteLabelingComponent implements OnInit {
   }
 
   toggleCustomerScope(): void {
-    this.isCustomerScope = !this.isCustomerScope;
-    if (!this.isCustomerScope) {
-      this.selectedCustomerId = null;
+    this.scope.isCustomerScope = !this.scope.isCustomerScope;
+    if (!this.scope.isCustomerScope) {
+      this.scope.customerId = null;
     }
     this.loadParams();
+  }
+
+  // The scope selector only makes sense where there is a scope to choose between.
+  get showScopeSelector(): boolean {
+    return this.isTenantAdmin && (this.tab === 'general' || this.tab === 'login');
+  }
+
+  // The card is titled after the tab, matching the platform's other tabbed sections
+  // where each tab is a page in its own right; the breadcrumb carries "White labeling".
+  get titleKey(): string {
+    switch (this.tab) {
+      case 'login':
+        return 'white-labeling.login-page';
+      case 'mail-templates':
+        return 'white-labeling.mail-templates';
+      case 'privacy-policy':
+        return 'white-labeling.privacy-policy';
+      case 'terms-of-use':
+        return 'white-labeling.terms-of-use';
+      default:
+        return 'white-labeling.general';
+    }
   }
 }

@@ -19,6 +19,10 @@ import { TenantId } from '@shared/models/id/tenant-id';
 import { CustomerId } from '@shared/models/id/customer-id';
 import { EntityId } from '@shared/models/id/entity-id';
 import { SchedulerEventId } from '@shared/models/id/scheduler-event-id';
+import { TranslateService } from '@ngx-translate/core';
+import moment_ from 'moment';
+
+const moment = moment_;
 
 export enum SchedulerRepeatType {
   DAILY = 'DAILY',
@@ -92,6 +96,56 @@ export interface SchedulerEventWithCustomerInfo extends SchedulerEventInfo {
 
 export interface SchedulerEvent extends SchedulerEventInfo {
   configuration: SchedulerEventConfiguration;
+}
+
+// TIMER timeUnit -> i18n key (PE `uT`)
+const timeUnitToI18n: {[unit: string]: string} = {
+  HOURS: 'scheduler.every-hour',
+  MINUTES: 'scheduler.every-minute',
+  SECONDS: 'scheduler.every-second'
+};
+
+// day-of-week i18n keys (PE `OG`)
+const dayOfWeekI18n = [
+  'scheduler.sunday', 'scheduler.monday', 'scheduler.tuesday', 'scheduler.wednesday',
+  'scheduler.thursday', 'scheduler.friday', 'scheduler.saturday'
+];
+
+// Human-readable summary of a schedule (PE `Bte`). Two callers with two different line separators:
+// the calendar tooltip (scheduler-events.component.ts) renders HTML and passes '<br/>' plus the
+// specific occurrence it is describing; the report Scheduling table renders plain text and lets
+// `start` default to the schedule's own startTime.
+export function schedulerEventScheduleText(schedule: SchedulerEventSchedule,
+                                           translate: TranslateService,
+                                           start?: moment_.Moment,
+                                           separator: string = ', '): string {
+  const m = start ?? moment(schedule.startTime);
+  let s = '';
+  if (schedule.repeat) {
+    const r = schedule.repeat;
+    s += m.local().format('hh:mma') + separator;
+    s += translate.instant('scheduler.starting-from') + ' ' + m.local().format('MMM DD, YYYY') + ', ';
+    if (r.type === SchedulerRepeatType.DAILY) {
+      s += translate.instant('scheduler.daily') + ', ';
+    } else if (r.type === SchedulerRepeatType.EVERY_N_DAYS) {
+      s += translate.instant('scheduler.every-n-days-text', { days: r.days }) + ', ';
+    } else if (r.type === SchedulerRepeatType.MONTHLY) {
+      s += translate.instant('scheduler.monthly') + ', ';
+    } else if (r.type === SchedulerRepeatType.EVERY_N_WEEKS) {
+      s += translate.instant('scheduler.every-n-weeks-text', { weeks: r.weeks }) + ', ';
+    } else if (r.type === SchedulerRepeatType.YEARLY) {
+      s += translate.instant('scheduler.yearly') + ', ';
+    } else if (r.type === SchedulerRepeatType.TIMER) {
+      s += translate.instant(timeUnitToI18n[r.timeUnit], { count: r.repeatInterval }) + ', ';
+    } else { // WEEKLY
+      s += translate.instant('scheduler.weekly') + ' ' + translate.instant('scheduler.on') + ' ';
+      (r.repeatOn || []).forEach((d: number) => { s += translate.instant(dayOfWeekI18n[d]) + ', '; });
+    }
+    s += translate.instant('scheduler.ending-on') + ' ' + moment(r.endsOn).local().format('MMM DD, YYYY');
+  } else {
+    s += m.local().format('hh:mma') + separator + m.local().format('MMM DD, YYYY');
+  }
+  return s;
 }
 
 export interface SchedulerEventConfigType {

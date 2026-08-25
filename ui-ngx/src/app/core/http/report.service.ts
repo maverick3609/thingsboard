@@ -22,6 +22,7 @@ import { defaultHttpOptionsFromConfig, RequestConfig } from '@core/http/http-uti
 import { PageLink } from '@shared/models/page/page-link';
 import { PageData } from '@shared/models/page/page-data';
 import { ResourcesService } from '@core/services/resources.service';
+import { ReportTemplateId } from '@shared/models/id/report-template-id';
 import {
   DashboardReportConfig,
   ReportInfo,
@@ -130,6 +131,19 @@ export class ReportService {
         return null;
       })
     );
+  }
+
+  // POST /api/v2/report/request - enqueues an asynchronous render Job for an ALREADY-SAVED
+  // template (ReportController#requestReport); the rendered file lands in the Reports list rather
+  // than downloading inline. Backs the templates-list "Generate report" row action. Returns the
+  // Job as-is (untyped: the FE has no Job model and only needs to know the request was accepted).
+  // The endpoint 400s with "Report renderer is not enabled" when REPORTS_RENDERER_ENABLED=false -
+  // errors are NOT swallowed here so the global interceptor surfaces that message to the operator.
+  public requestReport(reportTemplateId: string, timezone?: string, config?: RequestConfig): Observable<any> {
+    return this.http.post('/api/v2/report/request', {
+      reportTemplateId: new ReportTemplateId(reportTemplateId),
+      timezone: timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
+    }, defaultHttpOptionsFromConfig(config));
   }
 
   // POST /api/v2/report/test - the existing renderer-gated synchronous render endpoint

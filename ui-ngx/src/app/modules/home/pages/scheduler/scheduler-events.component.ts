@@ -43,9 +43,11 @@ import { SchedulerEventService } from '@core/http/scheduler-event.service';
 import { MatMenuTrigger } from '@angular/material/menu';
 import {
   SchedulerEvent,
+  SchedulerEventSchedule,
   SchedulerEventWithCustomerInfo,
   SchedulerRepeatType,
-  schedulerEventConfigTypes
+  schedulerEventConfigTypes,
+  schedulerEventScheduleText
 } from '@shared/models/scheduler-event.models';
 import { SchedulerEventDialogComponent, SchedulerEventDialogData } from '@home/pages/scheduler/scheduler-event-dialog.component';
 
@@ -94,12 +96,6 @@ const timeUnitToI18n: {[unit: string]: string} = {
   MINUTES: 'scheduler.every-minute',
   SECONDS: 'scheduler.every-second'
 };
-
-// day-of-week i18n keys (PE `OG`)
-const dayOfWeekI18n = [
-  'scheduler.sunday', 'scheduler.monday', 'scheduler.tuesday', 'scheduler.wednesday',
-  'scheduler.thursday', 'scheduler.friday', 'scheduler.saturday'
-];
 
 @Component({
   selector: 'tb-scheduler-events',
@@ -259,34 +255,11 @@ export class SchedulerEventsComponent implements OnInit, OnDestroy {
     };
   }
 
-  // PE `Bte` — schedule description HTML for the tooltip
-  private getSchedulerEventInfo(schedule: any, m: moment.Moment): string {
-    let s = '';
-    if (schedule.repeat) {
-      const r = schedule.repeat;
-      s += m.local().format('hh:mma') + '<br/>';
-      s += this.translate.instant('scheduler.starting-from') + ' ' + m.local().format('MMM DD, YYYY') + ', ';
-      if (r.type === SchedulerRepeatType.DAILY) {
-        s += this.translate.instant('scheduler.daily') + ', ';
-      } else if (r.type === SchedulerRepeatType.EVERY_N_DAYS) {
-        s += this.translate.instant('scheduler.every-n-days-text', { days: r.days }) + ', ';
-      } else if (r.type === SchedulerRepeatType.MONTHLY) {
-        s += this.translate.instant('scheduler.monthly') + ', ';
-      } else if (r.type === SchedulerRepeatType.EVERY_N_WEEKS) {
-        s += this.translate.instant('scheduler.every-n-weeks-text', { weeks: r.weeks }) + ', ';
-      } else if (r.type === SchedulerRepeatType.YEARLY) {
-        s += this.translate.instant('scheduler.yearly') + ', ';
-      } else if (r.type === SchedulerRepeatType.TIMER) {
-        s += this.translate.instant(timeUnitToI18n[r.timeUnit], { count: r.repeatInterval }) + ', ';
-      } else { // WEEKLY
-        s += this.translate.instant('scheduler.weekly') + ' ' + this.translate.instant('scheduler.on') + ' ';
-        (r.repeatOn || []).forEach((d: number) => { s += this.translate.instant(dayOfWeekI18n[d]) + ', '; });
-      }
-      s += this.translate.instant('scheduler.ending-on') + ' ' + moment(r.endsOn).local().format('MMM DD, YYYY');
-    } else {
-      s += m.local().format('hh:mma') + '<br/>' + m.local().format('MMM DD, YYYY');
-    }
-    return s;
+  // PE `Bte` — schedule description HTML for the tooltip. The line separator is the only thing
+  // that differs from the report Scheduling table's plain-text rendering, so the logic itself lives
+  // in scheduler-event.models.ts and both callers pass their own separator.
+  private getSchedulerEventInfo(schedule: SchedulerEventSchedule, m: moment.Moment): string {
+    return schedulerEventScheduleText(schedule, this.translate, m, '<br/>');
   }
 
   // ===== interactions =====

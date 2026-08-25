@@ -13,37 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 :host {
   display: flex;
-  flex: 1;
   flex-direction: column;
-}
-
-.tb-report-template-name {
-  min-width: 200px;
-}
-
-// Format is fixed at creation time (it decides the whole config shape), so it is shown, not edited.
-.tb-report-template-format {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.4px;
-  background: rgba(0, 0, 0, 0.06);
-}
-
-.tb-report-template-editor-body {
-  overflow: hidden;
-}
-
-.tb-report-template-editor-palette,
-.tb-report-template-editor-config {
-  width: 280px;
-  overflow: auto;
-}
-
-.tb-report-template-editor-canvas {
-  overflow: auto;
+  height: 100%;
 }

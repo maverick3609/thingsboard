@@ -486,6 +486,13 @@ export function newPdfReportTemplateConfig(): PdfReportTemplateConfig {
   };
 }
 
+export function newCsvReportTemplateConfig(): CsvReportTemplateConfig {
+  return {
+    format: 'CSV',
+    components: []
+  };
+}
+
 export function newReportComponent(type: ReportComponentType): ReportComponent {
   switch (type) {
     case ReportComponentType.HEADING:

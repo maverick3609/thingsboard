@@ -22,7 +22,12 @@ import { TranslateService } from '@ngx-translate/core';
 import { ActionNotificationShow } from '@core/notification/notification.actions';
 import { ReportService } from '@core/http/report.service';
 import { ReportTemplate, ReportTemplateType, TbReportFormat } from '@shared/models/report.models';
-import { ReportComponent, ReportTemplateConfigModel, newPdfReportTemplateConfig } from '@shared/models/report-configuration.models';
+import {
+  ReportComponent,
+  ReportTemplateConfigModel,
+  newCsvReportTemplateConfig,
+  newPdfReportTemplateConfig
+} from '@shared/models/report-configuration.models';
 import { deserialize, serialize } from '@home/pages/report/report-template/designer/report-configuration.serializer';
 import { ReportPageSettings } from '@home/pages/report/report-template/designer/report-page-settings.component';
 import { IAliasController } from '@core/api/widget-api.models';
@@ -43,12 +48,29 @@ function toPageSettings(config: ReportTemplateConfigModel): ReportPageSettings |
   } : null;
 }
 
+// Router-state payload the templates list hands to the 'new' route - see ngOnInit below. `config`
+// is only set on the import path, where the file already carries a full (deserialized) config tree.
+interface SeededReportTemplate {
+  name?: string;
+  format?: TbReportFormat;
+  type?: ReportTemplateType;
+  description?: string;
+  config?: ReportTemplateConfigModel;
+}
+
+// A blank config of the shape the chosen format requires: the two variants are structurally
+// different (only PDF carries page/header/footer fields), so format has to be decided before the
+// designer opens - which is exactly what the add dialog is for.
+function newTemplateConfig(format: TbReportFormat): ReportTemplateConfigModel {
+  return format === TbReportFormat.CSV ? newCsvReportTemplateConfig() : newPdfReportTemplateConfig();
+}
+
 // Full-page three-pane designer shell (design spec R2c "C1"): a toolbar (back/name/save/edit-preview
 // toggle) over a left/center/right body. T3 wired load/save + the placeholder panes; T5 fills the
 // right pane's page-settings branch (selected === null). The palette (left)/canvas (center) and
 // component-config (right, selected !== null) panes are filled in by T6/T8-T11, and the preview
 // overlay behind the toggle by T7 - they all bind against `config`/`selected`.
-// Reachable at both '/features/reports/templates/new' and '/features/reports/templates/:reportTemplateId'
+// Reachable at both '/reporting/templates/new' and '/reporting/templates/:reportTemplateId'
 // (report-routing.module.ts); the 'new' route has no reportTemplateId param, so a missing param is
 // treated the same as the literal 'new' segment.
 @Component({
@@ -88,18 +110,38 @@ export class ReportTemplateEditorComponent implements OnInit {
     // id for Task 13's SUB_REPORT panel to self-exclude from its picker.
     this.reportTemplateId = this.isAdd ? null : routeReportTemplateId;
     if (this.isAdd) {
+      const seed = this.takeSeed();
       this.reportTemplate = {
-        name: '',
-        format: TbReportFormat.PDF,
-        type: ReportTemplateType.REPORT
+        name: seed.name ?? '',
+        format: seed.format ?? TbReportFormat.PDF,
+        type: seed.type ?? ReportTemplateType.REPORT,
+        description: seed.description
       } as ReportTemplate;
-      this.applyConfig(newPdfReportTemplateConfig());
+      this.applyConfig(seed.config ?? newTemplateConfig(this.reportTemplate.format));
     } else {
       this.reportService.getReportTemplateById(this.reportTemplateId).subscribe(reportTemplate => {
         this.reportTemplate = reportTemplate;
         this.applyConfig(deserialize(reportTemplate.configuration));
       });
     }
+  }
+
+  // Seeded by whoever navigated here: the templates list's "Create new report template" dialog
+  // (report-template-dialog.component.ts) passes name/format/type/description through router state,
+  // and its "Import report template" action passes a whole parsed config as well. Read off
+  // history.state rather than Router#getCurrentNavigation() - the same idiom
+  // iot-hub-items-page.component.ts uses - because getCurrentNavigation() is only non-null while a
+  // navigation is in flight, and it survives a reload of the 'new' URL.
+  //
+  // Consumed, not just read: the seed is cleared from history.state immediately, so navigating back
+  // to this route later (browser Back, or a fresh "new" without the dialog) starts blank instead of
+  // silently resurrecting a template the user already abandoned.
+  private takeSeed(): SeededReportTemplate {
+    const seed: SeededReportTemplate = history.state?.reportTemplateSeed ?? {};
+    if (history.state?.reportTemplateSeed) {
+      history.replaceState({...history.state, reportTemplateSeed: undefined}, '');
+    }
+    return seed;
   }
 
   onPageSettingsChange(value: ReportPageSettings): void {

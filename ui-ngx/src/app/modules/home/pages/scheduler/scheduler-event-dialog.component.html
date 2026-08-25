@@ -33,7 +33,7 @@
           {{ 'scheduler.name-required' | translate }}
         </mat-error>
       </mat-form-field>
-      <mat-form-field class="mat-block">
+      <mat-form-field class="mat-block" *ngIf="!lockedType">
         <mat-label translate>scheduler.event-type</mat-label>
         <mat-select formControlName="type" required>
           <mat-option *ngFor="let type of configTypeKeys" [value]="type">

@@ -54,6 +54,36 @@ describe('ReportTemplateEditorComponent', () => {
     return new ReportTemplateEditorComponent(route, router, reportService, reportImportExport, store as any, translate as any);
   }
 
+  // history.state is the seed transport (see takeSeed()) - stub it rather than driving a real
+  // navigation, which plain instantiation has no router-outlet for.
+  function seedHistoryState(seed: unknown): void {
+    spyOnProperty(window.history, 'state', 'get').and.returnValue({reportTemplateSeed: seed});
+    spyOn(window.history, 'replaceState');
+  }
+
+  it('applies the add-dialog seed and builds a CSV config when the seed says CSV', () => {
+    seedHistoryState({name: 'Meter export', format: TbReportFormat.CSV, type: ReportTemplateType.SUB_REPORT});
+    const component = newComponent(routeWithId('new'));
+
+    component.ngOnInit();
+
+    expect(component.reportTemplate.name).toBe('Meter export');
+    expect(component.reportTemplate.format).toBe(TbReportFormat.CSV);
+    expect(component.reportTemplate.type).toBe(ReportTemplateType.SUB_REPORT);
+    // A CSV config carries no page settings at all - the shell must not offer a page-settings panel
+    // whose edits would have nowhere to go.
+    expect(component.config.format).toBe('CSV');
+    expect(component.pageSettings).toBeNull();
+  });
+
+  it('consumes the seed so a later visit to the same route starts blank', () => {
+    seedHistoryState({name: 'Meter export', format: TbReportFormat.CSV, type: ReportTemplateType.REPORT});
+    newComponent(routeWithId('new')).ngOnInit();
+
+    expect(window.history.replaceState).toHaveBeenCalledWith(
+      jasmine.objectContaining({reportTemplateSeed: undefined}), '');
+  });
+
   it('starts from an empty PDF config when reportTemplateId is "new"', () => {
     const component = newComponent(routeWithId('new'));
 

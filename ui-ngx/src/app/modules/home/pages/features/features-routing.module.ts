@@ -20,7 +20,6 @@ import { NgModule } from '@angular/core';
 import { otaUpdatesRoutes } from '@home/pages/ota-update/ota-update-routing.module';
 import { vcRoutes } from '@home/pages/vc/vc-routing.module';
 import { schedulerRoutes } from '@home/pages/scheduler/scheduler-routing.module';
-import { reportRoutes } from '@home/pages/report/report-routing.module';
 import { MenuId } from '@core/services/menu.models';
 
 const routes: Routes = [
@@ -43,8 +42,7 @@ const routes: Routes = [
       },
       ...otaUpdatesRoutes,
       ...vcRoutes,
-      ...schedulerRoutes,
-      ...reportRoutes
+      ...schedulerRoutes
     ]
   }
 ];

@@ -35,6 +35,10 @@ export interface SchedulerEventDialogData {
   isAdd: boolean;
   isCustomerUser: boolean;
   readonly?: boolean;
+  // Pins the event type and hides the type picker. Set by the report Scheduling tab, which only
+  // ever creates/edits 'generateReport' events - letting the type be changed there would move the
+  // event out of the very list it was created from.
+  lockedType?: string;
 }
 
 @Component({
@@ -52,6 +56,7 @@ export class SchedulerEventDialogComponent extends DialogComponent<SchedulerEven
   entityType = EntityType;
   configTypes: {[type: string]: SchedulerEventConfigType};
   configTypeKeys: string[];
+  lockedType: string | null;
   submitted = false;
 
   constructor(protected store: Store<AppState>,
@@ -64,6 +69,7 @@ export class SchedulerEventDialogComponent extends DialogComponent<SchedulerEven
     super(store, router, dialogRef);
     this.isAdd = data.isAdd;
     this.readonly = data.readonly === true;
+    this.lockedType = data.lockedType ?? null;
     this.configTypes = {...schedulerEventConfigTypes};
     if (data.isCustomerUser) {
       delete this.configTypes.generateReport;   // PE parity: hidden from customer users
@@ -73,7 +79,7 @@ export class SchedulerEventDialogComponent extends DialogComponent<SchedulerEven
     const event = data.schedulerEvent;
     this.schedulerEventFormGroup = this.fb.group({
       name: [event ? event.name : '', [Validators.required, Validators.maxLength(255)]],
-      type: [event ? event.type : null, [Validators.required]],
+      type: [event?.type ?? this.lockedType ?? null, [Validators.required]],
       enabled: [event ? event.enabled : true],
       customerId: [event ? event.customerId : null],
       schedule: [event ? event.schedule : {

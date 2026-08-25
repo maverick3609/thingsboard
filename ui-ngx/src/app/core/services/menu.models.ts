@@ -111,6 +111,7 @@ export enum MenuId {
   scheduler = 'scheduler',
   reports = 'reports',
   report_history = 'report_history',
+  report_scheduling = 'report_scheduling',
   report_templates = 'report_templates',
   api_usage = 'api_usage',
   trendz_settings = 'trendz_settings',
@@ -741,34 +742,44 @@ export const menuSectionMap = new Map<MenuId, MenuSection>([
     MenuId.reports,
     {
       id: MenuId.reports,
-      name: 'report.reports',
-      // 'link' (not 'toggle'): reports is nested inside the Features toggle, and the sidebar only
-      // renders two levels (toggle section -> link pages) - a nested toggle's own pages never show.
-      // So it's a link to a RouterTabs landing page whose History/Templates tabs live in-page,
-      // mirroring widget_library under Resources. See ReportRoutingModule.
+      name: 'report.reporting',
+      // Top-level section (promoted out of Features on 2026-08-24). 'link' rather than 'toggle',
+      // exactly like alarms_center: the sidebar shows one plain entry, while the three pages listed
+      // under this id in defaultUserMenuMap render as the in-page tab strip of the '/reporting'
+      // RouterTabs landing route (router-tabs.component.ts reads them off this section).
       type: 'link',
-      path: '/features/reports',
+      path: '/reporting',
       icon: 'assessment'
-    }
-  ],
-  [
-    MenuId.report_history,
-    {
-      id: MenuId.report_history,
-      name: 'report.report-history',
-      type: 'link',
-      path: '/features/reports/history',
-      icon: 'history'
     }
   ],
   [
     MenuId.report_templates,
     {
       id: MenuId.report_templates,
-      name: 'report.report-templates',
+      name: 'report.templates',
       type: 'link',
-      path: '/features/reports/templates',
+      path: '/reporting/templates',
       icon: 'description'
+    }
+  ],
+  [
+    MenuId.report_scheduling,
+    {
+      id: MenuId.report_scheduling,
+      name: 'report.scheduling',
+      type: 'link',
+      path: '/reporting/scheduling',
+      icon: 'pending_actions'
+    }
+  ],
+  [
+    MenuId.report_history,
+    {
+      id: MenuId.report_history,
+      name: 'report.reports',
+      type: 'link',
+      path: '/reporting/reports',
+      icon: 'library_books'
     }
   ],
   [
@@ -939,14 +950,7 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
         pages: [
           {id: MenuId.otaUpdates},
           {id: MenuId.version_control},
-          {id: MenuId.scheduler},
-          {
-            id: MenuId.reports,
-            pages: [
-              {id: MenuId.report_history},
-              {id: MenuId.report_templates}
-            ]
-          }
+          {id: MenuId.scheduler}
         ]
       },
       {
@@ -1005,6 +1009,14 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
               {id: MenuId.clients}
             ]
           }
+        ]
+      },
+      {
+        id: MenuId.reports,
+        pages: [
+          {id: MenuId.report_templates},
+          {id: MenuId.report_scheduling},
+          {id: MenuId.report_history}
         ]
       }
     ]

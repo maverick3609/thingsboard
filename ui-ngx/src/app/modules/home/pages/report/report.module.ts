@@ -101,13 +101,22 @@ import {
   ReportAliasCallbacksFactory
 } from '@home/pages/report/report-template/designer/data/report-alias-callbacks.models';
 import { ReportImportExportService } from '@home/pages/report/report-template/designer/report-import-export';
+import { ReportSchedulingComponent } from '@home/pages/report/report-scheduling/report-scheduling.component';
+import {
+  ReportTemplatesTableHeaderComponent
+} from '@home/pages/report/report-template/report-templates-table-header.component';
 
 @NgModule({
   declarations: [
     ReportHistoryComponent,
+    ReportSchedulingComponent,
     ReportTemplatesComponent,
-    // Unreferenced since C1 Task 3 (add/edit now navigate to ReportTemplateEditorComponent below
-    // instead of opening this dialog) - stays declared until a later cleanup task removes it.
+    // The templates list's toolbar filter, instantiated dynamically through
+    // EntityTableConfig#headerComponent.
+    ReportTemplatesTableHeaderComponent,
+    // The root-fields step in front of the designer: opened by the templates list for both
+    // "Create new report template" (format/type decide the config shape the designer builds) and
+    // the per-row edit action (name/description only).
     ReportTemplateDialogComponent,
     ReportTemplateEditorComponent,
     // C1 Task 5: right-panel page/template settings shown when no canvas component is selected.

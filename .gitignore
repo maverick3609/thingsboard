@@ -41,3 +41,14 @@ rebuild-docker.sh
 .planning
 docs/superpowers/
 /.superpowers/
+
+# Generated / local-only, never publishable
+.codegraph/
+graphify-out/
+.todo/
+# PE 4.2.0 reference jars + their extracted contents (~1GB) - local analysis input only
+docs/jars/
+# Ad-hoc screenshots, not referenced by any doc
+docs/images/Screenshot*.png
+# Repo builds with yarn (yarn.lock is the tracked lockfile)
+package-lock.json

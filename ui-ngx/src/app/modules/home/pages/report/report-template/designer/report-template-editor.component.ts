@@ -23,11 +23,17 @@ import { ActionNotificationShow } from '@core/notification/notification.actions'
 import { ReportService } from '@core/http/report.service';
 import { ReportTemplate, ReportTemplateType, TbReportFormat } from '@shared/models/report.models';
 import {
+  HeaderFooter,
   ReportComponent,
   ReportTemplateConfigModel,
   newCsvReportTemplateConfig,
   newPdfReportTemplateConfig
 } from '@shared/models/report-configuration.models';
+import { MatDialog } from '@angular/material/dialog';
+import { deepClone } from '@core/utils';
+import {
+  ReportAliasesFiltersDialogComponent
+} from '@home/pages/report/report-template/designer/data/report-aliases-filters-dialog.component';
 import { deserialize, serialize } from '@home/pages/report/report-template/designer/report-configuration.serializer';
 import { ReportPageSettings } from '@home/pages/report/report-template/designer/report-page-settings.component';
 import { IAliasController } from '@core/api/widget-api.models';
@@ -90,17 +96,29 @@ export class ReportTemplateEditorComponent implements OnInit {
   selected: ReportComponent | null = null;
   viewMode: 'edit' | 'preview' = 'edit';
   pageSettings: ReportPageSettings | null = null;
+  isFullscreen = false;
+  // Gates the toolbar's Save/Decline pair, exactly like PE's. Set by markDirty() from every edit
+  // channel (config, entity fields, the alias/filter dialogs) rather than by diffing on each change
+  // detection pass - a template tree can be large and this runs on every tick.
+  isDirty = false;
   // Bounded IAliasController shim (Task 9) backing tb-entity-alias-select/tb-filter-select inside
   // Task 11's table panels - built once here, lazily reading `this.config` on every call, so it
   // stays valid across the async (existing-template) load path below.
   aliasController: IAliasController;
+
+  // What Decline restores: the last state that came off the server (or, in add-mode, the seed the
+  // create dialog handed over). Cloned, so the live objects the panels mutate in place can never
+  // reach back into it.
+  private pristineTemplate: ReportTemplate;
+  private pristineConfig: ReportTemplateConfigModel;
 
   constructor(private route: ActivatedRoute,
               private router: Router,
               private reportService: ReportService,
               private reportImportExport: ReportImportExportService,
               private store: Store<AppState>,
-              private translate: TranslateService) {
+              private translate: TranslateService,
+              private dialog: MatDialog) {
   }
 
   ngOnInit(): void {
@@ -118,10 +136,15 @@ export class ReportTemplateEditorComponent implements OnInit {
         description: seed.description
       } as ReportTemplate;
       this.applyConfig(seed.config ?? newTemplateConfig(this.reportTemplate.format));
+      this.markPristine();
+      // A not-yet-persisted template IS unsaved work, so Save must be reachable without editing
+      // anything first - unlike the existing-template path, where nothing has changed yet.
+      this.isDirty = true;
     } else {
       this.reportService.getReportTemplateById(this.reportTemplateId).subscribe(reportTemplate => {
         this.reportTemplate = reportTemplate;
         this.applyConfig(deserialize(reportTemplate.configuration));
+        this.markPristine();
       });
     }
   }
@@ -149,6 +172,46 @@ export class ReportTemplateEditorComponent implements OnInit {
       Object.assign(this.config, value);
     }
     this.pageSettings = value;
+    this.markDirty();
+  }
+
+  markDirty(): void {
+    this.isDirty = true;
+  }
+
+  // Header and footer are edited in the canvas column (PE's layout, docs/images/reporting-5.png),
+  // not in the settings pane. Only the PDF variant has the fields at all, and a subreport is laid
+  // out inside its parent's page, so neither applies to one.
+  get showHeaderFooter(): boolean {
+    return this.config?.format === 'PDF' && this.reportTemplate?.type !== ReportTemplateType.SUB_REPORT;
+  }
+
+  // Narrowed to the PDF variant here so the TEMPLATE never has to: Angular's template type-checker
+  // does not narrow `config` from the ReportTemplateConfigModel union off a boolean getter the way
+  // plain TypeScript control flow would.
+  get header(): HeaderFooter | undefined {
+    return this.config?.format === 'PDF' ? this.config.header : undefined;
+  }
+
+  get footer(): HeaderFooter | undefined {
+    return this.config?.format === 'PDF' ? this.config.footer : undefined;
+  }
+
+  // The commit hop for the two canvas-column header/footer editors. `config.header`/`config.footer`
+  // are genuinely optional: a template that never had one must not gain an empty one just by being
+  // opened (C2 Task 18's byte-fidelity round-trip), so the editor starts on a detached
+  // {enabled: false, components: []} of its own and this handler is what attaches it - on the first
+  // real edit, and never before. Once attached the editor mutates it in place, so every later call
+  // re-assigns the same reference.
+  onHeaderFooterChange(header: boolean, value: HeaderFooter): void {
+    if (this.config?.format === 'PDF') {
+      if (header) {
+        this.config.header = value;
+      } else {
+        this.config.footer = value;
+      }
+    }
+    this.markDirty();
   }
 
   // The page-settings componentSelected hop (Task 15A): a click on a component inside either
@@ -174,6 +237,7 @@ export class ReportTemplateEditorComponent implements OnInit {
   onComponentChange(value: ReportComponent): void {
     if (this.selected) {
       Object.assign(this.selected, value);
+      this.markDirty();
     }
   }
 
@@ -192,6 +256,7 @@ export class ReportTemplateEditorComponent implements OnInit {
     if (!this.selectionStillReachable()) {
       this.selected = null;
     }
+    this.markDirty();
   }
 
   // Task 15A: fired by tb-report-page-settings's own componentsChanged (re-emitted from whichever
@@ -252,8 +317,51 @@ export class ReportTemplateEditorComponent implements OnInit {
       configuration: serialize(this.config)
     };
     this.reportService.saveReportTemplate(reportTemplate).subscribe(() => {
+      this.isDirty = false;
       this.goBack();
     });
+  }
+
+  // PE's Decline: throw away every unsaved edit and go back to the loaded state. Both sides are
+  // re-cloned so the restored objects are the editor's alone - declining twice in a row must not
+  // hand the panels the same objects to mutate.
+  decline(): void {
+    this.reportTemplate = deepClone(this.pristineTemplate);
+    this.applyConfig(deepClone(this.pristineConfig));
+    // Same reasoning as ngOnInit's add branch: a never-persisted template is still unsaved work
+    // after declining back to its seed, so Save must not be left disabled with no way back on.
+    this.isDirty = this.isAdd;
+  }
+
+  openAliases(): void {
+    this.openAliasesFilters('aliases');
+  }
+
+  openFilters(): void {
+    this.openAliasesFilters('filters');
+  }
+
+  // Both lists mutate config.entityAliases[]/config.filters[] in place through their own
+  // aliasController, so the dialog closes with nothing to return - a before/after snapshot of just
+  // those two arrays is what decides whether anything actually changed, rather than marking the
+  // template dirty for merely opening the dialog.
+  private openAliasesFilters(mode: 'aliases' | 'filters'): void {
+    const before = JSON.stringify([this.config.entityAliases, this.config.filters]);
+    this.dialog.open(ReportAliasesFiltersDialogComponent, {
+      disableClose: true,
+      panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
+      data: {config: this.config, mode}
+    }).afterClosed().subscribe(() => {
+      if (JSON.stringify([this.config.entityAliases, this.config.filters]) !== before) {
+        this.markDirty();
+      }
+    });
+  }
+
+  private markPristine(): void {
+    this.pristineTemplate = deepClone(this.reportTemplate);
+    this.pristineConfig = deepClone(this.config);
+    this.isDirty = false;
   }
 
   goBack(): void {
@@ -280,6 +388,7 @@ export class ReportTemplateEditorComponent implements OnInit {
         this.reportTemplate.format = imported.format;
         this.reportTemplate.type = imported.type;
         this.applyConfig(imported.config);
+        this.markDirty();
       },
       error: (err) => {
         console.error('Failed to import report template', err);

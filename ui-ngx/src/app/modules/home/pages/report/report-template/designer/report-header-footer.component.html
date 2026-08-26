@@ -15,28 +15,29 @@
     limitations under the License.
 
 -->
-<div class="tb-report-header-footer flex flex-col gap-2">
-  <div class="tb-report-header-footer-toggles flex flex-col gap-1" [formGroup]="toggleFormGroup">
-    <div class="flex items-center justify-between">
-      <span translate>report.designer.enabled</span>
-      <mat-slide-toggle formControlName="enabled"></mat-slide-toggle>
-    </div>
-    <div class="flex items-center justify-between" *ngIf="allowFirstPage">
-      <span translate>report.designer.different-first-page</span>
-      <mat-slide-toggle formControlName="firstPageEnabled"></mat-slide-toggle>
-    </div>
+<div class="tb-report-header-footer flex flex-col">
+  <div class="tb-report-header-footer-toolbar flex flex-row items-center gap-2">
+    <tb-toggle-select appearance="fill" [(ngModel)]="variant">
+      <tb-toggle-option value="main">{{ (header ? 'report.designer.header' : 'report.designer.footer') | translate }}</tb-toggle-option>
+      <tb-toggle-option value="firstPage">{{ (header ? 'report.designer.first-page-header' : 'report.designer.first-page-footer') | translate }}</tb-toggle-option>
+    </tb-toggle-select>
+    <span class="flex-1"></span>
+    <button mat-stroked-button type="button" (click)="expanded = !expanded">
+      <span>{{ (expanded ? 'report.designer.collapse' : 'report.designer.expand') | translate }}</span>
+      <mat-icon>{{ expanded ? 'expand_less' : 'expand_more' }}</mat-icon>
+    </button>
+    <button mat-stroked-button type="button" [disabled]="disabled" (click)="toggleEnabled()">
+      <mat-icon>{{ current.enabled ? 'block' : 'check' }}</mat-icon>
+      <span>{{ (current.enabled ? 'report.designer.disable' : 'report.designer.enable') | translate }}</span>
+    </button>
   </div>
-  <tb-report-canvas *ngIf="toggleFormGroup.get('enabled').value"
-                     [components]="value.components"
-                     (componentsChange)="onComponentsChange($event)"
-                     (selected)="reEmitSelection($event)">
-  </tb-report-canvas>
-  <tb-report-header-footer *ngIf="allowFirstPage && toggleFormGroup.get('firstPageEnabled').value"
-                            class="tb-report-header-footer-first-page"
-                            [allowFirstPage]="false"
-                            [ngModel]="value.firstPage"
-                            (ngModelChange)="onFirstPageChange($event)"
-                            (componentSelected)="reEmitSelection($event)"
-                            (componentsChanged)="componentsChanged.emit()">
-  </tb-report-header-footer>
+  <ng-container *ngIf="expanded">
+    <tb-report-canvas *ngIf="current.enabled"
+                       class="tb-report-header-footer-canvas"
+                       [components]="current.components"
+                       (componentsChange)="onComponentsChange($event)"
+                       (selected)="componentSelected.emit($event)">
+    </tb-report-canvas>
+    <div *ngIf="!current.enabled" class="tb-report-header-footer-disabled tb-prompt">{{ disabledKey | translate }}</div>
+  </ng-container>
 </div>

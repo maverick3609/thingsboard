@@ -16,25 +16,16 @@
 
 // Plain instantiation (no TestBed), matching this designer's established convention
 // (report-canvas.component.spec.ts, report-divider-config.component.spec.ts, etc.): the CVA
-// plumbing only touches the injected UntypedFormBuilder plus the two plain @Output EventEmitters,
-// never the DOM/a real nested tb-report-canvas, so a `new`'d instance proves the writeValue ->
-// toggleFormGroup -> propagateChange wiring and the componentSelected/componentsChanged
-// re-emission methods (reEmitSelection/onComponentsChange/onFirstPageChange) directly, without
-// compiling the template.
-import { UntypedFormBuilder } from '@angular/forms';
+// plumbing only touches the two plain @Output EventEmitters and the `value`/`variant` fields,
+// never the DOM or a real nested tb-report-canvas, so a `new`'d instance proves the
+// writeValue -> mutation -> propagateChange wiring directly, without compiling the template.
 import { ReportHeaderFooterComponent } from './report-header-footer.component';
 import { HeaderFooter, ReportComponent } from '@shared/models/report-configuration.models';
 
 describe('ReportHeaderFooterComponent', () => {
 
-  function newComponent(): ReportHeaderFooterComponent {
-    const component = new ReportHeaderFooterComponent(new UntypedFormBuilder());
-    component.ngOnInit();
-    return component;
-  }
-
-  it('round-trips a HeaderFooter with a nested firstPage through writeValue, without cloning it, reflecting both toggles', () => {
-    const component = newComponent();
+  it('keeps the written HeaderFooter by reference, without cloning it', () => {
+    const component = new ReportHeaderFooterComponent();
     const value: HeaderFooter = {
       enabled: true,
       components: [{ type: 'HEADING', value: 'Q3 header' }],
@@ -46,135 +37,114 @@ describe('ReportHeaderFooterComponent', () => {
     // Same reference, not a copy: the nested canvas mutates value.components in place (like the
     // shell's body canvas), which only stays correct if writeValue doesn't defensively clone.
     expect(component.value).toBe(value);
-    expect(component.toggleFormGroup.value).toEqual({ enabled: true, firstPageEnabled: true });
+    expect(component.current).toBe(value);
   });
 
   it('defaults to a disabled, empty HeaderFooter when written with no value', () => {
-    const component = newComponent();
+    const component = new ReportHeaderFooterComponent();
 
     component.writeValue(undefined);
 
     expect(component.value).toEqual({ enabled: false, components: [] });
-    expect(component.toggleFormGroup.value).toEqual({ enabled: false, firstPageEnabled: false });
   });
 
-  it('does not propagate a change when writeValue resets the toggles (no CVA feedback loop)', () => {
-    const component = newComponent();
-    const onChange = jasmine.createSpy('onChange');
-    component.registerOnChange(onChange);
-
-    component.writeValue({ enabled: true, components: [], firstPage: { enabled: true, components: [] } });
-
-    expect(onChange).not.toHaveBeenCalled();
-  });
-
-  it('propagates enabled:true when the enabled toggle is switched on by the user', () => {
-    const component = newComponent();
-    component.writeValue({ enabled: false, components: [] });
-    const onChange = jasmine.createSpy('onChange');
-    component.registerOnChange(onChange);
-
-    component.toggleFormGroup.patchValue({ enabled: true });
-
-    expect(onChange).toHaveBeenCalledWith(jasmine.objectContaining({ enabled: true }));
-  });
-
-  it('fabricates an empty firstPage the first time firstPageEnabled is switched on', () => {
-    const component = newComponent();
-    component.writeValue({ enabled: true, components: [] });
-    const onChange = jasmine.createSpy('onChange');
-    component.registerOnChange(onChange);
-
-    component.toggleFormGroup.patchValue({ firstPageEnabled: true });
-
-    expect(onChange).toHaveBeenCalledWith(jasmine.objectContaining({
-      firstPage: { enabled: false, components: [] }
-    }));
-  });
-
-  it('preserves an existing firstPage across an unrelated enabled toggle (spread, not overwrite)', () => {
-    const component = newComponent();
+  it('reads the firstPage variant when the toggle points at it', () => {
+    const component = new ReportHeaderFooterComponent();
     const firstPage: HeaderFooter = { enabled: true, components: [{ type: 'DIVIDER' }] };
     component.writeValue({ enabled: false, components: [], firstPage });
-    const onChange = jasmine.createSpy('onChange');
-    component.registerOnChange(onChange);
 
-    component.toggleFormGroup.patchValue({ enabled: true });
+    component.variant = 'firstPage';
 
-    const emitted = onChange.calls.mostRecent().args[0] as HeaderFooter;
-    expect(emitted.firstPage).toEqual(firstPage);
+    expect(component.current).toBe(firstPage);
   });
 
-  it('clears firstPage to undefined when firstPageEnabled is switched off', () => {
-    const component = newComponent();
-    component.writeValue({
-      enabled: true,
-      components: [],
-      firstPage: { enabled: true, components: [{ type: 'DIVIDER' }] }
-    });
-    const onChange = jasmine.createSpy('onChange');
-    component.registerOnChange(onChange);
+  // The byte-fidelity guarantee (C2 Task 18): an optional the user never touched must not appear in
+  // the saved config just because they looked at its tab.
+  it('does NOT materialise firstPage merely by switching to its tab', () => {
+    const component = new ReportHeaderFooterComponent();
+    const value: HeaderFooter = { enabled: true, components: [] };
+    component.writeValue(value);
+    let propagated: HeaderFooter = null;
+    component.registerOnChange(v => propagated = v);
 
-    component.toggleFormGroup.patchValue({ firstPageEnabled: false });
+    component.variant = 'firstPage';
 
-    const emitted = onChange.calls.mostRecent().args[0] as HeaderFooter;
-    expect(emitted.firstPage).toBeUndefined();
+    expect(component.current.enabled).toBe(false);
+    expect(component.current.components).toEqual([]);
+    expect(value.firstPage).toBeUndefined();
+    expect(propagated).toBeNull();
   });
 
-  it('onComponentsChange mutates value.components in place, propagates, and emits componentsChanged', () => {
-    const component = newComponent();
-    const original: ReportComponent[] = [{ type: 'DIVIDER' }];
-    component.writeValue({ enabled: true, components: original });
-    const onChange = jasmine.createSpy('onChange');
-    component.registerOnChange(onChange);
-    const onComponentsChanged = jasmine.createSpy('componentsChanged');
-    component.componentsChanged.subscribe(onComponentsChanged);
+  it('materialises firstPage on the first write to it, and propagates the OUTER HeaderFooter', () => {
+    const component = new ReportHeaderFooterComponent();
+    const value: HeaderFooter = { enabled: true, components: [] };
+    component.writeValue(value);
+    let propagated: HeaderFooter = null;
+    component.registerOnChange(v => propagated = v);
+    component.variant = 'firstPage';
 
-    const updated: ReportComponent[] = [{ type: 'DIVIDER' }, { type: 'PAGE_BREAK' }];
-    component.onComponentsChange(updated);
+    component.toggleEnabled();
 
-    expect(component.value.components).toBe(updated);
-    expect(onChange).toHaveBeenCalledWith(jasmine.objectContaining({ components: updated }));
-    expect(onComponentsChanged).toHaveBeenCalledTimes(1);
+    expect(value.firstPage).toEqual({ enabled: true, components: [] });
+    expect(propagated).toBe(value);
   });
 
-  it('onFirstPageChange writes the nested firstPage value back by reference and propagates the outer HeaderFooter', () => {
-    const component = newComponent();
-    component.writeValue({ enabled: true, components: [], firstPage: { enabled: false, components: [] } });
-    const onChange = jasmine.createSpy('onChange');
-    component.registerOnChange(onChange);
+  it('toggleEnabled flips the CURRENT variant only, in place, and signals componentsChanged', () => {
+    const component = new ReportHeaderFooterComponent();
+    const value: HeaderFooter = { enabled: false, components: [], firstPage: { enabled: true, components: [] } };
+    component.writeValue(value);
+    let changed = 0;
+    component.componentsChanged.subscribe(() => changed++);
 
-    const nestedValue: HeaderFooter = { enabled: true, components: [{ type: 'DIVIDER' }] };
-    component.onFirstPageChange(nestedValue);
+    component.toggleEnabled();
 
-    expect(component.value.firstPage).toBe(nestedValue);
-    expect(onChange).toHaveBeenCalledWith(jasmine.objectContaining({ firstPage: nestedValue }));
+    expect(value.enabled).toBe(true);
+    expect(value.firstPage.enabled).toBe(true);
+    expect(changed).toBe(1);
   });
 
-  it('reEmitSelection re-emits a component via componentSelected - the shared hop for both the nested canvas and a nested firstPage editor', () => {
-    const component = newComponent();
-    const onSelected = jasmine.createSpy('componentSelected');
-    component.componentSelected.subscribe(onSelected);
-    const heading: ReportComponent = { type: 'HEADING', value: 'h' };
+  it('onComponentsChange writes into the CURRENT variant and propagates the outer HeaderFooter', () => {
+    const component = new ReportHeaderFooterComponent();
+    const value: HeaderFooter = { enabled: true, components: [], firstPage: { enabled: true, components: [] } };
+    component.writeValue(value);
+    component.variant = 'firstPage';
+    let propagated: HeaderFooter = null;
+    component.registerOnChange(v => propagated = v);
+    const components: ReportComponent[] = [{ type: 'HEADING', value: 'First page only' }];
 
-    component.reEmitSelection(heading);
+    component.onComponentsChange(components);
 
-    expect(onSelected).toHaveBeenCalledWith(heading);
+    expect(value.firstPage.components).toBe(components);
+    expect(value.components).toEqual([]);
+    expect(propagated).toBe(value);
   });
 
-  it('allowFirstPage defaults to true, so the root header/footer editor offers the "different first page" toggle', () => {
-    const component = newComponent();
-
-    expect(component.allowFirstPage).toBe(true);
-  });
-
-  it('setDisabledState disables and re-enables the toggle form', () => {
-    const component = newComponent();
+  it('setDisabledState is reflected for the template to gate the Disable button', () => {
+    const component = new ReportHeaderFooterComponent();
 
     component.setDisabledState(true);
-    expect(component.toggleFormGroup.disabled).toBe(true);
+    expect(component.disabled).toBe(true);
 
     component.setDisabledState(false);
-    expect(component.toggleFormGroup.disabled).toBe(false);
+    expect(component.disabled).toBe(false);
+  });
+
+  it('picks header/footer labels and the matching "disabled" prompt per variant', () => {
+    const component = new ReportHeaderFooterComponent();
+
+    expect(component.titleKey).toBe('report.designer.header');
+    expect(component.disabledKey).toBe('report.designer.header-disabled');
+
+    component.variant = 'firstPage';
+    expect(component.titleKey).toBe('report.designer.first-page-header');
+    expect(component.disabledKey).toBe('report.designer.first-page-header-disabled');
+
+    component.header = false;
+    expect(component.titleKey).toBe('report.designer.first-page-footer');
+    expect(component.disabledKey).toBe('report.designer.first-page-footer-disabled');
+
+    component.variant = 'main';
+    expect(component.titleKey).toBe('report.designer.footer');
+    expect(component.disabledKey).toBe('report.designer.footer-disabled');
   });
 });

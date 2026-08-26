@@ -27,6 +27,10 @@ import { ReportTemplate, ReportTemplateType, TbReportFormat } from '@shared/mode
 import { DividerComponent, PageOrientation, PageSize, PdfReportTemplateConfig, ReportComponent } from '@shared/models/report-configuration.models';
 import { ReportImportExportService } from './report-import-export';
 import { ActionNotificationShow } from '@core/notification/notification.actions';
+import { MatDialog } from '@angular/material/dialog';
+import {
+  ReportAliasesFiltersDialogComponent
+} from '@home/pages/report/report-template/designer/data/report-aliases-filters-dialog.component';
 
 describe('ReportTemplateEditorComponent', () => {
   let reportService: jasmine.SpyObj<ReportService>;
@@ -34,6 +38,7 @@ describe('ReportTemplateEditorComponent', () => {
   let reportImportExport: jasmine.SpyObj<ReportImportExportService>;
   let store: jasmine.SpyObj<{ dispatch: (action: unknown) => void }>;
   let translate: jasmine.SpyObj<{ instant: (key: string) => string }>;
+  let dialog: jasmine.SpyObj<MatDialog>;
 
   beforeEach(() => {
     reportService = jasmine.createSpyObj('ReportService', ['getReportTemplateById', 'saveReportTemplate']);
@@ -41,6 +46,8 @@ describe('ReportTemplateEditorComponent', () => {
     reportImportExport = jasmine.createSpyObj('ReportImportExportService', ['exportTemplate', 'importTemplate']);
     store = jasmine.createSpyObj('Store', ['dispatch']);
     translate = jasmine.createSpyObj('TranslateService', ['instant']);
+    dialog = jasmine.createSpyObj('MatDialog', ['open']);
+    dialog.open.and.returnValue({afterClosed: () => of(undefined)} as any);
   });
 
   function routeWithId(reportTemplateId: string): ActivatedRoute {
@@ -48,10 +55,11 @@ describe('ReportTemplateEditorComponent', () => {
   }
 
   // Plain-instantiation convention (see file header note above the describe block in the original
-  // C1 Task 3 spec): centralizes the now-6-argument constructor call so the C2 Task 17 dependencies
-  // (reportImportExport/store/translate) aren't repeated at every call site below.
+  // C1 Task 3 spec): centralizes the now-7-argument constructor call so the C2 Task 17 dependencies
+  // (reportImportExport/store/translate) and C3's MatDialog aren't repeated at every call site below.
   function newComponent(route: ActivatedRoute): ReportTemplateEditorComponent {
-    return new ReportTemplateEditorComponent(route, router, reportService, reportImportExport, store as any, translate as any);
+    return new ReportTemplateEditorComponent(route, router, reportService, reportImportExport, store as any,
+      translate as any, dialog);
   }
 
   // history.state is the seed transport (see takeSeed()) - stub it rather than driving a real
@@ -370,5 +378,107 @@ describe('ReportTemplateEditorComponent', () => {
     const action = store.dispatch.calls.mostRecent().args[0] as ActionNotificationShow;
     expect(action.notification.type).toBe('error');
     expect(action.notification.message).toBe('Failed to import report template.');
+  });
+
+  // C3 (PE toolbar parity): Save/Decline are gated on isDirty.
+  it('an existing template loads clean; any edit marks it dirty', () => {
+    const existing: ReportTemplate = {
+      name: 'Weekly', format: TbReportFormat.PDF, type: ReportTemplateType.REPORT,
+      configuration: {format: 'PDF', components: [], pageSize: 'A4', pageOrientation: 'PORTRAIT',
+        pageMargins: {left: 40, right: 40, top: 40, bottom: 40}}
+    } as ReportTemplate;
+    reportService.getReportTemplateById.and.returnValue(of(existing));
+    const component = newComponent(routeWithId('t-1'));
+
+    component.ngOnInit();
+    expect(component.isDirty).toBe(false);
+
+    component.markDirty();
+    expect(component.isDirty).toBe(true);
+  });
+
+  // A never-persisted template is unsaved work by definition, so Save must be reachable at once.
+  it('a new template starts dirty', () => {
+    seedHistoryState({name: 'Fresh', format: TbReportFormat.PDF, type: ReportTemplateType.REPORT});
+    const component = newComponent(routeWithId('new'));
+
+    component.ngOnInit();
+
+    expect(component.isDirty).toBe(true);
+  });
+
+  it('decline() restores the loaded template and config, and clears the dirty flag', () => {
+    const existing: ReportTemplate = {
+      name: 'Weekly', format: TbReportFormat.PDF, type: ReportTemplateType.REPORT,
+      configuration: {format: 'PDF', components: [{type: 'DIVIDER'}], pageSize: 'A4',
+        pageOrientation: 'PORTRAIT', pageMargins: {left: 40, right: 40, top: 40, bottom: 40}}
+    } as ReportTemplate;
+    reportService.getReportTemplateById.and.returnValue(of(existing));
+    const component = newComponent(routeWithId('t-1'));
+    component.ngOnInit();
+
+    component.reportTemplate.name = 'Renamed';
+    component.config.components.push({type: 'PAGE_BREAK'});
+    component.markDirty();
+    component.decline();
+
+    expect(component.reportTemplate.name).toBe('Weekly');
+    expect(component.config.components).toEqual([{type: 'DIVIDER'}]);
+    expect(component.isDirty).toBe(false);
+  });
+
+  // config.header/config.footer are optional: opening a template that never had one must not give
+  // it an empty one (C2 Task 18's byte-fidelity round-trip). The header/footer editor starts on a
+  // detached object and this handler is what attaches it, on the first real edit.
+  it('onHeaderFooterChange attaches the edited HeaderFooter to the PDF config and marks it dirty', () => {
+    seedHistoryState({name: 'Fresh', format: TbReportFormat.PDF, type: ReportTemplateType.REPORT});
+    const component = newComponent(routeWithId('new'));
+    component.ngOnInit();
+    component.isDirty = false;
+    expect((component.config as PdfReportTemplateConfig).header).toBeUndefined();
+    const edited = {enabled: true, components: [] as ReportComponent[]};
+
+    component.onHeaderFooterChange(true, edited);
+
+    expect((component.config as PdfReportTemplateConfig).header).toBe(edited);
+    expect((component.config as PdfReportTemplateConfig).footer).toBeUndefined();
+    expect(component.isDirty).toBe(true);
+  });
+
+  it('showHeaderFooter is PDF-only and never true for a subreport', () => {
+    seedHistoryState({name: 'Fresh', format: TbReportFormat.PDF, type: ReportTemplateType.REPORT});
+    const component = newComponent(routeWithId('new'));
+    component.ngOnInit();
+    expect(component.showHeaderFooter).toBe(true);
+
+    component.reportTemplate.type = ReportTemplateType.SUB_REPORT;
+    expect(component.showHeaderFooter).toBe(false);
+
+    component.reportTemplate.type = ReportTemplateType.REPORT;
+    component.config = {format: 'CSV', components: []};
+    expect(component.showHeaderFooter).toBe(false);
+  });
+
+  // Opening the dialog is not an edit; only a change to the two arrays it manages is.
+  it('the aliases dialog marks the template dirty only when it actually changed something', () => {
+    seedHistoryState({name: 'Fresh', format: TbReportFormat.PDF, type: ReportTemplateType.REPORT});
+    const component = newComponent(routeWithId('new'));
+    component.ngOnInit();
+    component.isDirty = false;
+
+    component.openAliases();
+
+    expect(dialog.open).toHaveBeenCalledWith(ReportAliasesFiltersDialogComponent, jasmine.objectContaining({
+      data: {config: component.config, mode: 'aliases'}
+    }));
+    expect(component.isDirty).toBe(false);
+
+    dialog.open.and.callFake(() => {
+      component.config.entityAliases = [{id: 'a-1', alias: 'Devices', filter: null}];
+      return {afterClosed: () => of(undefined)} as any;
+    });
+    component.openFilters();
+
+    expect(component.isDirty).toBe(true);
   });
 });

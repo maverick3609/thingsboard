@@ -19,13 +19,8 @@
 // form -> propagateChange wiring (and the dimensionsLabel lookup) without compiling the template.
 import { UntypedFormBuilder } from '@angular/forms';
 import { ReportPageSettings, ReportPageSettingsComponent } from './report-page-settings.component';
-import {
-  HeaderFooter,
-  PageOrientation,
-  PageSize,
-  PageSizeDimensions,
-  PdfReportTemplateConfig
-} from '@shared/models/report-configuration.models';
+import { PageOrientation, PageSize, PageSizeDimensions } from '@shared/models/report-configuration.models';
+import { ReportTemplate, ReportTemplateType, TbReportFormat } from '@shared/models/report.models';
 
 describe('ReportPageSettingsComponent', () => {
 
@@ -86,66 +81,39 @@ describe('ReportPageSettingsComponent', () => {
     expect(component.pageSettingsFormGroup.disabled).toBe(false);
   });
 
-  // Task 15A: config.header/config.footer only exist on PdfReportTemplateConfig (CSV has neither
-  // field per the model) - showHeaderFooter gates the two new Header/Footer mat-expansion-panels in
-  // the template (*ngIf="showHeaderFooter"), mirroring report-sub-report-config.component.ts's own
-  // showAvoidPageBreakInside getter for the same "gate a template row off a plain getter, assert the
-  // getter directly" reason: this spec is plain instantiation (no TestBed/DOM), so the getter itself
-  // is the only testable surface for what the template conditionally renders.
-  it('showHeaderFooter is true for a PDF config and false for a CSV config (or no config at all)', () => {
+  // The three settings-pane gates the shell relies on. This spec is plain instantiation (no
+  // TestBed/DOM), so the getters themselves are the only testable surface for what the template
+  // conditionally renders.
+  it('showPageSettings is true only for a PDF report template', () => {
     const component = newComponent();
 
-    component.config = { format: 'PDF', components: [] } as any;
-    expect(component.showHeaderFooter).toBe(true);
+    component.reportTemplate = { format: TbReportFormat.PDF, type: ReportTemplateType.REPORT } as ReportTemplate;
+    expect(component.showPageSettings).toBe(true);
 
-    component.config = { format: 'CSV', components: [] } as any;
-    expect(component.showHeaderFooter).toBe(false);
+    component.reportTemplate = { format: TbReportFormat.CSV, type: ReportTemplateType.REPORT } as ReportTemplate;
+    expect(component.showPageSettings).toBe(false);
 
-    component.config = undefined;
-    expect(component.showHeaderFooter).toBe(false);
+    component.reportTemplate = undefined;
+    expect(component.showPageSettings).toBe(false);
   });
 
-  // Task 15A (discovered via the AOT build, not the design note): the template cannot read/write
-  // config.header/config.footer directly - Angular's template type-checker does not narrow `config`
-  // off a boolean getter/method call the way plain TypeScript control flow narrows off
-  // `config.format === 'PDF'`, so `config.header` inside *ngIf="showHeaderFooter" fails to compile
-  // (TS2339, "Property 'header' does not exist on type CsvReportTemplateConfig"). These accessor
-  // pairs do the SAME narrowing check internally (in .ts, where it works) and expose an
-  // already-narrowed value/setter for the template to bind instead.
-  it('header/footer getters read the PDF fields and return undefined for a CSV config (or no config at all)', () => {
+  // A subreport is laid out inside its parent's page: PE disables exactly the file-name/date-format
+  // controls for one, and shows it no page geometry at all.
+  it('a subreport hides the file-name/date-format rows and the whole page-settings card', () => {
     const component = newComponent();
-    const headerFooter: HeaderFooter = { enabled: true, components: [{ type: 'DIVIDER' }] };
 
-    component.config = { format: 'PDF', components: [], header: headerFooter } as PdfReportTemplateConfig;
-    expect(component.header).toBe(headerFooter);
-    expect(component.footer).toBeUndefined();
+    component.reportTemplate = { format: TbReportFormat.PDF, type: ReportTemplateType.SUB_REPORT } as ReportTemplate;
 
-    component.config = { format: 'CSV', components: [] } as any;
-    expect(component.header).toBeUndefined();
-    expect(component.footer).toBeUndefined();
-
-    component.config = undefined;
-    expect(component.header).toBeUndefined();
+    expect(component.isSubReport).toBe(true);
+    expect(component.showPageSettings).toBe(false);
   });
 
-  it('header/footer setters write back onto a PDF config, and are a no-op for a CSV config', () => {
+  // Suggestions over a free-text input, never a closed list: timeDataPattern is a Java date pattern
+  // and a template whose pattern isn't a platform preset must not lose it.
+  it('offers the platform date-format presets, excluding the non-pattern entries', () => {
     const component = newComponent();
-    const newHeader: HeaderFooter = { enabled: true, components: [] };
-    const newFooter: HeaderFooter = { enabled: false, components: [] };
-    const pdfConfig = { format: 'PDF', components: [] } as PdfReportTemplateConfig;
-    component.config = pdfConfig;
 
-    component.header = newHeader;
-    component.footer = newFooter;
-
-    expect(pdfConfig.header).toBe(newHeader);
-    expect(pdfConfig.footer).toBe(newFooter);
-
-    const csvConfig = { format: 'CSV', components: [] } as any;
-    component.config = csvConfig;
-
-    component.header = newHeader;
-
-    expect(csvConfig.header).toBeUndefined();
+    expect(component.dateFormatPatterns).toContain('yyyy-MM-dd HH:mm:ss');
+    expect(component.dateFormatPatterns.every(pattern => typeof pattern === 'string' && !!pattern)).toBe(true);
   });
 });

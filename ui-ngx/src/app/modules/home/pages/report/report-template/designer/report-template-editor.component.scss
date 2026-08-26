@@ -20,27 +20,36 @@
   flex-direction: column;
 }
 
-.tb-report-template-name {
-  min-width: 200px;
+// Name and format are both edited (name) or fixed (format, it decides the whole config shape) in
+// the settings pane now, so the toolbar just states what is open - like PE's "<name> - <format>".
+.tb-report-template-title {
+  font-size: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-// Format is fixed at creation time (it decides the whole config shape), so it is shown, not edited.
-.tb-report-template-format {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 12px;
+// The content/header/footer stack PE renders in the canvas column.
+.tb-report-template-editor-content-title {
+  padding: 8px;
   font-weight: 500;
-  letter-spacing: 0.4px;
-  background: rgba(0, 0, 0, 0.06);
 }
 
 .tb-report-template-editor-body {
   overflow: hidden;
 }
 
-.tb-report-template-editor-palette,
-.tb-report-template-editor-config {
+.tb-report-template-editor-palette {
   width: 280px;
+  overflow: auto;
+}
+
+// Wider than the palette: the settings pane's rows are label + field on ONE line (.tb-form-row's
+// .fixed-title-width reserves 200px for the label alone), which does not fit in 280px.
+.tb-report-template-editor-config {
+  width: 420px;
+  padding: 8px;
   overflow: auto;
 }
 

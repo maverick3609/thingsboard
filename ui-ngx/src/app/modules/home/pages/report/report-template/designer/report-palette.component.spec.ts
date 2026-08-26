@@ -250,7 +250,7 @@ describe('ReportPaletteComponent (data)', () => {
         // panel (Tasks 11/13/14), not the placeholder branch. hasConfigPanel() is a pure, stateless
         // check that never touches reportImportExport/store/translate (C2 Task 17), so those 3
         // constructor params are left undefined here rather than mocked.
-        const shell = new ReportTemplateEditorComponent(route, router, reportService, undefined, undefined, undefined);
+        const shell = new ReportTemplateEditorComponent(route, router, reportService, undefined, undefined, undefined, undefined);
         expect(shell.hasConfigPanel(dropped.type)).toBe(true);
       });
     });

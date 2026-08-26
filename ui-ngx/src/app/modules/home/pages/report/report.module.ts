@@ -94,6 +94,9 @@ import {
 import {
   ReportFiltersComponent
 } from '@home/pages/report/report-template/designer/data/report-filters.component';
+import {
+  ReportAliasesFiltersDialogComponent
+} from '@home/pages/report/report-template/designer/data/report-aliases-filters-dialog.component';
 import { MatDialog } from '@angular/material/dialog';
 import { createReportAliasCallbacks } from '@home/pages/report/report-template/designer/data/report-alias-callbacks';
 import {
@@ -185,6 +188,9 @@ import {
     // ReportPageSettingsComponent's two new expansion-panel entry points.
     ReportEntityAliasesComponent,
     ReportFiltersComponent,
+    // C3: the designer toolbar's Aliases/Filters buttons - one dialog hosting whichever of the two
+    // lists above was asked for (PE puts both behind toolbar buttons, docs/images/reporting-5.png).
+    ReportAliasesFiltersDialogComponent,
     // C2 Task 11: generic right-panel config panel for the 3 table-shaped components
     // (ENTITY_TABLE/ALARM_TABLE/TIME_SERIES_TABLE) - assembles Tasks 2/4/5/8/9's sub-editors behind
     // one CVA shaped by `componentType`.

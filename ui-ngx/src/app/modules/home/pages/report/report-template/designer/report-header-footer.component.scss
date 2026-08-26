@@ -19,14 +19,24 @@
   flex-direction: column;
 }
 
-// Visual nesting indicator for the one allowed recursion level (the firstPage editor). Themed via
-// the same Material divider token + fallback chain already used for a hairline border elsewhere in
-// ui-ngx (modules/home/components/iot-hub/device-install-dialog/device-install-dialog.component.scss)
-// - C2 final-review Fix M4: the previous hard-coded rgba(0, 0, 0, .12) didn't adapt to the .tb-dark
-// theme (theme.scss's mat.all-component-colors($tb-dark-theme)).
-.tb-report-header-footer-first-page {
-  padding-left: 12px;
-  border-left-style: solid;
-  border-left-width: 2px;
-  border-left-color: var(--mat-divider-color, var(--mat-app-outline));
+// PE renders the header/footer toolbar half-overlapping the block it controls; a plain row with the
+// same hairline border as the canvas cards is close enough and needs no measuring code.
+.tb-report-header-footer-toolbar {
+  padding: 4px 8px;
+}
+
+.tb-report-header-footer-disabled {
+  padding: 16px 8px;
+  text-align: center;
+}
+
+// Themed via the same Material divider token + fallback chain already used for a hairline border
+// elsewhere in ui-ngx (modules/home/components/iot-hub/device-install-dialog/
+// device-install-dialog.component.scss) - a hard-coded rgba(0, 0, 0, .12) doesn't adapt to the
+// .tb-dark theme (theme.scss's mat.all-component-colors($tb-dark-theme)).
+.tb-report-header-footer-canvas,
+.tb-report-header-footer-disabled {
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: var(--mat-divider-color, var(--mat-app-outline));
 }

@@ -15,69 +15,67 @@
     limitations under the License.
 
 -->
-<div class="tb-report-page-settings flex flex-col gap-2" [formGroup]="pageSettingsFormGroup">
-  <mat-form-field subscriptSizing="dynamic">
-    <mat-select formControlName="pageSize" placeholder="{{ 'report.designer.page-size' | translate }}">
-      <mat-option *ngFor="let size of pageSizes" [value]="size">{{ size }} ({{ dimensionsLabel(size) }})</mat-option>
-    </mat-select>
-    <mat-hint>{{ dimensionsLabel(pageSettingsFormGroup.get('pageSize').value) }}</mat-hint>
-  </mat-form-field>
-  <div class="flex flex-col gap-1">
-    <label class="mat-caption" translate>report.designer.page-orientation</label>
-    <mat-button-toggle-group formControlName="pageOrientation">
-      <mat-button-toggle [value]="pageOrientationEnum.PORTRAIT" translate>report.designer.portrait</mat-button-toggle>
-      <mat-button-toggle [value]="pageOrientationEnum.LANDSCAPE" translate>report.designer.landscape</mat-button-toggle>
-    </mat-button-toggle-group>
+<div class="tb-report-template-settings flex flex-col gap-4" [formGroup]="pageSettingsFormGroup">
+  <div class="tb-form-panel">
+    <div class="tb-form-panel-title" translate>report.designer.common-settings</div>
+    <div class="tb-form-row">
+      <div class="fixed-title-width" translate>report.name</div>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="flex-1">
+        <input matInput required maxlength="255"
+               [(ngModel)]="reportTemplate.name"
+               [ngModelOptions]="{standalone: true}"
+               (ngModelChange)="templateChanged.emit()"/>
+      </mat-form-field>
+    </div>
+    <div class="tb-form-row" *ngIf="!isSubReport">
+      <div class="fixed-title-width" translate>report.designer.file-name-pattern</div>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="flex-1">
+        <input matInput formControlName="namePattern"/>
+      </mat-form-field>
+    </div>
+    <div class="tb-form-row" *ngIf="!isSubReport">
+      <div class="fixed-title-width" translate>report.designer.default-date-format</div>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="flex-1">
+        <input matInput formControlName="timeDataPattern" [matAutocomplete]="dateFormatAutocomplete"/>
+        <mat-autocomplete #dateFormatAutocomplete="matAutocomplete">
+          <mat-option *ngFor="let pattern of dateFormatPatterns" [value]="pattern">{{ pattern }}</mat-option>
+        </mat-autocomplete>
+      </mat-form-field>
+    </div>
+    <div class="tb-form-row">
+      <div class="fixed-title-width" translate>report.description</div>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="flex-1">
+        <textarea matInput rows="2"
+                  [(ngModel)]="reportTemplate.description"
+                  [ngModelOptions]="{standalone: true}"
+                  (ngModelChange)="templateChanged.emit()"></textarea>
+      </mat-form-field>
+    </div>
   </div>
-  <div class="flex flex-col gap-1">
-    <label class="mat-caption" translate>report.designer.page-margins</label>
-    <tb-report-insets formControlName="pageMargins"></tb-report-insets>
+  <div class="tb-form-panel" *ngIf="showPageSettings">
+    <div class="tb-form-panel-title" translate>report.designer.page-settings</div>
+    <div class="tb-form-row">
+      <div class="fixed-title-width" translate>report.designer.page-size</div>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="flex-1">
+        <mat-select formControlName="pageSize">
+          <mat-option *ngFor="let size of pageSizes" [value]="size">{{ size }} ({{ dimensionsLabel(size) }})</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+    <div class="tb-form-row">
+      <div class="fixed-title-width" translate>report.designer.page-orientation</div>
+      <tb-toggle-select formControlName="pageOrientation">
+        <tb-toggle-option [value]="pageOrientationEnum.PORTRAIT">{{ 'report.designer.portrait' | translate }}</tb-toggle-option>
+        <tb-toggle-option [value]="pageOrientationEnum.LANDSCAPE">{{ 'report.designer.landscape' | translate }}</tb-toggle-option>
+      </tb-toggle-select>
+    </div>
+    <div class="tb-form-row column">
+      <div translate>report.designer.page-margins</div>
+      <tb-report-insets formControlName="pageMargins"></tb-report-insets>
+    </div>
+    <div class="tb-form-row">
+      <div class="fixed-title-width" translate>report.designer.background</div>
+      <tb-color-input formControlName="pageBackground" colorClearButton asBoxInput></tb-color-input>
+    </div>
   </div>
-  <tb-color-input formControlName="pageBackground" colorClearButton
-                  label="{{ 'report.designer.background' | translate }}">
-  </tb-color-input>
-  <mat-form-field subscriptSizing="dynamic">
-    <input matInput formControlName="namePattern" placeholder="{{ 'report.name-pattern' | translate }}"/>
-  </mat-form-field>
-  <mat-form-field subscriptSizing="dynamic">
-    <input matInput formControlName="timeDataPattern" placeholder="{{ 'report.designer.time-data-pattern' | translate }}"/>
-  </mat-form-field>
-  <mat-accordion *ngIf="showHeaderFooter" class="tb-report-header-footer-panels" multi>
-    <mat-expansion-panel>
-      <mat-expansion-panel-header>
-        <mat-panel-title translate>report.designer.header</mat-panel-title>
-      </mat-expansion-panel-header>
-      <tb-report-header-footer [ngModel]="header ?? { enabled: false, components: [] }"
-                                [ngModelOptions]="{standalone: true}"
-                                (ngModelChange)="header = $event"
-                                (componentSelected)="componentSelected.emit($event)"
-                                (componentsChanged)="componentsChanged.emit()">
-      </tb-report-header-footer>
-    </mat-expansion-panel>
-    <mat-expansion-panel>
-      <mat-expansion-panel-header>
-        <mat-panel-title translate>report.designer.footer</mat-panel-title>
-      </mat-expansion-panel-header>
-      <tb-report-header-footer [ngModel]="footer ?? { enabled: false, components: [] }"
-                                [ngModelOptions]="{standalone: true}"
-                                (ngModelChange)="footer = $event"
-                                (componentSelected)="componentSelected.emit($event)"
-                                (componentsChanged)="componentsChanged.emit()">
-      </tb-report-header-footer>
-    </mat-expansion-panel>
-  </mat-accordion>
-  <mat-accordion *ngIf="config" class="tb-report-manage-aliases-filters" multi>
-    <mat-expansion-panel>
-      <mat-expansion-panel-header>
-        <mat-panel-title translate>report.designer.manage-aliases</mat-panel-title>
-      </mat-expansion-panel-header>
-      <tb-report-entity-aliases [config]="config"></tb-report-entity-aliases>
-    </mat-expansion-panel>
-    <mat-expansion-panel>
-      <mat-expansion-panel-header>
-        <mat-panel-title translate>report.designer.manage-filters</mat-panel-title>
-      </mat-expansion-panel-header>
-      <tb-report-filters [config]="config"></tb-report-filters>
-    </mat-expansion-panel>
-  </mat-accordion>
 </div>

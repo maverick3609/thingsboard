@@ -19,32 +19,33 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR, UntypedFormBuilder, UntypedFor
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import {
-  HeaderFooter,
   PageOrientation,
   PageSize,
   PageSizeDimensions,
-  PdfReportTemplateConfig,
-  ReportComponent,
-  ReportTemplateConfigModel
+  PdfReportTemplateConfig
 } from '@shared/models/report-configuration.models';
+import { ReportTemplate, ReportTemplateType, TbReportFormat } from '@shared/models/report.models';
+import { dateFormats } from '@shared/models/widget-settings.models';
 
 // The 6 page-level fields of configuration/PdfReportTemplateConfig.java this panel edits; the rest
-// of the config (components, header/footer) is owned by the canvas (T6) and header/footer editors,
-// not this panel. entityAliases/filters (Task 10) are the one exception: this panel hosts their
-// "Manage aliases"/"Manage filters" entry points (see the plain `config` Input below), but does not
-// edit them itself through this CVA's own ReportPageSettings value - they stay out of this Pick<> and
-// out of the emitted form value, so the shell's onPageSettingsChange (Object.assign(this.config,
-// value)) can never clobber them.
+// of the config (components, header/footer) is owned by the canvas column, not this panel.
+// entityAliases/filters stay out of this Pick<> and out of the emitted form value too - they are
+// edited from the toolbar's Aliases/Filters dialogs - so the shell's onPageSettingsChange
+// (Object.assign(this.config, value)) can never clobber them.
 export type ReportPageSettings = Pick<PdfReportTemplateConfig,
   'pageSize' | 'pageOrientation' | 'pageMargins' | 'pageBackground' | 'namePattern' | 'timeDataPattern'>;
 
-// CVA for the PDF root's page-level fields - the shell's right-panel content when no canvas
-// component is selected (report-template-editor.component.html, selected === null branch). Mirrors
-// the FormGroup -> propagateChange plumbing of kv-map.component.ts / T4's widgets; the form's own
-// value already has the ReportPageSettings shape 1:1, so no mapping step is needed. pageSize/
-// pageOrientation/pageMargins are non-optional in the Java model (like Insets' 4 fields), so
-// writeValue defaults them rather than letting the form hold undefined; pageBackground/namePattern/
-// timeDataPattern are genuinely optional and stay null when unset.
+// The template-settings pane PE shows on the right of the designer (docs/images/reporting-5.png,
+// PE's tb-report-template-settings): a "Common settings" card over a "Page settings" card. Name and
+// Description belong to the ReportTemplate ENTITY, not to the jsonb configuration, so they are
+// edited through the plain `reportTemplate` Input below rather than through this CVA's value - two
+// independent channels into two different objects, never merged.
+//
+// Shown by the shell whenever no canvas component is selected
+// (report-template-editor.component.html, selected === null branch). pageSize/pageOrientation/
+// pageMargins are non-optional in the Java model (like Insets' 4 fields), so writeValue defaults
+// them rather than letting the form hold undefined; pageBackground/namePattern/timeDataPattern are
+// genuinely optional and stay null when unset.
 @Component({
     selector: 'tb-report-page-settings',
     templateUrl: './report-page-settings.component.html',
@@ -60,29 +61,16 @@ export type ReportPageSettings = Pick<PdfReportTemplateConfig,
 })
 export class ReportPageSettingsComponent implements ControlValueAccessor, OnInit, OnDestroy {
 
-  // Plain Input (NOT part of the CVA's ReportPageSettings value) - Task 10's "Manage aliases"/
-  // "Manage filters" expansion panels below need the whole config to hand down to
-  // tb-report-entity-aliases/tb-report-filters, which mutate config.entityAliases[]/config.filters[]
-  // directly (see those components' own headers). The shell (report-template-editor.component.html)
-  // binds [config]="config" alongside the existing [ngModel]="pageSettings" CVA binding - two
-  // independent channels into the same object, never merged.
+  // Plain Input (NOT part of the CVA's ReportPageSettings value): the entity-level name/description
+  // rows below bind [(ngModel)] straight into it, the same way the toolbar's name field used to.
   @Input()
-  config: ReportTemplateConfigModel;
+  reportTemplate: ReportTemplate;
 
-  // Task 15A: bubbles a selection from either hosted header/footer editor (see
-  // report-header-footer.component.ts's class header for the full 2-hop path: nested canvas/
-  // firstPage editor -> tb-report-header-footer's own componentSelected -> here -> the shell, which
-  // sets its `selected` field the same way it does for the body canvas's (selected) output).
+  // Fired when a name/description edit mutated `reportTemplate` in place - the shell has no other
+  // way to notice (the mutation happens through a reference it already holds) and needs it for the
+  // toolbar's dirty state.
   @Output()
-  componentSelected = new EventEmitter<ReportComponent>();
-
-  // Task 15A: bubbles "something in a hosted header/footer editor's own component array changed, at
-  // any depth" up to the shell, which re-runs its cross-array orphan-clear
-  // (selectionStillReachable() in report-template-editor.component.ts). Deliberately NOT routed
-  // through this component's own CVA (ngModelChange) channel - see report-header-footer.component
-  // .ts's class header for why that channel has nowhere natural to hang the recompute.
-  @Output()
-  componentsChanged = new EventEmitter<void>();
+  templateChanged = new EventEmitter<void>();
 
   pageSettingsFormGroup: UntypedFormGroup;
 
@@ -90,6 +78,13 @@ export class ReportPageSettingsComponent implements ControlValueAccessor, OnInit
 
   pageSizes = Object.values(PageSize);
   pageOrientationEnum = PageOrientation;
+
+  // The platform's own preset list (the one tb-date-format-select offers), minus the entries that
+  // are not plain patterns. `timeDataPattern` is a free-text Java date pattern, so these are
+  // autocomplete SUGGESTIONS over a text input, never a closed mat-select: a template whose pattern
+  // isn't on this list must not silently lose it.
+  dateFormatPatterns = dateFormats.filter(format => !format.lastUpdateAgo && !format.custom && !format.auto)
+    .map(format => format.format);
 
   private destroy$ = new Subject<void>();
   private propagateChange: (value: ReportPageSettings) => void = () => {};
@@ -150,35 +145,17 @@ export class ReportPageSettingsComponent implements ControlValueAccessor, OnInit
     return dims ? `${dims.width}×${dims.height}` : '';
   }
 
-  // Task 15A: gates the template's Header/Footer mat-expansion-panels - config.header/config.footer
-  // only exist on PdfReportTemplateConfig (CsvReportTemplateConfig has neither field, per the
-  // frozen model). Mirrors report-sub-report-config.component.ts's showAvoidPageBreakInside getter.
-  get showHeaderFooter(): boolean {
-    return this.config?.format === 'PDF';
+  // A subreport is embedded in its parent's page, so it has neither a file name of its own nor page
+  // geometry of its own - PE disables exactly these controls for one; we leave them out entirely.
+  // The underlying form controls keep whatever the config already held, so hiding the rows never
+  // rewrites them.
+  get isSubReport(): boolean {
+    return this.reportTemplate?.type === ReportTemplateType.SUB_REPORT;
   }
 
-  // Task 15A: config.header/config.footer accessor pairs, narrowed to the PDF variant internally so
-  // the TEMPLATE never has to (Angular's template type-checker does not narrow `config` from the
-  // ReportTemplateConfigModel union off a boolean getter/method call the way plain TypeScript control
-  // flow would - `config.header` inside *ngIf="showHeaderFooter" still fails to compile). Read/write
-  // through these instead of `config.header`/`config.footer` directly in the template.
-  get header(): HeaderFooter | undefined {
-    return this.config?.format === 'PDF' ? this.config.header : undefined;
-  }
-
-  set header(value: HeaderFooter) {
-    if (this.config?.format === 'PDF') {
-      this.config.header = value;
-    }
-  }
-
-  get footer(): HeaderFooter | undefined {
-    return this.config?.format === 'PDF' ? this.config.footer : undefined;
-  }
-
-  set footer(value: HeaderFooter) {
-    if (this.config?.format === 'PDF') {
-      this.config.footer = value;
-    }
+  // Page geometry only exists on PdfReportTemplateConfig - CsvReportTemplateConfig has none of
+  // these fields, per the frozen model.
+  get showPageSettings(): boolean {
+    return !this.isSubReport && this.reportTemplate?.format === TbReportFormat.PDF;
   }
 }

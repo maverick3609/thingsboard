@@ -15,7 +15,9 @@
     limitations under the License.
 
 -->
-<div class="tb-report-template-editor flex flex-1 flex-col" *ngIf="reportTemplate">
+<div class="tb-report-template-editor flex flex-1 flex-col" *ngIf="reportTemplate"
+     tb-fullscreen
+     [fullscreen]="isFullscreen">
   <mat-toolbar class="mat-elevation-z1 tb-report-template-editor-toolbar gap-4 lt-xl:gap-2">
     <button mat-icon-button
             matTooltip="{{ 'action.back' | translate }}"
@@ -23,13 +25,20 @@
             (click)="goBack()">
       <mat-icon>arrow_back</mat-icon>
     </button>
-    <mat-form-field class="tb-report-template-name tb-appearance-transparent">
-      <input matInput required maxlength="255"
-             [(ngModel)]="reportTemplate.name"
-             placeholder="{{ 'report.name' | translate }}"/>
-    </mat-form-field>
-    <span class="tb-report-template-format">{{ reportTemplate.format }}</span>
+    <span class="tb-report-template-title">{{ reportTemplate.name }} - {{ reportTemplate.format }}</span>
     <span class="flex-1"></span>
+    <button mat-button type="button" (click)="deselect()">
+      <mat-icon>settings</mat-icon>
+      <span>{{ 'report.designer.settings' | translate }}</span>
+    </button>
+    <button mat-button type="button" (click)="openAliases()">
+      <mat-icon>view_quilt</mat-icon>
+      <span>{{ 'entity.aliases-short' | translate }}</span>
+    </button>
+    <button mat-button type="button" (click)="openFilters()">
+      <mat-icon>filter_list</mat-icon>
+      <span>{{ 'filter.filters' | translate }}</span>
+    </button>
     <tb-toggle-select appearance="fill"
                        fillHeight
                        extraPadding
@@ -57,24 +66,52 @@
             matTooltipPosition="above">
       <mat-icon>file_upload</mat-icon>
     </button>
+    <button mat-button
+            type="button"
+            [disabled]="!isDirty"
+            (click)="decline()">
+      <mat-icon>close</mat-icon>
+      <span translate>action.decline</span>
+    </button>
     <button mat-raised-button color="primary"
-            [disabled]="!reportTemplate.name?.trim()"
-            (click)="save()"
-            matTooltip="{{ 'action.save' | translate }}"
-            matTooltipPosition="above">
-      <mat-icon>save</mat-icon>
+            [disabled]="!isDirty || !reportTemplate.name?.trim()"
+            (click)="save()">
+      <mat-icon>check</mat-icon>
       <span translate>action.save</span>
+    </button>
+    <button mat-icon-button
+            type="button"
+            (click)="isFullscreen = !isFullscreen"
+            matTooltip="{{ (isFullscreen ? 'fullscreen.exit' : 'fullscreen.expand') | translate }}"
+            matTooltipPosition="above">
+      <mat-icon>{{ isFullscreen ? 'fullscreen_exit' : 'fullscreen' }}</mat-icon>
     </button>
   </mat-toolbar>
   <div class="tb-report-template-editor-body flex flex-1 flex-row" cdkDropListGroup *ngIf="viewMode === 'edit'">
     <div class="tb-report-template-editor-palette">
       <tb-report-palette [format]="config?.format"></tb-report-palette>
     </div>
-    <div class="tb-report-template-editor-canvas flex-1">
-      <tb-report-canvas [components]="config.components"
+    <div class="tb-report-template-editor-canvas flex flex-1 flex-col">
+      <tb-report-header-footer *ngIf="showHeaderFooter"
+                                [header]="true"
+                                [ngModel]="header"
+                                (ngModelChange)="onHeaderFooterChange(true, $event)"
+                                (componentSelected)="onComponentSelected($event)"
+                                (componentsChanged)="onHeaderFooterComponentsChanged()">
+      </tb-report-header-footer>
+      <div class="tb-report-template-editor-content-title" translate>report.designer.content</div>
+      <tb-report-canvas class="flex-1"
+                         [components]="config.components"
                          (componentsChange)="onComponentsChange($event)"
-                         (selected)="selected = $event">
+                         (selected)="onComponentSelected($event)">
       </tb-report-canvas>
+      <tb-report-header-footer *ngIf="showHeaderFooter"
+                                [header]="false"
+                                [ngModel]="footer"
+                                (ngModelChange)="onHeaderFooterChange(false, $event)"
+                                (componentSelected)="onComponentSelected($event)"
+                                (componentsChanged)="onHeaderFooterComponentsChanged()">
+      </tb-report-header-footer>
     </div>
     <div class="tb-report-template-editor-config">
       <button mat-icon-button
@@ -88,9 +125,8 @@
       <tb-report-page-settings *ngIf="selected === null && pageSettings"
                                 [ngModel]="pageSettings"
                                 (ngModelChange)="onPageSettingsChange($event)"
-                                (componentSelected)="onComponentSelected($event)"
-                                (componentsChanged)="onHeaderFooterComponentsChanged()"
-                                [config]="config">
+                                [reportTemplate]="reportTemplate"
+                                (templateChanged)="markDirty()">
       </tb-report-page-settings>
       <tb-report-page-break-config *ngIf="selected?.type === 'PAGE_BREAK'">
       </tb-report-page-break-config>

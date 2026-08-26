@@ -14,50 +14,54 @@
 /// limitations under the License.
 ///
 
-import { Component, EventEmitter, forwardRef, Input, OnDestroy, OnInit, Output } from '@angular/core';
-import { ControlValueAccessor, NG_VALUE_ACCESSOR, UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
-import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
+import { Component, EventEmitter, forwardRef, Input, Output } from '@angular/core';
+import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { HeaderFooter, ReportComponent } from '@shared/models/report-configuration.models';
 
 function newHeaderFooter(): HeaderFooter {
   return { enabled: false, components: [] };
 }
 
-// CVA for configuration/HeaderFooter.java - report-page-settings.component.html hosts one instance
-// bound to config.header and one bound to config.footer (PDF only; task-15a-interfaces.md's frozen,
-// verified-PE model - report-configuration.models.ts is UNTOUCHED). Value shape:
-// HeaderFooter = {enabled?, components: ReportComponent[], firstPage?: HeaderFooter}.
+// Read-only stand-in returned by `current` while the "first page" tab is selected on a HeaderFooter
+// that has no `firstPage` yet. It exists so merely LOOKING at that tab never fabricates a firstPage
+// object in the saved config (C2 Task 18's byte-fidelity round-trip: an untouched optional must
+// stay absent). Frozen because nothing may write through it - every mutating path goes through
+// mutableCurrent(), which materialises the real firstPage first. Its `components` array is never
+// bound to a canvas: the canvas only renders when current.enabled is true, and this is never
+// enabled.
+const ABSENT_FIRST_PAGE: HeaderFooter = Object.freeze({ enabled: false, components: Object.freeze([]) as ReportComponent[] });
+
+// PE's ReportHeaderComponent: the header (or footer) block the canvas column renders above (below)
+// the report body - NOT a right-panel form. Verified against the PE 4.2.0 bundle
+// (docs/jars/.../ui-ngx-4.2.0PE.jar, chunk-UILY2NXB.js `wp` class) and docs/images/reporting-5.png:
+// a "Header | First page header" toggle, a Collapse/Expand button and a Disable/Enable button over
+// a drop target, with a "Header disabled" prompt in place of the drop target when that variant is
+// off.
 //
-// THE key insight this component exists to exploit (task-15a-interfaces.md's "KEY architectural
-// insight"): tb-report-canvas already exposes (selected) (the clicked component) plus
-// [components]/(componentsChange) (two-way, in-place mutation), and the shell edits a selected
+// One instance edits BOTH variants of one HeaderFooter: `value` (the main header/footer) and
+// `value.firstPage` (the "different first page" variant), switched by the toggle - which is why
+// PE has no recursion here and neither do we any more (the pre-C3 shape nested a second
+// tb-report-header-footer for firstPage, capped by an `allowFirstPage` Input). `header` only picks
+// the labels.
+//
+// THE key insight this component exists to exploit: tb-report-canvas already exposes (selected)
+// plus [components]/(componentsChange) (two-way, in-place mutation), and the shell edits a selected
 // component via Object.assign(this.selected, value) - pure identity mutation that works for a
 // component living in ANY array, not just config.components. So the nested <tb-report-canvas>
-// below routes its (selected) straight up through this component's OWN componentSelected output,
-// all the way to the shell's `selected` field (via report-page-settings.component.ts's own
-// re-emitting @Output of the same name) - the entire existing 10-panel right pane edits header/
-// footer components for FREE, with zero panel duplication.
+// routes its (selected) straight up through this component's OWN componentSelected output to the
+// shell's `selected` field - the entire existing 10-panel right pane edits header/footer components
+// for FREE, with zero panel duplication.
 //
-// Two channels out of this component, kept deliberately separate:
-// - The CVA value channel (propagateChange/ngModelChange) - carries the HeaderFooter itself. The
-//   nested canvas mutates value.components IN PLACE (like the shell's body canvas), so this channel
-//   mostly re-delivers the same array reference - but it is still the one channel that flushes the
-//   enabled/firstPage TOGGLES (which are plain-field replacements, not in-place mutations).
+// Two channels out, kept deliberately separate:
+// - The CVA value channel (propagateChange/ngModelChange) - carries the HeaderFooter itself.
+//   Mutations are made IN PLACE on the object the shell handed us (config.header/config.footer), so
+//   this channel mostly re-delivers the same reference; it is still what flushes a newly
+//   materialised `firstPage`.
 // - componentSelected/componentsChanged - plain @Output, no CVA involvement. componentSelected is
-//   the selection-routing hop described above. componentsChanged is a dedicated "something in one
-//   of my arrays changed, at any depth" signal: the shell's cross-array orphan-clear
-//   (selectionStillReachable() in report-template-editor.component.ts) needs to re-run on every such
-//   mutation, but the CVA channel gives report-page-settings.component.html's
-//   `(ngModelChange)="config.header = $event"` binding nowhere natural to hang that recompute (it's
-//   a same-reference no-op in the common case) - so this dedicated signal exists instead, re-emitted
-//   one more hop by report-page-settings.component.ts's own @Output of the same name.
-//
-// Recursion cap: `firstPage` is itself a full HeaderFooter (the model is genuinely recursive), but
-// the UI only ever exposes ONE level of "different first page". @Input() allowFirstPage, true by
-// default, is passed `false` on the nested instance this component hosts for value.firstPage, so
-// THAT instance's own "different first page" toggle (and thus a third template level) never
-// renders, regardless of what the underlying data contains.
+//   the selection-routing hop above. componentsChanged is a dedicated "something in one of my
+//   arrays changed" signal the shell needs to re-run its cross-array orphan-clear
+//   (selectionStillReachable() in report-template-editor.component.ts) - the CVA channel is a
+//   same-reference no-op for an in-place canvas mutation and so cannot carry it.
 @Component({
     selector: 'tb-report-header-footer',
     templateUrl: './report-header-footer.component.html',
@@ -71,116 +75,91 @@ function newHeaderFooter(): HeaderFooter {
     ],
     standalone: false
 })
-export class ReportHeaderFooterComponent implements ControlValueAccessor, OnInit, OnDestroy {
+export class ReportHeaderFooterComponent implements ControlValueAccessor {
 
-  // Caps the recursive model at 1 UI level - see class header. false on the nested firstPage
-  // instance this component's own template hosts.
+  // Labels only - a header and a footer are the same editor over the same shape.
   @Input()
-  allowFirstPage = true;
+  header = true;
 
-  // Selection channel, SEPARATE from the CVA value channel - see class header. Fed by
-  // reEmitSelection(), the shared hop for both the nested canvas's (selected) and a nested
-  // firstPage editor's own (componentSelected).
+  // Selection channel, SEPARATE from the CVA value channel - see class header.
   @Output()
   componentSelected = new EventEmitter<ReportComponent>();
 
   // "An array mutated somewhere under me" signal, SEPARATE from the CVA value channel - see class
-  // header. Re-emitted (not re-derived) from a nested firstPage editor's own componentsChanged.
+  // header.
   @Output()
   componentsChanged = new EventEmitter<void>();
 
-  toggleFormGroup: UntypedFormGroup;
+  variant: 'main' | 'firstPage' = 'main';
+
+  expanded = true;
 
   disabled = false;
 
-  // Bound directly in the template ([components]="value.components", *ngIf="...value.firstPage"),
-  // NOT part of toggleFormGroup - a nested tb-report-canvas/tb-report-header-footer is not itself a
-  // reactive form control (tb-report-canvas isn't a ControlValueAccessor at all), so these fields
-  // are plain, propagated by hand via onComponentsChange/onFirstPageChange below.
+  // Bound directly in the template, NOT through a reactive form - tb-report-canvas is not a
+  // ControlValueAccessor, and the two toggles are plain buttons.
   value: HeaderFooter = newHeaderFooter();
 
-  private destroy$ = new Subject<void>();
   private propagateChange: (value: HeaderFooter) => void = () => {};
 
-  constructor(private fb: UntypedFormBuilder) {
+  // The HeaderFooter the toggle currently points at, for READING only (labels, enabled state, the
+  // components the canvas renders). Writers must use mutableCurrent().
+  get current(): HeaderFooter {
+    return this.variant === 'firstPage' ? (this.value.firstPage ?? ABSENT_FIRST_PAGE) : this.value;
   }
 
-  ngOnInit(): void {
-    this.toggleFormGroup = this.fb.group({
-      enabled: [false],
-      firstPageEnabled: [false]
-    });
-    this.toggleFormGroup.valueChanges.pipe(
-      takeUntil(this.destroy$)
-    ).subscribe((toggles: { enabled: boolean; firstPageEnabled: boolean }) => {
-      this.value = {
-        ...this.value,
-        enabled: toggles.enabled,
-        firstPage: toggles.firstPageEnabled ? (this.value.firstPage ?? newHeaderFooter()) : undefined
-      };
-      this.propagateChange(this.value);
-      this.componentsChanged.emit();
-    });
+  get titleKey(): string {
+    if (this.variant === 'firstPage') {
+      return this.header ? 'report.designer.first-page-header' : 'report.designer.first-page-footer';
+    }
+    return this.header ? 'report.designer.header' : 'report.designer.footer';
   }
 
-  ngOnDestroy(): void {
-    this.destroy$.next();
-    this.destroy$.complete();
+  get disabledKey(): string {
+    if (this.variant === 'firstPage') {
+      return this.header ? 'report.designer.first-page-header-disabled' : 'report.designer.first-page-footer-disabled';
+    }
+    return this.header ? 'report.designer.header-disabled' : 'report.designer.footer-disabled';
   }
 
   registerOnChange(fn: (value: HeaderFooter) => void): void {
     this.propagateChange = fn;
   }
 
-  registerOnTouched(fn: any): void {
+  registerOnTouched(_fn: any): void {
   }
 
   setDisabledState(isDisabled: boolean): void {
     this.disabled = isDisabled;
-    if (this.disabled) {
-      this.toggleFormGroup.disable({emitEvent: false});
-    } else {
-      this.toggleFormGroup.enable({emitEvent: false});
-    }
   }
 
-  // {emitEvent: false} is REQUIRED: without it, .reset() fires toggleFormGroup.valueChanges,
-  // re-entering the subscription above and calling propagateChange()/componentsChanged.emit() right
-  // back out - a write driven by the PARENT (the shell loading an existing template, or switching
-  // `selected` away and back so page-settings remounts from config.header) would then be misread as
-  // the USER toggling enabled/firstPage: corrupting `firstPage` (the `?? newHeaderFooter()` branch
-  // would fabricate a bogus empty firstPage the moment a stale firstPageEnabled=true echoed back
-  // through valueChanges) and re-entering on every load.
+  // Keeps the same object reference the shell owns (config.header/config.footer): every mutation
+  // below writes through it, exactly like the body canvas mutates config.components in place.
   writeValue(value: HeaderFooter): void {
     this.value = value ?? newHeaderFooter();
-    this.toggleFormGroup.reset({
-      enabled: this.value.enabled ?? false,
-      firstPageEnabled: !!this.value.firstPage
-    }, {emitEvent: false});
   }
 
-  // tb-report-canvas mutates `components` in place and re-emits the same reference (like the
-  // shell's body canvas) - value.components = components is a same-ref no-op in the common case,
-  // but still propagated (see class header) so a delete's orphan-clear reaches the shell.
-  onComponentsChange(components: ReportComponent[]): void {
-    this.value.components = components;
+  toggleEnabled(): void {
+    const current = this.mutableCurrent();
+    current.enabled = !current.enabled;
     this.propagateChange(this.value);
     this.componentsChanged.emit();
   }
 
-  // ngModelChange handler for the nested firstPage editor (CVA value channel) - writes its updated
-  // HeaderFooter back onto value.firstPage and propagates the OUTER value upward. Deliberately does
-  // NOT also emit componentsChanged: the nested editor's own componentsChanged is forwarded by a
-  // separate, direct template binding, so re-emitting it here too would double-fire.
-  onFirstPageChange(firstPage: HeaderFooter): void {
-    this.value.firstPage = firstPage;
+  // The canvas mutates the array in place and re-emits the same reference, so this assignment is a
+  // no-op in the common case; it is still made so the component works if that ever changes.
+  onComponentsChange(components: ReportComponent[]): void {
+    this.mutableCurrent().components = components;
     this.propagateChange(this.value);
+    this.componentsChanged.emit();
   }
 
-  // Shared re-emission hop for componentSelected - bound to both the nested canvas's (selected) and
-  // a nested firstPage editor's own (componentSelected), so a click at either depth reaches this
-  // component's own componentSelected the same way.
-  reEmitSelection(component: ReportComponent): void {
-    this.componentSelected.emit(component);
+  // Materialises value.firstPage on the first WRITE to the first-page variant - see
+  // ABSENT_FIRST_PAGE for why reads must not do this.
+  private mutableCurrent(): HeaderFooter {
+    if (this.variant === 'firstPage' && !this.value.firstPage) {
+      this.value.firstPage = newHeaderFooter();
+    }
+    return this.current;
   }
 }

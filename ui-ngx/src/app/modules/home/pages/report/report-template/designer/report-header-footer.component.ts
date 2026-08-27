@@ -33,7 +33,7 @@ const ABSENT_FIRST_PAGE: HeaderFooter = Object.freeze({ enabled: false, componen
 
 // PE's ReportHeaderComponent: the header (or footer) block the canvas column renders above (below)
 // the report body - NOT a right-panel form. Verified against the PE 4.2.0 bundle
-// (docs/jars/.../ui-ngx-4.2.0PE.jar, chunk-UILY2NXB.js `wp` class) and docs/images/reporting-5.png:
+// (docs/jars/.../ui-ngx-4.2.0PE.jar, chunk-UILY2NXB.js `wp` class) and docs/images/reporting-template-1..7.png:
 // a "Header | First page header" toggle, a Collapse/Expand button and a Disable/Enable button over
 // a drop target, with a "Header disabled" prompt in place of the drop target when that variant is
 // off.

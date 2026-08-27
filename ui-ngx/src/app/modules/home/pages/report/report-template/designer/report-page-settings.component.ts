@@ -35,7 +35,7 @@ import { dateFormats } from '@shared/models/widget-settings.models';
 export type ReportPageSettings = Pick<PdfReportTemplateConfig,
   'pageSize' | 'pageOrientation' | 'pageMargins' | 'pageBackground' | 'namePattern' | 'timeDataPattern'>;
 
-// The template-settings pane PE shows on the right of the designer (docs/images/reporting-5.png,
+// The template-settings pane PE shows on the right of the designer (docs/images/reporting-template-1..7.png,
 // PE's tb-report-template-settings): a "Common settings" card over a "Page settings" card. Name and
 // Description belong to the ReportTemplate ENTITY, not to the jsonb configuration, so they are
 // edited through the plain `reportTemplate` Input below rather than through this CVA's value - two
@@ -48,8 +48,8 @@ export type ReportPageSettings = Pick<PdfReportTemplateConfig,
 // genuinely optional and stay null when unset.
 @Component({
     selector: 'tb-report-page-settings',
+    styleUrls: ['./report-page-settings.component.scss'],
     templateUrl: './report-page-settings.component.html',
-    styleUrls: [],
     providers: [
         {
             provide: NG_VALUE_ACCESSOR,

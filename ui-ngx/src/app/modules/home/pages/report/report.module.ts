@@ -189,7 +189,7 @@ import {
     ReportEntityAliasesComponent,
     ReportFiltersComponent,
     // C3: the designer toolbar's Aliases/Filters buttons - one dialog hosting whichever of the two
-    // lists above was asked for (PE puts both behind toolbar buttons, docs/images/reporting-5.png).
+    // lists above was asked for (PE puts both behind toolbar buttons, docs/images/reporting-template-1..7.png).
     ReportAliasesFiltersDialogComponent,
     // C2 Task 11: generic right-panel config panel for the 3 table-shaped components
     // (ENTITY_TABLE/ALARM_TABLE/TIME_SERIES_TABLE) - assembles Tasks 2/4/5/8/9's sub-editors behind

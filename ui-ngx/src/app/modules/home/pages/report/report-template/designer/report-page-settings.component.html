@@ -16,12 +16,17 @@
 
 -->
 <div class="tb-report-template-settings flex flex-col gap-4" [formGroup]="pageSettingsFormGroup">
+  <div class="tb-report-template-settings-header">
+    <div class="tb-report-template-settings-title">{{ reportTemplate.name }}</div>
+    <div class="tb-report-template-settings-subtitle" translate>report.designer.template-settings</div>
+  </div>
   <div class="tb-form-panel">
     <div class="tb-form-panel-title" translate>report.designer.common-settings</div>
     <div class="tb-form-row">
       <div class="fixed-title-width" translate>report.name</div>
       <mat-form-field appearance="outline" subscriptSizing="dynamic" class="flex-1">
         <input matInput required maxlength="255"
+               placeholder="{{ 'widget-config.set' | translate }}"
                [(ngModel)]="reportTemplate.name"
                [ngModelOptions]="{standalone: true}"
                (ngModelChange)="templateChanged.emit()"/>
@@ -30,7 +35,8 @@
     <div class="tb-form-row" *ngIf="!isSubReport">
       <div class="fixed-title-width" translate>report.designer.file-name-pattern</div>
       <mat-form-field appearance="outline" subscriptSizing="dynamic" class="flex-1">
-        <input matInput formControlName="namePattern"/>
+        <input matInput formControlName="namePattern"
+               placeholder="{{ 'widget-config.set' | translate }}"/>
       </mat-form-field>
     </div>
     <div class="tb-form-row" *ngIf="!isSubReport">
@@ -46,6 +52,7 @@
       <div class="fixed-title-width" translate>report.description</div>
       <mat-form-field appearance="outline" subscriptSizing="dynamic" class="flex-1">
         <textarea matInput rows="2"
+                  placeholder="{{ 'widget-config.set' | translate }}"
                   [(ngModel)]="reportTemplate.description"
                   [ngModelOptions]="{standalone: true}"
                   (ngModelChange)="templateChanged.emit()"></textarea>
@@ -55,7 +62,7 @@
   <div class="tb-form-panel" *ngIf="showPageSettings">
     <div class="tb-form-panel-title" translate>report.designer.page-settings</div>
     <div class="tb-form-row">
-      <div class="fixed-title-width" translate>report.designer.page-size</div>
+      <div class="fixed-title-width" translate>report.designer.paper-size</div>
       <mat-form-field appearance="outline" subscriptSizing="dynamic" class="flex-1">
         <mat-select formControlName="pageSize">
           <mat-option *ngFor="let size of pageSizes" [value]="size">{{ size }} ({{ dimensionsLabel(size) }})</mat-option>
@@ -70,7 +77,7 @@
       </tb-toggle-select>
     </div>
     <div class="tb-form-row column">
-      <div translate>report.designer.page-margins</div>
+      <div translate>report.designer.margins</div>
       <tb-report-insets formControlName="pageMargins"></tb-report-insets>
     </div>
     <div class="tb-form-row">

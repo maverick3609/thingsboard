@@ -16,6 +16,7 @@
 
 -->
 <div class="tb-report-palette">
+  <div class="tb-report-palette-title" translate>report.designer.report-components</div>
   <mat-form-field class="tb-report-palette-search tb-appearance-transparent" subscriptSizing="dynamic">
     <mat-icon matPrefix>search</mat-icon>
     <input matInput
@@ -30,39 +31,19 @@
     </button>
   </mat-form-field>
 
-  <div class="tb-report-palette-group" *ngIf="filteredComponents.length">
-    <div class="tb-form-panel-title" translate>report.designer.components</div>
-    <div cdkDropList
-         [cdkDropListSortingDisabled]="true"
-         [cdkDropListData]="filteredComponents"
-         [cdkDropListEnterPredicate]="noEnterPredicate"
-         class="tb-report-palette-list tb-drop-list">
-      <div *ngFor="let item of filteredComponents"
-           class="tb-report-palette-item tb-draggable"
-           cdkDrag
-           [cdkDragData]="item.type">
-        <img [src]="item.preview" [alt]="item.labelKey | translate" class="tb-report-palette-preview">
-        <span class="tb-report-palette-item-title">{{ item.labelKey | translate }}</span>
-      </div>
+  <div cdkDropList
+       [cdkDropListSortingDisabled]="true"
+       [cdkDropListData]="filteredItems"
+       [cdkDropListEnterPredicate]="noEnterPredicate"
+       class="tb-report-palette-list tb-drop-list">
+    <div *ngFor="let item of filteredItems"
+         class="tb-report-palette-item tb-draggable"
+         cdkDrag
+         [cdkDragData]="item.dragData">
+      <span class="tb-report-palette-item-title">{{ item.labelKey | translate }}</span>
+      <img [src]="item.preview" [alt]="item.labelKey | translate" class="tb-report-palette-preview">
     </div>
   </div>
 
-  <div class="tb-report-palette-group" *ngIf="filteredPresets.length">
-    <div class="tb-form-panel-title" translate>report.designer.presets</div>
-    <div cdkDropList
-         [cdkDropListSortingDisabled]="true"
-         [cdkDropListData]="filteredPresets"
-         [cdkDropListEnterPredicate]="noEnterPredicate"
-         class="tb-report-palette-list tb-drop-list">
-      <div *ngFor="let item of filteredPresets"
-           class="tb-report-palette-item tb-draggable"
-           cdkDrag
-           [cdkDragData]="{ preset: item }">
-        <img [src]="item.preview" [alt]="item.labelKey | translate" class="tb-report-palette-preview">
-        <span class="tb-report-palette-item-title">{{ item.labelKey | translate }}</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="tb-report-palette-no-results" *ngIf="!hasResults" translate>report.designer.no-results</div>
+  <div *ngIf="!hasResults" class="tb-report-palette-empty tb-prompt" translate>report.designer.no-results</div>
 </div>

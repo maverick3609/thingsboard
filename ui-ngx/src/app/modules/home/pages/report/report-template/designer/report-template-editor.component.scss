@@ -14,10 +14,20 @@
  * limitations under the License.
  */
 
+// min-height on every link of the flex chain below: a flex item defaults to min-height:auto, which
+// refuses to shrink below its content. Without it the editor grows to the palette's full height
+// (~2500px) inside the 936px router-tab panel, which then scrolls the WHOLE editor - toolbar and
+// all - instead of letting each pane scroll internally, and strands the footer block far below the
+// fold with no way to reach it.
 :host {
   display: flex;
   flex: 1;
   flex-direction: column;
+  min-height: 0;
+}
+
+.tb-report-template-editor {
+  min-height: 0;
 }
 
 // Name and format are both edited (name) or fixed (format, it decides the whole config shape) in
@@ -38,6 +48,7 @@
 
 .tb-report-template-editor-body {
   overflow: hidden;
+  min-height: 0;
 }
 
 .tb-report-template-editor-palette {
@@ -45,14 +56,16 @@
   overflow: auto;
 }
 
-// Wider than the palette: the settings pane's rows are label + field on ONE line (.tb-form-row's
-// .fixed-title-width reserves 200px for the label alone), which does not fit in 280px.
+// PE's own width for this pane (.tb-report-settings in ui-ngx-4.2.0PE.jar is `width: 500px`).
+// It has to be this wide because the rows are label + field on ONE line and .tb-form-row's
+// .fixed-title-width reserves 200px for the label alone - at 420px the Name field truncates.
 .tb-report-template-editor-config {
-  width: 420px;
+  width: 500px;
   padding: 8px;
   overflow: auto;
 }
 
 .tb-report-template-editor-canvas {
   overflow: auto;
+  min-height: 0;
 }

@@ -25,6 +25,18 @@ import {
   ReportComponentPreset
 } from '@home/pages/report/report-template/designer/presets/report-component-presets';
 
+// One palette entry as the template renders it. `dragData` carries exactly the two shapes
+// report-canvas.component.ts's onDrop already branches on: a bare ReportComponentType string for a
+// plain component, or a { preset } descriptor whose factory clones a PE fixture.
+export interface ReportPaletteItem {
+  labelKey: string;
+  preview: string;
+  dragData: ReportComponentType | { preset: ReportComponentPreset };
+  // The component type this entry ultimately produces - the CSV filter keys off it for presets too.
+  type: ReportComponentType;
+  preset: boolean;
+}
+
 export interface ReportComponentTypeInfo {
   type: ReportComponentType;
   icon: string;
@@ -66,6 +78,55 @@ const CSV_COMPONENT_TYPES: ReadonlySet<ReportComponentType> = new Set([
   ReportComponentType.SUB_REPORT
 ]);
 
+// PE's palette is ONE flat, ordered list of 23 entries - not a "components" group over a "presets"
+// group. Presets sit next to the plain component they relate to (the three text/image presets right
+// after Rich text, the five logo presets and three footers after Subreport), and Divider/Page break
+// come LAST. Order verified entry-for-entry against the PE 4.2.0 bundle's own ordered Map
+// (docs/jars/BOOT-INF/lib/ui-ngx-4.2.0PE.jar, chunk-UILY2NXB.js) and against
+// docs/images/reporting-template-1..7.png, which scroll the whole library top to bottom.
+const PE_LIBRARY_ORDER: ReadonlyArray<{ type: ReportComponentType } | { preset: string }> = [
+  { type: ReportComponentType.HEADING },
+  { type: ReportComponentType.RICH_TEXT },
+  { preset: 'textSection' },
+  { preset: 'textImage' },
+  { preset: 'imageText' },
+  { type: ReportComponentType.ENTITY_TABLE },
+  { type: ReportComponentType.TIME_SERIES_TABLE },
+  { type: ReportComponentType.ALARM_TABLE },
+  { type: ReportComponentType.IMAGE },
+  { type: ReportComponentType.DASHBOARD },
+  { type: ReportComponentType.SUB_REPORT },
+  { preset: 'logoHeading' },
+  { preset: 'headingLogo' },
+  { preset: 'logoText' },
+  { preset: 'textLogo' },
+  { preset: 'logoText2' },
+  { preset: 'footer1' },
+  { preset: 'footer2' },
+  { preset: 'footer3' },
+  { preset: 'pageNumber' },
+  { preset: 'createdTime' },
+  { type: ReportComponentType.DIVIDER },
+  { type: ReportComponentType.PAGE_BREAK }
+];
+
+// Built once at module load. Throws on a bad key rather than silently dropping an entry: a typo here
+// would otherwise cost the palette a component with no visible symptom beyond a shorter list.
+export const REPORT_COMPONENT_LIBRARY: ReportPaletteItem[] = PE_LIBRARY_ORDER.map(entry => {
+  if ('preset' in entry) {
+    const preset = REPORT_COMPONENT_PRESETS.find(p => p.key === entry.preset);
+    if (!preset) {
+      throw new Error(`Unknown report component preset in palette order: ${entry.preset}`);
+    }
+    return {labelKey: preset.labelKey, preview: preset.preview, dragData: {preset}, type: preset.type, preset: true};
+  }
+  const info = REPORT_COMPONENT_PALETTE.find(i => i.type === entry.type);
+  if (!info) {
+    throw new Error(`Unknown report component type in palette order: ${entry.type}`);
+  }
+  return {labelKey: info.labelKey, preview: info.preview, dragData: info.type, type: info.type, preset: false};
+});
+
 // Looked up by report-canvas.component.ts (T6) to label/icon each card by its component's `type`
 // (a string-literal type, not the enum - see report-configuration.models.ts's own note on why -
 // hence the plain `string` parameter); later component-config panels may reuse it too instead of
@@ -101,8 +162,7 @@ export class ReportPaletteComponent implements OnInit, OnChanges, OnDestroy {
 
   // Recomputed by updateLists() from `format` + the debounced search term. Initialised to the full
   // sets so the first render (before ngOnChanges/valueChanges fire) already shows every component.
-  filteredComponents: ReportComponentTypeInfo[] = REPORT_COMPONENT_PALETTE;
-  filteredPresets: ReportComponentPreset[] = REPORT_COMPONENT_PRESETS;
+  filteredItems: ReportPaletteItem[] = REPORT_COMPONENT_LIBRARY;
 
   readonly noEnterPredicate = (): boolean => false;
 
@@ -138,18 +198,16 @@ export class ReportPaletteComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   get hasResults(): boolean {
-    return this.filteredComponents.length > 0 || this.filteredPresets.length > 0;
+    return this.filteredItems.length > 0;
   }
 
   private updateLists(): void {
     const csv = this.format === 'CSV';
-    const components = csv
-      ? REPORT_COMPONENT_PALETTE.filter(item => CSV_COMPONENT_TYPES.has(item.type))
-      : REPORT_COMPONENT_PALETTE;
-    const presets = csv ? [] : REPORT_COMPONENT_PRESETS;
+    const items = csv
+      ? REPORT_COMPONENT_LIBRARY.filter(item => !item.preset && CSV_COMPONENT_TYPES.has(item.type))
+      : REPORT_COMPONENT_LIBRARY;
     const term = this.searchControl.value.trim().toLowerCase();
-    this.filteredComponents = term ? components.filter(item => this.matchesSearch(item.labelKey, term)) : components;
-    this.filteredPresets = term ? presets.filter(item => this.matchesSearch(item.labelKey, term)) : presets;
+    this.filteredItems = term ? items.filter(item => this.matchesSearch(item.labelKey, term)) : items;
   }
 
   // Case-insensitive match on the TRANSLATED label (PE filters by visible label text, not by key).

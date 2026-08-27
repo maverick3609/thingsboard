@@ -28,7 +28,7 @@ export interface ReportAliasesFiltersDialogData {
 }
 
 // The Aliases and Filters toolbar buttons PE puts on the report designer
-// (docs/images/reporting-5.png). One dialog serves both because the two lists it hosts -
+// (docs/images/reporting-template-1..7.png). One dialog serves both because the two lists it hosts -
 // tb-report-entity-aliases and tb-report-filters - already take the same single `config` Input and
 // already own their own add/edit/delete flows; only the title and which one renders differ.
 //

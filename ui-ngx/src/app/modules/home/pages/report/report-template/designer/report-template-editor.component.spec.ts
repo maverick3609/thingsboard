@@ -427,15 +427,34 @@ describe('ReportTemplateEditorComponent', () => {
     expect(component.isDirty).toBe(false);
   });
 
-  // config.header/config.footer are optional: opening a template that never had one must not give
-  // it an empty one (C2 Task 18's byte-fidelity round-trip). The header/footer editor starts on a
-  // detached object and this handler is what attaches it, on the first real edit.
-  it('onHeaderFooterChange attaches the edited HeaderFooter to the PDF config and marks it dirty', () => {
+  // PE's new-template default enables both (docs/images/reporting-template-1.png shows three drop
+  // zones on a brand-new template), so a fresh config already carries them.
+  it('a new PDF template starts with header AND footer enabled, per PE', () => {
+    seedHistoryState({name: 'Fresh', format: TbReportFormat.PDF, type: ReportTemplateType.REPORT});
+    const component = newComponent(routeWithId('new'));
+
+    component.ngOnInit();
+
+    const config = component.config as PdfReportTemplateConfig;
+    expect(config.header).toEqual({enabled: true, components: []});
+    expect(config.footer).toEqual({enabled: true, components: []});
+    expect(config.namePattern).toBe('report-%d{yyyy-MM-dd_HH:mm:ss}');
+    expect(config.timeDataPattern).toBe('yyyy-MM-dd HH:mm:ss');
+    expect(config.pageMargins).toEqual({left: 20, right: 20, top: 20, bottom: 20});
+    expect(config.pageBackground).toBe('#fff');
+  });
+
+  // A config that reaches the editor WITHOUT them - an older template, or an imported file - must
+  // not gain an empty header just by being opened (C2 Task 18's byte-fidelity round-trip). The
+  // header/footer editor starts on a detached object and this handler is what attaches it, on the
+  // first real edit.
+  it('onHeaderFooterChange attaches the edited HeaderFooter to a config that had none, and marks it dirty', () => {
     seedHistoryState({name: 'Fresh', format: TbReportFormat.PDF, type: ReportTemplateType.REPORT});
     const component = newComponent(routeWithId('new'));
     component.ngOnInit();
+    delete (component.config as PdfReportTemplateConfig).header;
+    delete (component.config as PdfReportTemplateConfig).footer;
     component.isDirty = false;
-    expect((component.config as PdfReportTemplateConfig).header).toBeUndefined();
     const edited = {enabled: true, components: [] as ReportComponent[]};
 
     component.onHeaderFooterChange(true, edited);

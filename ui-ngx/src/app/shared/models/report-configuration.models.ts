@@ -476,19 +476,39 @@ export interface CsvReportTemplateConfig extends ReportTemplateConfigBase {
 // configuration/ReportTemplateConfig.java - `format` is the @JsonTypeInfo discriminator.
 export type ReportTemplateConfigModel = PdfReportTemplateConfig | CsvReportTemplateConfig;
 
+// PE's own new-template literals, field-for-field and in PE's key order (verified against
+// docs/jars/BOOT-INF/lib/ui-ngx-4.2.0PE.jar, chunk-42C54VSB.js). Two consequences worth naming:
+// a new PDF template opens with its header AND footer already ENABLED (which is why PE's new-template
+// screen shows three drop zones, docs/images/reporting-template-1.png), and it carries a file-name
+// pattern, a date pattern and a white page background from the very first save rather than saving a
+// config with those keys absent.
+const PE_DEFAULT_NAME_PATTERN = 'report-%d{yyyy-MM-dd_HH:mm:ss}';
+const PE_DEFAULT_TIME_DATA_PATTERN = 'yyyy-MM-dd HH:mm:ss';
+
 export function newPdfReportTemplateConfig(): PdfReportTemplateConfig {
   return {
     format: 'PDF',
-    components: [],
+    namePattern: PE_DEFAULT_NAME_PATTERN,
+    timeDataPattern: PE_DEFAULT_TIME_DATA_PATTERN,
     pageSize: PageSize.A4,
     pageOrientation: PageOrientation.PORTRAIT,
-    pageMargins: { left: 40, right: 40, top: 40, bottom: 40 }
+    pageMargins: { left: 20, right: 20, top: 20, bottom: 20 },
+    pageBackground: '#fff',
+    header: { enabled: true, components: [] },
+    footer: { enabled: true, components: [] },
+    entityAliases: [],
+    filters: [],
+    components: []
   };
 }
 
 export function newCsvReportTemplateConfig(): CsvReportTemplateConfig {
   return {
     format: 'CSV',
+    namePattern: PE_DEFAULT_NAME_PATTERN,
+    timeDataPattern: PE_DEFAULT_TIME_DATA_PATTERN,
+    entityAliases: [],
+    filters: [],
     components: []
   };
 }

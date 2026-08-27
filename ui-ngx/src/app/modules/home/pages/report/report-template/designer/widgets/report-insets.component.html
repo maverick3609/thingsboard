@@ -15,21 +15,33 @@
     limitations under the License.
 
 -->
-<div class="tb-report-insets flex flex-row items-center gap-2" [formGroup]="insetsFormGroup">
-  <mat-form-field class="flex-1" subscriptSizing="dynamic">
-    <input matInput type="number" min="0" formControlName="left"
-           placeholder="{{ 'report.designer.left' | translate }}"/>
-  </mat-form-field>
-  <mat-form-field class="flex-1" subscriptSizing="dynamic">
-    <input matInput type="number" min="0" formControlName="right"
-           placeholder="{{ 'report.designer.right' | translate }}"/>
-  </mat-form-field>
-  <mat-form-field class="flex-1" subscriptSizing="dynamic">
-    <input matInput type="number" min="0" formControlName="top"
-           placeholder="{{ 'report.designer.top' | translate }}"/>
-  </mat-form-field>
-  <mat-form-field class="flex-1" subscriptSizing="dynamic">
-    <input matInput type="number" min="0" formControlName="bottom"
-           placeholder="{{ 'report.designer.bottom' | translate }}"/>
-  </mat-form-field>
+<div class="tb-report-insets flex flex-1 flex-col gap-2" [formGroup]="insetsFormGroup">
+  <div class="flex flex-1 flex-row items-center justify-center gap-2">
+    <tb-icon matTooltipPosition="above" matTooltip="{{ 'report.designer.left' | translate }}">mdi:format-horizontal-align-left</tb-icon>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="number">
+      <input matInput formControlName="left" type="number" min="0" step="1"
+             placeholder="{{ 'widget-config.set' | translate }}"/>
+      <div matSuffix>pt</div>
+    </mat-form-field>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="number">
+      <input matInput formControlName="top" type="number" min="0" step="1"
+             placeholder="{{ 'widget-config.set' | translate }}"/>
+      <div matSuffix>pt</div>
+    </mat-form-field>
+    <tb-icon matTooltipPosition="above" matTooltip="{{ 'report.designer.top' | translate }}">mdi:format-vertical-align-top</tb-icon>
+  </div>
+  <div class="flex flex-1 flex-row items-center justify-center gap-2">
+    <tb-icon matTooltipPosition="above" matTooltip="{{ 'report.designer.right' | translate }}">mdi:format-horizontal-align-right</tb-icon>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="number">
+      <input matInput formControlName="right" type="number" min="0" step="1"
+             placeholder="{{ 'widget-config.set' | translate }}"/>
+      <div matSuffix>pt</div>
+    </mat-form-field>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="number">
+      <input matInput formControlName="bottom" type="number" min="0" step="1"
+             placeholder="{{ 'widget-config.set' | translate }}"/>
+      <div matSuffix>pt</div>
+    </mat-form-field>
+    <tb-icon matTooltipPosition="above" matTooltip="{{ 'report.designer.bottom' | translate }}">mdi:format-vertical-align-bottom</tb-icon>
+  </div>
 </div>

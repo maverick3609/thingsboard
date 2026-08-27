@@ -179,7 +179,7 @@ export class ReportTemplateEditorComponent implements OnInit {
     this.isDirty = true;
   }
 
-  // Header and footer are edited in the canvas column (PE's layout, docs/images/reporting-5.png),
+  // Header and footer are edited in the canvas column (PE's layout, docs/images/reporting-template-1..7.png),
   // not in the settings pane. Only the PDF variant has the fields at all, and a subreport is laid
   // out inside its parent's page, so neither applies to one.
   get showHeaderFooter(): boolean {

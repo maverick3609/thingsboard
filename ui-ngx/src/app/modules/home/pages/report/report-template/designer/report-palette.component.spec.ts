@@ -25,7 +25,12 @@ import { fakeAsync, tick } from '@angular/core/testing';
 import { SimpleChange, SimpleChanges } from '@angular/core';
 import { TranslateService } from '@ngx-translate/core';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
-import { REPORT_COMPONENT_PALETTE, reportComponentTypeInfo, ReportPaletteComponent } from './report-palette.component';
+import {
+  REPORT_COMPONENT_LIBRARY,
+  REPORT_COMPONENT_PALETTE,
+  reportComponentTypeInfo,
+  ReportPaletteComponent
+} from './report-palette.component';
 import { ReportTemplateEditorComponent } from './report-template-editor.component';
 import { ReportService } from '@core/http/report.service';
 import { newReportComponent, ReportComponentType } from '@shared/models/report-configuration.models';
@@ -49,10 +54,11 @@ describe('ReportPaletteComponent (data)', () => {
   // PE's J2 - the only components a CSV report can render (report-palette.component.ts's
   // CSV_COMPONENT_TYPES). Listed here in REPORT_COMPONENT_PALETTE order, which is the order the
   // format filter preserves (it filters the palette array in place, not the set).
+  // PE library order, which puts Time series table before Alarm table.
   const CSV_TYPES_IN_PALETTE_ORDER: ReportComponentType[] = [
     ReportComponentType.ENTITY_TABLE,
-    ReportComponentType.ALARM_TABLE,
     ReportComponentType.TIME_SERIES_TABLE,
+    ReportComponentType.ALARM_TABLE,
     ReportComponentType.SUB_REPORT
   ];
 
@@ -71,7 +77,7 @@ describe('ReportPaletteComponent (data)', () => {
     ({ instant: (key: string) => key } as unknown as TranslateService);
 
   // Builds a palette wired like the editor does: sets @Input() format, runs ngOnInit (search
-  // subscription) then ngOnChanges (format filter), so filteredComponents/filteredPresets reflect the
+  // subscription) then ngOnChanges (format filter), so filteredItems reflects the
   // requested format with an empty search - exactly the first-render state.
   const newPalette = (format?: string): ReportPaletteComponent => {
     const palette = new ReportPaletteComponent(fakeTranslate());
@@ -101,43 +107,78 @@ describe('ReportPaletteComponent (data)', () => {
     });
   });
 
-  describe('presets (C2 Task 15B/16)', () => {
-    it('a fresh PDF palette exposes all 13 presets (2 HEADING + 11 RICH_TEXT composites), each with a non-empty PE preview thumbnail path', () => {
-      const palette = newPalette('PDF');
+  describe('PE library order (one flat list, no groups)', () => {
+    // PE's palette is a single ordered Map of 23 entries with presets interleaved among the plain
+    // components and Divider/Page break LAST - verified against the PE 4.2.0 bundle and against
+    // docs/images/reporting-template-1..7.png, which scroll the library end to end.
+    const PE_ORDER = [
+      'report.designer.component-heading',
+      'report.designer.component-rich-text',
+      'report.designer.preset-text-section',
+      'report.designer.preset-text-image',
+      'report.designer.preset-image-text',
+      'report.designer.component-entity-table',
+      'report.designer.component-time-series-table',
+      'report.designer.component-alarm-table',
+      'report.designer.component-image',
+      'report.designer.component-dashboard',
+      'report.designer.component-sub-report',
+      'report.designer.preset-logo-heading',
+      'report.designer.preset-heading-logo',
+      'report.designer.preset-logo-text',
+      'report.designer.preset-text-logo',
+      'report.designer.preset-logo-text-2',
+      'report.designer.preset-footer-1',
+      'report.designer.preset-footer-2',
+      'report.designer.preset-footer-3',
+      'report.designer.preset-page-number',
+      'report.designer.preset-created-time',
+      'report.designer.component-divider',
+      'report.designer.component-page-break'
+    ];
 
-      expect(palette.filteredPresets).toEqual(REPORT_COMPONENT_PRESETS);
-      expect(palette.filteredPresets.map(p => p.key)).toEqual([
-        'pageNumber', 'createdTime',
-        'textSection', 'textImage', 'imageText',
-        'logoHeading', 'headingLogo', 'logoText', 'textLogo', 'logoText2',
-        'footer1', 'footer2', 'footer3'
-      ]);
-      palette.filteredPresets.forEach(item => {
-        expect(item.preview).toBeTruthy();
+    it('is 23 entries in PE order, each with a PE preview thumbnail', () => {
+      expect(REPORT_COMPONENT_LIBRARY.length).toBe(23);
+      expect(REPORT_COMPONENT_LIBRARY.map(i => i.labelKey)).toEqual(PE_ORDER);
+      REPORT_COMPONENT_LIBRARY.forEach(item => {
         expect(item.preview).toMatch(/^\/assets\/report\/components\/[a-z0-9-]+\.svg$/);
       });
+    });
+
+    // The two drag-data shapes report-canvas.component.ts's onDrop branches on.
+    it('carries a bare type string for a component and a { preset } descriptor for a preset', () => {
+      const heading = REPORT_COMPONENT_LIBRARY.find(i => i.labelKey === 'report.designer.component-heading');
+      const footer1 = REPORT_COMPONENT_LIBRARY.find(i => i.labelKey === 'report.designer.preset-footer-1');
+
+      expect(heading.preset).toBe(false);
+      expect(heading.dragData).toBe(ReportComponentType.HEADING);
+      expect(footer1.preset).toBe(true);
+      expect((footer1.dragData as {preset: {key: string}}).preset.key).toBe('footer1');
+    });
+
+    it('covers all 10 component types and all 13 presets exactly once', () => {
+      expect(REPORT_COMPONENT_LIBRARY.filter(i => !i.preset).length).toBe(10);
+      expect(REPORT_COMPONENT_LIBRARY.filter(i => i.preset).length).toBe(REPORT_COMPONENT_PRESETS.length);
+      expect(new Set(REPORT_COMPONENT_LIBRARY.map(i => i.labelKey)).size).toBe(23);
     });
   });
 
   describe('format-aware library (PE tb-report-component-library filter)', () => {
-    it('unset format shows all 10 components + all 13 presets (default = PDF/everything)', () => {
+    it('unset format shows the whole 23-entry library (default = PDF/everything)', () => {
       const palette = newPalette(undefined);
-      expect(palette.filteredComponents.map(i => i.type)).toEqual(ALL_10_TYPES);
-      expect(palette.filteredPresets).toEqual(REPORT_COMPONENT_PRESETS);
+      expect(palette.filteredItems).toEqual(REPORT_COMPONENT_LIBRARY);
       expect(palette.hasResults).toBe(true);
     });
 
-    it('PDF shows all 10 components + all 13 presets', () => {
+    it('PDF shows the whole 23-entry library', () => {
       const palette = newPalette('PDF');
-      expect(palette.filteredComponents.length).toBe(10);
-      expect(palette.filteredPresets.length).toBe(13);
+      expect(palette.filteredItems.length).toBe(23);
     });
 
-    it('CSV shows only the 4 CSV-renderable components (palette order) and hides every preset', () => {
+    it('CSV shows only the 4 CSV-renderable components (library order) and hides every preset', () => {
       const palette = newPalette('CSV');
-      expect(palette.filteredComponents.map(i => i.type)).toEqual(CSV_TYPES_IN_PALETTE_ORDER);
-      expect(palette.filteredPresets).toEqual([]);
-      // Presets group is hidden but there ARE component results, so it is not a "no results" state.
+      expect(palette.filteredItems.map(i => i.type)).toEqual(CSV_TYPES_IN_PALETTE_ORDER);
+      expect(palette.filteredItems.every(i => !i.preset)).toBe(true);
       expect(palette.hasResults).toBe(true);
     });
   });
@@ -148,16 +189,18 @@ describe('ReportPaletteComponent (data)', () => {
       palette.searchControl.setValue('HEADING');
       tick(150);
       // Only the component labels containing "heading" survive (component-heading + preset-*heading*).
-      expect(palette.filteredComponents.map(i => i.type)).toEqual([ReportComponentType.HEADING]);
-      expect(palette.filteredComponents.length).toBe(1);
+      expect(palette.filteredItems.map(i => i.labelKey))
+        .toEqual(['report.designer.component-heading', 'report.designer.preset-logo-heading',
+                  'report.designer.preset-heading-logo']);
     }));
 
     it('filters presets as well as components', fakeAsync(() => {
       const palette = newPalette('PDF');
       palette.searchControl.setValue('footer');
       tick(150);
-      expect(palette.filteredComponents).toEqual([]);
-      expect(palette.filteredPresets.map(p => p.key)).toEqual(['footer1', 'footer2', 'footer3']);
+      expect(palette.filteredItems.map(i => i.labelKey))
+        .toEqual(['report.designer.preset-footer-1', 'report.designer.preset-footer-2',
+                  'report.designer.preset-footer-3']);
       expect(palette.hasResults).toBe(true);
     }));
 
@@ -165,8 +208,7 @@ describe('ReportPaletteComponent (data)', () => {
       const palette = newPalette('PDF');
       palette.searchControl.setValue('zzz-no-such-component');
       tick(150);
-      expect(palette.filteredComponents).toEqual([]);
-      expect(palette.filteredPresets).toEqual([]);
+      expect(palette.filteredItems).toEqual([]);
       expect(palette.hasResults).toBe(false);
     }));
 
@@ -175,45 +217,42 @@ describe('ReportPaletteComponent (data)', () => {
       // "heading" matches a PDF-only component; under CSV it must resolve to nothing, never re-add it.
       palette.searchControl.setValue('heading');
       tick(150);
-      expect(palette.filteredComponents).toEqual([]);
-      // "table" hits three of the four CSV components.
+      expect(palette.filteredItems).toEqual([]);
+      // "table" hits three of the four CSV components, in PE library order.
       palette.searchControl.setValue('table');
       tick(150);
-      expect(palette.filteredComponents.map(i => i.type)).toEqual([
+      expect(palette.filteredItems.map(i => i.type)).toEqual([
         ReportComponentType.ENTITY_TABLE,
-        ReportComponentType.ALARM_TABLE,
-        ReportComponentType.TIME_SERIES_TABLE
+        ReportComponentType.TIME_SERIES_TABLE,
+        ReportComponentType.ALARM_TABLE
       ]);
-      expect(palette.filteredPresets).toEqual([]);
     }));
 
     it('clearSearch() resets the control and restores the full lists', fakeAsync(() => {
       const palette = newPalette('PDF');
       palette.searchControl.setValue('heading');
       tick(150);
-      expect(palette.filteredComponents.length).toBe(1);
+      expect(palette.filteredItems.length).toBe(3);
 
       palette.clearSearch();
       tick(150);
       expect(palette.searchControl.value).toBe('');
-      expect(palette.filteredComponents.length).toBe(10);
-      expect(palette.filteredPresets.length).toBe(13);
+      expect(palette.filteredItems.length).toBe(23);
     }));
   });
 
-  describe('drag-source contract (unchanged): filtered lists still carry the canvas drag data', () => {
-    it('every visible component item exposes a ReportComponentType `type` (bound to [cdkDragData])', () => {
+  describe('drag-source contract (unchanged): the filtered list still carries the canvas drag data', () => {
+    it('every visible item exposes one of the two [cdkDragData] shapes the canvas branches on', () => {
       const palette = newPalette('PDF');
-      palette.filteredComponents.forEach(item => {
+      palette.filteredItems.forEach(item => {
         expect(ALL_10_TYPES).toContain(item.type);
-      });
-    });
-
-    it('every visible preset item is a REPORT_COMPONENT_PRESETS entry (bound to [cdkDragData]="{ preset: item }")', () => {
-      const palette = newPalette('PDF');
-      palette.filteredPresets.forEach(item => {
-        expect(REPORT_COMPONENT_PRESETS).toContain(item);
-        expect(typeof item.factory).toBe('function');
+        if (item.preset) {
+          const preset = (item.dragData as {preset: typeof REPORT_COMPONENT_PRESETS[0]}).preset;
+          expect(REPORT_COMPONENT_PRESETS).toContain(preset);
+          expect(typeof preset.factory).toBe('function');
+        } else {
+          expect(item.dragData).toBe(item.type);
+        }
       });
     });
 

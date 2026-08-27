@@ -22,7 +22,7 @@
        (cdkDropListDropped)="onDrop($event)"
        class="tb-report-canvas-list tb-drop-list flex flex-1 flex-col gap-2">
     <div *ngIf="!components.length" class="tb-report-canvas-empty flex flex-1 flex-col items-center justify-center">
-      <span translate class="tb-prompt">report.designer.canvas-empty</span>
+      <span translate class="tb-prompt">report.designer.drop-report-components</span>
     </div>
     <div *ngFor="let component of components; let i = index; trackBy: trackByComponent"
          class="tb-report-canvas-card tb-draggable flex flex-row items-center gap-2"

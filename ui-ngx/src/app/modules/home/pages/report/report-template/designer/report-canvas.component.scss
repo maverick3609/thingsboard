@@ -24,6 +24,17 @@
   padding: 8px;
 }
 
+// PE draws each empty drop target as a dashed, lightly filled box rather than bare prompt text
+// (docs/images/reporting-template-1..7.png). Themed off the same divider token the rest of the
+// designer uses so it survives the .tb-dark theme.
+.tb-report-canvas-empty {
+  min-height: 96px;
+  padding: 24px 16px;
+  border: 1px dashed var(--mat-divider-color, var(--mat-app-outline));
+  border-radius: 4px;
+  background: rgba(0, 0, 0, .03);
+}
+
 .tb-report-canvas-card {
   padding: 8px 12px;
   border: 1px solid rgba(0, 0, 0, .12);

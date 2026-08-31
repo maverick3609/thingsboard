@@ -33,6 +33,7 @@ import org.thingsboard.server.common.data.id.DeviceId;
 import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.msg.TbMsgType;
 import org.thingsboard.server.common.msg.TbMsg;
+import org.thingsboard.server.common.data.id.ReportId;
 import org.thingsboard.server.common.msg.TbMsgMetaData;
 
 import java.util.UUID;
@@ -81,6 +82,52 @@ public class TbMsgToEmailNodeTest {
         assertThat(config.getToTemplate()).isEqualTo("${userEmail}");
         assertThat(config.getSubjectTemplate()).isEqualTo("Device ${deviceType} temperature high");
         assertThat(config.getBodyTemplate()).isEqualTo("Device ${deviceName} has high temperature $[temperature]");
+    }
+
+    /**
+     * Inferrix: the "reports" metadata hop that lets a generated report actually be emailed. The
+     * "generate dashboard report" node (and ReportJobProcessor#produceOutputMsg) stamp report ids
+     * there; without this they are produced and never attached.
+     */
+    @Test
+    void givenReportsMetadata_whenOnMsg_thenTbEmailCarriesReportIds() {
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        var md = new TbMsgMetaData();
+        md.putValue("userEmail", EXPECTED_TO_EMAIL);
+        md.putValue("reports", first + "," + second);
+
+        node.onMsg(ctxMock, TbMsg.newMsg()
+                .type(TbMsgType.POST_TELEMETRY_REQUEST)
+                .originator(originator)
+                .copyMetaData(md)
+                .data(TbMsg.EMPTY_JSON_OBJECT)
+                .build());
+
+        var dataCaptor = ArgumentCaptor.forClass(String.class);
+        verify(ctxMock).transformMsg(any(TbMsg.class), any(TbMsgType.class), any(EntityId.class), any(TbMsgMetaData.class), dataCaptor.capture());
+        TbEmail email = JacksonUtil.fromBytes(dataCaptor.getValue().getBytes(), TbEmail.class);
+        assertThat(email.getReports()).containsExactly(new ReportId(first), new ReportId(second));
+    }
+
+    @Test
+    void givenUnparseableReportsMetadata_whenOnMsg_thenEmailStillBuildsWithNoReports() {
+        var md = new TbMsgMetaData();
+        md.putValue("userEmail", EXPECTED_TO_EMAIL);
+        md.putValue("reports", "not-a-uuid");
+
+        node.onMsg(ctxMock, TbMsg.newMsg()
+                .type(TbMsgType.POST_TELEMETRY_REQUEST)
+                .originator(originator)
+                .copyMetaData(md)
+                .data(TbMsg.EMPTY_JSON_OBJECT)
+                .build());
+
+        var dataCaptor = ArgumentCaptor.forClass(String.class);
+        verify(ctxMock).transformMsg(any(TbMsg.class), any(TbMsgType.class), any(EntityId.class), any(TbMsgMetaData.class), dataCaptor.capture());
+        verify(ctxMock, never()).tellFailure(any(), any());
+        TbEmail email = JacksonUtil.fromBytes(dataCaptor.getValue().getBytes(), TbEmail.class);
+        assertThat(email.getReports()).isNull();
     }
 
     @ParameterizedTest

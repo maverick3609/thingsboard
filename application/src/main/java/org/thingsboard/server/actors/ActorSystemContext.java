@@ -32,6 +32,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.common.util.SsrfProtectionValidator;
+import org.thingsboard.rule.engine.api.DashboardReportService;
 import org.thingsboard.rule.engine.api.DeviceStateManager;
 import org.thingsboard.rule.engine.api.JobManager;
 import org.thingsboard.rule.engine.api.MailService;
@@ -244,6 +245,13 @@ public class ActorSystemContext {
     @Autowired(required = false)
     @Getter
     private DeviceStateManager deviceStateManager;
+
+    // required = false: DefaultDashboardReportService is @ConditionalOnProperty(reports.renderer.enabled),
+    // so this stays null on a renderer-off node and TbGenerateReportNode fails the message with a clear
+    // reason instead of the context failing to construct.
+    @Autowired(required = false)
+    @Getter
+    private DashboardReportService dashboardReportService;
 
     @Autowired
     @Getter

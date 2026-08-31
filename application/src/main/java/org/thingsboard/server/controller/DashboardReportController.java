@@ -42,7 +42,7 @@ import org.thingsboard.server.common.data.id.DashboardId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.report.ReportData;
 import org.thingsboard.server.queue.util.TbCoreComponent;
-import org.thingsboard.server.service.report.DashboardReportService;
+import org.thingsboard.rule.engine.api.DashboardReportService;
 import org.thingsboard.server.service.security.model.SecurityUser;
 import org.thingsboard.server.service.security.permission.Operation;
 import org.thingsboard.server.utils.MiscUtils;

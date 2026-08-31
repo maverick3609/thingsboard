@@ -198,20 +198,33 @@ public class DefaultSchedulerService extends AbstractPartitionBasedService<Tenan
         List<SchedulerEventInfo> events = this.schedulerEventService.findSchedulerEventsByTenantIdAndEnabled(tenant.getId(), true);
         long scheduled = 0L;
         long passedAway = 0L;
+        long failed = 0L;
         for (SchedulerEventInfo event : events) {
-            SchedulerEventMetaData md = this.getSchedulerEventMetaData(event);
-            if (!md.getDescriptor().passedAway(ts)) {
-                this.eventsMetaData.put(event.getId(), md);
-                eventIds.add(event.getId());
-                ++scheduled;
-            } else {
-                ++passedAway;
+            // Per-event guard: toDescriptor() dereferences schedule.startTime/timezone, so a single row
+            // with a null or malformed schedule used to throw out of this loop and leave every REMAINING
+            // event of this tenant - and every tenant still to be processed in this partition - silently
+            // unscheduled. One bad row now costs only itself.
+            try {
+                SchedulerEventMetaData md = this.getSchedulerEventMetaData(event);
+                if (!md.getDescriptor().passedAway(ts)) {
+                    this.eventsMetaData.put(event.getId(), md);
+                    eventIds.add(event.getId());
+                    ++scheduled;
+                } else {
+                    ++passedAway;
+                    log.warn("[{}][{}] Scheduler event '{}' is not scheduled: its schedule has already ended. " +
+                            "Set a new end date ('Ends on') to resume it.", tenant.getId(), event.getId(), event.getName());
+                }
+                this.scheduleNextEvent(ts, event, md);
+            } catch (Exception e) {
+                ++failed;
+                log.error("[{}][{}] Failed to schedule event '{}'; skipping it.", tenant.getId(), event.getId(), event.getName(), e);
             }
-            this.scheduleNextEvent(ts, event, md);
         }
         this.tenantEvents.put(tenant.getId(), eventIds);
-        if (passedAway > 0) {
-            log.warn("[{}] Fetched scheduled events for tenant. Scheduling {} events. Found {} passed events.", tenant.getId(), scheduled, passedAway);
+        if (passedAway > 0 || failed > 0) {
+            log.warn("[{}] Fetched scheduled events for tenant. Scheduling {} events. Found {} passed events, {} failed.",
+                    tenant.getId(), scheduled, passedAway, failed);
         } else {
             log.debug("[{}] Fetched scheduled events for tenant. Scheduling {} events. Found {} passed events.", tenant.getId(), scheduled, passedAway);
         }
@@ -286,6 +299,15 @@ public class DefaultSchedulerService extends AbstractPartitionBasedService<Tenan
                                 () -> log.warn("[{}][{}] 'generateReport' event fired but the report renderer is disabled. " +
                                         "Set reports.renderer.enabled=true (env REPORTS_RENDERER_ENABLED=true) on a " +
                                         "headless-Chromium-capable host to enable scheduled report generation.", tenantId, eventId));
+                    } else if ("generateDashboardReport".equals(event.getType()) && schedulerReportExecutor.isPresent()) {
+                        // Direct execution, no rule-chain hop. PE only ever routes this type through the
+                        // rule engine, which means the event does nothing until a tenant wires
+                        // Message Type Switch -> "Generate Report" -> the "generate dashboard report"
+                        // node. Taking the executor when it exists is what makes these events fire out
+                        // of the box; when the renderer is off there is no executor and no working node
+                        // either, so we fall through to the rule-engine push below and behave exactly as
+                        // before. The node stays reachable for non-scheduler messages.
+                        schedulerReportExecutor.get().executeDashboardReport(tenantId, event);
                     } else {
                         TbMsgMetaData tbMsgMD = this.getTbMsgMetaData(event, configuration);
                         TbMsg tbMsg = TbMsg.newMsg().type(msgType).originator(originatorId).metaData(tbMsgMD).dataType(TbMsgDataType.JSON).data(this.getMsgBody(event.getConfiguration())).build();
@@ -309,9 +331,39 @@ public class DefaultSchedulerService extends AbstractPartitionBasedService<Tenan
         return JacksonUtil.toString(configuration.get("msgBody"));
     }
 
+    /**
+     * PE-identical, plus one compatibility fallback (see {@link #defaultMsgType}).
+     */
     private String getMsgType(SchedulerEvent event, JsonNode configuration) {
-        String msgType = configuration.has("msgType") && !configuration.get("msgType").isNull() ? configuration.get("msgType").asText() : event.getType();
+        String msgType = configuration.has("msgType") && !configuration.get("msgType").isNull()
+                ? configuration.get("msgType").asText() : defaultMsgType(event);
         return msgType.equals("generateDashboardReport") ? TbMsgType.generateReport.name() : msgType;
+    }
+
+    /**
+     * DEVIATION from PE, and the reason the scheduler needs no rule chain of its own.
+     * <p>
+     * PE returns {@code event.getType()} here, which is safe for PE only because PE's scheduler UI
+     * always writes an explicit {@code configuration.msgType}: {@code POST_ATTRIBUTES_REQUEST} for
+     * {@code updateAttributes} and {@code RPC_CALL_FROM_SERVER_TO_DEVICE} for {@code sendRpcRequest}
+     * (verified in {@code ui-ngx-4.2.0PE.jar}, chunk-LQGPECC4.js). Those are stock {@link TbMsgType}s
+     * that the DEFAULT root rule chain already routes — "Post attributes" -> Save Client Attributes
+     * (which takes its scope from {@code metadata.scope}) and "RPC Request to Device" -> RPC Call
+     * Request — so a PE scheduler event works out of the box.
+     * <p>
+     * Our UI wrote {@code msgType: null}, so this fell back to the raw event type ({@code
+     * "updateAttributes"}), which is not a {@link TbMsgType} at all: the Message Type Switch dropped it
+     * down its {@code Other} branch into a Log node and the event silently did nothing unless the
+     * tenant hand-wired a chain for it. Mapping the known types here rather than only in the UI fixes
+     * every ALREADY-STORED event too, with no migration. Unknown/custom types still fall through to
+     * the event type exactly as in PE.
+     */
+    private static String defaultMsgType(SchedulerEvent event) {
+        return switch (event.getType()) {
+            case "updateAttributes" -> TbMsgType.POST_ATTRIBUTES_REQUEST.name();
+            case "sendRpcRequest" -> TbMsgType.RPC_CALL_FROM_SERVER_TO_DEVICE.name();
+            default -> event.getType();
+        };
     }
 
     private TbMsgMetaData getTbMsgMetaData(SchedulerEvent event, JsonNode configuration) throws JsonProcessingException {

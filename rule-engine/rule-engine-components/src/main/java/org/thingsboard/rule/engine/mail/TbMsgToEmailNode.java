@@ -25,13 +25,18 @@ import org.thingsboard.rule.engine.api.TbNodeConfiguration;
 import org.thingsboard.rule.engine.api.TbNodeException;
 import org.thingsboard.rule.engine.api.util.TbNodeUtils;
 import org.thingsboard.server.common.data.StringUtils;
+import org.thingsboard.server.common.data.id.ReportId;
 import org.thingsboard.server.common.data.msg.TbMsgType;
 import org.thingsboard.server.common.data.msg.TbNodeConnectionType;
 import org.thingsboard.server.common.data.plugin.ComponentType;
 import org.thingsboard.server.common.msg.TbMsg;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RuleNode(
         type = ComponentType.TRANSFORMATION,
@@ -47,6 +52,11 @@ import java.util.Map;
 public class TbMsgToEmailNode implements TbNode {
 
     private static final String IMAGES = "images";
+    // Inferrix: comma-separated report ids stamped by the "generate dashboard report" node and by
+    // ReportJobProcessor#produceOutputMsg. PE uses an "attachments" key holding BlobEntity ids; this
+    // fork stores generated reports as Report entities instead, and DefaultMailService attaches by
+    // ReportId. Without this hop a generated report can be produced but never emailed.
+    private static final String REPORTS = "reports";
     private static final String DYNAMIC = "dynamic";
 
     private TbMsgToEmailNodeConfiguration config;
@@ -86,7 +96,28 @@ public class TbMsgToEmailNode implements TbNode {
             Map<String, String> imgMap = JacksonUtil.fromString(imagesStr, new TypeReference<HashMap<String, String>>() {});
             builder.images(imgMap);
         }
+        List<ReportId> reports = parseReports(msg.getMetaData().getValue(REPORTS));
+        if (!reports.isEmpty()) {
+            builder.reports(reports);
+        }
         return builder.build();
+    }
+
+    private static List<ReportId> parseReports(String reportsStr) {
+        if (StringUtils.isEmpty(reportsStr)) {
+            return List.of();
+        }
+        try {
+            return Arrays.stream(reportsStr.split(","))
+                    .map(String::trim)
+                    .filter(StringUtils::isNotEmpty)
+                    .map(id -> new ReportId(UUID.fromString(id)))
+                    .collect(Collectors.toList());
+        } catch (IllegalArgumentException e) {
+            // Metadata is free-form and may carry an unrelated "reports" value; a malformed id must not
+            // fail the whole email transform, it just means there is nothing to attach.
+            return List.of();
+        }
     }
 
     private String fromTemplate(String template, TbMsg msg) {

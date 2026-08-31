@@ -35,7 +35,10 @@ import org.thingsboard.server.common.data.id.DeviceId;
 import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.id.OtaPackageId;
 import org.thingsboard.server.common.data.id.SchedulerEventId;
+import org.thingsboard.server.common.data.Tenant;
 import org.thingsboard.server.common.data.id.TenantId;
+import org.thingsboard.server.common.data.page.PageData;
+import org.thingsboard.server.common.data.page.PageLink;
 import org.thingsboard.server.common.data.msg.TbMsgType;
 import org.thingsboard.server.common.data.ota.OtaPackageType;
 import org.thingsboard.server.common.data.scheduler.SchedulerEvent;
@@ -46,6 +49,8 @@ import org.thingsboard.server.dao.device.DeviceService;
 import org.thingsboard.server.dao.ota.OtaPackageService;
 import org.thingsboard.server.dao.scheduler.SchedulerEventService;
 import org.thingsboard.server.dao.tenant.TenantService;
+import org.thingsboard.server.common.msg.queue.ServiceType;
+import org.thingsboard.server.common.msg.queue.TopicPartitionInfo;
 import org.thingsboard.server.gen.transport.TransportProtos;
 import org.thingsboard.server.queue.discovery.PartitionService;
 import org.thingsboard.server.queue.discovery.TbServiceInfoProvider;
@@ -53,6 +58,8 @@ import org.thingsboard.server.service.ota.OtaPackageStateService;
 import org.thingsboard.server.service.scheduler.report.SchedulerReportExecutor;
 
 import java.util.Optional;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -145,7 +152,9 @@ class DefaultSchedulerServiceTest {
         ArgumentCaptor<TbMsg> captor = ArgumentCaptor.forClass(TbMsg.class);
         verify(clusterService, timeout(3000)).pushMsgToRuleEngine(eq(tenantId), eq(deviceId), captor.capture(), isNull());
         TbMsg msg = captor.getValue();
-        assertThat(msg.getType()).isEqualTo("updateAttributes");
+        // PE parity: a stock TbMsgType the default root rule chain already routes, not the raw event
+        // type (which would land on the switch's Other -> Log branch and do nothing).
+        assertThat(msg.getType()).isEqualTo(TbMsgType.POST_ATTRIBUTES_REQUEST.name());
         assertThat(msg.getOriginator()).isEqualTo(deviceId);
         assertThat(JacksonUtil.toJsonNode(msg.getData()).get("temp").asInt()).isEqualTo(22);
         assertThat(msg.getMetaData().getValue("eventName")).isEqualTo("test-updateAttributes");
@@ -171,8 +180,90 @@ class DefaultSchedulerServiceTest {
         assertThat(msg.getMetaData().getValue("oneway")).isEqualTo("true");
     }
 
+    /**
+     * The whole "scheduler needs no rule chain of its own" property. PE's UI writes these msgTypes
+     * explicitly; ours used to write null, which fell back to the raw event type and landed on the
+     * default chain's Other -> Log branch. Verified against ui-ngx-4.2.0PE.jar (chunk-LQGPECC4.js).
+     */
     @Test
-    void generateDashboardReport_mapsMsgTypeToGenerateReport() {
+    void updateAttributes_withoutExplicitMsgType_firesAsPostAttributesRequest() {
+        DeviceId deviceId = new DeviceId(UUID.randomUUID());
+        SchedulerEvent event = event("updateAttributes",
+                "{\"originatorId\":{\"entityType\":\"DEVICE\",\"id\":\"" + deviceId.getId() + "\"}," +
+                        "\"msgType\":null,\"msgBody\":{\"targetTemperature\":22},\"metadata\":{\"scope\":\"SERVER_SCOPE\"}}", 150);
+        stubAndDeliver(event);
+
+        ArgumentCaptor<TbMsg> captor = ArgumentCaptor.forClass(TbMsg.class);
+        verify(clusterService, timeout(3000)).pushMsgToRuleEngine(eq(tenantId), eq(deviceId), captor.capture(), isNull());
+        // "Post attributes" on the stock Message Type Switch -> Save Client Attributes, which reads the
+        // scope out of metadata. No tenant wiring involved.
+        assertThat(captor.getValue().getType()).isEqualTo(TbMsgType.POST_ATTRIBUTES_REQUEST.name());
+        assertThat(captor.getValue().getMetaData().getValue("scope")).isEqualTo("SERVER_SCOPE");
+    }
+
+    @Test
+    void sendRpcRequest_withoutExplicitMsgType_firesAsRpcCallFromServerToDevice() {
+        DeviceId deviceId = new DeviceId(UUID.randomUUID());
+        SchedulerEvent event = event("sendRpcRequest",
+                "{\"originatorId\":{\"entityType\":\"DEVICE\",\"id\":\"" + deviceId.getId() + "\"}," +
+                        "\"msgType\":null,\"msgBody\":{\"method\":\"setState\",\"params\":{}}," +
+                        "\"metadata\":{\"oneway\":\"true\",\"timeout\":\"5000\",\"persistent\":\"false\"}}", 150);
+        stubAndDeliver(event);
+
+        ArgumentCaptor<TbMsg> captor = ArgumentCaptor.forClass(TbMsg.class);
+        verify(clusterService, timeout(3000)).pushMsgToRuleEngine(eq(tenantId), eq(deviceId), captor.capture(), isNull());
+        // "RPC Request to Device" on the stock switch -> RPC Call Request.
+        assertThat(captor.getValue().getType()).isEqualTo(TbMsgType.RPC_CALL_FROM_SERVER_TO_DEVICE.name());
+        assertThat(captor.getValue().getMetaData().getValue("originServiceId")).isEqualTo("tb-core-test");
+    }
+
+    @Test
+    void explicitMsgTypeInTheConfigurationStillWins() {
+        DeviceId deviceId = new DeviceId(UUID.randomUUID());
+        SchedulerEvent event = event("updateAttributes",
+                "{\"originatorId\":{\"entityType\":\"DEVICE\",\"id\":\"" + deviceId.getId() + "\"}," +
+                        "\"msgType\":\"POST_TELEMETRY_REQUEST\",\"msgBody\":{},\"metadata\":null}", 150);
+        stubAndDeliver(event);
+
+        ArgumentCaptor<TbMsg> captor = ArgumentCaptor.forClass(TbMsg.class);
+        verify(clusterService, timeout(3000)).pushMsgToRuleEngine(eq(tenantId), eq(deviceId), captor.capture(), isNull());
+        assertThat(captor.getValue().getType()).isEqualTo(TbMsgType.POST_TELEMETRY_REQUEST.name());
+    }
+
+    @Test
+    void customEventTypeStillFallsThroughToItsOwnTypeAsInPe() {
+        SchedulerEvent event = event("myCustomType",
+                "{\"originatorId\":null,\"msgType\":null,\"msgBody\":{},\"metadata\":null}", 150);
+        stubAndDeliver(event);
+
+        ArgumentCaptor<TbMsg> captor = ArgumentCaptor.forClass(TbMsg.class);
+        verify(clusterService, timeout(3000)).pushMsgToRuleEngine(eq(tenantId), eq(eventId), captor.capture(), isNull());
+        assertThat(captor.getValue().getType()).isEqualTo("myCustomType");
+    }
+
+    @Test
+    void generateDashboardReport_invokesSeam_andSkipsRuleEngine() {
+        SchedulerEvent event = event("generateDashboardReport",
+                "{\"originatorId\":null,\"msgType\":null,\"msgBody\":{},\"metadata\":null}", 150);
+        stubAndDeliver(event);
+
+        // Direct execution: the whole point is that these events fire without the tenant first wiring
+        // Message Type Switch -> "Generate Report" -> the "generate dashboard report" node.
+        verify(reportExecutor, timeout(3000)).executeDashboardReport(eq(tenantId), any(SchedulerEvent.class));
+        verify(clusterService, never()).pushMsgToRuleEngine(any(TenantId.class), any(EntityId.class), any(TbMsg.class), any());
+    }
+
+    @Test
+    void generateDashboardReport_fallsBackToRuleEngineWhenRendererDisabled() {
+        // No executor bean == renderer off. Behave exactly as before the seam existed: push to the rule
+        // engine as TbMsgType.generateReport, so a chain that was wired for it keeps working.
+        service.stop();
+        service = new DefaultSchedulerService(tenantService, clusterService, partitionService,
+                schedulerEventService, otaStateService, deviceService, deviceProfileService,
+                otaPackageService, serviceInfoProvider, Optional.empty());
+        ReflectionTestUtils.setField(service, "minTimeout", 5000L);
+        service.init();
+
         SchedulerEvent event = event("generateDashboardReport",
                 "{\"originatorId\":null,\"msgType\":null,\"msgBody\":{},\"metadata\":null}", 150);
         stubAndDeliver(event);
@@ -181,6 +272,7 @@ class DefaultSchedulerServiceTest {
         verify(clusterService, timeout(3000)).pushMsgToRuleEngine(eq(tenantId), eq(eventId), captor.capture(), isNull());
         assertThat(captor.getValue().getType()).isEqualTo(TbMsgType.generateReport.name());
         assertThat(captor.getValue().getOriginator()).isEqualTo(eventId); // no originator configured -> event id
+        verify(reportExecutor, never()).executeDashboardReport(any(), any());
     }
 
     @Test
@@ -244,6 +336,31 @@ class DefaultSchedulerServiceTest {
         // wait past the original fire time: nothing may fire
         await().during(2500, TimeUnit.MILLISECONDS).atMost(4, TimeUnit.SECONDS)
                 .untilAsserted(() -> verify(clusterService, never()).pushMsgToRuleEngine(any(TenantId.class), any(EntityId.class), any(TbMsg.class), any()));
+    }
+
+    @Test
+    void partitionLoad_oneCorruptSchedule_doesNotStopTheRest() {
+        Tenant tenant = new Tenant();
+        tenant.setId(tenantId);
+        TopicPartitionInfo tpi = TopicPartitionInfo.builder().topic("tb_core").partition(0).build();
+        when(tenantService.findTenants(any(PageLink.class)))
+                .thenReturn(new PageData<>(List.of(tenant), 1, 1, false));
+        when(partitionService.resolve(eq(ServiceType.TB_CORE), eq(tenantId), eq(tenantId))).thenReturn(tpi);
+
+        DeviceId deviceId = new DeviceId(UUID.randomUUID());
+        SchedulerEvent broken = event("custom", "{\"originatorId\":null,\"msgType\":null,\"msgBody\":{},\"metadata\":null}", 0);
+        broken.setId(new SchedulerEventId(UUID.randomUUID()));
+        broken.setSchedule(JacksonUtil.toJsonNode("{\"timezone\":\"UTC\"}"));   // no startTime -> NPE in toDescriptor()
+        SchedulerEvent good = event("custom", "{\"originatorId\":{\"entityType\":\"DEVICE\",\"id\":\"" + deviceId.getId() + "\"}," +
+                "\"msgType\":null,\"msgBody\":{},\"metadata\":null}", 300);
+        when(schedulerEventService.findSchedulerEventsByTenantIdAndEnabled(tenantId, true))
+                .thenReturn(List.of(broken, good));
+        when(schedulerEventService.findSchedulerEventById(tenantId, good.getId())).thenReturn(good);
+
+        service.onAddedPartitions(Set.of(tpi));
+
+        // The corrupt row must cost only itself: the event listed after it still fires.
+        verify(clusterService, timeout(5000)).pushMsgToRuleEngine(eq(tenantId), eq(deviceId), any(TbMsg.class), isNull());
     }
 
     @Test

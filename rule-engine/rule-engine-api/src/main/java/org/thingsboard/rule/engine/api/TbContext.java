@@ -378,6 +378,13 @@ public interface TbContext {
 
     ApiKeyService getApiKeyService();
 
+    /**
+     * Dashboard-report renderer, used by the {@code generate dashboard report} node. Returns
+     * {@code null} when {@code reports.renderer.enabled} is false — the implementation is a
+     * conditional bean, so callers must null-check rather than assume presence.
+     */
+    DashboardReportService getDashboardReportService();
+
     boolean isExternalNodeForceAck();
 
     /**

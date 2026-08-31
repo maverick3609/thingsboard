@@ -23,7 +23,9 @@ import {
   SchedulerEventSchedule,
   SchedulerRepeatType,
   SchedulerTimeUnit,
-  schedulerEventScheduleText
+  schedulerEventScheduleText,
+  schedulerEventStatus,
+  SchedulerEventStatus
 } from '@shared/models/scheduler-event.models';
 
 const translate = {
@@ -85,5 +87,35 @@ describe('schedulerEventScheduleText', () => {
     const occurrence = moment(startTime).add(3, 'days');
     const text = schedulerEventScheduleText({timezone: 'UTC', startTime}, translate, occurrence);
     expect(text).toBe(`${occurrence.local().format('hh:mma')}, ${occurrence.local().format('MMM DD, YYYY')}`);
+  });
+});
+
+describe('schedulerEventStatus', () => {
+
+  const now = 1_700_000_000_000;
+  const repeating = (endsOn: number): SchedulerEventSchedule => ({
+    timezone: 'UTC',
+    startTime: now - 86_400_000,
+    repeat: {type: SchedulerRepeatType.DAILY, endsOn}
+  });
+
+  it('reports a live repeating event as active', () => {
+    expect(schedulerEventStatus(repeating(now + 86_400_000), true, now)).toBe(SchedulerEventStatus.ACTIVE);
+  });
+
+  it('reports a repeating event past its end date as expired even while enabled', () => {
+    expect(schedulerEventStatus(repeating(now - 1), true, now)).toBe(SchedulerEventStatus.EXPIRED);
+  });
+
+  it('reports a live but switched-off event as disabled', () => {
+    expect(schedulerEventStatus(repeating(now + 86_400_000), false, now)).toBe(SchedulerEventStatus.DISABLED);
+  });
+
+  it('treats a one-shot whose start time has passed as expired', () => {
+    expect(schedulerEventStatus({timezone: 'UTC', startTime: now - 1}, true, now)).toBe(SchedulerEventStatus.EXPIRED);
+  });
+
+  it('treats a one-shot still ahead of us as active', () => {
+    expect(schedulerEventStatus({timezone: 'UTC', startTime: now + 1}, true, now)).toBe(SchedulerEventStatus.ACTIVE);
   });
 });

@@ -23,6 +23,7 @@ import org.bouncycastle.util.Arrays;
 import org.thingsboard.common.util.DebugModeUtil;
 import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.common.util.ListeningExecutor;
+import org.thingsboard.rule.engine.api.DashboardReportService;
 import org.thingsboard.rule.engine.api.DeviceStateManager;
 import org.thingsboard.rule.engine.api.JobManager;
 import org.thingsboard.rule.engine.api.MailService;
@@ -929,6 +930,11 @@ public class DefaultTbContext implements TbContext {
     @Override
     public ApiKeyService getApiKeyService() {
         return mainCtx.getApiKeyService();
+    }
+
+    @Override
+    public DashboardReportService getDashboardReportService() {
+        return mainCtx.getDashboardReportService();
     }
 
     @Override

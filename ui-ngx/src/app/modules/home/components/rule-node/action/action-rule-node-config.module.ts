@@ -43,6 +43,7 @@ import { MathFunctionConfigComponent } from './math-function-config.component';
 import { DeviceStateConfigComponent } from './device-state-config.component';
 import { SendRestApiCallReplyConfigComponent } from './send-rest-api-call-reply-config.component';
 import { GenerateReportConfigComponent } from './generate-report-config.component';
+import { GenerateDashboardReportConfigComponent } from './generate-dashboard-report-config.component';
 import {
   AdvancedProcessingSettingComponent
 } from '@home/components/rule-node/action/advanced-processing-setting.component';
@@ -78,6 +79,7 @@ import {
     AdvancedProcessingSettingComponent,
     AdvancedProcessingSettingRowComponent,
     GenerateReportConfigComponent,
+    GenerateDashboardReportConfigComponent,
   ],
   imports: [
     CommonModule,
@@ -109,7 +111,8 @@ import {
     PushToCloudConfigComponent,
     MathFunctionConfigComponent,
     DeviceStateConfigComponent,
-    GenerateReportConfigComponent
+    GenerateReportConfigComponent,
+    GenerateDashboardReportConfigComponent
   ]
 })
 export class ActionRuleNodeConfigModule {

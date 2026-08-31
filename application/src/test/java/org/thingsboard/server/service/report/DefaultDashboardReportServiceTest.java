@@ -22,6 +22,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.thingsboard.server.common.data.report.TbReportFormat;
+import org.thingsboard.server.common.data.report.Report;
+import org.thingsboard.server.common.data.id.CustomerId;
+import org.thingsboard.server.common.data.User;
 import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.common.data.dashboardreport.DashboardReportConfig;
 import org.thingsboard.server.common.data.id.TenantId;
@@ -55,15 +60,97 @@ class DefaultDashboardReportServiceTest {
     private PlaywrightWebReportRenderer renderer;
     @Mock
     private SystemSecurityService systemSecurityService;
+    @Mock
+    private org.thingsboard.server.dao.report.ReportService reportDao;
+    @Mock
+    private org.thingsboard.server.dao.user.UserService userService;
 
     private DefaultDashboardReportService service;
+
+    private static final String CONFIGURED_BASE_URL = "https://cortex.inferrix.com";
 
     private final TenantId tenantId = TenantId.fromUUID(UUID.randomUUID());
     private final UserId userId = new UserId(UUID.randomUUID());
 
     @BeforeEach
     void setUp() {
-        service = new DefaultDashboardReportService(renderer, systemSecurityService);
+        service = new DefaultDashboardReportService(renderer, systemSecurityService, reportDao, userService);
+        ReflectionTestUtils.setField(service, "rendererBaseUrl", CONFIGURED_BASE_URL);
+    }
+
+    /**
+     * The rule-node path must never navigate the renderer to a caller-supplied host: that config can
+     * come straight off an incoming rule-engine message, and the renderer carries a freshly minted
+     * user JWT (same reason DashboardReportController overrides the client's baseUrl). It also stops
+     * a legacy PE-era scheduler event from rendering against the old PE deployment's URL.
+     */
+    @Test
+    void generateAndSaveReportIgnoresConfigBaseUrlAndUsesTheConfiguredOne() {
+        DashboardReportConfig config = new DashboardReportConfig();
+        config.setBaseUrl("https://attacker.example.com");
+        config.setDashboardId("11111111-1111-1111-1111-111111111111");
+        config.setType("pdf");
+        config.setUserId(userId.toString());
+
+        User user = new User(userId);
+        user.setTenantId(tenantId);
+        when(userService.findUserById(tenantId, userId)).thenReturn(user);
+        when(systemSecurityService.createUserAccessToken(tenantId, userId)).thenReturn("minted-jwt");
+        when(renderer.renderDashboard(any(), any(), any(RenderOptions.class))).thenReturn(ReportData.builder()
+                .data(new byte[]{1}).name("d.pdf").contentType("application/pdf").build());
+        when(reportDao.createReport(any(Report.class), any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.generateAndSaveReport(tenantId, config);
+
+        verify(renderer).renderDashboard(eq(CONFIGURED_BASE_URL), eq("minted-jwt"), any(RenderOptions.class));
+        verify(renderer, never()).renderDashboard(eq("https://attacker.example.com"), any(), any());
+    }
+
+    @Test
+    void generateAndSaveReportPersistsWithTemplateIdNullAndUserOwnership() {
+        DashboardReportConfig config = new DashboardReportConfig();
+        config.setDashboardId("11111111-1111-1111-1111-111111111111");
+        config.setUserId(userId.toString());
+
+        CustomerId customerId = new CustomerId(UUID.randomUUID());
+        User user = new User(userId);
+        user.setTenantId(tenantId);
+        user.setCustomerId(customerId);
+        when(userService.findUserById(tenantId, userId)).thenReturn(user);
+        when(systemSecurityService.createUserAccessToken(tenantId, userId)).thenReturn("minted-jwt");
+        byte[] bytes = {7, 8, 9};
+        when(renderer.renderDashboard(any(), any(), any(RenderOptions.class))).thenReturn(ReportData.builder()
+                .data(bytes).name("weekly.pdf").contentType("application/pdf").build());
+        when(reportDao.createReport(any(Report.class), any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.generateAndSaveReport(tenantId, config);
+
+        ArgumentCaptor<Report> reportCaptor = ArgumentCaptor.forClass(Report.class);
+        ArgumentCaptor<byte[]> dataCaptor = ArgumentCaptor.forClass(byte[].class);
+        verify(reportDao).createReport(reportCaptor.capture(), dataCaptor.capture());
+        Report report = reportCaptor.getValue();
+        assertThat(report.getTemplateId()).isNull();
+        assertThat(report.getTenantId()).isEqualTo(tenantId);
+        assertThat(report.getCustomerId()).isEqualTo(customerId);
+        assertThat(report.getUserId()).isEqualTo(userId);
+        assertThat(report.getFormat()).isEqualTo(TbReportFormat.PDF);
+        assertThat(report.getName()).isEqualTo("weekly.pdf");
+        assertThat(dataCaptor.getValue()).isEqualTo(bytes);
+    }
+
+    @Test
+    void generateAndSaveReportRejectsNonPdfTypes() {
+        DashboardReportConfig config = new DashboardReportConfig();
+        config.setDashboardId("11111111-1111-1111-1111-111111111111");
+        config.setUserId(userId.toString());
+        config.setType("png");
+
+        assertThatThrownBy(() -> service.generateAndSaveReport(tenantId, config))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("png");
+        // Rejected before anything expensive runs: no token minted, no browser driven, nothing stored.
+        verify(renderer, never()).renderDashboard(any(), any(), any());
+        verify(reportDao, never()).createReport(any(), any());
     }
 
     @Test

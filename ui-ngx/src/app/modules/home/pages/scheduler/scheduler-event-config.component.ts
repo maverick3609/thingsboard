@@ -22,6 +22,7 @@ import {
 import { of, Subscription } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { EntityType } from '@shared/models/entity-type.models';
+import { MessageType } from '@shared/models/rule-node.models';
 import { SchedulerEventConfiguration } from '@shared/models/scheduler-event.models';
 import { ReportService } from '@core/http/report.service';
 import { ReportConfig, ReportTemplateInfo } from '@shared/models/report.models';
@@ -72,8 +73,8 @@ export class SchedulerEventConfigComponent implements ControlValueAccessor, Vali
       // sendRpcRequest helpers
       rpcMethod: [null],
       rpcParams: [{}],
-      rpcOneway: [false],
-      rpcTimeout: [30000],
+      rpcOneway: [true],      // PE default (ui-ngx-4.2.0PE.jar: metadata.oneway = true)
+      rpcTimeout: [5000],     // PE default (ui-ngx-4.2.0PE.jar: metadata.timeout = 5000)
       rpcPersistent: [false],
       // generateReport helpers (bare ReportConfig shape - see updateModel's 'report' case)
       reportTemplateId: [null],   // plain uuid string; wrapped into a ReportTemplateId on emit
@@ -107,7 +108,19 @@ export class SchedulerEventConfigComponent implements ControlValueAccessor, Vali
       if (!f.reportTemplateId || !f.userId || !f.timezone) {
         return {reportConfigRequired: true};
       }
+      // Targets are required, unlike PE: ReportJobProcessor#onJobFinished can only deliver a finished
+      // report to notification targets, so an event saved without them renders a report every cycle
+      // and sends it to nobody - the silent failure this requirement exists to prevent. The
+      // notification template stays optional (a built-in one is used when it is empty).
+      if (!f.targets || !f.targets.length) {
+        return {reportConfigRequired: true};
+      }
       return null;
+    }
+    if (this.mode === 'dashboard-report') {
+      // The executor fails the firing without it, so block the save instead of letting the event look
+      // healthy and do nothing at its next occurrence.
+      return this.configFormGroup.get('msgBody').value?.reportConfig ? null : {reportConfigRequired: true};
     }
     if (this.mode !== 'raw' && !this.configFormGroup.get('originatorId').value) {
       return {originatorRequired: true};
@@ -115,14 +128,15 @@ export class SchedulerEventConfigComponent implements ControlValueAccessor, Vali
     return null;
   }
 
-  get mode(): 'attributes' | 'rpc' | 'ota' | 'report' | 'raw' {
+  get mode(): 'attributes' | 'rpc' | 'ota' | 'report' | 'dashboard-report' | 'raw' {
     switch (this.eventType) {
       case 'updateAttributes': return 'attributes';
       case 'sendRpcRequest': return 'rpc';
       case 'updateFirmware':
       case 'updateSoftware': return 'ota';
       case 'generateReport': return 'report';
-      default: return 'raw';   // custom types + generateDashboardReport (R2, not in R1 scope)
+      case 'generateDashboardReport': return 'dashboard-report';
+      default: return 'raw';   // custom types
     }
   }
 
@@ -155,6 +169,24 @@ export class SchedulerEventConfigComponent implements ControlValueAccessor, Vali
       }, {emitEvent: false});
       return;
     }
+    if (this.mode === 'dashboard-report') {
+      // PE's generic {msgType, msgBody, metadata} shape (msgBody.reportConfig holds the dashboard
+      // settings) PLUS our two delivery fields at the top level, which
+      // InferrixSchedulerReportExecutor#executeDashboardReport reads. PE has neither - it expects a
+      // rule chain's email node to address the report - so a legacy event simply has them empty.
+      const dv = (value as SchedulerEventConfiguration & Partial<ReportConfig>) || {};
+      this.configFormGroup.patchValue({
+        msgType: dv.msgType || null,
+        msgBody: dv.msgBody || {},
+        metadata: dv.metadata || null,
+        targets: dv.targets || null,
+        notificationTemplateId: dv.notificationTemplateId || null,
+        reportTemplateId: null,
+        userId: null,
+        timezone: null
+      }, {emitEvent: false});
+      return;
+    }
     const v = (value as SchedulerEventConfiguration) || {msgType: null, msgBody: {}, metadata: null};
     this.configFormGroup.patchValue({
       originatorId: v.originatorId || null,
@@ -165,8 +197,8 @@ export class SchedulerEventConfigComponent implements ControlValueAccessor, Vali
       attributes: this.mode === 'attributes' ? (v.msgBody || {}) : {},
       rpcMethod: this.mode === 'rpc' ? (v.msgBody?.method || null) : null,
       rpcParams: this.mode === 'rpc' ? (v.msgBody?.params || {}) : {},
-      rpcOneway: v.metadata?.oneway === 'true',
-      rpcTimeout: v.metadata?.timeout ? Number(v.metadata.timeout) : 30000,
+      rpcOneway: v.metadata?.oneway !== 'false',
+      rpcTimeout: v.metadata?.timeout ? Number(v.metadata.timeout) : 5000,
       rpcPersistent: v.metadata?.persistent === 'true',
       // Reset the generateReport controls when a stale (previous-tick) `mode` read routes an
       // in-dialog type switch through this generic branch instead of the 'report' branch above
@@ -189,7 +221,10 @@ export class SchedulerEventConfigComponent implements ControlValueAccessor, Vali
       case 'attributes':
         config = {
           originatorId: f.originatorId,
-          msgType: null,
+          // PE-verbatim (ui-ngx-4.2.0PE.jar): a stock TbMsgType, NOT the scheduler event type. The
+          // default root rule chain already routes "Post attributes" to Save Client Attributes, which
+          // takes its scope from metadata.scope - so the event works without any chain of its own.
+          msgType: MessageType.POST_ATTRIBUTES_REQUEST,
           msgBody: f.attributes,
           metadata: {scope: f.attributesScope}
         };
@@ -197,7 +232,8 @@ export class SchedulerEventConfigComponent implements ControlValueAccessor, Vali
       case 'rpc':
         config = {
           originatorId: f.originatorId,
-          msgType: null,
+          // PE-verbatim: routed by the default chain's "RPC Request to Device" -> RPC Call Request.
+          msgType: MessageType.RPC_CALL_FROM_SERVER_TO_DEVICE,
           msgBody: {method: f.rpcMethod, params: f.rpcParams},
           metadata: {
             oneway: String(f.rpcOneway),
@@ -224,6 +260,17 @@ export class SchedulerEventConfigComponent implements ControlValueAccessor, Vali
           targets: f.targets || null,
           notificationTemplateId: f.notificationTemplateId || null
         };
+        break;
+      case 'dashboard-report':
+        // PE's shape, plus the delivery fields. Emitted even when empty so that clearing them in the
+        // dialog actually clears them on the event rather than leaving stale recipients behind.
+        config = {
+          msgType: f.msgType,
+          msgBody: f.msgBody,
+          metadata: f.metadata,
+          targets: f.targets || null,
+          notificationTemplateId: f.notificationTemplateId || null
+        } as SchedulerEventConfiguration & Partial<ReportConfig>;
         break;
       default:
         config = {originatorId: f.originatorId, msgType: f.msgType, msgBody: f.msgBody, metadata: f.metadata};

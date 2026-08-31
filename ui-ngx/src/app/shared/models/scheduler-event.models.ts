@@ -166,3 +166,30 @@ export const schedulerEventConfigTypes: {[type: string]: SchedulerEventConfigTyp
   updateFirmware: { name: 'scheduler.update-firmware' },
   updateSoftware: { name: 'scheduler.update-software' }
 };
+
+export enum SchedulerEventStatus {
+  ACTIVE = 'ACTIVE',
+  DISABLED = 'DISABLED',
+  EXPIRED = 'EXPIRED'
+}
+
+export const schedulerEventStatusTranslations = new Map<SchedulerEventStatus, string>([
+  [SchedulerEventStatus.ACTIVE, 'scheduler.status-active'],
+  [SchedulerEventStatus.DISABLED, 'scheduler.status-disabled'],
+  [SchedulerEventStatus.EXPIRED, 'scheduler.status-expired']
+]);
+
+// Mirrors SchedulerEventDescriptor.passedAway(ts) on the backend: a repeating event is dead once its
+// mandatory `endsOn` is in the past, a one-shot once its startTime is. The engine drops those at
+// partition load with a server-side WARN and nothing else, so without this the UI shows a happily
+// "enabled" event that has silently stopped firing - the usual explanation for "my scheduled report
+// stopped arriving".
+export function schedulerEventStatus(schedule: SchedulerEventSchedule | null | undefined,
+                                     enabled: boolean,
+                                     now: number = Date.now()): SchedulerEventStatus {
+  const passedAway = schedule ? (schedule.repeat ? schedule.repeat.endsOn < now : schedule.startTime < now) : false;
+  if (passedAway) {
+    return SchedulerEventStatus.EXPIRED;
+  }
+  return enabled ? SchedulerEventStatus.ACTIVE : SchedulerEventStatus.DISABLED;
+}

@@ -19,6 +19,7 @@ import com.lowagie.text.pdf.PdfReader;
 import com.lowagie.text.pdf.parser.PdfTextExtractor;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.thingsboard.rule.engine.api.DashboardReportService;
 import org.thingsboard.server.common.data.alarm.Alarm;
 import org.thingsboard.server.common.data.alarm.AlarmSeverity;
 import org.thingsboard.server.common.data.dashboardreport.DashboardReportConfig;

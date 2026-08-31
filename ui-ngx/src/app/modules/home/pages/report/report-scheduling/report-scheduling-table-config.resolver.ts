@@ -30,6 +30,9 @@ import {
 import { EntityType, entityTypeResources, entityTypeTranslations } from '@shared/models/entity-type.models';
 import {
   SchedulerEvent,
+  schedulerEventStatus,
+  SchedulerEventStatus,
+  schedulerEventStatusTranslations,
   SchedulerEventWithCustomerInfo,
   schedulerEventScheduleText
 } from '@shared/models/scheduler-event.models';
@@ -90,7 +93,13 @@ export class ReportSchedulingTableConfigResolver {
       new EntityTableColumn<SchedulerEventWithCustomerInfo>('user', 'report.user', '20%',
         entity => this.userNames.get(this.eventConfigs.get(entity.id.id)?.userId) ?? '', () => ({}), false),
       new EntityTableColumn<SchedulerEventWithCustomerInfo>('schedule', 'report.schedule', '25%',
-        entity => schedulerEventScheduleText(entity.schedule, this.translate), () => ({}), false)
+        entity => schedulerEventScheduleText(entity.schedule, this.translate), () => ({}), false),
+      // Same expiry surface as the Scheduler page: a report whose schedule has ended is still stored
+      // 'enabled', so without this the row looks healthy while the engine has stopped firing it.
+      new EntityTableColumn<SchedulerEventWithCustomerInfo>('enabled', 'scheduler.status', '110px',
+        entity => this.translate.instant(schedulerEventStatusTranslations.get(this.statusOf(entity))),
+        entity => this.statusOf(entity) === SchedulerEventStatus.EXPIRED ? {color: 'rgb(221, 44, 0)'} : {},
+        false)
     );
 
     this.config.deleteEntityTitle = event =>
@@ -198,6 +207,10 @@ export class ReportSchedulingTableConfigResolver {
         onAction: ($event, entity) => this.toggleEnabled($event, entity, false)
       }
     ];
+  }
+
+  private statusOf(entity: SchedulerEventWithCustomerInfo): SchedulerEventStatus {
+    return schedulerEventStatus(entity.schedule, entity.enabled);
   }
 
   private toggleEnabled($event: Event, entity: SchedulerEventWithCustomerInfo, enabled: boolean): void {

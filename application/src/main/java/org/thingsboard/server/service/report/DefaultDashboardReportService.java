@@ -17,12 +17,19 @@ package org.thingsboard.server.service.report;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import org.thingsboard.rule.engine.api.DashboardReportService;
 import org.thingsboard.server.common.data.dashboardreport.DashboardReportConfig;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.id.UserId;
+import org.thingsboard.common.util.JacksonUtil;
+import org.thingsboard.server.common.data.User;
+import org.thingsboard.server.common.data.report.Report;
 import org.thingsboard.server.common.data.report.ReportData;
+import org.thingsboard.server.common.data.report.TbReportFormat;
+import org.thingsboard.server.dao.user.UserService;
 import org.thingsboard.server.service.report.render.PlaywrightWebReportRenderer;
 import org.thingsboard.server.service.report.render.RenderOptions;
 import org.thingsboard.server.service.security.system.SystemSecurityService;
@@ -46,8 +53,13 @@ import java.util.UUID;
 @ConditionalOnProperty(prefix = "reports.renderer", name = "enabled", havingValue = "true")
 public class DefaultDashboardReportService implements DashboardReportService {
 
+    @Value("${reports.renderer.base_url:http://localhost:8080}")
+    private String rendererBaseUrl;
+
     private final PlaywrightWebReportRenderer renderer;
     private final SystemSecurityService systemSecurityService;
+    private final org.thingsboard.server.dao.report.ReportService reportDao;
+    private final UserService userService;
 
     @Override
     public ReportData generateReport(TenantId tenantId, DashboardReportConfig config) {
@@ -58,6 +70,76 @@ public class DefaultDashboardReportService implements DashboardReportService {
                 reportData.getName(), tenantId, config.getDashboardId(),
                 reportData.getData() != null ? reportData.getData().length : 0);
         return reportData;
+    }
+
+    /**
+     * Render-and-persist path used by the {@code generate dashboard report} rule node. Mirrors
+     * {@code TbReportService#generateReport}'s shape for templated reports: render, build the
+     * {@link Report} header, hand the bytes to the DAO.
+     * <p>
+     * The report's owner comes from {@code config.userId} (PE does the same — it resolves that user
+     * to stamp the blob's tenant/customer), so a scheduled dashboard report lands in the same
+     * customer scope as the user it was configured to run as, not the scope of whatever entity
+     * happened to originate the message.
+     */
+    @Override
+    public Report generateAndSaveReport(TenantId tenantId, DashboardReportConfig config) {
+        // Format first: toFormat rejects anything but PDF, and discovering that AFTER driving a headless
+        // browser for a minute wastes the render and surfaces as a confusing downstream NPE.
+        TbReportFormat format = toFormat(config);
+        User user = resolveUser(tenantId, config);
+        // Pin the base URL to the configured one instead of trusting config.baseUrl. Two reasons, both
+        // real: (1) on the rule-node path this config can come straight off an incoming message, and
+        // the renderer navigates there carrying a freshly minted user JWT — DashboardReportController
+        // overrides the client's baseUrl for exactly that reason; (2) a legacy PE-era
+        // generateDashboardReport scheduler event carries the OLD PE deployment's URL, so honouring it
+        // would render somebody else's stack.
+        DashboardReportConfig pinned = withConfiguredBaseUrl(config);
+        ReportData reportData = generateReport(tenantId, pinned);
+        Report report = new Report();
+        report.setTenantId(tenantId);
+        // Null/NULL_UUID is fine: ReportDataValidator normalizes a null customerId to NULL_UUID and
+        // only validates non-null ones, same as TbReportService#buildReport passes the task's through.
+        report.setCustomerId(user.getCustomerId());
+        // templateId stays null: a dashboard report is rendered straight from a dashboard, it has no
+        // report template. The column is nullable and ReportDataValidator does not require it.
+        report.setFormat(format);
+        report.setName(reportData.getName());
+        report.setUserId(user.getId());
+        Report saved = reportDao.createReport(report, reportData.getData());
+        log.info("Persisted dashboard report [{}] for tenant [{}], dashboard [{}], {} bytes",
+                saved.getId(), tenantId, config.getDashboardId(),
+                reportData.getData() != null ? reportData.getData().length : 0);
+        return saved;
+    }
+
+    private DashboardReportConfig withConfiguredBaseUrl(DashboardReportConfig config) {
+        DashboardReportConfig copy = JacksonUtil.clone(config);
+        copy.setBaseUrl(rendererBaseUrl);
+        return copy;
+    }
+
+    private User resolveUser(TenantId tenantId, DashboardReportConfig config) {
+        UserId userId = new UserId(UUID.fromString(config.getUserId()));
+        User user = userService.findUserById(tenantId, userId);
+        if (user == null) {
+            throw new IllegalArgumentException("Dashboard report user not found: " + config.getUserId());
+        }
+        return user;
+    }
+
+    /**
+     * ponytail: PDF only. The renderer can also emit PNG and JPEG (PE stores those in a generic blob
+     * store), but {@link TbReportFormat} has no image members and widening it would leak image
+     * formats into the report-template pickers that enumerate it. Failing loudly beats persisting a
+     * PNG labelled as a PDF; add PNG/JPEG members plus picker filters if anyone actually needs them.
+     */
+    private static TbReportFormat toFormat(DashboardReportConfig config) {
+        String type = config.getType() != null ? config.getType().trim().toLowerCase() : "pdf";
+        if (!"pdf".equals(type)) {
+            throw new IllegalArgumentException("Only 'pdf' dashboard reports can be stored, got '" + config.getType() + "'");
+        }
+        return TbReportFormat.PDF;
     }
 
     /**

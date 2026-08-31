@@ -86,14 +86,39 @@
       <tb-timezone-select formControlName="timezone" required></tb-timezone-select>
 
       <div class="tb-form-panel-title">{{ 'report.notification-targets' | translate }}</div>
+      <tb-entity-list required formControlName="targets"
+                      entityType="{{ entityType.NOTIFICATION_TARGET }}"
+                      labelText="{{ 'report.notification-targets' | translate }}"
+                      placeholderText="{{ 'report.notification-target' | translate }}">
+      </tb-entity-list>
+      <div class="tb-hint">{{ 'report.notification-targets-hint' | translate }}</div>
+
+      <div class="tb-form-panel-title">{{ 'report.notification-template' | translate }}</div>
+      <tb-template-autocomplete formControlName="notificationTemplateId"></tb-template-autocomplete>
+      <div class="tb-hint">{{ 'report.notification-template-hint' | translate }}</div>
+    </ng-container>
+
+    <ng-container *ngSwitchCase="'dashboard-report'">
+      <!-- PE's generic {msgType, msgBody, metadata} shape - msgBody.reportConfig carries the dashboard
+           settings - plus the two delivery fields the executor reads. Kept as a raw editor: legacy PE
+           events already hold a full reportConfig here and a typed form would have to round-trip every
+           PE field losslessly to avoid silently dropping one. -->
+      <div class="tb-form-panel-title">{{ 'scheduler.message-body' | translate }}</div>
+      <tb-json-object-edit formControlName="msgBody"
+                           [label]="'scheduler.message-body' | translate" jsonRequired></tb-json-object-edit>
+      <div class="tb-hint">{{ 'scheduler.dashboard-report-body-hint' | translate }}</div>
+
+      <div class="tb-form-panel-title">{{ 'report.notification-targets' | translate }}</div>
       <tb-entity-list formControlName="targets"
                       entityType="{{ entityType.NOTIFICATION_TARGET }}"
                       labelText="{{ 'report.notification-targets' | translate }}"
                       placeholderText="{{ 'report.notification-target' | translate }}">
       </tb-entity-list>
+      <div class="tb-hint">{{ 'report.notification-targets-hint' | translate }}</div>
 
       <div class="tb-form-panel-title">{{ 'report.notification-template' | translate }}</div>
       <tb-template-autocomplete formControlName="notificationTemplateId"></tb-template-autocomplete>
+      <div class="tb-hint">{{ 'report.notification-template-hint' | translate }}</div>
     </ng-container>
 
     <ng-container *ngSwitchDefault>

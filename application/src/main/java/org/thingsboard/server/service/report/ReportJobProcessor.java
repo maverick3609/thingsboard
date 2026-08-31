@@ -21,7 +21,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.thingsboard.common.util.DebugModeUtil;
-import org.thingsboard.rule.engine.api.NotificationCenter;
 import org.thingsboard.server.actors.ActorSystemContext;
 import org.thingsboard.server.cluster.TbClusterService;
 import org.thingsboard.server.common.data.User;
@@ -37,13 +36,9 @@ import org.thingsboard.server.common.data.job.task.ReportTask;
 import org.thingsboard.server.common.data.job.task.Task;
 import org.thingsboard.server.common.data.job.task.TaskResult;
 import org.thingsboard.server.common.data.msg.TbNodeConnectionType;
-import org.thingsboard.server.common.data.notification.NotificationRequest;
-import org.thingsboard.server.common.data.notification.NotificationRequestConfig;
-import org.thingsboard.server.common.data.notification.info.ReportGeneratedNotificationInfo;
 import org.thingsboard.server.common.data.report.Report;
 import org.thingsboard.server.common.data.report.ReportTemplate;
 import org.thingsboard.server.common.data.rule.RuleNode;
-import org.thingsboard.server.common.data.util.CollectionsUtil;
 import org.thingsboard.server.common.msg.TbMsg;
 import org.thingsboard.server.common.msg.gen.MsgProtos;
 import org.thingsboard.server.common.msg.queue.ServiceType;
@@ -102,7 +97,7 @@ public class ReportJobProcessor implements JobProcessor {
     private final UserService userService;
     private final SystemSecurityService systemSecurityService;
     private final JwtTokenFactory jwtTokenFactory;
-    private final NotificationCenter notificationCenter;
+    private final ReportNotificationDispatcher reportNotificationDispatcher;
     private final TbClusterService clusterService;
     private final PartitionService partitionService;
     private final ActorSystemContext actorSystemContext;
@@ -116,7 +111,7 @@ public class ReportJobProcessor implements JobProcessor {
                                UserService userService,
                                SystemSecurityService systemSecurityService,
                                JwtTokenFactory jwtTokenFactory,
-                               @Lazy NotificationCenter notificationCenter,
+                               ReportNotificationDispatcher reportNotificationDispatcher,
                                TbClusterService clusterService,
                                PartitionService partitionService,
                                @Lazy ActorSystemContext actorSystemContext) {
@@ -124,7 +119,7 @@ public class ReportJobProcessor implements JobProcessor {
         this.userService = userService;
         this.systemSecurityService = systemSecurityService;
         this.jwtTokenFactory = jwtTokenFactory;
-        this.notificationCenter = notificationCenter;
+        this.reportNotificationDispatcher = reportNotificationDispatcher;
         this.clusterService = clusterService;
         this.partitionService = partitionService;
         this.actorSystemContext = actorSystemContext;
@@ -222,30 +217,8 @@ public class ReportJobProcessor implements JobProcessor {
         }
         log.info("[{}][{}] Report job finished, report [{}]", tenantId, job.getId(), report.getId());
 
-        if (CollectionsUtil.isNotEmpty(configuration.getTargets()) && configuration.getNotificationTemplateId() != null) {
-            NotificationRequestConfig requestConfig = new NotificationRequestConfig();
-            requestConfig.setReports(List.of(report.getId()));
-            NotificationRequest notificationRequest = NotificationRequest.builder()
-                    .tenantId(tenantId)
-                    .targets(configuration.getTargets())
-                    .templateId(configuration.getNotificationTemplateId())
-                    .originatorEntityId(report.getUserId())
-                    .info(ReportGeneratedNotificationInfo.builder()
-                            .tenantId(tenantId)
-                            .customerId(report.getCustomerId())
-                            .reportFormat(report.getFormat())
-                            .reportName(report.getName())
-                            .userId(report.getUserId())
-                            .build())
-                    .additionalConfig(requestConfig)
-                    .build();
-            try {
-                notificationCenter.processNotificationRequest(tenantId, notificationRequest, null);
-                log.info("[{}][{}] Dispatched report-generated notification for report [{}]", tenantId, job.getId(), report.getId());
-            } catch (Exception e) {
-                log.error("[{}][{}] Failed to dispatch report-generated notification for report [{}]", tenantId, job.getId(), report.getId(), e);
-            }
-        }
+        reportNotificationDispatcher.dispatch(tenantId, report, configuration.getTargets(),
+                configuration.getNotificationTemplateId(), job.getId().toString());
     }
 
     /**

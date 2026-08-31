@@ -25,7 +25,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.thingsboard.rule.engine.api.NotificationCenter;
 import org.thingsboard.server.actors.ActorSystemContext;
 import org.thingsboard.server.cluster.TbClusterService;
 import org.thingsboard.server.common.data.User;
@@ -49,6 +48,7 @@ import org.thingsboard.server.common.data.job.task.ReportTaskResult;
 import org.thingsboard.server.common.data.job.task.Task;
 import org.thingsboard.server.common.data.msg.TbMsgType;
 import org.thingsboard.server.common.data.msg.TbNodeConnectionType;
+import org.thingsboard.server.common.data.notification.NotificationDeliveryMethod;
 import org.thingsboard.server.common.data.notification.NotificationRequest;
 import org.thingsboard.server.common.data.notification.info.ReportGeneratedNotificationInfo;
 import org.thingsboard.server.common.data.report.Report;
@@ -77,6 +77,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -104,7 +105,7 @@ class ReportJobProcessorTest {
     @Mock
     private JwtTokenFactory jwtTokenFactory;
     @Mock
-    private NotificationCenter notificationCenter;
+    private ReportNotificationDispatcher reportNotificationDispatcher;
     @Mock
     private TbClusterService clusterService;
     @Mock
@@ -230,25 +231,39 @@ class ReportJobProcessorTest {
 
         processor.onJobFinished(job);
 
-        ArgumentCaptor<NotificationRequest> captor = ArgumentCaptor.forClass(NotificationRequest.class);
-        verify(notificationCenter).processNotificationRequest(eq(tenantId), captor.capture(), any());
-        NotificationRequest request = captor.getValue();
-        // NotificationRequest's field is `additionalConfig` (getAdditionalConfig()) on the real
-        // common/data class -- there is no `config`/`getConfig()` member to assert against.
-        assertThat(request.getAdditionalConfig().getReports()).containsExactly(reportId);
-        assertThat(request.getTargets()).containsExactly(target);
-        assertThat(request.getTemplateId()).isEqualTo(notificationTemplateId);
-        assertThat(request.getOriginatorEntityId()).isEqualTo(userId);
-        ReportGeneratedNotificationInfo info = (ReportGeneratedNotificationInfo) request.getInfo();
-        assertThat(info.getTenantId()).isEqualTo(tenantId);
-        assertThat(info.getCustomerId()).isEqualTo(customerId);
-        assertThat(info.getReportFormat()).isEqualTo(TbReportFormat.PDF);
-        assertThat(info.getReportName()).isEqualTo("weekly.pdf");
-        assertThat(info.getUserId()).isEqualTo(userId);
+        // What gets built from the report and targets is ReportNotificationDispatcher's contract and is
+        // asserted in ReportNotificationDispatcherTest; here we only pin the hand-off.
+        verify(reportNotificationDispatcher).dispatch(tenantId, report, List.of(target),
+                notificationTemplateId, job.getId().toString());
     }
 
     @Test
-    void onJobFinishedSkipsNotificationWhenNoTargets() {
+    void onJobFinishedPassesANullTemplateIdStraightThrough() {
+        Report report = new Report(new ReportId(UUID.randomUUID()));
+        report.setTenantId(tenantId);
+        report.setUserId(userId);
+        report.setFormat(TbReportFormat.PDF);
+        report.setName("weekly.pdf");
+
+        UUID target = UUID.randomUUID();
+        ReportJobConfiguration configuration = ReportJobConfiguration.builder()
+                .reportTemplateId(templateId)
+                .userId(userId)
+                .targets(List.of(target))
+                .build();
+        Job job = buildJob(configuration);
+        job.setStatus(JobStatus.COMPLETED);
+        ((ReportJobResult) job.getResult()).setReport(report);
+
+        processor.onJobFinished(job);
+
+        // Choosing a fallback template is the dispatcher's job, not the processor's - it must not
+        // substitute one of its own here.
+        verify(reportNotificationDispatcher).dispatch(tenantId, report, List.of(target), null, job.getId().toString());
+    }
+
+    @Test
+    void onJobFinishedStillDelegatesWhenNoTargets() {
         Report report = new Report(new ReportId(UUID.randomUUID()));
         report.setTenantId(tenantId);
         report.setUserId(userId);
@@ -265,7 +280,9 @@ class ReportJobProcessorTest {
 
         processor.onJobFinished(job);
 
-        verify(notificationCenter, never()).processNotificationRequest(any(), any(), any());
+        // The "no targets -> nobody gets it" warning lives in the dispatcher, so the processor hands
+        // over unconditionally rather than deciding twice in two places.
+        verify(reportNotificationDispatcher).dispatch(eq(tenantId), eq(report), isNull(), isNull(), any());
     }
 
     @Test
@@ -281,7 +298,7 @@ class ReportJobProcessorTest {
 
         processor.onJobFinished(job);
 
-        verify(notificationCenter, never()).processNotificationRequest(any(), any(), any());
+        verify(reportNotificationDispatcher, never()).dispatch(any(), any(), any(), any(), any());
     }
 
     // --- R2b task J: renderer opt-in gate (no orphan jobs) + rule-engine push-back ---
@@ -333,8 +350,10 @@ class ReportJobProcessorTest {
         assertThat(pushed.getFailureMessage()).isEmpty();
         TbMsg outputMsg = TbMsg.fromProto("Main", pushed.getTbMsgProto(), null);
         assertThat(outputMsg.getMetaData().getValue("reports")).isEqualTo(reportId.toString());
-        // No targets/notificationTemplateId -> the rule-engine push is the only effect.
-        verify(notificationCenter, never()).processNotificationRequest(any(), any(), any());
+        // The rule-engine push and the notification dispatch are independent: this job has no targets,
+        // so the hand-over still happens and the dispatcher is the one that decides there is nobody to
+        // deliver to (see ReportNotificationDispatcherTest).
+        verify(reportNotificationDispatcher).dispatch(eq(tenantId), any(), isNull(), isNull(), any());
     }
 
     @Test

@@ -26,14 +26,20 @@ import { take } from 'rxjs/operators';
 import { Observable } from 'rxjs';
 import {
   CellActionDescriptor,
-  checkBoxCell,
   DateEntityTableColumn,
   EntityTableColumn,
   EntityTableConfig
 } from '@home/models/entity/entities-table-config.models';
 import { EntityType, entityTypeResources, entityTypeTranslations } from '@shared/models/entity-type.models';
 import { Authority } from '@shared/models/authority.enum';
-import { SchedulerEvent, SchedulerEventWithCustomerInfo } from '@shared/models/scheduler-event.models';
+import {
+  SchedulerEvent,
+  schedulerEventConfigTypes,
+  schedulerEventStatus,
+  SchedulerEventStatus,
+  schedulerEventStatusTranslations,
+  SchedulerEventWithCustomerInfo
+} from '@shared/models/scheduler-event.models';
 import { SchedulerEventService } from '@core/http/scheduler-event.service';
 import {
   SchedulerEventDialogComponent,
@@ -62,10 +68,15 @@ export class SchedulerEventsTableConfigResolver {
     this.config.columns.push(
       new DateEntityTableColumn<SchedulerEventWithCustomerInfo>('createdTime', 'common.created-time', this.datePipe, '150px'),
       new EntityTableColumn<SchedulerEventWithCustomerInfo>('name', 'scheduler.name', '25%'),
-      new EntityTableColumn<SchedulerEventWithCustomerInfo>('type', 'scheduler.event-type', '25%'),
-      new EntityTableColumn<SchedulerEventWithCustomerInfo>('customerTitle', 'customer.customer', '25%'),
-      new EntityTableColumn<SchedulerEventWithCustomerInfo>('enabled', 'scheduler.enabled', '60px',
-        entity => checkBoxCell(entity.enabled), () => ({}), false)
+      new EntityTableColumn<SchedulerEventWithCustomerInfo>('type', 'scheduler.event-type', '25%',
+        entity => this.typeLabel(entity.type)),
+      new EntityTableColumn<SchedulerEventWithCustomerInfo>('customerTitle', 'scheduler.created_customer', '25%'),
+      // Not sortable: 'enabled' is a real column but the rendered value also folds in schedule expiry,
+      // which the backend cannot order by.
+      new EntityTableColumn<SchedulerEventWithCustomerInfo>('enabled', 'scheduler.status', '120px',
+        entity => this.translate.instant(schedulerEventStatusTranslations.get(this.statusOf(entity))),
+        entity => this.statusOf(entity) === SchedulerEventStatus.EXPIRED ? {color: 'rgb(221, 44, 0)'} : {},
+        false)
     );
 
     this.config.deleteEntityTitle = event => this.translate.instant('scheduler.delete-scheduler-event-title', {schedulerEventName: event.name});
@@ -99,18 +110,42 @@ export class SchedulerEventsTableConfigResolver {
   private configureCellActions(): Array<CellActionDescriptor<SchedulerEventWithCustomerInfo>> {
     return [
       {
+        name: this.translate.instant('scheduler.disable'),
+        icon: 'toggle_on',
+        isEnabled: (entity) => entity.enabled,
+        onAction: ($event, entity) => this.toggleEnabled($event, entity, false)
+      },
+      {
         name: this.translate.instant('scheduler.enable'),
-        icon: 'play_arrow',
+        icon: 'toggle_off',
         isEnabled: (entity) => !entity.enabled,
         onAction: ($event, entity) => this.toggleEnabled($event, entity, true)
       },
       {
-        name: this.translate.instant('scheduler.disable'),
-        icon: 'pause',
-        isEnabled: (entity) => entity.enabled,
-        onAction: ($event, entity) => this.toggleEnabled($event, entity, false)
+        name: this.translate.instant('scheduler.edit-scheduler-event'),
+        icon: 'edit',
+        isEnabled: () => true,
+        onAction: ($event, entity) => {
+          if ($event) {
+            $event.stopPropagation();
+          }
+          this.openEdit(entity);
+        }
       }
     ];
+  }
+
+  private typeLabel(type: string): string {
+    // hasOwnProperty rather than a bare lookup: the REST API accepts any string as an event type
+    // (custom types are a supported feature), so `__proto__` would resolve to Object.prototype and
+    // hand translate.instant() an undefined key, which throws and takes the whole row's render with it.
+    const configType = Object.prototype.hasOwnProperty.call(schedulerEventConfigTypes, type)
+      ? schedulerEventConfigTypes[type] : null;
+    return configType ? this.translate.instant(configType.name) : type;
+  }
+
+  private statusOf(entity: SchedulerEventWithCustomerInfo): SchedulerEventStatus {
+    return schedulerEventStatus(entity.schedule, entity.enabled);
   }
 
   private toggleEnabled($event: Event, entity: SchedulerEventWithCustomerInfo, enabled: boolean) {

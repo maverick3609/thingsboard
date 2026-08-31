@@ -24,7 +24,7 @@ import org.thingsboard.server.common.data.dashboardreport.DashboardReportConfig;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.report.ReportData;
 import org.thingsboard.server.dao.service.DaoSqlTest;
-import org.thingsboard.server.service.report.DashboardReportService;
+import org.thingsboard.rule.engine.api.DashboardReportService;
 
 import java.util.Map;
 import java.util.UUID;

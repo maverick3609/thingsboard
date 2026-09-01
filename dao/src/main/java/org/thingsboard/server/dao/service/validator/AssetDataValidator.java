@@ -25,6 +25,7 @@ import org.thingsboard.server.common.data.id.CustomerId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.dao.asset.AssetDao;
 import org.thingsboard.server.dao.customer.CustomerDao;
+import org.thingsboard.server.dao.license.LicenseService;
 import org.thingsboard.server.exception.DataValidationException;
 import org.thingsboard.server.dao.service.DataValidator;
 import org.thingsboard.server.dao.tenant.TenantService;
@@ -44,8 +45,13 @@ public class AssetDataValidator extends DataValidator<Asset> {
     @Autowired
     private CustomerDao customerDao;
 
+    @Autowired
+    @Lazy
+    private LicenseService licenseService;
+
     @Override
     protected void validateCreate(TenantId tenantId, Asset asset) {
+        licenseService.checkCreateAllowed(tenantId, EntityType.ASSET);
         validateNumberOfEntitiesPerTenant(tenantId, EntityType.ASSET);
     }
 

@@ -26,6 +26,8 @@ public interface LicenseService {
      * @throws org.thingsboard.server.exception.EntitiesLimitExceededException when the install-wide count for
      *         this entity type has reached the licensed cap. Reusing that exception means the existing 403
      *         handler and the existing Angular limit dialog work with no change.
+     * @throws LicenseException thrown when a fatal violation was already detected and the platform is
+     *         shutting down.
      */
     void checkCreateAllowed(TenantId tenantId, EntityType entityType);
 

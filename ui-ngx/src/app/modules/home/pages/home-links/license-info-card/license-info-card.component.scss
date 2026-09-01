@@ -1,0 +1,70 @@
+/**
+ * Copyright © 2016-2026 The Inferrix Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+:host {
+  display: block;
+}
+
+.tb-license-card {
+  width: 100%;
+  margin-bottom: 16px;
+  border-left: 4px solid transparent;
+
+  &.tb-license-warn {
+    border-left-color: #ffa000;
+  }
+
+  &.tb-license-critical {
+    border-left-color: #d32f2f;
+  }
+}
+
+.tb-license-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 14px;
+}
+
+.tb-license-customer {
+  font-weight: 500;
+  font-size: 16px;
+}
+
+.tb-license-label {
+  flex: 0 0 80px;
+  color: rgba(0, 0, 0, 0.54);
+}
+
+.tb-license-meter mat-progress-bar {
+  flex: 1 1 auto;
+  max-width: 240px;
+}
+
+.tb-license-count {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.tb-license-days {
+  color: rgba(0, 0, 0, 0.54);
+}
+
+.tb-license-instance code {
+  font-size: 12px;
+  word-break: break-all;
+}

@@ -69,8 +69,11 @@ export class LicenseInfoCardComponent implements OnInit {
 
   /** null when the cap is unlimited, so the template knows to skip the bar. */
   percent(used: number, cap: number | null): number | null {
-    if (this.isUnlimited(cap) || cap === 0) {
+    if (this.isUnlimited(cap)) {
       return null;
+    }
+    if (cap === 0) {
+      return 100; // zero-cap licences are at capacity from the first entity per DefaultLicenseService.checkCreateAllowed
     }
     return Math.min(100, Math.round((used / cap) * 100));
   }

@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { TranslateModule } from '@ngx-translate/core';
@@ -98,6 +98,21 @@ describe('LicenseInfoCardComponent', () => {
     expect(text).not.toContain('/ null');
   });
 
+  it('treats a zero cap as already exhausted, not unlimited', () => {
+    load(info({ devices: 1, maxDevices: 0, daysRemaining: 400 }));
+    expect(component.percent(1, 0)).toBe(100);
+    expect(component.isUnlimited(0)).toBeFalse();
+    expect(component.severity).toBe('critical');
+  });
+
+  it('draws a full progress bar for a zero cap instead of hiding it as unlimited', () => {
+    load(info({ devices: 1, maxDevices: 0, daysRemaining: 400 }));
+    const bars = fixture.nativeElement.querySelectorAll('mat-progress-bar');
+    // A zero cap is a real, already-exhausted cap -- not unlimited -- so both
+    // the devices row and the assets row (still capped at 2000) draw a bar.
+    expect(bars.length).toBe(2);
+  });
+
   it('is amber below thirty days remaining', () => {
     load(info({ daysRemaining: 29 }));
     expect(component.severity).toBe('warn');
@@ -137,6 +152,20 @@ describe('LicenseInfoCardComponent', () => {
     load(info({ daysRemaining: 211 }));
     expect(component.severity).toBe('ok');
   });
+
+  it('is red when assets alone are at full capacity, devices and days healthy', () => {
+    load(info({ daysRemaining: 400, devices: 100, maxDevices: 5000, assets: 2000, maxAssets: 2000 }));
+    expect(component.severity).toBe('critical');
+  });
+
+  it('copies the instance id and flips the icon', fakeAsync(() => {
+    load(info());
+    spyOn(navigator.clipboard, 'writeText').and.returnValue(Promise.resolve());
+    fixture.nativeElement.querySelector('button[mat-icon-button]').click();
+    tick();
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('9f3a1c02-4b6d-4c3e-9a10-2f7c5d3e8b71');
+    expect(component.copied).toBeTrue();
+  }));
 
   it('hides itself on a 403', () => {
     load(null, 403);

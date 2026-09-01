@@ -29,11 +29,11 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -42,7 +42,7 @@ import static org.mockito.Mockito.when;
 public class DefaultLicenseServiceTest {
 
     private static final UUID INSTANCE_ID = UUID.fromString("9f3a1c02-4b6d-4c3e-9a10-2f7c5d3e8b71");
-    private static final long EXP_SECONDS = 1795033600L;          // 2026-11-14T00:26:40Z
+    private static final long EXP_SECONDS = 1795033600L;          // 2026-11-18T20:26:40Z
     private static final long BEFORE_EXP_MILLIS = (EXP_SECONDS - 86_400L) * 1000L;
     private static final long AFTER_EXP_MILLIS = (EXP_SECONDS + 86_400L) * 1000L;
     private static final long TOLERANCE_MILLIS = 3_600_000L;
@@ -238,5 +238,47 @@ public class DefaultLicenseServiceTest {
         install.checkCreateAllowed(TenantId.SYS_TENANT_ID, EntityType.DEVICE);
         install.checkCreateAllowed(TenantId.SYS_TENANT_ID, EntityType.ASSET);
         assertThat(install.getInfo()).isNull();
+    }
+
+    /**
+     * The golden vector's plan always carries maxDevices/maxAssets, so no other test ever reaches the
+     * {@code cap == null} guard for a type that IS in {@code CAP_KEYS} -- a genuine unlimited-devices licence.
+     * {@code absentCapSkipsTheCountQueryEntirely} only covers DASHBOARD, which exits one guard earlier because
+     * it isn't metered at all. Real signing key isn't available here, so the codec is mocked to hand back a
+     * hand-built payload with an empty plan instead.
+     */
+    @Test
+    public void unlimitedCapIsAllowedAndSkipsTheCountQuery() {
+        LicenseCodec unsignedCodec = mock(LicenseCodec.class);
+        LicensePayload unlimitedDevices = new LicensePayload(1, LicenseCodec.sha3Hex(INSTANCE_ID.toString()),
+                "Acme Pvt Ltd", 0L, EXP_SECONDS, Map.of());
+        when(unsignedCodec.decodeAndVerify("unlimited-key")).thenReturn(unlimitedDevices);
+
+        TestableLicenseService s = new TestableLicenseService(unsignedCodec, dao);
+        s.setLicenseKey("unlimited-key");
+        s.setClockToleranceMs(TOLERANCE_MILLIS);
+        s.setClock(Clock.fixed(Instant.ofEpochMilli(BEFORE_EXP_MILLIS), ZoneOffset.UTC));
+        s.init();
+        assertThat(s.exits).isEmpty();
+
+        s.checkCreateAllowed(TenantId.SYS_TENANT_ID, EntityType.DEVICE);
+        verify(dao, never()).countEntities(EntityType.DEVICE);
+    }
+
+    @Test
+    public void fatalViolationBlocksCheckCreateAllowed() {
+        TestableLicenseService s = service(goldenKey, AFTER_EXP_MILLIS);
+        s.init();
+        assertThat(s.exits).containsExactly(LicenseViolation.EXPIRED.getExitCode());
+
+        assertThatThrownBy(() -> s.checkCreateAllowed(TenantId.SYS_TENANT_ID, EntityType.DEVICE))
+                .isInstanceOf(LicenseException.class)
+                .hasFieldOrPropertyWithValue("violation", LicenseViolation.EXPIRED);
+    }
+
+    @Test
+    public void checkCreateAllowedIsSafeBeforeInit() {
+        TestableLicenseService s = new TestableLicenseService(codec, dao);
+        s.checkCreateAllowed(TenantId.SYS_TENANT_ID, EntityType.DEVICE);
     }
 }

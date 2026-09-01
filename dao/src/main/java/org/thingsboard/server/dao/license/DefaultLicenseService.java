@@ -66,6 +66,7 @@ public class DefaultLicenseService implements LicenseService {
 
     private volatile LicensePayload payload;
     private volatile UUID instanceId;
+    private volatile LicenseViolation fatalViolation;
 
     public DefaultLicenseService(LicenseCodec codec, LicenseDao licenseDao) {
         this.codec = codec;
@@ -138,8 +139,20 @@ public class DefaultLicenseService implements LicenseService {
 
     @Override
     public void checkCreateAllowed(TenantId tenantId, EntityType entityType) {
+        LicenseViolation fatal = fatalViolation;
+        if (fatal != null) {
+            // A violation was already detected (boot or scheduled check) and a shutdown thread is in flight,
+            // but graceful shutdown is not instant. Fail closed for the rest of that window instead of
+            // falling through to the payload check below, which would otherwise read as the benign
+            // not-yet-initialised state and let creates through unenforced until the process actually exits.
+            throw new LicenseException(fatal, "licence enforcement is shutting down");
+        }
         LicensePayload current = payload;
         if (current == null) {
+            // Genuinely pre-init: init() has not completed yet (e.g. a validator invoked before the
+            // @PostConstruct callback runs) and no violation has been recorded. Allow rather than NPE --
+            // this is the only branch the "checkCreateAllowed must be safe before init() completes"
+            // requirement is about.
             return;
         }
         String capKey = CAP_KEYS.get(entityType);
@@ -208,6 +221,12 @@ public class DefaultLicenseService implements LicenseService {
     }
 
     private void reportAndExit(LicenseException e) {
+        // Recorded before the shutdown thread is even spawned, so checkCreateAllowed fails closed for the
+        // whole window between "violation detected" and "process actually exits" -- graceful shutdown can
+        // take a while, and payload alone can't signal this: it was already null (NO_KEY) or still holds the
+        // last-good value (a scheduled recheck failure), so leaving it as the only signal would let creates
+        // through unenforced for the entire shutdown window.
+        fatalViolation = e.getViolation();
         log.error("{}", e.getMessage());
         if (e.getViolation() == LicenseViolation.NO_KEY) {
             log.error("Instance ID: {}", instanceId);

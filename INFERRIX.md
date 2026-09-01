@@ -61,6 +61,12 @@ orchestrator's restart history):
 Reaching a device/asset cap does **not** exit the process — it only blocks further creates (existing
 devices/assets keep operating normally); only the six conditions above terminate the platform.
 
+The systemd unit template sets `RestartPreventExitStatus=13 14 15 16 17 18` so a licence exit stops the
+service instead of restarting it. Docker Compose's `restart:` directive has no equivalent exit-code
+predicate, so under `restart: always` a licence exit **will** loop the container every restart delay
+instead of stopping. If a container is exiting on a licence code, stop it (`docker compose stop`) rather
+than waiting on it, and fix the licence before starting it again.
+
 ### No internet access required
 
 Verification is entirely offline: the public key used to verify signatures is compiled into the

@@ -9,8 +9,12 @@ SuccessExitStatus=143
 
 # Service shall be restarted in 30 seconds when the service process exits, is killed, or a timeout is reached.
 # Restart parameter default value 'no'
-Restart=always 
+Restart=always
 RestartSec=30
+# Licence exit codes (13-18, see INFERRIX.md "Exit codes") are fatal-by-design, not crash-and-retry: a
+# first boot with no key, or a licence expiring mid-run, must stop and wait for an operator rather than
+# restart into the same failure every 30 seconds forever.
+RestartPreventExitStatus=13 14 15 16 17 18
 
 [Install]
 WantedBy=multi-user.target

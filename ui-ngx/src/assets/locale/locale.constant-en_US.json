@@ -5560,6 +5560,17 @@
             "import-error": "Failed to import report template. Please check the file and try again."
         }
     },
+    "license": {
+        "title": "Inferrix License",
+        "expires": "Expires",
+        "days-remaining": "{{count}} days",
+        "devices": "Devices",
+        "assets": "Assets",
+        "unlimited": "unlimited",
+        "instance-id": "Instance",
+        "copy-instance-id": "Copy instance ID",
+        "copied": "Copied"
+    },
     "security": {
         "security": "Security",
         "general-settings": "General security settings",

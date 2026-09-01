@@ -4,6 +4,11 @@ Narrative documentation for Inferrix-specific features on this fork. For the TB-
 ledger (which upstream files were changed, and how to recover a patch after `git merge
 upstream/release-4.3`), see `INFERRIX-PATCHES.md` instead.
 
+This file is the feature documentation for `inferrix-release-4.3`. `master` separately carries an
+unrelated, older `INFERRIX.md` (commit `f2e6ce9aa9`) documenting the superseded "Inferrix Synapse"
+`src/inferrix/` branding overlay — the two branches are divergent, these are not versions of the same
+document, and they should not be merged or reconciled as if they were.
+
 ## License Control
 
 Offline, install-wide licence enforcement. A signed key caps the number of devices and assets a

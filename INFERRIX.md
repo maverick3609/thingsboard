@@ -81,7 +81,7 @@ long as the gap lasts.
 **Confirm it before touching anything.** The exit-18 log line prints both values it compared:
 
 ```
-clock reads <now> but the recorded high-water mark is <highWater>
+System clock moved backwards past the recorded high-water mark: clock reads <now> but the recorded high-water mark is <highWater>
 ```
 
 Convert both to readable times and check them against a clock you trust (NTP, another host). If
@@ -91,9 +91,15 @@ to the recovery below. If instead `now` is the one that looks wrong, the check i
 recreate the same stuck mark for whoever checks in next.
 
 **Blast radius:** `license.max_high_water_advance_ms` (default 24h) caps how far one check can push the
-mark ahead, so one bad clock can lock the install out for at most that long — after which real time
-catches up to the mark on its own and every node resumes without intervention. The recovery below exists
-to skip that wait, not because the platform can't otherwise recover.
+mark ahead, not how many checks can push it. A **transient** bad reading (a one-off NTP jump that
+self-corrects, or a node that stops checking in) costs at most one clamp period of lockout, then the
+install heals itself. A **persistent** skew (dead RTC battery, wrong timezone) instead walks the mark
+forward by one clamp period per check until it reaches that node's own reading, then tracks it exactly —
+the lockout then lasts as long as that node keeps running and checking in, not just one clamp period. The
+real fix there is correcting or stopping the offending node's clock; the recovery below buys time, but a
+still-running bad node will push the mark straight back up, so it may need repeating until the clock is
+actually fixed. A WARN in the log (`DefaultLicenseService`, "high-water mark clamped") fires every time a
+check gets clamped, so this is visible well before the lockout lands rather than only once it's too late.
 
 **Recovery**, only once the clocks involved are confirmed good:
 

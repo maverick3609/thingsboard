@@ -81,14 +81,16 @@ public class LicenseDaoTest extends AbstractServiceTest {
         licenseDao.readOrCreateInstanceId();
         assertThat(licenseDao.readHighWaterTs()).isZero();
 
-        licenseDao.advanceHighWaterTs(5_000L, 86_400_000L);
+        assertThat(licenseDao.advanceHighWaterTs(5_000L, 86_400_000L)).isEqualTo(5_000L);
         assertThat(licenseDao.readHighWaterTs()).isEqualTo(5_000L);
 
-        licenseDao.advanceHighWaterTs(9_000L, 86_400_000L);
+        assertThat(licenseDao.advanceHighWaterTs(9_000L, 86_400_000L)).isEqualTo(9_000L);
         assertThat(licenseDao.readHighWaterTs()).isEqualTo(9_000L);
 
-        // A backwards value must not lower the mark — that is the whole point of the guard.
-        licenseDao.advanceHighWaterTs(1_000L, 86_400_000L);
+        // A backwards value must not lower the mark — that is the whole point of the guard. The returned
+        // value reflects that too, not just a later readHighWaterTs(): a caller can tell from the return
+        // alone that the requested value did not win.
+        assertThat(licenseDao.advanceHighWaterTs(1_000L, 86_400_000L)).isEqualTo(9_000L);
         assertThat(licenseDao.readHighWaterTs()).isEqualTo(9_000L);
     }
 
@@ -106,17 +108,21 @@ public class LicenseDaoTest extends AbstractServiceTest {
         licenseDao.readOrCreateInstanceId();
         licenseDao.advanceHighWaterTs(1_000_000L, 86_400_000L);   // bootstrap from zero
         long base = licenseDao.readHighWaterTs();
+        long requested = base + 30L * 86_400_000L;   // a 30-day jump
 
-        licenseDao.advanceHighWaterTs(base + 30L * 86_400_000L, 86_400_000L);  // a 30-day jump
+        long returned = licenseDao.advanceHighWaterTs(requested, 86_400_000L);
 
-        assertThat(licenseDao.readHighWaterTs()).isEqualTo(base + 86_400_000L);
+        // The return value is how DefaultLicenseService's operator warning detects that the clamp bound --
+        // it must come back below what was requested, not merely below the (already-known) DB state.
+        assertThat(returned).isEqualTo(base + 86_400_000L).isLessThan(requested);
+        assertThat(licenseDao.readHighWaterTs()).isEqualTo(returned);
     }
 
     @Test
     public void firstAdvanceFromZeroTakesTheGivenTimeExactly() {
         licenseDao.readOrCreateInstanceId();
 
-        licenseDao.advanceHighWaterTs(1_700_000_000_000L, 86_400_000L);
+        assertThat(licenseDao.advanceHighWaterTs(1_700_000_000_000L, 86_400_000L)).isEqualTo(1_700_000_000_000L);
 
         assertThat(licenseDao.readHighWaterTs()).isEqualTo(1_700_000_000_000L);
     }
@@ -126,7 +132,9 @@ public class LicenseDaoTest extends AbstractServiceTest {
         licenseDao.readOrCreateInstanceId();
         licenseDao.advanceHighWaterTs(1_700_000_000_000L, 86_400_000L);
 
-        licenseDao.advanceHighWaterTs(1_600_000_000_000L, 86_400_000L);
+        // Not less than what was requested (1_600_000_000_000L) -- this is a rejected backward attempt, not
+        // a clamp, so the return value must equal the unchanged mark, not something in between.
+        assertThat(licenseDao.advanceHighWaterTs(1_600_000_000_000L, 86_400_000L)).isEqualTo(1_700_000_000_000L);
 
         assertThat(licenseDao.readHighWaterTs()).isEqualTo(1_700_000_000_000L);
     }

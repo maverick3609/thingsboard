@@ -16,6 +16,7 @@
 package org.thingsboard.server.dao.license;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.thingsboard.server.cache.TbTransactionalCache;
@@ -57,28 +58,38 @@ public class LicenseDao {
     /**
      * Moves the mark forward only, and by at most {@code maxAdvanceMs} per call.
      * <p>
-     * The clamp bounds a real failure: a node whose clock is ahead — but still short of the licence expiry,
-     * so it passes checkExpiry and checkClock — would otherwise persist its own future timestamp, and since
-     * the mark only moves forward every other node then fails the rollback check and exits 18 for as long as
-     * the skew lasts. With the clamp, one bad node costs at most maxAdvanceMs of lockout and the install
-     * heals itself. A mark that lags real time is harmless; it only weakens rollback detection by the lag.
+     * The clamp bounds the size of a single advance, not how many times it can fire. A transient bad
+     * reading -- a one-off NTP jump that self-corrects, or a node that simply stops checking in -- costs
+     * every other node at most one clamp period of lockout, and the install then heals itself once real
+     * time catches up to the mark. A persistent skew -- a dead RTC battery, a wrong timezone -- instead
+     * walks the mark forward by {@code maxAdvanceMs} on every check until it reaches the bad clock's own
+     * reading, then tracks it exactly; from that point every correctly-clocked node stays locked out for
+     * as long as the offending node keeps running and checking in, not just for {@code maxAdvanceMs}. The
+     * actual remedy there is fixing or stopping that node's clock, not waiting. A mark that lags real time
+     * is harmless; it only weakens rollback detection by the lag.
      * <p>
      * The {@code high_water_ts = 0} branch is the fresh-install bootstrap: clamping against zero would pin
      * the mark near the epoch. There is no trusted reference to check the first value against, so it is
      * taken as given.
      * <p>
      * Fails loud rather than silently discarding the advance: an {@code UPDATE ... WHERE singleton = TRUE}
-     * against a missing row matches zero rows and would otherwise return cleanly, which would defeat the
-     * clock-rollback anti-tamper check without a trace.
+     * against a missing row matches zero rows; {@code queryForObject} turns that into an
+     * {@link EmptyResultDataAccessException}, which this method re-throws as an {@link IllegalStateException}
+     * naming the real cause, rather than letting a discarded advance defeat the clock-rollback anti-tamper
+     * check without a trace.
+     *
+     * @return the mark's value after this call; less than {@code nowMillis} means this call was clamped.
      */
-    public void advanceHighWaterTs(long nowMillis, long maxAdvanceMs) {
-        int updated = jdbcTemplate.update(
-                "UPDATE inferrix_license_state SET high_water_ts = CASE "
-                        + "WHEN high_water_ts = 0 THEN ? "
-                        + "ELSE GREATEST(high_water_ts, LEAST(?, high_water_ts + ?)) END "
-                        + "WHERE singleton = TRUE",
-                nowMillis, nowMillis, maxAdvanceMs);
-        if (updated == 0) {
+    public long advanceHighWaterTs(long nowMillis, long maxAdvanceMs) {
+        try {
+            return jdbcTemplate.queryForObject(
+                    "UPDATE inferrix_license_state SET high_water_ts = CASE "
+                            + "WHEN high_water_ts = 0 THEN ? "
+                            + "ELSE GREATEST(high_water_ts, LEAST(?, high_water_ts + ?)) END "
+                            + "WHERE singleton = TRUE "
+                            + "RETURNING high_water_ts",
+                    Long.class, nowMillis, nowMillis, maxAdvanceMs);
+        } catch (EmptyResultDataAccessException e) {
             throw new IllegalStateException(
                     "inferrix_license_state has no row yet -- readOrCreateInstanceId() must run first");
         }

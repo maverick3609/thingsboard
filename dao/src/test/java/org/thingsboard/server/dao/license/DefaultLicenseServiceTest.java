@@ -15,10 +15,16 @@
  */
 package org.thingsboard.server.dao.license;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.thingsboard.server.common.data.EntityType;
 import org.thingsboard.server.common.data.id.TenantId;
@@ -35,6 +41,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -53,6 +60,7 @@ public class DefaultLicenseServiceTest {
     private LicenseCodec codec;
     private String goldenKey;
     private String fixturePublicKey;
+    private ListAppender<ILoggingEvent> testLogAppender;
 
     /** Captures exit codes instead of terminating the JVM. */
     private static class TestableLicenseService extends DefaultLicenseService {
@@ -90,6 +98,26 @@ public class DefaultLicenseServiceTest {
         // The golden vector's iid must correspond to INSTANCE_ID for the happy paths to pass.
         when(dao.readOrCreateInstanceId()).thenReturn(INSTANCE_ID);
         when(dao.readHighWaterTs()).thenReturn(0L);
+        // Default: the DAO reports the advance landed at exactly what was asked, i.e. unclamped -- almost
+        // no test here cares about the high-water mark itself. Tests that do (the clamp-warning ones below)
+        // override this per-test.
+        when(dao.advanceHighWaterTs(anyLong(), anyLong())).thenAnswer(inv -> (Long) inv.getArguments()[0]);
+
+        testLogAppender = new ListAppender<>();
+        testLogAppender.start();
+        ((Logger) LoggerFactory.getLogger(DefaultLicenseService.class)).addAppender(testLogAppender);
+    }
+
+    @After
+    public void tearDown() {
+        if (testLogAppender != null) {
+            testLogAppender.stop();
+            ((Logger) LoggerFactory.getLogger(DefaultLicenseService.class)).detachAppender(testLogAppender);
+        }
+    }
+
+    private List<ILoggingEvent> warnEvents() {
+        return testLogAppender.list.stream().filter(e -> e.getLevel() == Level.WARN).toList();
     }
 
     @Test
@@ -163,6 +191,32 @@ public class DefaultLicenseServiceTest {
         s.init();
         assertThat(s.exits).isEmpty();
         verify(dao).advanceHighWaterTs(BEFORE_EXP_MILLIS, MAX_HIGH_WATER_ADVANCE_MILLIS);
+    }
+
+    @Test
+    public void unclampedAdvanceLogsNoWarning() {
+        // Relies on setUp()'s default stub: the DAO reports landing exactly on the requested value, i.e.
+        // the clamp never bound. A WARN here on every normal check would train operators to ignore it.
+        TestableLicenseService s = service(goldenKey, BEFORE_EXP_MILLIS);
+        s.init();
+        assertThat(s.exits).isEmpty();
+        assertThat(warnEvents()).isEmpty();
+    }
+
+    @Test
+    public void clampedAdvanceLogsAWarning() {
+        long clampedMark = BEFORE_EXP_MILLIS - 1;   // anything below what was requested is "the clamp bound"
+        when(dao.advanceHighWaterTs(anyLong(), anyLong())).thenReturn(clampedMark);
+
+        TestableLicenseService s = service(goldenKey, BEFORE_EXP_MILLIS);
+        s.init();
+
+        assertThat(s.exits).isEmpty();
+        List<ILoggingEvent> warnings = warnEvents();
+        assertThat(warnings).hasSize(1);
+        assertThat(warnings.get(0).getFormattedMessage())
+                .contains(String.valueOf(BEFORE_EXP_MILLIS))
+                .contains(String.valueOf(clampedMark));
     }
 
     @Test

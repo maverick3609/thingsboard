@@ -110,7 +110,7 @@ public class DefaultLicenseService implements LicenseService {
         try {
             checkExpiry(payload);
             checkClock();
-            licenseDao.advanceHighWaterTs(clock.millis(), maxHighWaterAdvanceMs);
+            advanceHighWaterMark(clock.millis());
             warnIfOverCapacity();
         } catch (LicenseException e) {
             reportAndExit(e);
@@ -128,8 +128,31 @@ public class DefaultLicenseService implements LicenseService {
         }
         checkExpiry(decoded);
         checkClock();
-        licenseDao.advanceHighWaterTs(clock.millis(), maxHighWaterAdvanceMs);
+        advanceHighWaterMark(clock.millis());
         return decoded;
+    }
+
+    /**
+     * Shared by both call sites so the clamp-bound warning fires the same way from either one.
+     * <p>
+     * The clamp (see {@link LicenseDao#advanceHighWaterTs}) bounds one advance, not the count of them: a
+     * persistently fast clock on this node walks the mark forward by {@code maxHighWaterAdvanceMs} every
+     * check until it reaches this node's own reading, at which point every correctly-clocked node stays
+     * locked out for as long as this node keeps running and checking in. The clamp binding is the earliest
+     * observable sign of that, roughly a day before the lockout actually lands, so it is worth a WARN --
+     * but only when it actually binds; logging on every normal, unclamped advance would train operators to
+     * ignore it.
+     */
+    private void advanceHighWaterMark(long nowMillis) {
+        long resultingMark = licenseDao.advanceHighWaterTs(nowMillis, maxHighWaterAdvanceMs);
+        if (resultingMark < nowMillis) {
+            log.warn("Inferrix licence high-water mark clamped: this node's clock ({}) is more than the "
+                            + "configured maximum ({} ms) ahead of the recorded mark, which advanced only to "
+                            + "{} this check. If this node's clock is persistently fast rather than a one-off "
+                            + "spike, it will keep pushing the mark forward until every correctly-clocked node "
+                            + "is locked out -- fix or stop this node's clock.",
+                    nowMillis, maxHighWaterAdvanceMs, resultingMark);
+        }
     }
 
     private void checkExpiry(LicensePayload decoded) {

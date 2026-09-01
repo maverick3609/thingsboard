@@ -48,17 +48,26 @@ public class LicenseDao {
     }
 
     public long readHighWaterTs() {
-        Long value = jdbcTemplate.queryForObject(
+        return jdbcTemplate.queryForObject(
                 "SELECT high_water_ts FROM inferrix_license_state WHERE singleton = TRUE", Long.class);
-        return value == null ? 0L : value;
     }
 
-    /** Moves the mark forward only. GREATEST makes concurrent updates from several nodes safe. */
+    /**
+     * Moves the mark forward only. GREATEST makes concurrent updates from several nodes safe.
+     * <p>
+     * Fails loud rather than silently discarding the advance: an {@code UPDATE ... WHERE singleton = TRUE}
+     * against a missing row matches zero rows and would otherwise return cleanly, which would defeat the
+     * clock-rollback anti-tamper check without a trace.
+     */
     public void advanceHighWaterTs(long nowMillis) {
-        jdbcTemplate.update(
+        int updated = jdbcTemplate.update(
                 "UPDATE inferrix_license_state SET high_water_ts = GREATEST(high_water_ts, ?) "
                         + "WHERE singleton = TRUE",
                 nowMillis);
+        if (updated == 0) {
+            throw new IllegalStateException(
+                    "inferrix_license_state has no row yet -- readOrCreateInstanceId() must run first");
+        }
     }
 
     /**
@@ -75,7 +84,6 @@ public class LicenseDao {
             default -> throw new IllegalArgumentException(
                     "Licence limits are not defined for entity type " + entityType);
         };
-        Long count = jdbcTemplate.queryForObject("SELECT count(*) FROM " + table, Long.class);
-        return count == null ? 0L : count;
+        return jdbcTemplate.queryForObject("SELECT count(*) FROM " + table, Long.class);
     }
 }

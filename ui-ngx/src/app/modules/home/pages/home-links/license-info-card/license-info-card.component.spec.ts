@@ -14,10 +14,11 @@
 /// limitations under the License.
 ///
 
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { TranslateModule } from '@ngx-translate/core';
+import { ClipboardService } from 'ngx-clipboard';
 import { LicenseInfoCardComponent } from './license-info-card.component';
 import { LicenseInfo } from '@shared/models/license.models';
 
@@ -158,14 +159,16 @@ describe('LicenseInfoCardComponent', () => {
     expect(component.severity).toBe('critical');
   });
 
-  it('copies the instance id and flips the icon', fakeAsync(() => {
+  it('copies the instance id and flips the icon', () => {
     load(info());
-    spyOn(navigator.clipboard, 'writeText').and.returnValue(Promise.resolve());
+    // ClipboardService.copy is synchronous (document.execCommand('copy')), unlike the
+    // navigator.clipboard.writeText Promise this used to spy on -- works on insecure origins too.
+    const clipboardService = TestBed.inject(ClipboardService);
+    spyOn(clipboardService, 'copy');
     fixture.nativeElement.querySelector('button[mat-icon-button]').click();
-    tick();
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('9f3a1c02-4b6d-4c3e-9a10-2f7c5d3e8b71');
+    expect(clipboardService.copy).toHaveBeenCalledWith('9f3a1c02-4b6d-4c3e-9a10-2f7c5d3e8b71');
     expect(component.copied).toBeTrue();
-  }));
+  });
 
   it('hides itself on a 403', () => {
     load(null, 403);

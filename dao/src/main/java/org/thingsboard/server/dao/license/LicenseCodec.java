@@ -157,7 +157,8 @@ public class LicenseCodec {
             }
             if (!value.isIntegralNumber() || !value.canConvertToLong() || value.asLong() < 0) {
                 throw new LicenseException(LicenseViolation.MALFORMED,
-                        cap + " must be a non-negative integer");
+                        cap + " must be a non-negative integer that fits in a signed 64-bit long "
+                                + "(got " + value + ")");
             }
             caps.put(cap, value.asLong());
         }

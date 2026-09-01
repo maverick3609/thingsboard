@@ -22,6 +22,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { TranslateModule } from '@ngx-translate/core';
+import { ClipboardService } from 'ngx-clipboard';
 import { catchError, of } from 'rxjs';
 import { LicenseService } from '@core/http/license.service';
 import {
@@ -33,9 +34,11 @@ import {
 } from '@shared/models/license.models';
 
 /**
- * Licence summary on /home. Standalone and dependency-light on purpose: it injects nothing beyond
- * LicenseService, which keeps it clear of the DialogService <-> EntityLimitExceededDialogComponent circular
- * import that breaks any Karma bundle pulling in the platform ImportExportService.
+ * Licence summary on /home. Standalone and dependency-light on purpose: LicenseService and ngx-clipboard's
+ * ClipboardService are its only injected dependencies, and both are {@code providedIn: 'root'} -- so
+ * neither needs a SharedModule import, which keeps this component clear of the DialogService <->
+ * EntityLimitExceededDialogComponent circular import that breaks any Karma bundle pulling in the platform
+ * ImportExportService.
  */
 @Component({
   selector: 'tb-license-info-card',
@@ -52,6 +55,7 @@ export class LicenseInfoCardComponent implements OnInit {
   copied = false;
 
   constructor(private licenseService: LicenseService,
+              private clipboardService: ClipboardService,
               private cd: ChangeDetectorRef) {}
 
   ngOnInit(): void {
@@ -100,9 +104,10 @@ export class LicenseInfoCardComponent implements OnInit {
   }
 
   copyInstanceId(): void {
-    navigator.clipboard.writeText(this.license.instanceId).then(() => {
-      this.copied = true;
-      this.cd.markForCheck();
-    });
+    // ClipboardService.copy uses document.execCommand('copy'), unlike navigator.clipboard.writeText,
+    // so it also works on a plain http:// deployment where navigator.clipboard is undefined.
+    this.clipboardService.copy(this.license.instanceId);
+    this.copied = true;
+    this.cd.markForCheck();
   }
 }

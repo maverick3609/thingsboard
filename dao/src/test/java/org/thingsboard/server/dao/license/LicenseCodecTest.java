@@ -100,6 +100,21 @@ public class LicenseCodecTest {
                 .hasFieldOrPropertyWithValue("violation", LicenseViolation.MALFORMED);
     }
 
+    @Test
+    public void noArgConstructorParsesThePublicKeyConstantIntoAUsableKey() {
+        // The no-arg constructor is the one Spring actually calls; every other test in this class goes
+        // through the package-private test constructor instead. PUBLIC_KEY_BASE64 is guaranteed to change
+        // again (it's a development key, per its own Javadoc), and a bad edit throws IllegalStateException
+        // at bean creation, failing every dao Spring context with an error pointing nowhere near the cause.
+        // decodeAndVerify against a key signed by a *different* keypair proves the constant is not just
+        // parseable but a fully usable key: it drives a real Signature.initVerify/update/verify call and
+        // fails for the expected reason (signature mismatch), not for some unrelated construction defect.
+        LicenseCodec production = new LicenseCodec();
+        assertThatThrownBy(() -> production.decodeAndVerify(goldenKey))
+                .isInstanceOf(LicenseException.class)
+                .hasFieldOrPropertyWithValue("violation", LicenseViolation.BAD_SIGNATURE);
+    }
+
     // Payload-rule tests go through parsePayload directly, NOT through decodeAndVerify. decodeAndVerify
     // verifies the signature BEFORE it parses, so a hand-built payload can only ever come back
     // BAD_SIGNATURE there. That ordering is deliberate — never parse attacker-controlled JSON before
@@ -137,6 +152,12 @@ public class LicenseCodecTest {
                 "{\"v\":1,\"iid\":\"aa\",\"exp\":1,\"plan\":{\"maxDevices\":-1}}",
                 "{\"v\":1,\"iid\":\"aa\",\"exp\":1,\"plan\":{\"maxDevices\":1.5}}",
                 "{\"v\":1,\"iid\":\"aa\",\"exp\":1,\"plan\":{\"maxDevices\":\"x\"}}",
+                // Beyond Long range: BigIntegerNode.isIntegralNumber() is true but asLong() silently
+                // truncates to the low 64 bits, so canConvertToLong() must be checked too.
+                "{\"v\":1,\"iid\":\"aa\",\"exp\":1,\"plan\":{\"maxDevices\":18446744073709551621}}",
+                // Same defect, but truncates to a positive value (1000000000) -- the dangerous direction,
+                // since a naive `< 0` guard alone would let this one through as a fabricated valid cap.
+                "{\"v\":1,\"iid\":\"aa\",\"exp\":1,\"plan\":{\"maxDevices\":18446744074709551616}}",
                 "{\"v\":1,\"iid\":\"aa\",\"exp\":1,\"plan\":{\"maxAssets\":-7}}",
                 "{\"v\":1,\"iid\":\"aa\",\"exp\":1,\"plan\":[]}"
         };
@@ -193,5 +214,17 @@ public class LicenseCodecTest {
     public void sha3HexMatchesTheNistEmptyStringVector() {
         assertThat(LicenseCodec.sha3Hex(""))
                 .isEqualTo("a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a");
+    }
+
+    @Test
+    public void exitCodesArePinned() {
+        // Operational contract: Task 13 publishes these in INFERRIX.md for operators to branch on in shell
+        // and systemd units. A transposition (e.g. EXPIRED <-> CLOCK_ROLLBACK) would otherwise go undetected.
+        assertThat(LicenseViolation.NO_KEY.getExitCode()).isEqualTo(13);
+        assertThat(LicenseViolation.MALFORMED.getExitCode()).isEqualTo(14);
+        assertThat(LicenseViolation.BAD_SIGNATURE.getExitCode()).isEqualTo(15);
+        assertThat(LicenseViolation.WRONG_INSTANCE.getExitCode()).isEqualTo(16);
+        assertThat(LicenseViolation.EXPIRED.getExitCode()).isEqualTo(17);
+        assertThat(LicenseViolation.CLOCK_ROLLBACK.getExitCode()).isEqualTo(18);
     }
 }

@@ -155,7 +155,7 @@ public class LicenseCodec {
             if (value == null || value.isNull()) {
                 continue; // absent means unlimited
             }
-            if (!value.isIntegralNumber() || value.asLong() < 0) {
+            if (!value.isIntegralNumber() || !value.canConvertToLong() || value.asLong() < 0) {
                 throw new LicenseException(LicenseViolation.MALFORMED,
                         cap + " must be a non-negative integer");
             }

@@ -1,7 +1,6 @@
 {
-  "_comment" : "Throwaway fixture keypair. NOT the production signing key. Pins the licence key format across the generator and the platform. iid = sha3Hex(9f3a1c02-4b6d-4c3e-9a10-2f7c5d3e8b71).",
+  "_comment" : "Throwaway fixture keypair. NOT the production signing key. Pins the licence key format across the generator and the platform. iid = sha3Hex(9f3a1c02-4b6d-4c3e-9a10-2f7c5d3e8b71). privateKeyPem is intentionally omitted from this copy -- nothing in this repo reads it; it lives only in the generator repo (inferrix-license-keygen), which needs it to re-sign and byte-compare against expectedKey.",
   "instanceUuid" : "9f3a1c02-4b6d-4c3e-9a10-2f7c5d3e8b71",
-  "privateKeyPem" : "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIF2RlvNCw280rgjU7dzHWuI8WrU3apmXGWbg28xidlzd\n-----END PRIVATE KEY-----\n",
   "publicKeyPem" : "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMwybJY2MbJ0Cz3mhhgel+vFN9mzZxYXaUQx9r8svsMk=\n-----END PUBLIC KEY-----\n",
   "publicKeyBase64" : "MCowBQYDK2VwAyEAMwybJY2MbJ0Cz3mhhgel+vFN9mzZxYXaUQx9r8svsMk=",
   "payload" : {

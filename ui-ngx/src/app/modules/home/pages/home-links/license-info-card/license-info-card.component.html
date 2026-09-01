@@ -20,7 +20,7 @@
     <span class="mat-headline-6" translate>license.title</span>
   </mat-card-title>
   <mat-card-content>
-    <div class="tb-license-row tb-license-customer">{{ license.customer }}</div>
+    <div class="tb-license-row tb-license-customer" *ngIf="license.customer">{{ license.customer }}</div>
 
     <div class="tb-license-row">
       <span translate>license.expires</span>
@@ -50,7 +50,7 @@
       </span>
     </div>
 
-    <div class="tb-license-row tb-license-instance">
+    <div class="tb-license-row tb-license-instance" *ngIf="license.instanceId">
       <span class="tb-license-label" translate>license.instance-id</span>
       <code>{{ license.instanceId }}</code>
       <button mat-icon-button

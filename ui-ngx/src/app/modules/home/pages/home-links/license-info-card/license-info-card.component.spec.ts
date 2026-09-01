@@ -181,4 +181,12 @@ describe('LicenseInfoCardComponent', () => {
     expect(component.license).toBeNull();
     expect(fixture.nativeElement.querySelector('mat-card')).toBeNull();
   });
+
+  it('hides the customer line and the instance row when those fields are absent', () => {
+    load(info({ customer: null, instanceId: null }));
+
+    expect(fixture.nativeElement.querySelector('.tb-license-customer')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.tb-license-instance')).toBeNull();
+    expect(fixture.nativeElement.querySelectorAll('mat-progress-bar').length).toBe(2);
+  });
 });

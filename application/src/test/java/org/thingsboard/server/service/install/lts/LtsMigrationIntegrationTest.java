@@ -213,6 +213,40 @@ public class LtsMigrationIntegrationTest extends AbstractControllerTest {
                 beansWithoutDir.isEmpty());
     }
 
+    @Test
+    public void licenseStateTableExists() {
+        // Fresh test-context schema comes from schema-entities.sql + schema-inferrix.sql, the fresh-install
+        // path. LTS migrations do not run on a fresh install, so this proves the schema-inferrix.sql half.
+        assertTrue("inferrix_license_state missing from the fresh-install schema",
+                tableExists("inferrix_license_state"));
+    }
+
+    @Test
+    public void licenseStateTableIsCreatedByTheVersionedMigrationToo() {
+        // Prove the upgrade half independently: drop the table, run only the 4.3.1.5 schema migration,
+        // and it must come back. This is the path an existing 4.3.1.4 database takes.
+        jdbcTemplate.execute("DROP TABLE IF EXISTS inferrix_license_state");
+        assertFalse(tableExists("inferrix_license_state"));
+
+        ltsMigrationService.runSchemaMigrations("4.3.1.4", "4.3.1.5");
+
+        assertTrue("lts/4.3.1.5/schema_update.sql did not create inferrix_license_state",
+                tableExists("inferrix_license_state"));
+
+        // Re-running must not error: both statements are IF NOT EXISTS.
+        ltsMigrationService.runSchemaMigrations("4.3.1.4", "4.3.1.5");
+
+        // The DDL must not seed a row; LicenseDao's insert-if-absent is what populates it.
+        assertEquals(Integer.valueOf(0),
+                jdbcTemplate.queryForObject("SELECT count(*) FROM inferrix_license_state", Integer.class));
+    }
+
+    @Test
+    public void migration4315IsRegisteredExactlyOnce() {
+        long count = migrations.stream().filter(m -> "4.3.1.5".equals(m.getVersion())).count();
+        assertEquals("V4_3_1_5Migration must be registered exactly once", 1L, count);
+    }
+
     private Set<String> listDirVersions(Path ltsDir) {
         if (!Files.isDirectory(ltsDir)) {
             return Set.of();

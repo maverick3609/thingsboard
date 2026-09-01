@@ -81,3 +81,14 @@ CREATE TABLE IF NOT EXISTS report (
 );
 CREATE INDEX IF NOT EXISTS idx_report_tenant_id ON report(tenant_id, created_time DESC);
 CREATE INDEX IF NOT EXISTS idx_report_template_id ON report(tenant_id, template_id);
+
+-- INFERRIX LICENSE STATE START
+-- Single-row table holding this install's identity and the monotonic clock high-water mark.
+-- instance_id is minted by LicenseDao (UUID.randomUUID + ON CONFLICT DO NOTHING), not by this DDL,
+-- so we do not depend on gen_random_uuid()/pgcrypto being present.
+CREATE TABLE IF NOT EXISTS inferrix_license_state (
+    singleton     boolean PRIMARY KEY DEFAULT TRUE CHECK (singleton),
+    instance_id   uuid   NOT NULL,
+    high_water_ts bigint NOT NULL DEFAULT 0
+);
+-- INFERRIX LICENSE STATE END

@@ -2271,6 +2271,11 @@ license:
   # Inferrix licence key. Obtain it from Inferrix using the instance ID the server prints on its first boot.
   # Set it via INFERRIX_LICENSE_KEY in thingsboard.conf. The platform will not start without it.
   key: "${INFERRIX_LICENSE_KEY:}"
+  enforcement:
+    # Licence enforcement on/off switch. Defaults to true (enforced). Exists so the platform's own test
+    # suite can run without a licence key; setting it false in a real deployment disables licence
+    # enforcement entirely and must never be done there.
+    enabled: "${INFERRIX_LICENSE_ENFORCEMENT_ENABLED:true}"
   # How often the licence is re-checked, in milliseconds. Default one hour.
   check_interval_ms: "${INFERRIX_LICENSE_CHECK_INTERVAL_MS:3600000}"
   # Clock-rollback tolerance, in milliseconds. Absorbs an NTP correction without a false positive.

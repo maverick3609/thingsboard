@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Before;
 import org.junit.Test;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.thingsboard.server.common.data.EntityType;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.exception.EntitiesLimitExceededException;
@@ -280,5 +281,40 @@ public class DefaultLicenseServiceTest {
     public void checkCreateAllowedIsSafeBeforeInit() {
         TestableLicenseService s = new TestableLicenseService(codec, dao);
         s.checkCreateAllowed(TenantId.SYS_TENANT_ID, EntityType.DEVICE);
+    }
+
+    /**
+     * Every non-install Spring test context leaves {@code license.enforcement.enabled} unset, which is
+     * exactly the "default" case this proves: {@code matchIfMissing = true} on {@link DefaultLicenseService}
+     * must still select the enforcing bean, not the no-op. A real (fixture-keyed) codec and a valid golden
+     * key are used so {@code init()} succeeds cleanly -- an unconditional context-runner call to a real
+     * {@code @PostConstruct} that failed with NO_KEY would call the real {@link DefaultLicenseService#shutdown}
+     * and kill this very test JVM, which is the exact class of bug this whole fix round is about.
+     */
+    @Test
+    public void defaultPropertyValueSelectsTheEnforcingBean() {
+        new ApplicationContextRunner()
+                .withBean(LicenseCodec.class, () -> codec)
+                .withBean(LicenseDao.class, () -> dao)
+                .withUserConfiguration(DefaultLicenseService.class, NoopLicenseService.class)
+                .withPropertyValues("license.key=" + goldenKey)
+                // license.enforcement.enabled deliberately left unset here.
+                .run(context -> {
+                    assertThat(context).hasSingleBean(LicenseService.class);
+                    assertThat(context).hasSingleBean(DefaultLicenseService.class);
+                    assertThat(context).doesNotHaveBean(NoopLicenseService.class);
+                });
+    }
+
+    @Test
+    public void disabledEnforcementSelectsTheNoopBean() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(DefaultLicenseService.class, NoopLicenseService.class)
+                .withPropertyValues("license.enforcement.enabled=false")
+                .run(context -> {
+                    assertThat(context).hasSingleBean(LicenseService.class);
+                    assertThat(context).hasSingleBean(NoopLicenseService.class);
+                    assertThat(context).doesNotHaveBean(DefaultLicenseService.class);
+                });
     }
 }

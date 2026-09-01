@@ -20,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -39,9 +40,15 @@ import java.util.concurrent.TimeUnit;
  * local database, blocks creates once a cap is reached, and terminates the process on any critical violation.
  * <p>
  * No network access at any point: the public key is compiled in, and the only state is one local row.
+ * <p>
+ * Selected only when enforcement is not explicitly turned off ({@code license.enforcement.enabled} true or
+ * absent) -- {@link NoopLicenseService} takes over when it is {@code false}, which every non-install Spring
+ * test context needs, since none of them configure a licence key and this bean's own {@code @PostConstruct}
+ * would otherwise call {@link System#exit}.
  */
 @Service
 @Profile("!install")
+@ConditionalOnProperty(name = "license.enforcement.enabled", havingValue = "true", matchIfMissing = true)
 @Slf4j
 public class DefaultLicenseService implements LicenseService {
 

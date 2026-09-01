@@ -2266,3 +2266,12 @@ iot-hub:
   max-uncompressed-entry-bytes: "${IOT_HUB_MAX_UNCOMPRESSED_ENTRY_BYTES:52428800}" # maximum uncompressed size in bytes for any single entry inside a solution template archive.
   max-archive-entry-count: "${IOT_HUB_MAX_ARCHIVE_ENTRY_COUNT:10000}" # maximum number of entries allowed inside a solution template archive.
   max-install-timeout-ms: "${IOT_HUB_MAX_INSTALL_TIMEOUT_MS:60000}" # upper clamp in milliseconds for the post-install wait declared in a solution template's solution.json. Prevents a malicious or misconfigured template from pinning an HTTP worker thread.
+
+license:
+  # Inferrix licence key. Obtain it from Inferrix using the instance ID the server prints on its first boot.
+  # Set it via INFERRIX_LICENSE_KEY in thingsboard.conf. The platform will not start without it.
+  key: "${INFERRIX_LICENSE_KEY:}"
+  # How often the licence is re-checked, in milliseconds. Default one hour.
+  check_interval_ms: "${INFERRIX_LICENSE_CHECK_INTERVAL_MS:3600000}"
+  # Clock-rollback tolerance, in milliseconds. Absorbs an NTP correction without a false positive.
+  clock_tolerance_ms: "${INFERRIX_LICENSE_CLOCK_TOLERANCE_MS:3600000}"

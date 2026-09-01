@@ -767,6 +767,9 @@ cache:
     entityCount:
       timeToLiveInMinutes: "${CACHE_SPECS_ENTITY_COUNT_TTL:1440}" # Entity count cache TTL
       maxSize: "${CACHE_SPECS_ENTITY_COUNT_MAX_SIZE:100000}" # 0 means the cache is disabled
+    inferrixLicenseCount:
+      timeToLiveInMinutes: "${CACHE_SPECS_INFERRIX_LICENSE_COUNT_TTL:60}" # Inferrix install-wide licensed-entity count cache TTL. Backstop only -- the cache is evicted on every device/asset create and delete; this bounds drift if an evict event is ever missed.
+      maxSize: "${CACHE_SPECS_INFERRIX_LICENSE_COUNT_MAX_SIZE:16}" # two keys are used (DEVICE, ASSET); 0 means the cache is disabled
     resourceInfo:
       timeToLiveInMinutes: "${CACHE_SPECS_RESOURCE_INFO_TTL:1440}" # Resource info cache TTL
       maxSize: "${CACHE_SPECS_RESOURCE_INFO_MAX_SIZE:100000}" # 0 means the cache is disabled

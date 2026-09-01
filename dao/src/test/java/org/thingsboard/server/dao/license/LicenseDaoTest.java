@@ -19,6 +19,7 @@ import org.junit.After;
 import org.junit.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.thingsboard.server.cache.TbTransactionalCache;
 import org.thingsboard.server.common.data.EntityType;
 import org.thingsboard.server.dao.service.AbstractServiceTest;
 import org.thingsboard.server.dao.service.DaoSqlTest;
@@ -50,6 +51,9 @@ public class LicenseDaoTest extends AbstractServiceTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private TbTransactionalCache<LicenseCountCacheKey, Long> cache;
+
     @After
     public void tearDown() {
         jdbcTemplate.execute("DELETE FROM inferrix_license_state");
@@ -57,6 +61,10 @@ public class LicenseDaoTest extends AbstractServiceTest {
         jdbcTemplate.update("DELETE FROM device_profile WHERE id = ?", DEVICE_PROFILE_ID);
         jdbcTemplate.update("DELETE FROM asset WHERE tenant_id IN (?, ?)", TENANT_A, TENANT_B);
         jdbcTemplate.update("DELETE FROM asset_profile WHERE id = ?", ASSET_PROFILE_ID);
+        // These deletes are raw JDBC, same as the inserts below -- no evict event fires for them either.
+        // Leave the shared cache clean for whatever test runs next in this Spring context.
+        cache.evict(new LicenseCountCacheKey(EntityType.DEVICE));
+        cache.evict(new LicenseCountCacheKey(EntityType.ASSET));
     }
 
     @Test
@@ -148,6 +156,13 @@ public class LicenseDaoTest extends AbstractServiceTest {
                 ASSET_PROFILE_ID, System.currentTimeMillis());
         insertAsset(TENANT_A, "license-dao-test-asset-a");
         insertAsset(TENANT_B, "license-dao-test-asset-b");
+
+        // All four inserts above are raw JDBC, so no evict event fired for any of them; evict by hand so
+        // this test keeps proving what it is actually for -- that the SQL itself is install-wide, not
+        // tenant-scoped. Cache staleness after a bypassed write is its own concern, covered separately by
+        // LicenseCountCacheTest.
+        cache.evict(new LicenseCountCacheKey(EntityType.DEVICE));
+        cache.evict(new LicenseCountCacheKey(EntityType.ASSET));
 
         // Two different tenant_id values: this only passes if the count is install-wide, not tenant-scoped.
         assertThat(licenseDao.countEntities(EntityType.DEVICE)).isEqualTo(devicesBefore + 2);

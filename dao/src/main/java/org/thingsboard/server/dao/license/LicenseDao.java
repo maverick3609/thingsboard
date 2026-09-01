@@ -18,6 +18,7 @@ package org.thingsboard.server.dao.license;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.thingsboard.server.cache.TbTransactionalCache;
 import org.thingsboard.server.common.data.EntityType;
 
 import java.util.UUID;
@@ -31,6 +32,7 @@ import java.util.UUID;
 public class LicenseDao {
 
     private final JdbcTemplate jdbcTemplate;
+    private final TbTransactionalCache<LicenseCountCacheKey, Long> cache;
 
     /**
      * The identity this install's licence is bound to, minting it on first call.
@@ -73,11 +75,17 @@ public class LicenseDao {
     /**
      * Install-wide count, not per tenant: the licence caps the deployment, not a tenant.
      * <p>
-     * ponytail: a full count(*) per create, which is the same cost CE already pays in
-     * DataValidator.validateNumberOfEntitiesPerTenant. If bulk provisioning ever shows this in a profile,
-     * replace it with a cached counter refreshed on the licence check interval.
+     * Read through a cache evicted by {@link LicenseCountEvictor} on every device/asset create and delete,
+     * so the uncached count(*) runs once per mutation rather than once per create. Stock ThingsBoard runs no
+     * query at all on this path (DefaultApiLimitService short-circuits when the tenant-profile limit is
+     * unset), so an unconditional full-table scan here would be new cost on the hot provisioning path.
      */
     public long countEntities(EntityType entityType) {
+        return cache.getAndPutInTransaction(new LicenseCountCacheKey(entityType),
+                () -> countEntitiesUncached(entityType), false);
+    }
+
+    long countEntitiesUncached(EntityType entityType) {
         String table = switch (entityType) {
             case DEVICE -> "device";
             case ASSET -> "asset";

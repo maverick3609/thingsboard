@@ -106,6 +106,19 @@ public class LicenseCountCacheTest extends AbstractServiceTest {
     }
 
     @Test
+    public void updatingADeviceAlsoEvictsTheCachedCount() {
+        Device device = saveDevice("license-count-cache-test-update");
+        long before = licenseDao.countEntities(EntityType.DEVICE); // populates the cache, device included
+
+        insertDeviceDirectly(); // raw JDBC, no event -- cache is now stale-low by one row
+
+        deviceService.saveDevice(device); // update (device.getId() != null already), not a create
+
+        // If updates didn't evict, this would still return the stale "before", missing the raw-inserted row.
+        assertThat(licenseDao.countEntities(EntityType.DEVICE)).isEqualTo(before + 1);
+    }
+
+    @Test
     public void creatingAnAssetEvictsTheCachedCount() {
         long before = licenseDao.countEntities(EntityType.ASSET); // populates the cache with the old count
 

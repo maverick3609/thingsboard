@@ -25,7 +25,7 @@ import org.thingsboard.server.dao.eventsourcing.DeleteEntityEvent;
 import org.thingsboard.server.dao.eventsourcing.SaveEntityEvent;
 
 /**
- * Evicts the install-wide licensed-entity count cache whenever a device or asset is created or deleted,
+ * Evicts the install-wide licensed-entity count cache whenever a device or asset is saved or deleted,
  * ignoring which tenant changed.
  * <p>
  * Listens to {@link SaveEntityEvent}/{@link DeleteEntityEvent} rather than TB's own (package-private)
@@ -39,6 +39,11 @@ import org.thingsboard.server.dao.eventsourcing.SaveEntityEvent;
  * was adopted, not by inspection alone. {@code SaveEntityEvent}/{@code DeleteEntityEvent} are published
  * unconditionally either way, and {@code fallbackExecution = true} is the same pattern already used for this
  * exact reason by {@code EntityStateSourcingListener} and {@code EdqsListener}.
+ * <p>
+ * {@code onSave} evicts on every save, not only on {@code SaveEntityEvent.getCreated() == true}: an update
+ * evicting the count costs one harmless extra query on the next read, while trusting every current and
+ * future DEVICE/ASSET publisher to set {@code created} correctly is a correctness dependency this class does
+ * not need to take on, for a saving that does not matter.
  */
 @Component
 @RequiredArgsConstructor
@@ -48,9 +53,7 @@ public class LicenseCountEvictor {
 
     @TransactionalEventListener(fallbackExecution = true)
     public void onSave(SaveEntityEvent<?> event) {
-        if (Boolean.TRUE.equals(event.getCreated())) {
-            evictIfLicensed(event.getEntityId());
-        }
+        evictIfLicensed(event.getEntityId());
     }
 
     @TransactionalEventListener(fallbackExecution = true)

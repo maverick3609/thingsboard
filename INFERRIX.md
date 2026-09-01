@@ -67,6 +67,46 @@ predicate, so under `restart: always` a licence exit **will** loop the container
 instead of stopping. If a container is exiting on a licence code, stop it (`docker compose stop`) rather
 than waiting on it, and fix the licence before starting it again.
 
+#### Recovering from exit code 18
+
+Exit 18 does not always mean *this* node's clock is wrong. `checkClock` compares the current clock
+against `high_water_ts`, a mark in `inferrix_license_state` that only ever moves forward. The usual cause
+is a **different** node whose clock once ran ahead of real time: that node still passed `checkExpiry`
+(its fast clock hadn't reached the licence's expiry yet) and `checkClock` (nothing had recorded a higher
+mark yet), so it persisted its own future timestamp as the new high-water mark. Because the mark cannot
+move backward, every node afterwards — including the offending one, once its clock is corrected — now
+reads a real "now" behind that stale future mark, and fails `now < highWater - clock_tolerance_ms` for as
+long as the gap lasts.
+
+**Confirm it before touching anything.** The exit-18 log line prints both values it compared:
+
+```
+clock reads <now> but the recorded high-water mark is <highWater>
+```
+
+Convert both to readable times and check them against a clock you trust (NTP, another host). If
+`highWater` is the one in the future, this is the scenario above, not a live rollback attempt — proceed
+to the recovery below. If instead `now` is the one that looks wrong, the check is doing its job: fix
+*this* node's clock and let it re-verify normally. Do not run the recovery in that case — it would
+recreate the same stuck mark for whoever checks in next.
+
+**Blast radius:** `license.max_high_water_advance_ms` (default 24h) caps how far one check can push the
+mark ahead, so one bad clock can lock the install out for at most that long — after which real time
+catches up to the mark on its own and every node resumes without intervention. The recovery below exists
+to skip that wait, not because the platform can't otherwise recover.
+
+**Recovery**, only once the clocks involved are confirmed good:
+
+```sql
+-- Only after confirming no clock is actually wound back. Sets the mark to the current true time.
+UPDATE inferrix_license_state SET high_water_ts = <current epoch millis> WHERE singleton = TRUE;
+```
+
+This is a deliberate override of an anti-tamper control, applied directly against the database, bypassing
+the platform entirely. Run it only once the clocks are known good — used on a node whose clock is
+genuinely wound back, it is exactly the tampering this mechanism exists to catch, defeated silently by an
+operator's own hand.
+
 ### No internet access required
 
 Verification is entirely offline: the public key used to verify signatures is compiled into the

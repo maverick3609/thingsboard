@@ -81,14 +81,14 @@ public class LicenseDaoTest extends AbstractServiceTest {
         licenseDao.readOrCreateInstanceId();
         assertThat(licenseDao.readHighWaterTs()).isZero();
 
-        licenseDao.advanceHighWaterTs(5_000L);
+        licenseDao.advanceHighWaterTs(5_000L, 86_400_000L);
         assertThat(licenseDao.readHighWaterTs()).isEqualTo(5_000L);
 
-        licenseDao.advanceHighWaterTs(9_000L);
+        licenseDao.advanceHighWaterTs(9_000L, 86_400_000L);
         assertThat(licenseDao.readHighWaterTs()).isEqualTo(9_000L);
 
         // A backwards value must not lower the mark — that is the whole point of the guard.
-        licenseDao.advanceHighWaterTs(1_000L);
+        licenseDao.advanceHighWaterTs(1_000L, 86_400_000L);
         assertThat(licenseDao.readHighWaterTs()).isEqualTo(9_000L);
     }
 
@@ -96,9 +96,39 @@ public class LicenseDaoTest extends AbstractServiceTest {
     public void advanceHighWaterTsFailsLoudWhenNoRowExistsYet() {
         // No readOrCreateInstanceId() call first -- the table is empty. Without the row-count guard this
         // would silently update zero rows and swallow the advance instead of raising.
-        assertThatThrownBy(() -> licenseDao.advanceHighWaterTs(1_000L))
+        assertThatThrownBy(() -> licenseDao.advanceHighWaterTs(1_000L, 86_400_000L))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("readOrCreateInstanceId");
+    }
+
+    @Test
+    public void advanceIsClampedToTheConfiguredMaximum() {
+        licenseDao.readOrCreateInstanceId();
+        licenseDao.advanceHighWaterTs(1_000_000L, 86_400_000L);   // bootstrap from zero
+        long base = licenseDao.readHighWaterTs();
+
+        licenseDao.advanceHighWaterTs(base + 30L * 86_400_000L, 86_400_000L);  // a 30-day jump
+
+        assertThat(licenseDao.readHighWaterTs()).isEqualTo(base + 86_400_000L);
+    }
+
+    @Test
+    public void firstAdvanceFromZeroTakesTheGivenTimeExactly() {
+        licenseDao.readOrCreateInstanceId();
+
+        licenseDao.advanceHighWaterTs(1_700_000_000_000L, 86_400_000L);
+
+        assertThat(licenseDao.readHighWaterTs()).isEqualTo(1_700_000_000_000L);
+    }
+
+    @Test
+    public void advanceStillNeverMovesTheMarkBackwards() {
+        licenseDao.readOrCreateInstanceId();
+        licenseDao.advanceHighWaterTs(1_700_000_000_000L, 86_400_000L);
+
+        licenseDao.advanceHighWaterTs(1_600_000_000_000L, 86_400_000L);
+
+        assertThat(licenseDao.readHighWaterTs()).isEqualTo(1_700_000_000_000L);
     }
 
     @Test

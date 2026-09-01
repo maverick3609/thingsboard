@@ -62,6 +62,9 @@ public class LicenseCountEvictor {
     }
 
     private void evictIfLicensed(EntityId entityId) {
+        if (entityId == null) {
+            return;
+        }
         EntityType type = entityId.getEntityType();
         if (type == EntityType.DEVICE || type == EntityType.ASSET) {
             cache.evict(new LicenseCountCacheKey(type));

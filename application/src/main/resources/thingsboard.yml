@@ -2283,3 +2283,7 @@ license:
   check_interval_ms: "${INFERRIX_LICENSE_CHECK_INTERVAL_MS:3600000}"
   # Clock-rollback tolerance, in milliseconds. Absorbs an NTP correction without a false positive.
   clock_tolerance_ms: "${INFERRIX_LICENSE_CLOCK_TOLERANCE_MS:3600000}"
+  # Largest amount, in milliseconds, by which one licence check may advance the clock-rollback high-water
+  # mark. Bounds the damage from a node with a fast clock: without it, such a node persists its own future
+  # timestamp and every other node then fails the rollback check until real time catches up. Default 24h.
+  max_high_water_advance_ms: "${INFERRIX_LICENSE_MAX_HIGH_WATER_ADVANCE_MS:86400000}"

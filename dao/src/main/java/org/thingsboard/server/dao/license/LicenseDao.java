@@ -55,17 +55,29 @@ public class LicenseDao {
     }
 
     /**
-     * Moves the mark forward only. GREATEST makes concurrent updates from several nodes safe.
+     * Moves the mark forward only, and by at most {@code maxAdvanceMs} per call.
+     * <p>
+     * The clamp bounds a real failure: a node whose clock is ahead — but still short of the licence expiry,
+     * so it passes checkExpiry and checkClock — would otherwise persist its own future timestamp, and since
+     * the mark only moves forward every other node then fails the rollback check and exits 18 for as long as
+     * the skew lasts. With the clamp, one bad node costs at most maxAdvanceMs of lockout and the install
+     * heals itself. A mark that lags real time is harmless; it only weakens rollback detection by the lag.
+     * <p>
+     * The {@code high_water_ts = 0} branch is the fresh-install bootstrap: clamping against zero would pin
+     * the mark near the epoch. There is no trusted reference to check the first value against, so it is
+     * taken as given.
      * <p>
      * Fails loud rather than silently discarding the advance: an {@code UPDATE ... WHERE singleton = TRUE}
      * against a missing row matches zero rows and would otherwise return cleanly, which would defeat the
      * clock-rollback anti-tamper check without a trace.
      */
-    public void advanceHighWaterTs(long nowMillis) {
+    public void advanceHighWaterTs(long nowMillis, long maxAdvanceMs) {
         int updated = jdbcTemplate.update(
-                "UPDATE inferrix_license_state SET high_water_ts = GREATEST(high_water_ts, ?) "
+                "UPDATE inferrix_license_state SET high_water_ts = CASE "
+                        + "WHEN high_water_ts = 0 THEN ? "
+                        + "ELSE GREATEST(high_water_ts, LEAST(?, high_water_ts + ?)) END "
                         + "WHERE singleton = TRUE",
-                nowMillis);
+                nowMillis, nowMillis, maxAdvanceMs);
         if (updated == 0) {
             throw new IllegalStateException(
                     "inferrix_license_state has no row yet -- readOrCreateInstanceId() must run first");

@@ -47,6 +47,7 @@ public class DefaultLicenseServiceTest {
     private static final long BEFORE_EXP_MILLIS = (EXP_SECONDS - 86_400L) * 1000L;
     private static final long AFTER_EXP_MILLIS = (EXP_SECONDS + 86_400L) * 1000L;
     private static final long TOLERANCE_MILLIS = 3_600_000L;
+    private static final long MAX_HIGH_WATER_ADVANCE_MILLIS = 86_400_000L;
 
     private LicenseDao dao;
     private LicenseCodec codec;
@@ -71,6 +72,7 @@ public class DefaultLicenseServiceTest {
         TestableLicenseService s = new TestableLicenseService(codec, dao);
         s.setLicenseKey(key);
         s.setClockToleranceMs(TOLERANCE_MILLIS);
+        s.setMaxHighWaterAdvanceMs(MAX_HIGH_WATER_ADVANCE_MILLIS);
         s.setClock(Clock.fixed(Instant.ofEpochMilli(nowMillis), ZoneOffset.UTC));
         return s;
     }
@@ -160,7 +162,7 @@ public class DefaultLicenseServiceTest {
         TestableLicenseService s = service(goldenKey, BEFORE_EXP_MILLIS);
         s.init();
         assertThat(s.exits).isEmpty();
-        verify(dao).advanceHighWaterTs(BEFORE_EXP_MILLIS);
+        verify(dao).advanceHighWaterTs(BEFORE_EXP_MILLIS, MAX_HIGH_WATER_ADVANCE_MILLIS);
     }
 
     @Test

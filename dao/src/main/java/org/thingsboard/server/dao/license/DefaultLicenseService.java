@@ -69,6 +69,9 @@ public class DefaultLicenseService implements LicenseService {
     @Value("${license.clock_tolerance_ms:3600000}")
     private long clockToleranceMs;
 
+    @Value("${license.max_high_water_advance_ms:86400000}")
+    private long maxHighWaterAdvanceMs;
+
     private Clock clock = Clock.systemUTC();
 
     private volatile LicensePayload payload;
@@ -107,7 +110,7 @@ public class DefaultLicenseService implements LicenseService {
         try {
             checkExpiry(payload);
             checkClock();
-            licenseDao.advanceHighWaterTs(clock.millis());
+            licenseDao.advanceHighWaterTs(clock.millis(), maxHighWaterAdvanceMs);
             warnIfOverCapacity();
         } catch (LicenseException e) {
             reportAndExit(e);
@@ -125,7 +128,7 @@ public class DefaultLicenseService implements LicenseService {
         }
         checkExpiry(decoded);
         checkClock();
-        licenseDao.advanceHighWaterTs(clock.millis());
+        licenseDao.advanceHighWaterTs(clock.millis(), maxHighWaterAdvanceMs);
         return decoded;
     }
 
@@ -271,6 +274,10 @@ public class DefaultLicenseService implements LicenseService {
 
     void setClockToleranceMs(long clockToleranceMs) {
         this.clockToleranceMs = clockToleranceMs;
+    }
+
+    void setMaxHighWaterAdvanceMs(long maxHighWaterAdvanceMs) {
+        this.maxHighWaterAdvanceMs = maxHighWaterAdvanceMs;
     }
 
     void setClock(Clock clock) {

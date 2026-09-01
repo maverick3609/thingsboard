@@ -286,18 +286,31 @@ public class DefaultLicenseServiceTest {
     /**
      * Every non-install Spring test context leaves {@code license.enforcement.enabled} unset, which is
      * exactly the "default" case this proves: {@code matchIfMissing = true} on {@link DefaultLicenseService}
-     * must still select the enforcing bean, not the no-op. A real (fixture-keyed) codec and a valid golden
-     * key are used so {@code init()} succeeds cleanly -- an unconditional context-runner call to a real
-     * {@code @PostConstruct} that failed with NO_KEY would call the real {@link DefaultLicenseService#shutdown}
-     * and kill this very test JVM, which is the exact class of bug this whole fix round is about.
+     * must still select the enforcing bean, not the no-op.
+     * <p>
+     * This registers the <b>real</b> {@code DefaultLicenseService} -- that's unavoidable, it's the only way
+     * to exercise the actual {@code @Profile}/{@code @ConditionalOnProperty} conditions -- so it keeps the
+     * real, non-overridden {@code shutdown()} and a hardcoded {@code Clock.systemUTC()} with no seam to fake
+     * it after {@code @PostConstruct} runs. A real signed key expires on the calendar; wall-clock time would
+     * eventually cross it and this test would call the real {@code System.exit} and kill its own JVM -- the
+     * exact bug this round exists to fix, just on a delay. So the codec is mocked (as
+     * {@code unlimitedCapIsAllowedAndSkipsTheCountQuery} already does) to hand back a payload whose
+     * {@code exp} is the largest value a {@code long} of epoch-seconds can hold without {@code expMillis()}'s
+     * {@code exp * 1000L} overflowing -- not "expires later", but the type's own ceiling, so {@code init()}
+     * cannot observe an expiry at any wall-clock date a running JVM will ever see.
      */
     @Test
     public void defaultPropertyValueSelectsTheEnforcingBean() {
+        LicenseCodec neverExpiringCodec = mock(LicenseCodec.class);
+        LicensePayload neverExpiring = new LicensePayload(1, LicenseCodec.sha3Hex(INSTANCE_ID.toString()),
+                "Acme Pvt Ltd", 0L, Long.MAX_VALUE / 1000L, Map.of());
+        when(neverExpiringCodec.decodeAndVerify("never-expiring-key")).thenReturn(neverExpiring);
+
         new ApplicationContextRunner()
-                .withBean(LicenseCodec.class, () -> codec)
+                .withBean(LicenseCodec.class, () -> neverExpiringCodec)
                 .withBean(LicenseDao.class, () -> dao)
                 .withUserConfiguration(DefaultLicenseService.class, NoopLicenseService.class)
-                .withPropertyValues("license.key=" + goldenKey)
+                .withPropertyValues("license.key=never-expiring-key")
                 // license.enforcement.enabled deliberately left unset here.
                 .run(context -> {
                     assertThat(context).hasSingleBean(LicenseService.class);

@@ -90,6 +90,25 @@ extends ITextUserAgent {
             if (uri.startsWith("/assets/")) {
                 url = PdfReportUserAgent.class.getResource("/public" + uri);
             }
+            if (url == null && uri.startsWith("jar:")) {
+                // flying-saucer resolves its OWN bundled resources -- most importantly the default
+                // user-agent stylesheet resources/css/XhtmlNamespaceHandler.css, which carries
+                // "head, script { display: none }" and every block/inline/table default -- to an absolute
+                // jar: URL and hands it back to us here. Class.getResource cannot take an absolute URL, so
+                // the R2a guard below used to return null for it and the renderer silently ran with NO
+                // user-agent stylesheet at all: <head> became visible and printed the report's own CSS
+                // into the document, and no HTML element had its default display.
+                //
+                // Re-resolve the jar entry path through our own classloader rather than opening the URL,
+                // so this can still only ever yield something genuinely on the classpath -- never an
+                // arbitrary local file and never a remote fetch. lastIndexOf handles the nested
+                // jar:file:/app.jar!/BOOT-INF/lib/flying-saucer-core.jar!/... form a Spring Boot fat jar
+                // produces.
+                int entry = uri.lastIndexOf("!/");
+                if (entry > 0) {
+                    url = PdfReportUserAgent.class.getResource(uri.substring(entry + 1));
+                }
+            }
             if (url == null) {
                 // R2a policy: resolve ONLY bundled classpath assets here. Do NOT fetch arbitrary URLs
                 // (http/https/file/ftp/...) via super.resolveAndOpenStream -> new URL(uri).openStream():

@@ -151,8 +151,12 @@ public class PdfReportService extends AbstractReportService {
             reportVariables.put("pageContent", renderContent(ctx, components, usablePageWidthPx));
 
             String renderedHtmlContent = ThymeleafUtil.renderFromHtmlTemplate("html/report-template", reportVariables);
-            String xHtml = HtmlRenderUtils.convertToXhtml(renderedHtmlContent);
-            renderer.setDocumentFromString(xHtml);
+            // Hand flying-saucer a parsed DOM, never a re-serialised XHTML string. jsoup's XML output
+            // syntax wraps <style>/<script> bodies in /*<![CDATA[*/ ... /*]]>*/; the XML parser then
+            // unwraps the CDATA and leaves /**/ @page { ... } /**/ as the element's text, which loses the
+            // @page rule and prints the CSS into the report. parseDom skips serialisation entirely, and is
+            // the same path measureHtmlHeight already uses.
+            renderer.setDocument(HtmlRenderUtils.parseDom(renderedHtmlContent));
             renderer.layout();
 
             byte[] reportBytes;

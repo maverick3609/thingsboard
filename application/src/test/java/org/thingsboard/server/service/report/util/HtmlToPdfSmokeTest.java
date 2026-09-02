@@ -15,6 +15,8 @@
  */
 package org.thingsboard.server.service.report.util;
 
+import com.lowagie.text.pdf.PdfReader;
+import com.lowagie.text.pdf.parser.PdfTextExtractor;
 import org.junit.jupiter.api.Test;
 import org.thingsboard.server.service.report.util.itext.PdfReportFontResolver;
 import org.thingsboard.server.service.report.util.itext.PdfReportImageResolver;
@@ -36,6 +38,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * classpath, and an SVG rasterizes via jsvg — without throwing on font resolution or SVG raster.
  */
 class HtmlToPdfSmokeTest {
+
 
     /** Never invoked in this test (no tb-image URIs) — fails loudly if the image seam is hit. */
     private static final PdfReportImageResolver STUB_RESOLVER = new PdfReportImageResolver() {
@@ -127,4 +130,68 @@ class HtmlToPdfSmokeTest {
                 .as("Roboto-Regular.ttf loadable off the classpath by the font resolver")
                 .isNotNull();
     }
+
+    /**
+     * Regression for the report whose only visible text was its own stylesheet.
+     * <p>
+     * Cause was serialising the rendered template back to a string before handing it to flying-saucer.
+     * jsoup's XML output syntax wraps a style element's body in CDATA comment guards; the XML parser then
+     * consumes the CDATA sections, and what survives as the element's text is an empty CSS comment, the
+     * rules, and another empty comment. The page rule is lost and the CSS prints into the document.
+     * <p>
+     * This drives the real production sequence in PdfReportService.renderPdf - the classpath template,
+     * then parseDom into the renderer - and asserts against the extracted PDF text, which is what a reader
+     * actually sees. The pre-existing smoke tests never caught this because they already used parseDom,
+     * while production used the serialising path.
+     */
+    @Test
+    void reportTemplateStylesheetNeverLeaksIntoTheRenderedPdfText() throws Exception {
+        Map<String, Object> vars = new HashMap<>();
+        // The exact page geometry from the report that surfaced this.
+        vars.put("pageWidth", "595.0pt");
+        vars.put("pageHeight", "842.0pt");
+        vars.put("pageBackground", "#fff");
+        vars.put("pageMarginLeft", "20pt");
+        vars.put("pageMarginRight", "20pt");
+        vars.put("pageMarginTop", "20pt");
+        vars.put("pageMarginBottom", "20pt");
+        vars.put("enableHeader", false);
+        vars.put("enableFooter", false);
+        vars.put("enableFirstPageHeader", false);
+        vars.put("enableFirstPageFooter", false);
+        vars.put("pageContent", "<h1>Primary Pump Report</h1><p>BODY_MARKER</p>");
+
+        String renderedHtml = ThymeleafUtil.renderFromHtmlTemplate("html/report-template", vars);
+        ITextRenderer renderer = HtmlRenderUtils.createRenderer(STUB_RESOLVER, 555);
+        renderer.setDocument(HtmlRenderUtils.parseDom(renderedHtml));
+        renderer.layout();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        renderer.createPDF(out);
+
+        PdfReader reader = new PdfReader(out.toByteArray());
+        StringBuilder text = new StringBuilder();
+        try {
+            PdfTextExtractor extractor = new PdfTextExtractor(reader);
+            for (int page = 1; page <= reader.getNumberOfPages(); page++) {
+                text.append(extractor.getTextFromPage(page)).append('\n');
+            }
+        } finally {
+            reader.close();
+        }
+        String pdfText = text.toString();
+
+        assertThat(pdfText)
+                .as("the report body must actually render")
+                .contains("BODY_MARKER");
+        assertThat(pdfText)
+                .as("@page belongs in the stylesheet, never in the reader-visible text")
+                .doesNotContain("@page");
+        assertThat(pdfText)
+                .as("CDATA comment guards must never survive into the document")
+                .doesNotContain("/**/", "<![CDATA[", "]]>");
+        assertThat(pdfText)
+                .as("no stray CSS declarations in the text layer")
+                .doesNotContain("margin-left:", "background:");
+    }
+
 }

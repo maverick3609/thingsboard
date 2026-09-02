@@ -44,12 +44,13 @@ public class HtmlRenderUtils {
         return new ITextRenderer(26.666666f, 20, outputDevice, (ITextUserAgent) userAgent, (FontResolver) fontResolver, (ReplacedElementFactory) replacedElementFactory, textRenderer);
     }
 
-    public static String convertToXhtml(String html) {
-        org.jsoup.nodes.Document jsoupDocument = Jsoup.parse(html);
-        jsoupDocument.outputSettings().syntax(Syntax.xml);
-        return jsoupDocument.html();
-    }
-
+    /**
+     * Parses report HTML straight into the W3C DOM flying-saucer consumes.
+     * <p>
+     * Deliberately no serialise-and-reparse step: jsoup's XML output syntax wraps a style element's body
+     * in CDATA comment guards, which the XML parser then unwraps into stray empty CSS comments around the
+     * rules. Handing over the parsed DOM avoids that round trip entirely.
+     */
     public static Document parseDom(String html) {
         org.jsoup.nodes.Document jsoupDocument = Jsoup.parse(html);
         jsoupDocument.outputSettings().syntax(Syntax.xml);

@@ -119,7 +119,7 @@ class DashboardRenderIntegrationTest {
 
     @BeforeAll
     static void up() throws IOException {
-        renderer = new PlaywrightWebReportRenderer(2, TEST_TIMEOUT_MS, "");
+        renderer = new PlaywrightWebReportRenderer(2, TEST_TIMEOUT_MS, "", 0L);
         renderer.init();
 
         fixtureServer = HttpServer.create(new InetSocketAddress("localhost", 0), 0);

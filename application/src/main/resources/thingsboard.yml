@@ -1061,6 +1061,11 @@ reports:
     max_concurrent: "${REPORTS_RENDERER_MAX_CONCURRENT:2}"
     browser_path: "${REPORTS_RENDERER_BROWSER_PATH:}"   # empty = Playwright-managed Chromium
     base_url: "${REPORTS_RENDERER_BASE_URL:http://localhost:8080}"   # TB UI URL reachable by the headless browser
+    # After the dashboard reports itself settled, wait up to this long for the page network to go
+    # quiet before capturing. Covers widgets that fetch their own assets outside the UI readiness
+    # protocol (custom widgets, map tiles) and would otherwise be captured mid-download. Best-effort:
+    # a dashboard that polls continuously never reaches idle and is captured when this elapses.
+    dashboard_settle_ms: "${REPORTS_RENDERER_DASHBOARD_SETTLE_MS:5000}"
   generation_timeout_ms: "${REPORTS_GENERATION_TIMEOUT_MS:120000}"
   test_report_pool_size: "${REPORTS_TEST_REPORT_POOL_SIZE:12}"
 

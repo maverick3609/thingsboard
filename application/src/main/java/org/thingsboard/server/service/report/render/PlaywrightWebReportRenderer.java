@@ -21,6 +21,7 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.options.LoadState;
 import com.microsoft.playwright.options.ScreenshotType;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -97,6 +98,7 @@ public class PlaywrightWebReportRenderer {
     private final int maxConcurrent;
     private final long timeoutMs;
     private final String browserPath;
+    private final long dashboardSettleMs;
 
     private BlockingQueue<PooledBrowser> pool;
     private ExecutorService renderExecutor;
@@ -104,10 +106,12 @@ public class PlaywrightWebReportRenderer {
     public PlaywrightWebReportRenderer(
             @Value("${reports.renderer.max_concurrent:2}") int maxConcurrent,
             @Value("${reports.generation_timeout_ms:120000}") long timeoutMs,
-            @Value("${reports.renderer.browser_path:}") String browserPath) {
+            @Value("${reports.renderer.browser_path:}") String browserPath,
+            @Value("${reports.renderer.dashboard_settle_ms:5000}") long dashboardSettleMs) {
         this.maxConcurrent = maxConcurrent;
         this.timeoutMs = timeoutMs;
         this.browserPath = browserPath;
+        this.dashboardSettleMs = dashboardSettleMs;
     }
 
     @PostConstruct
@@ -248,7 +252,7 @@ public class PlaywrightWebReportRenderer {
             BrowserContext ctx = createContext(pb.browser, navigateUrl);
             try {
                 CompletableFuture<ReportData> future = CompletableFuture.supplyAsync(
-                        () -> doRenderDashboard(ctx, navigateUrl, accessToken, options, timeoutMs), renderExecutor);
+                        () -> doRenderDashboard(ctx, navigateUrl, accessToken, options, timeoutMs, dashboardSettleMs), renderExecutor);
                 ReportData result = future.get(timeoutMs, TimeUnit.MILLISECONDS);
                 log.info("Rendered dashboard [{}] in {} ms, {} bytes", options.getDashboardId(),
                         System.currentTimeMillis() - start, result.getData().length);
@@ -408,7 +412,7 @@ public class PlaywrightWebReportRenderer {
      * forever.
      */
     private static ReportData doRenderDashboard(BrowserContext ctx, String navigateUrl, String accessToken,
-                                                 RenderOptions options, long timeoutMs) {
+                                                 RenderOptions options, long timeoutMs, long settleMs) {
         Page page = ctx.newPage();
         page.setDefaultTimeout(timeoutMs);
 
@@ -445,6 +449,25 @@ public class PlaywrightWebReportRenderer {
         int pageHeight = extractPageHeight(result);
         int pageWidth = options.getPageWidth() != null ? options.getPageWidth() : page.viewportSize().width;
         page.setViewportSize(pageWidth, pageHeight);
+
+        // The UI's readiness protocol only accounts for widgets that register with it: waitForWebsocketData
+        // and waitForWidgetsLoaded both pass IMMEDIATELY when nothing has registered. A widget that fetches
+        // its own assets outside that protocol -- a custom widget pulling a 3D model, a map tile layer --
+        // therefore reports "settled" while it is still downloading, and we captured it mid-flight
+        // ("Downloading model... 2.0 / 6.1 MB" rendered straight into a report). Resizing the viewport just
+        // above also re-lays-out the page and can start fresh requests.
+        //
+        // Wait for the network to actually go quiet rather than sleeping a guessed interval. A live
+        // dashboard that polls or holds a websocket may never reach idle, so this is bounded and
+        // best-effort: on timeout we capture anyway rather than failing a report that is probably fine.
+        if (settleMs > 0) {
+            try {
+                page.waitForLoadState(LoadState.NETWORKIDLE,
+                        new Page.WaitForLoadStateOptions().setTimeout(settleMs));
+            } catch (RuntimeException e) {
+                log.debug("Dashboard did not reach network idle within {} ms; capturing anyway", settleMs);
+            }
+        }
 
         return capture(page, options, pageWidth, pageHeight);
     }

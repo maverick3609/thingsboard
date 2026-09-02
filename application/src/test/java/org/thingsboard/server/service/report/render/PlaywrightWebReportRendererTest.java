@@ -60,7 +60,7 @@ class PlaywrightWebReportRendererTest {
 
     @BeforeAll
     static void up() {
-        renderer = new PlaywrightWebReportRenderer(2, TEST_TIMEOUT_MS, "");
+        renderer = new PlaywrightWebReportRenderer(2, TEST_TIMEOUT_MS, "", 0L);
         renderer.init();
     }
 

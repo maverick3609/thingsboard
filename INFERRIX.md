@@ -26,12 +26,13 @@ It goes in `thingsboard.conf` as an environment variable:
 export INFERRIX_LICENSE_KEY="..."
 ```
 
-`thingsboard.yml` reads it via `license.key: "${INFERRIX_LICENSE_KEY:}"`. Two more tunables live in the
+`thingsboard.yml` reads it via `license.key: "${INFERRIX_LICENSE_KEY:}"`. Four more tunables live in the
 same `license:` block: `license.enforcement.enabled` (the on/off switch — must stay `true`, i.e. absent
 or explicit `true`, in every real deployment; see `INFERRIX-PATCHES.md`'s License Control section for
-why a `false` default would be a critical misconfiguration) and `license.check_interval_ms`/
-`license.clock_tolerance_ms` (how often the key is re-verified at runtime, and how far the system clock
-is allowed to move backwards before that counts as tampering).
+why a `false` default would be a critical misconfiguration), `license.check_interval_ms` (how often the
+key is re-verified at runtime), `license.clock_tolerance_ms` (how far the system clock is allowed to move
+backwards before that counts as tampering), and `license.max_high_water_advance_ms` (how far one licence
+check may advance the clock-rollback high-water mark; see "Recovering from exit code 18" below).
 
 ### First boot
 
@@ -42,6 +43,16 @@ If `INFERRIX_LICENSE_KEY` is not set, the platform logs that instance UUID and e
 below). The operator sends that UUID to Inferrix, receives a key issued specifically for it, sets
 `INFERRIX_LICENSE_KEY`, and restarts. From then on the platform re-verifies the key at boot and on a
 timer (`license.check_interval_ms`, default 1 hour) for as long as the process runs.
+
+### What each role sees
+
+`GET /api/license/info` backs a card on the `/home` fallback grid, visible to SYS_ADMIN and TENANT_ADMIN
+alike. Both roles see the capacity numbers — devices and assets used against the cap, plus days remaining
+— because that is the point of the card: a tenant admin needs to see capacity pressure coming. The
+licensing customer name and the instance ID are SYS_ADMIN-only: the API omits both fields (rather than
+blanking them client-side) for every other caller, so a TENANT_ADMIN never receives them. On a shared
+multi-tenant install those two values identify the paying customer and the deployment itself to every
+tenant on it, which would be a cross-tenant information leak.
 
 ### Exit codes
 

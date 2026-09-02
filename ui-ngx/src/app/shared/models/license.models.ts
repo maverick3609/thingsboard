@@ -15,8 +15,10 @@
 ///
 
 export interface LicenseInfo {
-  customer: string;
-  instanceId: string;
+  /** null for a TENANT_ADMIN caller — the API withholds it to avoid a cross-tenant leak. */
+  customer: string | null;
+  /** null for a TENANT_ADMIN caller — the API withholds it to avoid a cross-tenant leak. */
+  instanceId: string | null;
   /** Epoch seconds, UTC — the same unit the decoded licence key carries. */
   expiresAt: number;
   daysRemaining: number;

@@ -375,7 +375,7 @@ Bakes Inferrix branding into the default build (every `yarn build:prod` output i
   - `ui-ngx/src/app/modules/home/pages/home-links/license-info-card/*`
   - `dao/src/test/java/org/thingsboard/server/dao/service/validator/LicenseEnforcementTest.java` — added, Inferrix-owned. It exercises the two TB-core validator rows below (#1, #2) but sits beside them rather than under `dao/.../dao/license/`, which is the only reason it isn't caught by the additive-paths convention automatically.
   - `dao/src/main/resources/sql/schema-inferrix.sql` is Inferrix-owned and gets **no row** — this feature's only change to it is appending the `inferrix_license_state` table to the existing overlay file described under "Inferrix schema overlay" below.
-- **Status:** complete on `feature/license-control` (2026-09-01, 16 commits, `980ecbf57c`..`93757a4249`).
+- **Status:** complete on `feature/license-control` (2026-09-01/02, 27 commits, `980ecbf57c`..`353e08a5e2` — the last code commit; this ledger row is updated one commit later). The last six are a follow-up pass fixing three defects the final review found: a clock high-water clamp (`license.max_high_water_advance_ms`), withholding the licensing customer name and instance ID from non-`SYS_ADMIN` callers of `/api/license/info`, and an install-wide entity-count cache that was built, reviewed, and then **reverted** in `353e08a5e2` — an evict-on-save cache cannot reduce the `count(*)` on the create path, because a create reads the count and then invalidates it at `AFTER_COMMIT`. That reversal is why this section has no `cache.specs` row; see the `ponytail:` note on `LicenseDao.countEntities` before reaching for a cache here again.
 
 ### TB-core files modified (13)
 

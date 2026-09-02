@@ -1,0 +1,18 @@
+{
+  "_comment" : "Throwaway fixture keypair. NOT the production signing key. Pins the licence key format across the generator and the platform. iid = sha3Hex(9f3a1c02-4b6d-4c3e-9a10-2f7c5d3e8b71). privateKeyPem is intentionally omitted from this copy -- nothing in this repo reads it; it lives only in the generator repo (inferrix-license-keygen), which needs it to re-sign and byte-compare against expectedKey.",
+  "instanceUuid" : "9f3a1c02-4b6d-4c3e-9a10-2f7c5d3e8b71",
+  "publicKeyPem" : "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMwybJY2MbJ0Cz3mhhgel+vFN9mzZxYXaUQx9r8svsMk=\n-----END PUBLIC KEY-----\n",
+  "publicKeyBase64" : "MCowBQYDK2VwAyEAMwybJY2MbJ0Cz3mhhgel+vFN9mzZxYXaUQx9r8svsMk=",
+  "payload" : {
+    "v" : 1,
+    "iid" : "4d0e5b0a51b53154b6fb520513c859a710ab25b84afe67391c950435e462ef40",
+    "cust" : "Acme Pvt Ltd",
+    "iat" : 1756684800,
+    "exp" : 1795033600,
+    "plan" : {
+      "maxDevices" : 5000,
+      "maxAssets" : 2000
+    }
+  },
+  "expectedKey" : "eyJ2IjoxLCJpaWQiOiI0ZDBlNWIwYTUxYjUzMTU0YjZmYjUyMDUxM2M4NTlhNzEwYWIyNWI4NGFmZTY3MzkxYzk1MDQzNWU0NjJlZjQwIiwiY3VzdCI6IkFjbWUgUHZ0IEx0ZCIsImlhdCI6MTc1NjY4NDgwMCwiZXhwIjoxNzk1MDMzNjAwLCJwbGFuIjp7Im1heERldmljZXMiOjUwMDAsIm1heEFzc2V0cyI6MjAwMH19.GswsTzRKlLIEn7EdzKWNSPqdzQtM6NGOjeYTXQfvtQYnMEXMLM7aTAxUZa9NPC9HkIqwBdluuuoL_6X-2hg8Dg"
+}

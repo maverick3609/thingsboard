@@ -18,7 +18,9 @@ package org.thingsboard.server.service.install.lts;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.FixMethodOrder;
 import org.junit.Test;
+import org.junit.runners.MethodSorters;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.thingsboard.common.util.JacksonUtil;
@@ -34,7 +36,9 @@ import org.thingsboard.server.dao.widget.WidgetsBundleService;
 import org.thingsboard.server.service.install.InstallScripts;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -51,6 +55,10 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 @DaoSqlTest
+// Cheap protection for the 8 methods sharing one DirtiesContext(AFTER_CLASS) schema: JUnit 4's default
+// order is String.hashCode()-keyed, not declaration order. Individual tests still must not rely on order
+// for correctness (each establishes its own preconditions) — this just makes runs reproducible.
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class LtsMigrationIntegrationTest extends AbstractControllerTest {
 
     private static final long V_4_2_2_2 = 4_002_002_002L;
@@ -213,6 +221,54 @@ public class LtsMigrationIntegrationTest extends AbstractControllerTest {
                 beansWithoutDir.isEmpty());
     }
 
+    @Test
+    public void licenseStateTableExists() {
+        // Order-independent by construction: don't trust whatever the other tests sharing this schema left
+        // behind (in particular licenseStateTableIsCreatedByTheVersionedMigrationToo, which creates the same
+        // table). Establish the precondition ourselves, then apply schema-inferrix.sql via applySchemaInferrixSql()
+        // (see its javadoc for why that's classpath, not installScripts.getDataDir()) — the fresh-install path.
+        jdbcTemplate.execute("DROP TABLE IF EXISTS inferrix_license_state");
+        assertFalse(tableExists("inferrix_license_state"));
+
+        applySchemaInferrixSql();
+
+        assertTrue("schema-inferrix.sql did not create inferrix_license_state",
+                tableExists("inferrix_license_state"));
+
+        // Re-applying must not error: the DDL is IF NOT EXISTS.
+        applySchemaInferrixSql();
+
+        // The DDL must not seed a row; LicenseDao's insert-if-absent is what populates it.
+        assertEquals(Integer.valueOf(0),
+                jdbcTemplate.queryForObject("SELECT count(*) FROM inferrix_license_state", Integer.class));
+    }
+
+    @Test
+    public void licenseStateTableIsCreatedByTheVersionedMigrationToo() {
+        // Prove the upgrade half independently: drop the table, run only the 4.3.1.5 schema migration,
+        // and it must come back. This is the path an existing 4.3.1.4 database takes.
+        jdbcTemplate.execute("DROP TABLE IF EXISTS inferrix_license_state");
+        assertFalse(tableExists("inferrix_license_state"));
+
+        ltsMigrationService.runSchemaMigrations("4.3.1.4", "4.3.1.5");
+
+        assertTrue("lts/4.3.1.5/schema_update.sql did not create inferrix_license_state",
+                tableExists("inferrix_license_state"));
+
+        // Re-running must not error: both statements are IF NOT EXISTS.
+        ltsMigrationService.runSchemaMigrations("4.3.1.4", "4.3.1.5");
+
+        // The DDL must not seed a row; LicenseDao's insert-if-absent is what populates it.
+        assertEquals(Integer.valueOf(0),
+                jdbcTemplate.queryForObject("SELECT count(*) FROM inferrix_license_state", Integer.class));
+    }
+
+    @Test
+    public void migration4315IsRegisteredExactlyOnce() {
+        long count = migrations.stream().filter(m -> "4.3.1.5".equals(m.getVersion())).count();
+        assertEquals("V4_3_1_5Migration must be registered exactly once", 1L, count);
+    }
+
     private Set<String> listDirVersions(Path ltsDir) {
         if (!Files.isDirectory(ltsDir)) {
             return Set.of();
@@ -223,6 +279,27 @@ public class LtsMigrationIntegrationTest extends AbstractControllerTest {
                     .collect(Collectors.toSet());
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to list LTS migration directories: " + ltsDir, e);
+        }
+    }
+
+    /**
+     * Applies schema-inferrix.sql from the test classpath — the same {@code sql/schema-inferrix.sql} location
+     * and loader ({@link org.thingsboard.server.dao.PostgreSqlInitializer}) that builds the {@code @DaoSqlTest}
+     * fresh schema in the first place. {@code installScripts.getDataDir()} is NOT usable here: in this test JVM
+     * it resolves to the {@code application/src/main/data} source tree (proven by the pre-existing
+     * {@code migrationDirectoriesAndBeansStayInSyncBothWays} test, which reads {@code upgrade/lts/} from it),
+     * and that tree has no {@code sql/} subdirectory — {@code schema-inferrix.sql} lives only under
+     * {@code dao/src/main/resources/sql/}. That dataDir path is real only for a packaged install
+     * ({@code SqlDatabaseUpgradeService}, {@code @Profile("install")}), which this test does not run under.
+     */
+    private void applySchemaInferrixSql() {
+        try (InputStream in = getClass().getClassLoader().getResourceAsStream("sql/schema-inferrix.sql")) {
+            if (in == null) {
+                throw new IllegalStateException("sql/schema-inferrix.sql not found on the test classpath");
+            }
+            jdbcTemplate.execute(new String(in.readAllBytes(), StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 

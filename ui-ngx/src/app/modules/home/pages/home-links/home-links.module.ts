@@ -21,6 +21,7 @@ import { HomeLinksRoutingModule } from './home-links-routing.module';
 import { HomeLinksComponent } from './home-links.component';
 import { SharedModule } from '@app/shared/shared.module';
 import { HomeComponentsModule } from '@home/components/home-components.module';
+import { LicenseInfoCardComponent } from './license-info-card/license-info-card.component';
 
 @NgModule({
   declarations:
@@ -31,7 +32,8 @@ import { HomeComponentsModule } from '@home/components/home-components.module';
     CommonModule,
     SharedModule,
     HomeComponentsModule,
-    HomeLinksRoutingModule
+    HomeLinksRoutingModule,
+    LicenseInfoCardComponent
   ]
 })
 export class HomeLinksModule { }

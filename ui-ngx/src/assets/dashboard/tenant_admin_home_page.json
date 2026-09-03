@@ -106,7 +106,7 @@
           "color": "rgba(0, 0, 0, 0.87)",
           "padding": "16px",
           "settings": {},
-          "title": "New Usage info",
+          "title": "License info",
           "dropShadow": false,
           "enableFullscreen": false,
           "widgetStyle": {},
@@ -119,7 +119,7 @@
         "row": 0,
         "col": 0,
         "id": "ebbd0a6e-8a47-e770-5086-7f4974250f2d",
-        "typeFullFqn": "system.home_page_widgets.usage_info"
+        "typeFullFqn": "system.home_page_widgets.license_info"
       },
       "9e3ef045-d8bc-1640-a3f4-2dd10b19d50e": {
         "type": "static",

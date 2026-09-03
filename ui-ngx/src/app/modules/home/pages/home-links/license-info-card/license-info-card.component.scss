@@ -32,6 +32,37 @@
   }
 }
 
+/* Widget-hosted variant: the dashboard frame supplies the card, so this only supplies the inner
+   layout, plus the left severity bar the standalone card gets from .tb-license-card. */
+.tb-license-embedded {
+  width: 100%;
+  height: 100%;
+  gap: 8px;
+  padding-left: 8px;
+  border-left: 4px solid transparent;
+
+  &.tb-license-warn {
+    border-left-color: #ffa000;
+  }
+
+  &.tb-license-critical {
+    border-left-color: #d32f2f;
+  }
+
+  .tb-card-header {
+    padding-bottom: 4px;
+  }
+
+  .tb-title {
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    letter-spacing: 0.25px;
+    color: rgba(0, 0, 0, 0.54);
+  }
+}
+
 .tb-license-row {
   display: flex;
   align-items: center;

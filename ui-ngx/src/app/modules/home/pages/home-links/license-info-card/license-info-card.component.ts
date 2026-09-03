@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, Input, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -50,6 +50,13 @@ import {
             MatTooltipModule, MatProgressBarModule, TranslateModule]
 })
 export class LicenseInfoCardComponent implements OnInit {
+
+  /**
+   * Drops the mat-card chrome so the same rows can be hosted by a home-dashboard widget, whose frame
+   * already draws the card. Set from the widget type's templateHtml; the /home fallback grid leaves it
+   * false and keeps the card.
+   */
+  @Input() embedded = false;
 
   license: LicenseInfo = null;
   copied = false;

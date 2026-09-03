@@ -6,6 +6,31 @@
   "configuration": {
     "description": "",
     "widgets": {
+      "3f1a7c02-5be6-4a71-9a1e-1c9d0e2b4f77": {
+        "type": "static",
+        "sizeX": 7.5,
+        "sizeY": 6.5,
+        "config": {
+          "showTitle": false,
+          "backgroundColor": "rgb(255, 255, 255)",
+          "color": "rgba(0, 0, 0, 0.87)",
+          "padding": "16px",
+          "settings": {},
+          "title": "License info",
+          "dropShadow": false,
+          "enableFullscreen": false,
+          "widgetStyle": {},
+          "widgetCss": "",
+          "pageSize": 1024,
+          "noDataDisplayMessage": "",
+          "showLegend": false,
+          "datasources": []
+        },
+        "row": 0,
+        "col": 0,
+        "id": "3f1a7c02-5be6-4a71-9a1e-1c9d0e2b4f77",
+        "typeFullFqn": "system.home_page_widgets.license_info"
+      },
       "d70cc256-4c7b-ee06-9905-b8c5e546605f": {
         "type": "latest",
         "sizeX": 5,
@@ -2157,6 +2182,14 @@
                 "row": 0,
                 "col": 85,
                 "mobileHide": false,
+                "mobileHeight": 7
+              },
+              "3f1a7c02-5be6-4a71-9a1e-1c9d0e2b4f77": {
+                "sizeX": 85,
+                "sizeY": 11,
+                "row": 42,
+                "col": 0,
+                "mobileOrder": 9,
                 "mobileHeight": 7
               }
             },

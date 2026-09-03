@@ -37,6 +37,9 @@ import {
 } from '@home/components/widget/lib/home-page/recent-dashboards-widget.component';
 import { IotHubWidgetComponent } from '@home/components/widget/lib/home-page/iot-hub-widget.component';
 import { IotHubComponentsModule } from '@home/components/iot-hub/iot-hub-components.module';
+import {
+  LicenseInfoCardComponent
+} from '@home/pages/home-links/license-info-card/license-info-card.component';
 
 @NgModule({
   declarations:
@@ -60,7 +63,11 @@ import { IotHubComponentsModule } from '@home/components/iot-hub/iot-hub-compone
   imports: [
     CommonModule,
     SharedModule,
-    IotHubComponentsModule
+    IotHubComponentsModule,
+    // Standalone, so it is imported rather than declared. Exported below because home-dashboard widget
+    // templates are compiled against this module (via WidgetComponentsModule) and the license_info
+    // widget type's templateHtml names tb-license-info-card.
+    LicenseInfoCardComponent
   ],
   exports: [
     ClusterInfoTableComponent,
@@ -77,7 +84,8 @@ import { IotHubComponentsModule } from '@home/components/iot-hub/iot-hub-compone
     QuickLinkComponent,
     AddQuickLinkDialogComponent,
     RecentDashboardsWidgetComponent,
-    IotHubWidgetComponent
+    IotHubWidgetComponent,
+    LicenseInfoCardComponent
   ]
 })
 export class HomePageWidgetsModule { }

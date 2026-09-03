@@ -189,4 +189,33 @@ describe('LicenseInfoCardComponent', () => {
     expect(fixture.nativeElement.querySelector('.tb-license-instance')).toBeNull();
     expect(fixture.nativeElement.querySelectorAll('mat-progress-bar').length).toBe(2);
   });
+
+  // Embedded is what the home_page_widgets.license_info widget type renders: the dashboard widget frame
+  // already draws a card, so this variant must drop the mat-card while keeping every row identical.
+  describe('embedded', () => {
+
+    beforeEach(() => component.embedded = true);
+
+    it('drops the mat-card chrome but keeps the rows', () => {
+      load(info());
+
+      expect(fixture.nativeElement.querySelector('mat-card')).toBeNull();
+      expect(fixture.nativeElement.querySelector('.tb-license-embedded')).toBeTruthy();
+      const text = fixture.nativeElement.textContent;
+      expect(text).toContain('3,104');
+      expect(text).toContain('5,000');
+      expect(fixture.nativeElement.querySelectorAll('mat-progress-bar').length).toBe(2);
+    });
+
+    it('still carries the severity class, which is what colours the strip', () => {
+      load(info({ daysRemaining: 6 }));
+      expect(fixture.nativeElement.querySelector('.tb-license-embedded.tb-license-critical')).toBeTruthy();
+    });
+
+    it('renders nothing at all when there is no licence', () => {
+      load(null);
+      expect(fixture.nativeElement.querySelector('.tb-license-embedded')).toBeNull();
+      expect(fixture.nativeElement.textContent.trim()).toBe('');
+    });
+  });
 });

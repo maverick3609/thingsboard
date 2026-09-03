@@ -15,49 +15,68 @@
     limitations under the License.
 
 -->
-<mat-card appearance="outlined" class="tb-license-card" *ngIf="license" [ngClass]="'tb-license-' + severity">
-  <mat-card-title>
-    <span class="mat-headline-6" translate>license.title</span>
-  </mat-card-title>
-  <mat-card-content>
-    <div class="tb-license-row tb-license-customer" *ngIf="license.customer">{{ license.customer }}</div>
-
-    <div class="tb-license-row">
-      <span translate>license.expires</span>
-      <strong>{{ expiryDate | date:'mediumDate' }}</strong>
-      <span class="tb-license-days">({{ 'license.days-remaining' | translate:{count: license.daysRemaining} }})</span>
+<!-- Embedded renders the same rows without the mat-card chrome: on a home dashboard the widget frame
+     already draws the white card and its shadow, so a card here would nest one inside another. -->
+<ng-container *ngIf="license">
+  <div *ngIf="embedded; else standaloneCard"
+       class="tb-card-content tb-license-embedded flex flex-col"
+       [ngClass]="'tb-license-' + severity">
+    <div class="tb-card-header">
+      <span class="tb-title" translate>license.title</span>
     </div>
+    <ng-container *ngTemplateOutlet="rows"></ng-container>
+  </div>
+</ng-container>
 
-    <div class="tb-license-row tb-license-meter">
-      <span class="tb-license-label" translate>license.devices</span>
-      <mat-progress-bar *ngIf="percent(license.devices, license.maxDevices) !== null"
-                        mode="determinate" [value]="percent(license.devices, license.maxDevices)"></mat-progress-bar>
-      <span class="tb-license-count">
-        {{ license.devices | number }} /
-        <ng-container *ngIf="!isUnlimited(license.maxDevices); else unlimitedDevices">{{ license.maxDevices | number }}</ng-container>
-        <ng-template #unlimitedDevices><span translate>license.unlimited</span></ng-template>
-      </span>
-    </div>
+<ng-template #standaloneCard>
+  <mat-card appearance="outlined" class="tb-license-card" [ngClass]="'tb-license-' + severity">
+    <mat-card-title>
+      <span class="mat-headline-6" translate>license.title</span>
+    </mat-card-title>
+    <mat-card-content>
+      <ng-container *ngTemplateOutlet="rows"></ng-container>
+    </mat-card-content>
+  </mat-card>
+</ng-template>
 
-    <div class="tb-license-row tb-license-meter">
-      <span class="tb-license-label" translate>license.assets</span>
-      <mat-progress-bar *ngIf="percent(license.assets, license.maxAssets) !== null"
-                        mode="determinate" [value]="percent(license.assets, license.maxAssets)"></mat-progress-bar>
-      <span class="tb-license-count">
-        {{ license.assets | number }} /
-        <ng-container *ngIf="!isUnlimited(license.maxAssets); else unlimitedAssets">{{ license.maxAssets | number }}</ng-container>
-        <ng-template #unlimitedAssets><span translate>license.unlimited</span></ng-template>
-      </span>
-    </div>
+<ng-template #rows>
+  <div class="tb-license-row tb-license-customer" *ngIf="license.customer">{{ license.customer }}</div>
 
-    <div class="tb-license-row tb-license-instance" *ngIf="license.instanceId">
-      <span class="tb-license-label" translate>license.instance-id</span>
-      <code>{{ license.instanceId }}</code>
-      <button mat-icon-button
-              [matTooltip]="(copied ? 'license.copied' : 'license.copy-instance-id') | translate"
-              (click)="copyInstanceId()">
-        <mat-icon>{{ copied ? 'check' : 'content_copy' }}</mat-icon>
-      </button>
-    </div>
-  </mat-card-content>
-</mat-card>
+  <div class="tb-license-row">
+    <span translate>license.expires</span>
+    <strong>{{ expiryDate | date:'mediumDate' }}</strong>
+    <span class="tb-license-days">({{ 'license.days-remaining' | translate:{count: license.daysRemaining} }})</span>
+  </div>
+
+  <div class="tb-license-row tb-license-meter">
+    <span class="tb-license-label" translate>license.devices</span>
+    <mat-progress-bar *ngIf="percent(license.devices, license.maxDevices) !== null"
+                      mode="determinate" [value]="percent(license.devices, license.maxDevices)"></mat-progress-bar>
+    <span class="tb-license-count">
+      {{ license.devices | number }} /
+      <ng-container *ngIf="!isUnlimited(license.maxDevices); else unlimitedDevices">{{ license.maxDevices | number }}</ng-container>
+      <ng-template #unlimitedDevices><span translate>license.unlimited</span></ng-template>
+    </span>
+  </div>
+
+  <div class="tb-license-row tb-license-meter">
+    <span class="tb-license-label" translate>license.assets</span>
+    <mat-progress-bar *ngIf="percent(license.assets, license.maxAssets) !== null"
+                      mode="determinate" [value]="percent(license.assets, license.maxAssets)"></mat-progress-bar>
+    <span class="tb-license-count">
+      {{ license.assets | number }} /
+      <ng-container *ngIf="!isUnlimited(license.maxAssets); else unlimitedAssets">{{ license.maxAssets | number }}</ng-container>
+      <ng-template #unlimitedAssets><span translate>license.unlimited</span></ng-template>
+    </span>
+  </div>
+
+  <div class="tb-license-row tb-license-instance" *ngIf="license.instanceId">
+    <span class="tb-license-label" translate>license.instance-id</span>
+    <code>{{ license.instanceId }}</code>
+    <button mat-icon-button
+            [matTooltip]="(copied ? 'license.copied' : 'license.copy-instance-id') | translate"
+            (click)="copyInstanceId()">
+      <mat-icon>{{ copied ? 'check' : 'content_copy' }}</mat-icon>
+    </button>
+  </div>
+</ng-template>

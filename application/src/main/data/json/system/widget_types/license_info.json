@@ -1,0 +1,18 @@
+{
+  "fqn": "home_page_widgets.license_info",
+  "name": "License info",
+  "deprecated": false,
+  "description": "Display the Inferrix licence: expiry and how much of the device and asset allowance is used.",
+  "descriptor": {
+    "type": "static",
+    "sizeX": 7.5,
+    "sizeY": 6.5,
+    "templateHtml": "<tb-license-info-card embedded>\n</tb-license-info-card>\n",
+    "templateCss": "",
+    "controllerScript": "self.onInit = function() {\n}\n",
+    "settingsSchema": "",
+    "dataKeySettingsSchema": "",
+    "settingsDirective": "",
+    "defaultConfig": "{\"showTitle\":false,\"backgroundColor\":\"rgb(255, 255, 255)\",\"color\":\"rgba(0, 0, 0, 0.87)\",\"padding\":\"8px\",\"settings\":{},\"title\":\"License info\",\"dropShadow\":true,\"enableFullscreen\":false,\"widgetStyle\":{},\"widgetCss\":\"\",\"pageSize\":1024,\"noDataDisplayMessage\":\"\",\"showLegend\":false}"
+  }
+}

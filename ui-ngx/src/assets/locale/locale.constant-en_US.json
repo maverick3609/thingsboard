@@ -5393,7 +5393,7 @@
         "delete-report-template-text": "Be careful, after the confirmation the report template and all related data will become unrecoverable.",
         "delete-report-templates-title": "Are you sure you want to delete { count, plural, =1 {1 report template} other {# report templates} }?",
         "delete-report-templates-text": "Be careful, after the confirmation all selected report templates will be removed and all related data will become unrecoverable.",
-        "recipient-user": "Recipient user",
+        "recipient-user": "Generate report as user",
         "notification-targets": "Notification targets",
         "notification-target": "Notification target",
         "notification-targets-hint": "The generated report is delivered to these targets. Without at least one, the report is created but sent to nobody.",

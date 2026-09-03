@@ -78,8 +78,12 @@ export class ReportHistoryTableConfigResolver {
     this.config.deleteEntitiesTitle = count => this.translate.instant('report.delete-reports-title', {count});
     this.config.deleteEntitiesContent = () => this.translate.instant('report.delete-reports-text');
 
+    // includeCustomers: a scheduled report is owned by the user it was generated as (see the
+    // "Generate report as user" field), so a run under a customer user lands on that customer and
+    // the tenant-only default hides it - the operator sees an empty history for reports that did
+    // run. A tenant admin owns everything in the tenant, so there is nothing to scope out here.
     this.config.entitiesFetchFunction = pageLink =>
-      this.reportService.getReportInfos(pageLink, {}).pipe(
+      this.reportService.getReportInfos(pageLink, {includeCustomers: true}).pipe(
         mergeMap(pageData => this.resolveNames(pageData))
       );
     this.config.deleteEntity = id => this.reportService.deleteReport(id.id);

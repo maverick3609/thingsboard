@@ -82,6 +82,7 @@
       <div class="tb-form-panel-title">{{ 'report.recipient-user' | translate }}</div>
       <tb-entity-select [allowedEntityTypes]="[entityType.USER]"
                         [required]="true" formControlName="userId"></tb-entity-select>
+      <div class="tb-hint">{{ 'report.user-credentials-description' | translate }}</div>
 
       <tb-timezone-select formControlName="timezone" required></tb-timezone-select>
 

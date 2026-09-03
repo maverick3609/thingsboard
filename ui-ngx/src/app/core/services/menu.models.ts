@@ -114,6 +114,7 @@ export enum MenuId {
   report_scheduling = 'report_scheduling',
   report_templates = 'report_templates',
   api_usage = 'api_usage',
+  utilities = 'utilities',
   trendz_settings = 'trendz_settings',
   ai_models = 'ai_models',
   white_labeling = 'white_labeling',
@@ -793,6 +794,16 @@ export const menuSectionMap = new Map<MenuId, MenuSection>([
     }
   ],
   [
+    MenuId.utilities,
+    {
+      id: MenuId.utilities,
+      name: 'utilities.utilities',
+      type: 'toggle',
+      path: '/utilities',
+      icon: 'build'
+    }
+  ],
+  [
     MenuId.trendz_settings,
     {
       id: MenuId.trendz_settings,
@@ -939,16 +950,8 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
       {id: MenuId.calculated_fields},
       {id: MenuId.rule_chains},
       {
-        id: MenuId.edge_management,
-        pages: [
-          {id: MenuId.edges},
-          {id: MenuId.rulechain_templates}
-        ]
-      },
-      {
         id: MenuId.features,
         pages: [
-          {id: MenuId.otaUpdates},
           {id: MenuId.version_control},
           {id: MenuId.scheduler}
         ]
@@ -980,13 +983,18 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
         ]
       },
       {
-        id: MenuId.mobile_center,
+        id: MenuId.utilities,
         pages: [
-          {id: MenuId.mobile_bundles},
-          {id: MenuId.mobile_apps}
+          {id: MenuId.api_usage},
+          {
+            id: MenuId.mobile_center,
+            pages: [
+              {id: MenuId.mobile_bundles},
+              {id: MenuId.mobile_apps}
+            ]
+          }
         ]
       },
-      {id: MenuId.api_usage},
       {id: MenuId.white_labeling},
       {
         id: MenuId.settings,
@@ -1035,7 +1043,6 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
           {id: MenuId.entity_views}
         ]
       },
-      {id: MenuId.edge_instances},
       {
         id: MenuId.notifications_center,
         pages: [

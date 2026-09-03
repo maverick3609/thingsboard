@@ -428,7 +428,7 @@ const routes: Routes = [
 ];
 
 @NgModule({
-  imports: [RouterModule.forChild(routes)],
+  imports: [RouterModule.forChild([])], // Inferrix: edge management UI removed (routes disabled, resolver still provided for /customers/:id/edges)
   exports: [RouterModule],
   providers: [
     EdgesTableConfigResolver

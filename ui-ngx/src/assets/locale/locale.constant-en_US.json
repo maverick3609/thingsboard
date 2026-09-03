@@ -7895,6 +7895,9 @@
         "user-list": "User list",
         "user-list-required": "User list is required"
     },
+    "utilities": {
+        "utilities": "Utilities"
+    },
     "value": {
         "type": "Value type",
         "string": "String",

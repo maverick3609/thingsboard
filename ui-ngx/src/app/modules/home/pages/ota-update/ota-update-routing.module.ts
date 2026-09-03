@@ -78,7 +78,7 @@ const routes: Routes = [
 ];
 
 @NgModule({
-  imports: [RouterModule.forChild(routes)],
+  imports: [RouterModule.forChild([])], // Inferrix: OTA updates UI removed
   exports: [RouterModule],
   providers: [
     OtaUpdateTableConfigResolve

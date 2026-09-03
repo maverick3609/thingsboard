@@ -973,16 +973,6 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
         ]
       },
       {
-        id: MenuId.notifications_center,
-        pages: [
-          {id: MenuId.notification_inbox},
-          {id: MenuId.notification_sent},
-          {id: MenuId.notification_recipients},
-          {id: MenuId.notification_templates},
-          {id: MenuId.notification_rules}
-        ]
-      },
-      {
         id: MenuId.utilities,
         pages: [
           {id: MenuId.api_usage},
@@ -995,7 +985,6 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
           }
         ]
       },
-      {id: MenuId.white_labeling},
       {
         id: MenuId.settings,
         pages: [
@@ -1004,7 +993,18 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
           {id: MenuId.repository_settings},
           {id: MenuId.auto_commit_settings},
           {id: MenuId.trendz_settings},
-          {id: MenuId.ai_models}
+          {id: MenuId.ai_models},
+          {id: MenuId.white_labeling},
+          {
+            id: MenuId.notifications_center,
+            pages: [
+              {id: MenuId.notification_inbox},
+              {id: MenuId.notification_sent},
+              {id: MenuId.notification_recipients},
+              {id: MenuId.notification_templates},
+              {id: MenuId.notification_rules}
+            ]
+          }
         ]
       },
       {

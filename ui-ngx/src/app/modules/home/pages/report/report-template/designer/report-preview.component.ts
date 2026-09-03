@@ -44,9 +44,10 @@ export class ReportPreviewComponent implements OnInit, OnDestroy {
 
   previewUrl: SafeResourceUrl | null = null;
   loading = false;
-  // null = no error (either a preview is showing, or none has been requested/resolved yet).
-  // Distinguishes the renderer-disabled 400 (an expected, documented state) from any other failure.
-  errorState: 'renderer-off' | 'other' | null = null;
+  // True once a refresh has failed, cleared by the next one. `errorMessage` carries the server's own
+  // explanation when it could be decoded; null means the template shows a generic string instead.
+  failed = false;
+  errorMessage: string | null = null;
 
   private refresh$ = new Subject<void>();
   private destroy$ = new Subject<void>();
@@ -67,8 +68,9 @@ export class ReportPreviewComponent implements OnInit, OnDestroy {
         return this.reportService.previewReport({reportTemplateConfig: serialize(this.config), timezone}).pipe(
           catchError((err: HttpErrorResponse) => {
             this.loading = false;
-            this.errorState = err.status === 400 ? 'renderer-off' : 'other';
+            this.failed = true;
             this.clearPreview();
+            this.readErrorMessage(err);
             return EMPTY;
           })
         );
@@ -89,8 +91,27 @@ export class ReportPreviewComponent implements OnInit, OnDestroy {
 
   refresh(): void {
     this.loading = true;
-    this.errorState = null;
+    this.failed = false;
+    this.errorMessage = null;
     this.refresh$.next();
+  }
+
+  // Every failure this endpoint can produce arrives as 400 BAD_REQUEST_PARAMS - the documented
+  // renderer-disabled state and a genuine render failure alike - so the status code cannot tell them
+  // apart and only the server's message can. Because the request sets responseType 'blob', that
+  // message arrives as an undecoded Blob; if decoding it fails the template falls back to a generic
+  // string rather than asserting a cause we do not know.
+  private readErrorMessage(err: HttpErrorResponse): void {
+    if (!(err.error instanceof Blob)) {
+      return;
+    }
+    err.error.text().then(text => {
+      try {
+        this.errorMessage = JSON.parse(text).message ?? null;
+      } catch {
+        this.errorMessage = null;
+      }
+    }, () => {});
   }
 
   private setPreview(blob: Blob): void {

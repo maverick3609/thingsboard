@@ -23,6 +23,7 @@ import org.thingsboard.server.common.data.report.Report;
 import org.thingsboard.server.common.data.report.ReportData;
 import org.thingsboard.server.common.data.report.ReportTemplate;
 import org.thingsboard.server.common.data.report.TbReportFormat;
+import org.thingsboard.server.common.data.report.configuration.ReportTemplateConfig;
 import org.thingsboard.server.dao.report.ReportTemplateService;
 import org.thingsboard.server.service.report.context.TbReportCtx;
 import org.thingsboard.server.service.report.context.TbReportCtxProvider;
@@ -75,7 +76,7 @@ public class TbReportService {
         log.info("Generating report for tenant [{}], template [{}]", task.getTenantId(), task.getReportTemplateId());
         try {
             ReportTemplate template = loadTemplate(task);
-            ReportData reportData = render(task, template);
+            ReportData reportData = render(task, template.getFormat());
             Report report = buildReport(task, template, reportData);
             Report saved = reportDao.createReport(report, reportData.getData());
             log.info("Persisted report [{}] for tenant [{}], template [{}], {} bytes",
@@ -96,8 +97,15 @@ public class TbReportService {
     public ReportData generateTestReport(ReportTask task) {
         log.info("Generating test report (no persist) for tenant [{}], template [{}]", task.getTenantId(), task.getReportTemplateId());
         try {
-            ReportTemplate template = loadTemplate(task);
-            return render(task, template);
+            // The designer's preview posts the in-memory config of a template that may never have been
+            // saved, so there is no id to load and loadTemplate would fail validation ("Incorrect
+            // reportTemplateId null"). Nothing downstream needs the persisted row: the render pipeline
+            // reads the configuration off the task via TbReportCtx (LocalTbReportCtxProvider), and the
+            // template is consulted only to pick the engine. So take the format from the inline config
+            // when there is one, and fall back to the stored template otherwise.
+            ReportTemplateConfig config = task.getReportTemplateConfig();
+            TbReportFormat format = config != null ? config.getFormat() : loadTemplate(task).getFormat();
+            return render(task, format);
         } catch (RuntimeException e) {
             log.error("Failed to generate test report for tenant [{}], template [{}]: {}",
                     task.getTenantId(), task.getReportTemplateId(), e.getMessage(), e);
@@ -113,8 +121,7 @@ public class TbReportService {
         return template;
     }
 
-    private ReportData render(ReportTask task, ReportTemplate template) {
-        TbReportFormat format = template.getFormat();
+    private ReportData render(ReportTask task, TbReportFormat format) {
         TbReportRenderService renderService = renderServices.get(format);
         if (renderService == null) {
             // Defensive: with the renderer enabled, PDF and CSV both register — this guards a format that has

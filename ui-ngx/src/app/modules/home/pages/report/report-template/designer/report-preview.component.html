@@ -27,7 +27,6 @@
 <div class="tb-report-preview-body flex flex-1 flex-col items-center justify-center">
   <object *ngIf="previewUrl" [data]="previewUrl" type="application/pdf" class="tb-report-preview-object"></object>
   <mat-progress-spinner *ngIf="loading && !previewUrl" diameter="40" mode="indeterminate"></mat-progress-spinner>
-  <span *ngIf="!loading && !previewUrl && errorState === 'renderer-off'" class="tb-prompt" translate>report.designer.preview-renderer-off</span>
-  <span *ngIf="!loading && !previewUrl && errorState === 'other'" class="tb-prompt" translate>report.designer.preview-error</span>
-  <span *ngIf="!loading && !previewUrl && !errorState" class="tb-prompt" translate>report.designer.preview-empty</span>
+  <span *ngIf="!loading && !previewUrl && failed" class="tb-prompt">{{ errorMessage || ('report.designer.preview-error' | translate) }}</span>
+  <span *ngIf="!loading && !previewUrl && !failed" class="tb-prompt" translate>report.designer.preview-empty</span>
 </div>

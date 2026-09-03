@@ -33,6 +33,7 @@ import org.thingsboard.server.common.data.report.ReportData;
 import org.thingsboard.server.common.data.report.ReportTemplate;
 import org.thingsboard.server.common.data.report.ReportTemplateType;
 import org.thingsboard.server.common.data.report.TbReportFormat;
+import org.thingsboard.server.common.data.report.configuration.PdfReportTemplateConfig;
 import org.thingsboard.server.dao.report.ReportTemplateService;
 import org.thingsboard.server.service.report.context.TbReportCtx;
 import org.thingsboard.server.service.report.context.TbReportCtxProvider;
@@ -137,6 +138,27 @@ class TbReportServiceTest {
         ReportData result = svc.generateTestReport(task);
 
         assertThat(result).isSameAs(rendered);
+        verify(reportDao, never()).createReport(any(), any());
+    }
+
+    @Test
+    void generateTestReportRendersAnInlineConfigWithNoTemplateId() {
+        // The designer's preview of an unsaved template: an inline config and a null reportTemplateId.
+        // This is the production shape of POST /api/v2/report/test, and the only one the persisted
+        // template cannot serve - loadTemplate would reject the null id before rendering ever started.
+        TbReportCtx ctx = TbReportCtx.builder().tenantId(tenantId).build();
+        ReportTask task = ReportTask.builder()
+                .tenantId(tenantId).reportTemplateConfig(new PdfReportTemplateConfig())
+                .timezone("UTC").userId(userId).build();
+        when(ctxProvider.newContext(task)).thenReturn(ctx);
+        ReportData rendered = ReportData.builder()
+                .data(new byte[]{1, 2, 3}).name("test.pdf").contentType("application/pdf").build();
+        when(pdfRenderService.generateReport(eq(task), eq(ctx))).thenReturn(rendered);
+
+        ReportData result = svc.generateTestReport(task);
+
+        assertThat(result).isSameAs(rendered);
+        verify(templateDao, never()).findReportTemplateById(any(), any());
         verify(reportDao, never()).createReport(any(), any());
     }
 

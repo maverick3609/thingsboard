@@ -64,7 +64,7 @@ describe('ReportPreviewComponent', () => {
     expect(sanitizer.bypassSecurityTrustResourceUrl).toHaveBeenCalledWith('blob:mock-url');
     expect(component.previewUrl).toBe(sanitizer.bypassSecurityTrustResourceUrl.calls.mostRecent().returnValue);
     expect(component.loading).toBe(false);
-    expect(component.errorState).toBeNull();
+    expect(component.failed).toBe(false);
 
     component.ngOnDestroy();
   }));
@@ -88,29 +88,37 @@ describe('ReportPreviewComponent', () => {
     component.ngOnDestroy();
   }));
 
-  it('shows the renderer-off placeholder and sets no object URL on an HTTP 400', fakeAsync(() => {
-    reportService.previewReport.and.returnValue(throwError(() => new HttpErrorResponse({ status: 400 })));
+  // Real timers, not fakeAsync: Blob.text() resolves on the browser's own microtask queue, which
+  // fakeAsync's tick()/flushMicrotasks() do not drain. Waiting past the 300 ms debounce for real is
+  // the only way to assert the decoded message without a flake.
+  it('surfaces the server message decoded from the error blob, and sets no object URL', async () => {
+    // The endpoint answers 400 BAD_REQUEST_PARAMS for every failure, the documented renderer-disabled
+    // state included, so the status is not diagnostic - only the message is.
+    const body = new Blob([JSON.stringify({status: 400, message: 'Report renderer is not enabled'})]);
+    reportService.previewReport.and.returnValue(throwError(() => new HttpErrorResponse({ status: 400, error: body })));
     const component = newComponent();
 
     component.ngOnInit();
-    tick(300);
+    await new Promise(resolve => setTimeout(resolve, 400));
 
-    expect(component.errorState).toBe('renderer-off');
+    expect(component.failed).toBe(true);
+    expect(component.errorMessage).toBe('Report renderer is not enabled');
     expect(component.previewUrl).toBeNull();
     expect(URL.createObjectURL).not.toHaveBeenCalled();
     expect(component.loading).toBe(false);
 
     component.ngOnDestroy();
-  }));
+  });
 
-  it('treats a non-400 failure as a generic (non-renderer-off) error placeholder', fakeAsync(() => {
+  it('leaves the message null when the failure carries no decodable body', fakeAsync(() => {
     reportService.previewReport.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
     const component = newComponent();
 
     component.ngOnInit();
     tick(300);
 
-    expect(component.errorState).toBe('other');
+    expect(component.failed).toBe(true);
+    expect(component.errorMessage).toBeNull();
     expect(component.previewUrl).toBeNull();
 
     component.ngOnDestroy();

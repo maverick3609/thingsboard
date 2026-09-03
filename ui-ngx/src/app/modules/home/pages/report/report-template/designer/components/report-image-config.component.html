@@ -19,8 +19,8 @@
   <div class="mat-subtitle-1" translate>report.designer.component-image</div>
   <mat-form-field subscriptSizing="dynamic">
     <mat-select formControlName="sourceType" placeholder="{{ 'report.designer.image-source-type' | translate }}">
-      <mat-option [value]="sourceTypeEnum.IMAGE" translate>report.designer.image-source-type-image</mat-option>
-      <mat-option [value]="sourceTypeEnum.ENTITY_KEY" translate>report.designer.image-source-type-entity-key</mat-option>
+      <mat-option [value]="sourceTypeEnum.IMAGE">{{ 'report.designer.image-source-type-image' | translate }}</mat-option>
+      <mat-option [value]="sourceTypeEnum.ENTITY_KEY">{{ 'report.designer.image-source-type-entity-key' | translate }}</mat-option>
     </mat-select>
   </mat-form-field>
   <tb-gallery-image-input *ngIf="isImageSource"
@@ -34,9 +34,9 @@
   </tb-report-datasource>
   <mat-form-field subscriptSizing="dynamic">
     <mat-select formControlName="widthType" placeholder="{{ 'report.designer.image-width-type' | translate }}">
-      <mat-option [value]="widthTypeEnum.FIT_WIDTH" translate>report.designer.image-width-type-fit-width</mat-option>
-      <mat-option [value]="widthTypeEnum.ORIGINAL" translate>report.designer.image-width-type-original</mat-option>
-      <mat-option [value]="widthTypeEnum.CUSTOM" translate>report.designer.image-width-type-custom</mat-option>
+      <mat-option [value]="widthTypeEnum.FIT_WIDTH">{{ 'report.designer.image-width-type-fit-width' | translate }}</mat-option>
+      <mat-option [value]="widthTypeEnum.ORIGINAL">{{ 'report.designer.image-width-type-original' | translate }}</mat-option>
+      <mat-option [value]="widthTypeEnum.CUSTOM">{{ 'report.designer.image-width-type-custom' | translate }}</mat-option>
     </mat-select>
   </mat-form-field>
   <mat-form-field *ngIf="imageFormGroup.get('widthType').value === widthTypeEnum.CUSTOM" subscriptSizing="dynamic">
@@ -45,9 +45,9 @@
   </mat-form-field>
   <mat-form-field subscriptSizing="dynamic">
     <mat-select formControlName="alignment" placeholder="{{ 'report.designer.image-alignment' | translate }}">
-      <mat-option [value]="alignmentEnum.LEFT" translate>report.designer.align-left</mat-option>
-      <mat-option [value]="alignmentEnum.CENTER" translate>report.designer.align-center</mat-option>
-      <mat-option [value]="alignmentEnum.RIGHT" translate>report.designer.align-right</mat-option>
+      <mat-option [value]="alignmentEnum.LEFT">{{ 'report.designer.align-left' | translate }}</mat-option>
+      <mat-option [value]="alignmentEnum.CENTER">{{ 'report.designer.align-center' | translate }}</mat-option>
+      <mat-option [value]="alignmentEnum.RIGHT">{{ 'report.designer.align-right' | translate }}</mat-option>
     </mat-select>
   </mat-form-field>
   <div class="flex flex-col gap-1">

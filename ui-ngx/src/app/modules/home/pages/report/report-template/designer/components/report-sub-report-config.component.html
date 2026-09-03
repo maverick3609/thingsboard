@@ -36,7 +36,7 @@
     </mat-autocomplete>
   </mat-form-field>
   <div class="flex flex-col gap-2" [formGroup]="subFormGroup">
-    <mat-checkbox *ngIf="showAvoidPageBreakInside" formControlName="avoidPageBreakInside" translate>report.designer.avoid-page-break-inside</mat-checkbox>
+    <mat-checkbox *ngIf="showAvoidPageBreakInside" formControlName="avoidPageBreakInside">{{ 'report.designer.avoid-page-break-inside' | translate }}</mat-checkbox>
     <div class="flex flex-col gap-1">
       <label class="mat-caption" translate>report.designer.data-sources</label>
       <tb-report-datasources [aliasController]="aliasController" formControlName="dataSources"></tb-report-datasources>

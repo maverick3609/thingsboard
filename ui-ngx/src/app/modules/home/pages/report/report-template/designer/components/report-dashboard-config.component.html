@@ -30,7 +30,7 @@
                      [historyOnly]="true"
                      formControlName="timewindow">
       </tb-timewindow>
-      <mat-checkbox formControlName="useDashboardTimewindow" translate>report.designer.use-dashboard-timewindow</mat-checkbox>
+      <mat-checkbox formControlName="useDashboardTimewindow">{{ 'report.designer.use-dashboard-timewindow' | translate }}</mat-checkbox>
     </div>
     <div tabData class="flex flex-col gap-2">
       <tb-report-datasources [aliasController]="aliasController" formControlName="dataSources"></tb-report-datasources>
@@ -38,9 +38,9 @@
     <div tabLayout class="flex flex-col gap-2">
       <mat-form-field subscriptSizing="dynamic">
         <mat-select formControlName="widthType" placeholder="{{ 'report.designer.image-width-type' | translate }}">
-          <mat-option [value]="widthTypeEnum.FIT_WIDTH" translate>report.designer.image-width-type-fit-width</mat-option>
-          <mat-option [value]="widthTypeEnum.ORIGINAL" translate>report.designer.image-width-type-original</mat-option>
-          <mat-option [value]="widthTypeEnum.CUSTOM" translate>report.designer.image-width-type-custom</mat-option>
+          <mat-option [value]="widthTypeEnum.FIT_WIDTH">{{ 'report.designer.image-width-type-fit-width' | translate }}</mat-option>
+          <mat-option [value]="widthTypeEnum.ORIGINAL">{{ 'report.designer.image-width-type-original' | translate }}</mat-option>
+          <mat-option [value]="widthTypeEnum.CUSTOM">{{ 'report.designer.image-width-type-custom' | translate }}</mat-option>
         </mat-select>
       </mat-form-field>
       <mat-form-field *ngIf="dashFormGroup.get('widthType').value === widthTypeEnum.CUSTOM" subscriptSizing="dynamic">
@@ -49,9 +49,9 @@
       </mat-form-field>
       <mat-form-field subscriptSizing="dynamic">
         <mat-select formControlName="alignment" placeholder="{{ 'report.designer.image-alignment' | translate }}">
-          <mat-option [value]="alignmentEnum.LEFT" translate>report.designer.align-left</mat-option>
-          <mat-option [value]="alignmentEnum.CENTER" translate>report.designer.align-center</mat-option>
-          <mat-option [value]="alignmentEnum.RIGHT" translate>report.designer.align-right</mat-option>
+          <mat-option [value]="alignmentEnum.LEFT">{{ 'report.designer.align-left' | translate }}</mat-option>
+          <mat-option [value]="alignmentEnum.CENTER">{{ 'report.designer.align-center' | translate }}</mat-option>
+          <mat-option [value]="alignmentEnum.RIGHT">{{ 'report.designer.align-right' | translate }}</mat-option>
         </mat-select>
       </mat-form-field>
       <div class="flex flex-col gap-1">

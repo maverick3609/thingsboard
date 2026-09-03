@@ -23,7 +23,7 @@
     <div tabContent class="flex flex-col gap-2">
       <tb-report-table-settings formControlName="tableSettings"></tb-report-table-settings>
       <ng-container *ngIf="isTimeSeriesTable">
-        <mat-checkbox formControlName="showTimestamp" translate>report.designer.show-timestamp</mat-checkbox>
+        <mat-checkbox formControlName="showTimestamp">{{ 'report.designer.show-timestamp' | translate }}</mat-checkbox>
         <div class="flex flex-col gap-1">
           <label class="mat-caption" translate>report.designer.timestamp-label</label>
           <mat-form-field subscriptSizing="dynamic">

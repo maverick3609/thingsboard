@@ -16,7 +16,7 @@
 
 -->
 <div class="tb-report-table-settings flex flex-col gap-2" [formGroup]="tableFormGroup">
-  <mat-checkbox formControlName="showTableHeading" translate>report.designer.show-table-heading</mat-checkbox>
+  <mat-checkbox formControlName="showTableHeading">{{ 'report.designer.show-table-heading' | translate }}</mat-checkbox>
   <div class="flex flex-col gap-2" formGroupName="tableHeading">
     <label class="mat-caption" translate>report.designer.table-heading</label>
     <mat-form-field subscriptSizing="dynamic">
@@ -42,8 +42,8 @@
     <mat-form-field subscriptSizing="dynamic">
       <mat-select formControlName="direction" placeholder="{{ 'report.designer.sort-direction' | translate }}">
         <mat-option [value]="null"></mat-option>
-        <mat-option [value]="tableSortDirectionEnum.ASC" translate>report.designer.sort-direction-asc</mat-option>
-        <mat-option [value]="tableSortDirectionEnum.DESC" translate>report.designer.sort-direction-desc</mat-option>
+        <mat-option [value]="tableSortDirectionEnum.ASC">{{ 'report.designer.sort-direction-asc' | translate }}</mat-option>
+        <mat-option [value]="tableSortDirectionEnum.DESC">{{ 'report.designer.sort-direction-desc' | translate }}</mat-option>
       </mat-select>
     </mat-form-field>
   </div>

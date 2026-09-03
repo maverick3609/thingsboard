@@ -21,15 +21,15 @@
     <div tabContent class="flex flex-col gap-2">
       <mat-form-field subscriptSizing="dynamic">
         <mat-select formControlName="length" placeholder="{{ 'report.designer.divider-length' | translate }}">
-          <mat-option [value]="borderLengthEnum.LONG" translate>report.designer.divider-length-long</mat-option>
-          <mat-option [value]="borderLengthEnum.SHORT" translate>report.designer.divider-length-short</mat-option>
+          <mat-option [value]="borderLengthEnum.LONG">{{ 'report.designer.divider-length-long' | translate }}</mat-option>
+          <mat-option [value]="borderLengthEnum.SHORT">{{ 'report.designer.divider-length-short' | translate }}</mat-option>
         </mat-select>
       </mat-form-field>
       <mat-form-field subscriptSizing="dynamic">
         <mat-select formControlName="borderType" placeholder="{{ 'report.designer.border-type' | translate }}">
-          <mat-option [value]="borderTypeEnum.SOLID" translate>report.designer.border-type-solid</mat-option>
-          <mat-option [value]="borderTypeEnum.DASHED" translate>report.designer.border-type-dashed</mat-option>
-          <mat-option [value]="borderTypeEnum.DOTTED" translate>report.designer.border-type-dotted</mat-option>
+          <mat-option [value]="borderTypeEnum.SOLID">{{ 'report.designer.border-type-solid' | translate }}</mat-option>
+          <mat-option [value]="borderTypeEnum.DASHED">{{ 'report.designer.border-type-dashed' | translate }}</mat-option>
+          <mat-option [value]="borderTypeEnum.DOTTED">{{ 'report.designer.border-type-dotted' | translate }}</mat-option>
         </mat-select>
       </mat-form-field>
       <mat-form-field subscriptSizing="dynamic">

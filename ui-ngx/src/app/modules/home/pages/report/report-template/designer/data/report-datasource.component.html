@@ -18,10 +18,10 @@
 <div class="tb-report-datasource flex flex-col gap-2" [formGroup]="dsFormGroup">
   <mat-form-field subscriptSizing="dynamic">
     <mat-select formControlName="type" placeholder="{{ 'report.designer.datasource-type' | translate }}">
-      <mat-option *ngIf="isTypeAllowed(dataSourceTypeEnum.DEVICE)" [value]="dataSourceTypeEnum.DEVICE" translate>report.designer.datasource-type-device</mat-option>
-      <mat-option *ngIf="isTypeAllowed(dataSourceTypeEnum.ENTITY)" [value]="dataSourceTypeEnum.ENTITY" translate>report.designer.datasource-type-entity</mat-option>
-      <mat-option *ngIf="isTypeAllowed(dataSourceTypeEnum.ENTITY_COUNT)" [value]="dataSourceTypeEnum.ENTITY_COUNT" translate>report.designer.datasource-type-entity-count</mat-option>
-      <mat-option *ngIf="isTypeAllowed(dataSourceTypeEnum.ALARM_COUNT)" [value]="dataSourceTypeEnum.ALARM_COUNT" translate>report.designer.datasource-type-alarm-count</mat-option>
+      <mat-option *ngIf="isTypeAllowed(dataSourceTypeEnum.DEVICE)" [value]="dataSourceTypeEnum.DEVICE">{{ 'report.designer.datasource-type-device' | translate }}</mat-option>
+      <mat-option *ngIf="isTypeAllowed(dataSourceTypeEnum.ENTITY)" [value]="dataSourceTypeEnum.ENTITY">{{ 'report.designer.datasource-type-entity' | translate }}</mat-option>
+      <mat-option *ngIf="isTypeAllowed(dataSourceTypeEnum.ENTITY_COUNT)" [value]="dataSourceTypeEnum.ENTITY_COUNT">{{ 'report.designer.datasource-type-entity-count' | translate }}</mat-option>
+      <mat-option *ngIf="isTypeAllowed(dataSourceTypeEnum.ALARM_COUNT)" [value]="dataSourceTypeEnum.ALARM_COUNT">{{ 'report.designer.datasource-type-alarm-count' | translate }}</mat-option>
     </mat-select>
   </mat-form-field>
 

@@ -217,5 +217,15 @@ describe('LicenseInfoCardComponent', () => {
       expect(fixture.nativeElement.querySelector('.tb-license-embedded')).toBeNull();
       expect(fixture.nativeElement.textContent.trim()).toBe('');
     });
+
+    // The widget type writes the bare attribute `<tb-license-info-card embedded>`, which hands the
+    // input the empty string. Assigning the field directly (as the tests above do) skips the input
+    // transform and so cannot catch that; setInput runs it, the way a real template binding does.
+    it('treats the bare attribute form as true', () => {
+      fixture.componentRef.setInput('embedded', '');
+      load(info());
+      expect(fixture.nativeElement.querySelector('mat-card')).toBeNull();
+      expect(fixture.nativeElement.querySelector('.tb-license-embedded')).toBeTruthy();
+    });
   });
 });

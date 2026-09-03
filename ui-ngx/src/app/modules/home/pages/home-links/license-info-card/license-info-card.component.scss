@@ -16,6 +16,11 @@
 
 :host {
   display: block;
+  /* Fill the widget slot so the embedded variant's `height: 100%` is definite and can scroll instead of
+     overflowing invisibly. Harmless on the standalone /home fallback, whose parent is auto-height. */
+  height: 100%;
+  /* Container for the width query below. Block-size is untouched, so the card still sizes to content. */
+  container-type: inline-size;
 }
 
 .tb-license-card {
@@ -37,6 +42,9 @@
 .tb-license-embedded {
   width: 100%;
   height: 100%;
+  /* Last resort: at widths where the rows below still need one line more than the slot has, scroll
+     rather than clip the tail off with no indication that anything is missing. */
+  overflow: auto;
   gap: 8px;
   padding-left: 8px;
   border-left: 4px solid transparent;
@@ -60,6 +68,42 @@
     line-height: 20px;
     letter-spacing: 0.25px;
     color: rgba(0, 0, 0, 0.54);
+  }
+}
+
+/* A full-width home-dashboard placement is wide and short - the sysadmin strip is ~800x117px, and
+   stacking its five rows (customer, expiry, devices, assets, instance id) needs 207px, so the last
+   two clipped away with no scrollbar. Flow the rows across the width instead. The tenant placement
+   is a narrow column well under this threshold and keeps stacking. */
+@container (min-width: 520px) {
+  .tb-license-embedded {
+    flex-flow: row wrap;
+    align-content: flex-start;
+    column-gap: 32px;
+    row-gap: 4px;
+
+    /* The title joins the flow rather than claiming a line of its own: at ~800x117 there is room for
+       exactly three wrapped lines, and the five rows need all three. */
+    .tb-card-header {
+      flex: 0 0 auto;
+      padding-bottom: 0;
+      align-content: center;
+    }
+
+    .tb-license-row {
+      flex: 0 1 auto;
+      padding: 2px 0;
+    }
+
+    /* A shrink-to-fit row gives a flex-basis:auto progress bar zero width (its content is empty),
+       so pin the meter here instead of letting it take the leftover of a full-width row. */
+    .tb-license-meter mat-progress-bar {
+      flex: 0 0 120px;
+    }
+
+    .tb-license-instance code {
+      word-break: normal;
+    }
   }
 }
 

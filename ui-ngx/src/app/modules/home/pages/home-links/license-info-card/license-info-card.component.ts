@@ -14,7 +14,14 @@
 /// limitations under the License.
 ///
 
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, Input, OnInit } from '@angular/core';
+import {
+  booleanAttribute,
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  Component,
+  Input,
+  OnInit
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -56,7 +63,10 @@ export class LicenseInfoCardComponent implements OnInit {
    * already draws the card. Set from the widget type's templateHtml; the /home fallback grid leaves it
    * false and keeps the card.
    */
-  @Input() embedded = false;
+  // booleanAttribute so the bare attribute form works: the widget type's templateHtml is
+  // `<tb-license-info-card embedded>`, which hands the input the empty string, and without the
+  // transform that is falsy and the widget silently falls back to the standalone card.
+  @Input({transform: booleanAttribute}) embedded = false;
 
   license: LicenseInfo = null;
   copied = false;

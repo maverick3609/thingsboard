@@ -7,6 +7,7 @@
     "type": "static",
     "sizeX": 7.5,
     "sizeY": 6.5,
+    "resources": [],
     "templateHtml": "<tb-license-info-card embedded>\n</tb-license-info-card>\n",
     "templateCss": "",
     "controllerScript": "self.onInit = function() {\n}\n",
@@ -14,5 +15,7 @@
     "dataKeySettingsSchema": "",
     "settingsDirective": "",
     "defaultConfig": "{\"showTitle\":false,\"backgroundColor\":\"rgb(255, 255, 255)\",\"color\":\"rgba(0, 0, 0, 0.87)\",\"padding\":\"8px\",\"settings\":{},\"title\":\"License info\",\"dropShadow\":true,\"enableFullscreen\":false,\"widgetStyle\":{},\"widgetCss\":\"\",\"pageSize\":1024,\"noDataDisplayMessage\":\"\",\"showLegend\":false}"
-  }
+  },
+  "tags": null,
+  "resources": []
 }

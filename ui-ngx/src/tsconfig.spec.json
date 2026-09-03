@@ -11,7 +11,8 @@
     "supportJitMode": true
   },
   "files": [
-    "polyfills.ts"
+    "polyfills.ts",
+    "test-globals.ts"
   ],
   "include": [
     "**/*.spec.ts",

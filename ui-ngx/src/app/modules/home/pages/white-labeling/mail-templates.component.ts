@@ -18,7 +18,8 @@ import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslateService } from '@ngx-translate/core';
-import { EditorOptions } from 'tinymce';
+import { EditorOptions } from 'hugerte';
+import { defaultHugeRteOptions } from '@shared/models/hugerte/hugerte.models';
 import { WhiteLabelingHttpService } from '@core/http/white-labeling.service';
 import { MailTemplates, mailTemplateTranslations } from '@shared/models/white-labeling.models';
 
@@ -37,20 +38,18 @@ export class MailTemplatesComponent implements OnInit {
 
   readonly mailTemplateTranslations = mailTemplateTranslations;
 
-  tinyMceOptions: Partial<EditorOptions> = {
-    base_url: '/assets/tinymce',
-    suffix: '.min',
+  // hugerte since the 2026-09-03 upstream merge (tinymce removed for CVE-2025-71329/71330);
+  // defaultHugeRteOptions supplies base_url/suffix/autofocus/branding, and `promotion` has no
+  // hugerte counterpart (there is no upsell to disable).
+  hugeRteOptions: Partial<EditorOptions> = defaultHugeRteOptions({
     plugins: ['link', 'table', 'image', 'lists', 'code', 'fullscreen'],
     menubar: 'edit insert tools view format table',
     toolbar: 'undo redo | fontfamily fontsize blocks | bold italic strikethrough | forecolor backcolor ' +
       '| link table image | alignleft aligncenter alignright alignjustify ' +
       '| numlist bullist | outdent indent | removeformat | code | fullscreen',
     toolbar_mode: 'sliding',
-    height: 500,
-    autofocus: false,
-    branding: false,
-    promotion: false
-  };
+    height: 500
+  });
 
   private templates: MailTemplates = {};
 
@@ -65,7 +64,7 @@ export class MailTemplatesComponent implements OnInit {
       body: [null]
     });
     // keep edits of the currently selected template so switching templates does not lose them.
-    // No dirty flag: tinymce re-emits its own normalised html right after writeValue, so a
+    // No dirty flag: the editor re-emits its own normalised html right after writeValue, so a
     // dirty-gated Save would be enabled from load anyway (PE's mail tab behaves the same).
     this.form.valueChanges.subscribe(value => {
       if (this.selectedTemplate) {

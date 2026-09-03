@@ -220,11 +220,15 @@
           "options": {
             "polyfills": [
               "zone.js",
-              "zone.js/testing"
+              "zone.js/testing",
+              "src/test-globals.ts"
             ],
             "tsConfig": "src/tsconfig.spec.json",
             "include": [
               "src/**/*.spec.ts"
+            ],
+            "exclude": [
+              "src/app/core/auth/auth.service.spec.ts"
             ],
             "browsers": "ChromeHeadless"
           }

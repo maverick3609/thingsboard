@@ -115,6 +115,7 @@ export enum MenuId {
   report_templates = 'report_templates',
   api_usage = 'api_usage',
   utilities = 'utilities',
+  settings_center = 'settings_center',
   trendz_settings = 'trendz_settings',
   ai_models = 'ai_models',
   white_labeling = 'white_labeling',
@@ -804,6 +805,16 @@ export const menuSectionMap = new Map<MenuId, MenuSection>([
     }
   ],
   [
+    MenuId.settings_center,
+    {
+      id: MenuId.settings_center,
+      name: 'admin.settings',
+      type: 'toggle',
+      path: '/settings-center',
+      icon: 'settings'
+    }
+  ],
+  [
     MenuId.trendz_settings,
     {
       id: MenuId.trendz_settings,
@@ -986,14 +997,19 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
         ]
       },
       {
-        id: MenuId.settings,
+        id: MenuId.settings_center,
         pages: [
-          {id: MenuId.home_settings},
-          {id: MenuId.notification_settings},
-          {id: MenuId.repository_settings},
-          {id: MenuId.auto_commit_settings},
-          {id: MenuId.trendz_settings},
-          {id: MenuId.ai_models},
+          {
+            id: MenuId.settings,
+            pages: [
+              {id: MenuId.home_settings},
+              {id: MenuId.notification_settings},
+              {id: MenuId.repository_settings},
+              {id: MenuId.auto_commit_settings},
+              {id: MenuId.trendz_settings},
+              {id: MenuId.ai_models}
+            ]
+          },
           {id: MenuId.white_labeling},
           {
             id: MenuId.notifications_center,

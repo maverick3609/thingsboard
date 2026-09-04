@@ -49,7 +49,9 @@ public class DefaultAccessControlService implements AccessControlService {
     @Override
     public void checkPermission(SecurityUser user, Resource resource, Operation operation) throws ThingsboardException {
         PermissionChecker permissionChecker = getPermissionChecker(user.getAuthority(), resource);
-        if (!permissionChecker.hasPermission(user, operation)) {
+        // Inferrix RBAC (Option B): the authority checker runs first, then the role gate —
+        // roles can only restrict within the authority baseline, never extend it
+        if (!permissionChecker.hasPermission(user, operation) || !UserPermissionsUtil.granted(user, resource, operation)) {
             permissionDenied();
         }
     }
@@ -58,7 +60,7 @@ public class DefaultAccessControlService implements AccessControlService {
     @SuppressWarnings("unchecked")
     public boolean hasPermission(SecurityUser user, Resource resource, Operation operation) throws ThingsboardException {
         var permissionChecker = getPermissionChecker(user.getAuthority(), resource);
-        return permissionChecker.hasPermission(user, operation);
+        return permissionChecker.hasPermission(user, operation) && UserPermissionsUtil.granted(user, resource, operation);
     }
 
     @Override
@@ -66,7 +68,7 @@ public class DefaultAccessControlService implements AccessControlService {
     public <I extends EntityId, T extends HasTenantId> void checkPermission(SecurityUser user, Resource resource,
                                                                             Operation operation, I entityId, T entity) throws ThingsboardException {
         PermissionChecker permissionChecker = getPermissionChecker(user.getAuthority(), resource);
-        if (!permissionChecker.hasPermission(user, operation, entityId, entity)) {
+        if (!permissionChecker.hasPermission(user, operation, entityId, entity) || !UserPermissionsUtil.granted(user, resource, operation)) {
             permissionDenied();
         }
     }
@@ -75,7 +77,7 @@ public class DefaultAccessControlService implements AccessControlService {
     @SuppressWarnings("unchecked")
     public <I extends EntityId, T extends HasTenantId> boolean hasPermission(SecurityUser user, Resource resource, Operation operation, I entityId, T entity) throws ThingsboardException {
         var permissionChecker = getPermissionChecker(user.getAuthority(), resource);
-        return permissionChecker.hasPermission(user, operation, entityId, entity);
+        return permissionChecker.hasPermission(user, operation, entityId, entity) && UserPermissionsUtil.granted(user, resource, operation);
     }
 
     private PermissionChecker getPermissionChecker(Authority authority, Resource resource) throws ThingsboardException {

@@ -105,6 +105,7 @@ import org.thingsboard.server.common.data.id.QueueId;
 import org.thingsboard.server.common.data.id.RpcId;
 import org.thingsboard.server.common.data.id.ReportId;
 import org.thingsboard.server.common.data.id.ReportTemplateId;
+import org.thingsboard.server.common.data.id.RoleId;
 import org.thingsboard.server.common.data.id.RuleChainId;
 import org.thingsboard.server.common.data.id.RuleNodeId;
 import org.thingsboard.server.common.data.id.SchedulerEventId;
@@ -131,6 +132,7 @@ import org.thingsboard.server.common.data.query.EntityKey;
 import org.thingsboard.server.common.data.queue.Queue;
 import org.thingsboard.server.common.data.report.Report;
 import org.thingsboard.server.common.data.report.ReportTemplate;
+import org.thingsboard.server.common.data.role.Role;
 import org.thingsboard.server.common.data.rpc.Rpc;
 import org.thingsboard.server.common.data.rule.RuleChain;
 import org.thingsboard.server.common.data.rule.RuleChainType;
@@ -172,6 +174,7 @@ import org.thingsboard.server.dao.queue.QueueService;
 import org.thingsboard.server.dao.relation.RelationService;
 import org.thingsboard.server.dao.report.ReportService;
 import org.thingsboard.server.dao.report.ReportTemplateService;
+import org.thingsboard.server.dao.role.RoleService;
 import org.thingsboard.server.dao.resource.ResourceService;
 import org.thingsboard.server.dao.rpc.RpcService;
 import org.thingsboard.server.dao.rule.RuleChainService;
@@ -417,6 +420,9 @@ public abstract class BaseController {
 
     @Autowired
     protected ReportTemplateService reportTemplateService;
+
+    @Autowired
+    protected RoleService roleService;
 
     @Value("${server.log_controller_error_stack_trace}")
     @Getter
@@ -683,6 +689,7 @@ public abstract class BaseController {
                 case SCHEDULER_EVENT -> checkSchedulerEventId(new SchedulerEventId(entityId.getId()), operation);
                 case REPORT -> checkReportId(new ReportId(entityId.getId()), operation);
                 case REPORT_TEMPLATE -> checkReportTemplateId(new ReportTemplateId(entityId.getId()), operation);
+                case ROLE -> checkRoleId(new RoleId(entityId.getId()), operation);
                 default -> (HasId<? extends EntityId>) checkEntityId(entityId, entitiesService::findEntityByTenantIdAndId, operation);
             };
         } catch (Exception e) {
@@ -807,6 +814,10 @@ public abstract class BaseController {
 
     ReportTemplate checkReportTemplateId(ReportTemplateId reportTemplateId, Operation operation) throws ThingsboardException {
         return checkEntityId(reportTemplateId, reportTemplateService::findReportTemplateById, operation);
+    }
+
+    Role checkRoleId(RoleId roleId, Operation operation) throws ThingsboardException {
+        return checkEntityId(roleId, roleService::findRoleById, operation);
     }
 
     SchedulerEventInfo checkSchedulerEventInfoId(SchedulerEventId schedulerEventId, Operation operation) throws ThingsboardException {

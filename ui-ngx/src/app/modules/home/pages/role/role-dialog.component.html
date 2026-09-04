@@ -1,0 +1,84 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<form [formGroup]="roleFormGroup" (ngSubmit)="save()" style="min-width: 560px;">
+  <mat-toolbar color="primary">
+    <h2>{{ (isAdd ? 'role.add-role' : 'role.edit-role') | translate }}</h2>
+    <span class="flex-1"></span>
+    <button mat-icon-button type="button" (click)="cancel()">
+      <mat-icon class="material-icons">close</mat-icon>
+    </button>
+  </mat-toolbar>
+  <mat-progress-bar color="warn" mode="indeterminate" *ngIf="isLoading$ | async"></mat-progress-bar>
+  <div mat-dialog-content>
+    <fieldset [disabled]="isLoading$ | async" class="flex flex-col">
+      <mat-form-field class="mat-block">
+        <mat-label translate>role.name</mat-label>
+        <input matInput formControlName="name" required>
+        <mat-error *ngIf="roleFormGroup.get('name').hasError('required')">
+          {{ 'role.name-required' | translate }}
+        </mat-error>
+      </mat-form-field>
+      <mat-form-field class="mat-block">
+        <mat-label translate>role.description</mat-label>
+        <textarea matInput formControlName="description" rows="1"></textarea>
+      </mat-form-field>
+      <div class="tb-form-panel-title" translate>role.permissions</div>
+      <div class="tb-hint" translate>role.permissions-hint</div>
+      <div formArrayName="permissions" class="flex flex-col">
+        <div *ngFor="let row of permissionsFormArray.controls; let i = index" [formGroupName]="i"
+             class="flex flex-row items-baseline gap-2">
+          <mat-form-field class="flex-1">
+            <mat-label translate>role.resource</mat-label>
+            <mat-select formControlName="resource" required>
+              <mat-option *ngFor="let resource of allowedResources" [value]="resource">
+                {{ humanize(resource) }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field class="flex-1">
+            <mat-label translate>role.operations</mat-label>
+            <mat-select formControlName="operations" multiple required>
+              <mat-option *ngFor="let operation of allowedOperations" [value]="operation">
+                {{ humanize(operation) }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+          <button mat-icon-button type="button" (click)="removePermissionRow(i)"
+                  matTooltip="{{ 'action.remove' | translate }}" matTooltipPosition="above">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </div>
+      </div>
+      <div>
+        <button mat-stroked-button type="button" (click)="addPermissionRow()">
+          <mat-icon>add</mat-icon>
+          {{ 'role.add-permission' | translate }}
+        </button>
+      </div>
+    </fieldset>
+  </div>
+  <div mat-dialog-actions class="flex justify-end">
+    <button mat-button type="button" [disabled]="isLoading$ | async" (click)="cancel()">
+      {{ 'action.cancel' | translate }}
+    </button>
+    <button mat-raised-button color="primary" type="submit"
+            [disabled]="(isLoading$ | async) || roleFormGroup.invalid">
+      {{ (isAdd ? 'action.add' : 'action.save') | translate }}
+    </button>
+  </div>
+</form>

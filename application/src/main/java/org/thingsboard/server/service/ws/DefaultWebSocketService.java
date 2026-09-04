@@ -62,6 +62,8 @@ import org.thingsboard.server.service.security.ValidationResult;
 import org.thingsboard.server.service.security.ValidationResultCode;
 import org.thingsboard.server.service.security.model.UserPrincipal;
 import org.thingsboard.server.service.security.permission.Operation;
+import org.thingsboard.server.service.security.permission.Resource;
+import org.thingsboard.server.service.security.permission.UserPermissionsUtil;
 import org.thingsboard.server.service.subscription.SubscriptionErrorCode;
 import org.thingsboard.server.service.subscription.TbAttributeSubscription;
 import org.thingsboard.server.service.subscription.TbAttributeSubscriptionScope;
@@ -239,18 +241,32 @@ public class DefaultWebSocketService implements WebSocketService {
 
     private void handleWsEntityDataCmd(WebSocketSessionRef sessionRef, EntityDataCmd cmd) {
         if (validateSubscriptionCmd(sessionRef, cmd)) {
+            // Inferrix RBAC: role-restricted users need READ on the queried entity type
+            if (cmd.getQuery() != null && !UserPermissionsUtil.grantedEntityQuery(sessionRef.getSecurityCtx(), cmd.getQuery().getEntityFilter())) {
+                sendError(sessionRef, cmd.getCmdId(), SubscriptionErrorCode.UNAUTHORIZED, SubscriptionErrorCode.UNAUTHORIZED.getDefaultMsg());
+                return;
+            }
             entityDataSubService.handleCmd(sessionRef, cmd);
         }
     }
 
     private void handleWsEntityCountCmd(WebSocketSessionRef sessionRef, EntityCountCmd cmd) {
         if (validateSubscriptionCmd(sessionRef, cmd)) {
+            if (cmd.getQuery() != null && !UserPermissionsUtil.grantedEntityQuery(sessionRef.getSecurityCtx(), cmd.getQuery().getEntityFilter())) {
+                sendError(sessionRef, cmd.getCmdId(), SubscriptionErrorCode.UNAUTHORIZED, SubscriptionErrorCode.UNAUTHORIZED.getDefaultMsg());
+                return;
+            }
             entityDataSubService.handleCmd(sessionRef, cmd);
         }
     }
 
     private void handleWsAlarmDataCmd(WebSocketSessionRef sessionRef, AlarmDataCmd cmd) {
         if (validateSubscriptionCmd(sessionRef, cmd)) {
+            if (!UserPermissionsUtil.granted(sessionRef.getSecurityCtx(), Resource.ALARM, Operation.READ)
+                    || (cmd.getQuery() != null && !UserPermissionsUtil.grantedEntityQuery(sessionRef.getSecurityCtx(), cmd.getQuery().getEntityFilter()))) {
+                sendError(sessionRef, cmd.getCmdId(), SubscriptionErrorCode.UNAUTHORIZED, SubscriptionErrorCode.UNAUTHORIZED.getDefaultMsg());
+                return;
+            }
             entityDataSubService.handleCmd(sessionRef, cmd);
         }
     }
@@ -261,6 +277,11 @@ public class DefaultWebSocketService implements WebSocketService {
 
     private void handleWsAlarmCountCmd(WebSocketSessionRef sessionRef, AlarmCountCmd cmd) {
         if (validateCmd(sessionRef, cmd)) {
+            if (!UserPermissionsUtil.granted(sessionRef.getSecurityCtx(), Resource.ALARM, Operation.READ)
+                    || (cmd.getQuery() != null && !UserPermissionsUtil.grantedEntityQuery(sessionRef.getSecurityCtx(), cmd.getQuery().getEntityFilter()))) {
+                sendError(sessionRef, cmd.getCmdId(), SubscriptionErrorCode.UNAUTHORIZED, SubscriptionErrorCode.UNAUTHORIZED.getDefaultMsg());
+                return;
+            }
             entityDataSubService.handleCmd(sessionRef, cmd);
         }
     }

@@ -67,6 +67,13 @@ enum EntityTypeProto {
   ADMIN_SETTINGS        = 42;
   AI_MODEL              = 43;
   API_KEY               = 44;
+  // Inferrix fork entity types — numbers match EntityType.protoNumber (PE parity);
+  // without these, ProtoUtils.toProto(EntityType.X) yields null and cluster
+  // broadcasts / lifecycle msgs for these types NPE.
+  SCHEDULER_EVENT       = 103;
+  ROLE                  = 105;
+  REPORT_TEMPLATE       = 108;
+  REPORT                = 109;
 }
 
 enum ApiUsageRecordKeyProto {

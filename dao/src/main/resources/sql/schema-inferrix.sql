@@ -92,3 +92,29 @@ CREATE TABLE IF NOT EXISTS inferrix_license_state (
     high_water_ts bigint NOT NULL DEFAULT 0
 );
 -- INFERRIX LICENSE STATE END
+
+-- RBAC (PE-parity, Option B: GENERIC roles assigned directly to users) -----------------------
+-- role.permissions is the PE-shaped JSON: {"DEVICE": ["READ","WRITE"], "ALL": ["READ"], ...}.
+-- user_role is the assignment edge (PE assigns roles to user groups; CE has no entity groups,
+-- so the fork assigns them straight to users, N:M). FKs cascade so deleting a user or a role
+-- cleans its assignments without service-level bookkeeping.
+CREATE TABLE IF NOT EXISTS role (
+    id uuid NOT NULL CONSTRAINT role_pkey PRIMARY KEY,
+    created_time bigint NOT NULL,
+    tenant_id uuid NOT NULL,
+    name varchar(255) NOT NULL,
+    type varchar(255) NOT NULL,
+    permissions jsonb,
+    additional_info varchar,
+    version bigint DEFAULT 1,
+    CONSTRAINT role_name_unq_key UNIQUE (tenant_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS user_role (
+    user_id uuid NOT NULL CONSTRAINT fk_user_role_user REFERENCES tb_user(id) ON DELETE CASCADE,
+    role_id uuid NOT NULL CONSTRAINT fk_user_role_role REFERENCES role(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL,
+    created_time bigint NOT NULL,
+    CONSTRAINT user_role_pkey PRIMARY KEY (user_id, role_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_role_role_id ON user_role(role_id);

@@ -56,6 +56,7 @@ export enum EntityType {
   SCHEDULER_EVENT = 'SCHEDULER_EVENT',
   REPORT = 'REPORT',
   REPORT_TEMPLATE = 'REPORT_TEMPLATE',
+  ROLE = 'ROLE',
 }
 
 export enum AliasEntityType {
@@ -538,6 +539,18 @@ export const entityTypeTranslations = new Map<EntityType | AliasEntityType, Enti
       }
     ],
     [
+      EntityType.ROLE,
+      {
+        type: 'entity.type-role',
+        typePlural: 'entity.type-roles',
+        list: 'entity.list-of-roles',
+        add: 'role.add-role',
+        noEntities: 'role.no-roles-text',
+        search: 'role.search',
+        selectedEntities: 'role.selected-roles'
+      }
+    ],
+    [
       EntityType.REPORT,
       {
         type: 'entity.type-report',
@@ -715,6 +728,12 @@ export const entityTypeResources = new Map<EntityType, EntityTypeResource<BaseDa
       EntityType.SCHEDULER_EVENT,
       {
         helpLinkId: 'scheduler'
+      }
+    ],
+    [
+      EntityType.ROLE,
+      {
+        helpLinkId: 'roles'
       }
     ],
     [

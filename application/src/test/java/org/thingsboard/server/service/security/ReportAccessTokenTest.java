@@ -43,6 +43,7 @@ import org.thingsboard.server.service.security.auth.jwt.settings.DefaultJwtSetti
 import org.thingsboard.server.service.security.auth.jwt.settings.JwtSettingsService;
 import org.thingsboard.server.service.security.model.SecurityUser;
 import org.thingsboard.server.service.security.model.token.JwtTokenFactory;
+import org.thingsboard.server.service.security.permission.UserPermissionsService;
 import org.thingsboard.server.service.security.system.DefaultSystemSecurityService;
 
 import java.nio.charset.StandardCharsets;
@@ -52,6 +53,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -101,7 +103,7 @@ class ReportAccessTokenTest {
 
         JwtSettingsService jwtSettingsService = new DefaultJwtSettingsService(
                 adminSettingsService, Optional.empty(), new DefaultJwtSettingsValidator(), Optional.empty());
-        jwtTokenFactory = new JwtTokenFactory(jwtSettingsService);
+        jwtTokenFactory = new JwtTokenFactory(jwtSettingsService, mock(UserPermissionsService.class));
 
         systemSecurityService = new DefaultSystemSecurityService(adminSettingsService, encoder, userService,
                 mailService, auditLogService, securitySettingsService, customerService, jwtTokenFactory);

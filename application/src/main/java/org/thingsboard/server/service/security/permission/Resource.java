@@ -22,6 +22,10 @@ import java.util.Set;
 
 public enum Resource {
 
+    // PE-compatible wildcard: valid only as a key inside a Role's permissions JSON
+    // ("ALL": [...] grants the listed operations on every resource). Never registered
+    // in the per-authority checker maps and never passed to checkPermission directly.
+    ALL,
     ADMIN_SETTINGS(EntityType.ADMIN_SETTINGS),
     ALARM(EntityType.ALARM),
     DEVICE(EntityType.DEVICE),
@@ -58,6 +62,7 @@ public enum Resource {
     AI_MODEL(EntityType.AI_MODEL),
     API_KEY(EntityType.API_KEY),
     REPORT_TEMPLATE(EntityType.REPORT_TEMPLATE),
+    ROLE(EntityType.ROLE),
     REPORT(EntityType.REPORT);
 
     private final Set<EntityType> entityTypes;

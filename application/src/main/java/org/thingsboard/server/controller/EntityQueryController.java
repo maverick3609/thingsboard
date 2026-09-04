@@ -29,6 +29,7 @@ import org.springframework.web.context.request.async.DeferredResult;
 import org.thingsboard.server.common.data.AttributeScope;
 import org.thingsboard.server.common.data.edqs.EdqsState;
 import org.thingsboard.server.common.data.edqs.ToCoreEdqsRequest;
+import org.thingsboard.server.common.data.exception.ThingsboardErrorCode;
 import org.thingsboard.server.common.data.exception.ThingsboardException;
 import org.thingsboard.server.common.data.id.UserId;
 import org.thingsboard.server.common.data.page.PageData;
@@ -47,6 +48,8 @@ import org.thingsboard.server.config.annotations.ApiOperation;
 import org.thingsboard.server.queue.util.TbCoreComponent;
 import org.thingsboard.server.service.query.EntityQueryService;
 import org.thingsboard.server.service.security.permission.Operation;
+import org.thingsboard.server.service.security.permission.Resource;
+import org.thingsboard.server.service.security.permission.UserPermissionsUtil;
 
 import java.util.Set;
 
@@ -54,6 +57,8 @@ import static org.thingsboard.server.controller.ControllerConstants.ALARM_DATA_Q
 import static org.thingsboard.server.controller.ControllerConstants.ENTITY_COUNT_QUERY_DESCRIPTION;
 import static org.thingsboard.server.controller.ControllerConstants.ENTITY_DATA_QUERY_DESCRIPTION;
 import static org.thingsboard.server.controller.ControllerConstants.TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH;
+
+import static org.thingsboard.server.controller.UserController.YOU_DON_T_HAVE_PERMISSION_TO_PERFORM_THIS_OPERATION;
 
 @RestController
 @TbCoreComponent
@@ -73,6 +78,7 @@ public class EntityQueryController extends BaseController {
             @Parameter(description = "A JSON value representing the entity count query. See API call notes above for more details.")
             @RequestBody EntityCountQuery query) throws ThingsboardException {
         checkNotNull(query);
+        checkQueryReadPermission(query.getEntityFilter());
         resolveQuery(query);
         return entityQueryService.countEntitiesByQuery(getCurrentUser(), query);
     }
@@ -84,6 +90,7 @@ public class EntityQueryController extends BaseController {
             @Parameter(description = "A JSON value representing the entity data query. See API call notes above for more details.")
             @RequestBody EntityDataQuery query) throws ThingsboardException {
         checkNotNull(query);
+        checkQueryReadPermission(query.getEntityFilter());
         resolveQuery(query);
         return entityQueryService.findEntityDataByQuery(getCurrentUser(), query);
     }
@@ -100,6 +107,8 @@ public class EntityQueryController extends BaseController {
         if (assigneeId != null) {
             checkUserId(assigneeId, Operation.READ);
         }
+        checkAlarmQueryReadPermission();
+        checkQueryReadPermission(query.getEntityFilter());
         resolveQuery(query);
         return entityQueryService.findAlarmDataByQuery(getCurrentUser(), query);
     }
@@ -114,6 +123,8 @@ public class EntityQueryController extends BaseController {
         if (assigneeId != null) {
             checkUserId(assigneeId, Operation.READ);
         }
+        checkAlarmQueryReadPermission();
+        checkQueryReadPermission(query.getEntityFilter());
         resolveQuery(query);
         return entityQueryService.countAlarmsByQuery(getCurrentUser(), query);
     }
@@ -149,6 +160,7 @@ public class EntityQueryController extends BaseController {
                     schema = @Schema(allowableValues = {"SERVER_SCOPE", "SHARED_SCOPE", "CLIENT_SCOPE"}))
             @RequestParam(value = "scope", required = false) AttributeScope scope
     ) throws ThingsboardException {
+        checkQueryReadPermission(query.getEntityFilter());
         resolveQuery(query);
         EntityDataPageLink pageLink = query.getPageLink();
         if (pageLink.getPageSize() > MAX_PAGE_SIZE) {
@@ -195,6 +207,7 @@ public class EntityQueryController extends BaseController {
                     When false, only key names are returned (sample is omitted from JSON).""")
             @RequestParam(defaultValue = "false") boolean includeSamples
     ) throws ThingsboardException {
+        checkQueryReadPermission(query.getEntityFilter());
         resolveQuery(query);
         EntityDataPageLink pageLink = query.getPageLink();
         if (pageLink.getPageSize() > MAX_PAGE_SIZE) {
@@ -223,6 +236,25 @@ public class EntityQueryController extends BaseController {
             var customerId = user.getCustomerId();
             var ownerId = customerId != null && !customerId.isNullUid() ? customerId : getTenantId();
             EntityFilter.resolveEntityFilter(query.getEntityFilter(), getTenantId(), user.getId(), ownerId);
+        }
+    }
+
+
+    // Inferrix RBAC (Option B): role-restricted users need READ on the queried entity type —
+    // without this gate the query endpoints would bypass every per-entity permission check.
+    // Legacy (role-less) users are unaffected; tenant/customer scoping still applies inside
+    // the query builder.
+    private void checkQueryReadPermission(EntityFilter entityFilter) throws ThingsboardException {
+        if (!UserPermissionsUtil.grantedEntityQuery(getCurrentUser(), entityFilter)) {
+            throw new ThingsboardException(YOU_DON_T_HAVE_PERMISSION_TO_PERFORM_THIS_OPERATION,
+                    ThingsboardErrorCode.PERMISSION_DENIED);
+        }
+    }
+
+    private void checkAlarmQueryReadPermission() throws ThingsboardException {
+        if (!UserPermissionsUtil.granted(getCurrentUser(), Resource.ALARM, Operation.READ)) {
+            throw new ThingsboardException(YOU_DON_T_HAVE_PERMISSION_TO_PERFORM_THIS_OPERATION,
+                    ThingsboardErrorCode.PERMISSION_DENIED);
         }
     }
 

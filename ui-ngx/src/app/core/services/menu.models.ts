@@ -116,6 +116,7 @@ export enum MenuId {
   api_usage = 'api_usage',
   utilities = 'utilities',
   settings_center = 'settings_center',
+  roles = 'roles',
   trendz_settings = 'trendz_settings',
   ai_models = 'ai_models',
   white_labeling = 'white_labeling',
@@ -836,6 +837,16 @@ export const menuSectionMap = new Map<MenuId, MenuSection>([
     }
   ],
   [
+    MenuId.roles,
+    {
+      id: MenuId.roles,
+      name: 'role.roles',
+      type: 'link',
+      path: '/roles',
+      icon: 'manage_accounts'
+    }
+  ],
+  [
     MenuId.iot_hub,
     {
       id: MenuId.iot_hub,
@@ -1011,6 +1022,7 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
             ]
           },
           {id: MenuId.white_labeling},
+          {id: MenuId.roles},
           {
             id: MenuId.notifications_center,
             pages: [

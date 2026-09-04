@@ -32,6 +32,10 @@ import { CustomerService } from '@core/http/customer.service';
 import { map, mergeMap, take, tap } from 'rxjs/operators';
 import { Observable, of } from 'rxjs';
 import { Authority } from '@shared/models/authority.enum';
+import {
+  ManageUserRolesDialogComponent,
+  ManageUserRolesDialogData
+} from '@home/pages/role/manage-user-roles-dialog.component';
 import { CustomerId } from '@shared/models/id/customer-id';
 import { MatDialog } from '@angular/material/dialog';
 import { EntityAction } from '@home/models/entity/entity-component.models';
@@ -152,6 +156,29 @@ export class UsersTableConfigResolver  {
         }
       );
     }
+    // Inferrix RBAC (Option B): direct user-role assignment; only tenant admins may call the
+    // role endpoints, so the action is hidden for sysadmin (who also lists tenant users)
+    if (auth.authUser?.authority === Authority.TENANT_ADMIN) {
+      this.config.cellActionDescriptors.push(
+        {
+          name: this.translate.instant('role.manage-roles'),
+          icon: 'manage_accounts',
+          isEnabled: () => true,
+          onAction: ($event, entity) => this.manageUserRoles($event, entity)
+        }
+      );
+    }
+  }
+
+  private manageUserRoles($event: Event, user: User): void {
+    $event?.stopPropagation();
+    this.dialog.open<ManageUserRolesDialogComponent, ManageUserRolesDialogData, boolean>(ManageUserRolesDialogComponent, {
+      disableClose: true,
+      panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
+      data: {
+        user
+      }
+    });
   }
 
   saveUser(user: User): Observable<User> {

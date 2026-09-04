@@ -77,7 +77,11 @@ public enum EntityType {
     API_KEY(44),
     SCHEDULER_EVENT(103),
     REPORT_TEMPLATE(108),
-    REPORT(109);
+    REPORT(109),
+    // Declared AFTER the earlier fork types on purpose: alarm.originator_type is persisted by
+    // enum ORDINAL (AbstractAlarmEntity has no @Enumerated), so new types must only ever be
+    // APPENDED here — protoNumber 105 (PE parity) is unaffected by declaration order.
+    ROLE(105);
 
     @Getter
     private final int protoNumber; // Corresponds to EntityTypeProto

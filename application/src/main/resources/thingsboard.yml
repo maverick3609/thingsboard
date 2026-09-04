@@ -672,6 +672,9 @@ cache:
     relations:
       timeToLiveInMinutes: "${CACHE_SPECS_RELATIONS_TTL:1440}" # Relations cache TTL
       maxSize: "${CACHE_SPECS_RELATIONS_MAX_SIZE:10000}" # 0 means the cache is disabled
+    permissions:
+      timeToLiveInMinutes: "${CACHE_SPECS_PERMISSIONS_TTL:1440}" # Inferrix RBAC: merged user role permissions cache TTL
+      maxSize: "${CACHE_SPECS_PERMISSIONS_MAX_SIZE:10000}" # 0 means the cache is disabled
     deviceCredentials:
       timeToLiveInMinutes: "${CACHE_SPECS_DEVICE_CREDENTIALS_TTL:1440}" # Device credentials cache TTL
       maxSize: "${CACHE_SPECS_DEVICE_CREDENTIALS_MAX_SIZE:10000}" # 0 means the cache is disabled

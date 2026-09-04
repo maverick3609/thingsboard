@@ -43,6 +43,7 @@ import org.thingsboard.server.service.security.auth.jwt.settings.JwtSettingsServ
 import org.thingsboard.server.service.security.exception.JwtExpiredTokenException;
 import org.thingsboard.server.service.security.model.SecurityUser;
 import org.thingsboard.server.service.security.model.UserPrincipal;
+import org.thingsboard.server.service.security.permission.UserPermissionsService;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -73,6 +74,10 @@ public class JwtTokenFactory {
 
     @Lazy
     private final JwtSettingsService jwtSettingsService;
+    // Inferrix RBAC (Option B): merged role permissions are loaded (cache-backed) on every
+    // access-token parse — the JWT itself never carries permissions, so role edits apply
+    // via cache eviction without re-login
+    private final UserPermissionsService userPermissionsService;
 
     private volatile JwtParser jwtParser;
     private volatile SecretKey secretKey;
@@ -144,6 +149,15 @@ public class JwtTokenFactory {
         }
         UserPrincipal principal = new UserPrincipal(isPublic ? UserPrincipal.Type.PUBLIC_ID : UserPrincipal.Type.USER_NAME, subject);
         securityUser.setUserPrincipal(principal);
+        if (authority == Authority.TENANT_ADMIN || authority == Authority.CUSTOMER_USER) {
+            try {
+                securityUser.setUserPermissions(userPermissionsService.getMergedPermissions(securityUser));
+            } catch (Exception e) {
+                // fail closed: a user whose permissions cannot be resolved must not fall
+                // through to legacy full access
+                throw new BadCredentialsException("Failed to get user permissions", e);
+            }
+        }
         return securityUser;
     }
 

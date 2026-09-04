@@ -27,6 +27,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.thingsboard.server.service.security.permission.MergedUserPermissions;
+
 public class SecurityUser extends User {
 
     private static final long serialVersionUID = -797397440703066079L;
@@ -38,6 +40,10 @@ public class SecurityUser extends User {
     private UserPrincipal userPrincipal;
     @Getter @Setter
     private String sessionId = UUID.randomUUID().toString();
+    // Inferrix RBAC (Option B): merged role permissions, set on JWT parse; null = no roles
+    // assigned = legacy authority-based access (see UserPermissionsUtil.granted)
+    @Getter @Setter
+    private MergedUserPermissions userPermissions;
 
     public SecurityUser() {
         super();

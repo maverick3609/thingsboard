@@ -35,6 +35,7 @@ import org.thingsboard.server.service.security.model.SecurityUser;
 import org.thingsboard.server.service.security.model.UserPrincipal;
 import org.thingsboard.server.service.security.model.token.AccessJwtToken;
 import org.thingsboard.server.service.security.model.token.JwtTokenFactory;
+import org.thingsboard.server.service.security.permission.UserPermissionsService;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -68,7 +69,7 @@ public class JwtTokenFactoryTest {
         jwtSettingsService = mockJwtSettingsService();
         mockJwtSettings(jwtSettings);
 
-        tokenFactory = new JwtTokenFactory(jwtSettingsService);
+        tokenFactory = new JwtTokenFactory(jwtSettingsService, mock(UserPermissionsService.class));
     }
 
     @Test

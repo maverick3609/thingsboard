@@ -1,0 +1,47 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<form [formGroup]="rolesFormGroup" (ngSubmit)="save()" style="min-width: 480px;">
+  <mat-toolbar color="primary">
+    <h2>{{ 'role.manage-user-roles' | translate: {email: data.user.email} }}</h2>
+    <span class="flex-1"></span>
+    <button mat-icon-button type="button" (click)="cancel()">
+      <mat-icon class="material-icons">close</mat-icon>
+    </button>
+  </mat-toolbar>
+  <mat-progress-bar color="warn" mode="indeterminate" *ngIf="(isLoading$ | async) || !loaded"></mat-progress-bar>
+  <div mat-dialog-content>
+    <div class="tb-hint" translate>role.manage-user-roles-hint</div>
+    <mat-form-field class="mat-block">
+      <mat-label translate>role.assigned-roles</mat-label>
+      <mat-select formControlName="roleIds" multiple>
+        <mat-option *ngFor="let role of allRoles" [value]="role.id.id">
+          {{ role.name }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+    <div class="tb-hint" *ngIf="loaded && !allRoles.length" translate>role.no-roles-defined</div>
+  </div>
+  <div mat-dialog-actions class="flex justify-end">
+    <button mat-button type="button" [disabled]="isLoading$ | async" (click)="cancel()">
+      {{ 'action.cancel' | translate }}
+    </button>
+    <button mat-raised-button color="primary" type="submit" [disabled]="(isLoading$ | async) || !loaded">
+      {{ 'action.save' | translate }}
+    </button>
+  </div>
+</form>

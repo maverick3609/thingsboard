@@ -807,6 +807,18 @@ public class ModelConstants {
     public static final String REPORT_DATA_PROPERTY = "data";
 
     /**
+     * Role constants (RBAC port, Option B).
+     */
+    public static final String ROLE_TABLE_NAME = "role";
+    public static final String ROLE_NAME_PROPERTY = "name";
+    public static final String ROLE_TYPE_PROPERTY = "type";
+    public static final String ROLE_PERMISSIONS_PROPERTY = "permissions";
+
+    public static final String USER_ROLE_TABLE_NAME = "user_role";
+    public static final String USER_ROLE_USER_ID_PROPERTY = "user_id";
+    public static final String USER_ROLE_ROLE_ID_PROPERTY = "role_id";
+
+    /**
      * IoT Hub installed item constants.
      */
     public static final String IOT_HUB_INSTALLED_ITEM_TABLE_NAME = "iot_hub_installed_item";

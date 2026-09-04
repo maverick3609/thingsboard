@@ -808,10 +808,10 @@ export const menuSectionMap = new Map<MenuId, MenuSection>([
     MenuId.settings_center,
     {
       id: MenuId.settings_center,
-      name: 'admin.settings',
+      name: 'admin.administration',
       type: 'toggle',
       path: '/settings-center',
-      icon: 'settings'
+      icon: 'admin_panel_settings'
     }
   ],
   [

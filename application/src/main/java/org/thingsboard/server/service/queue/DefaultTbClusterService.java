@@ -612,7 +612,9 @@ public class DefaultTbClusterService implements TbClusterService {
                 EntityType.JOB,
                 EntityType.TB_RESOURCE,
                 EntityType.CUSTOMER,
-                EntityType.USER)
+                EntityType.USER,
+                // Inferrix RBAC: a role change evicts the permissions cache on every tb-core node
+                EntityType.ROLE)
                 || (entityType == EntityType.ASSET && msg.getEvent() == ComponentLifecycleEvent.UPDATED)
                 || (entityType == EntityType.DEVICE && msg.getEvent() == ComponentLifecycleEvent.UPDATED)
         ) {

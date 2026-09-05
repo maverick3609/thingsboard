@@ -17,6 +17,10 @@ package org.thingsboard.server.service.security.permission;
 
 import org.junit.jupiter.api.Test;
 import org.thingsboard.common.util.JacksonUtil;
+import org.thingsboard.server.common.data.EntityType;
+import org.thingsboard.server.common.data.query.RelationsQueryFilter;
+import org.thingsboard.server.common.data.relation.EntitySearchDirection;
+import org.thingsboard.server.common.data.relation.RelationEntityTypeFilter;
 import org.thingsboard.server.common.data.role.Role;
 import org.thingsboard.server.common.data.role.RoleType;
 import org.thingsboard.server.common.data.security.Authority;
@@ -88,6 +92,32 @@ public class UserPermissionsTest {
         // non-restrictable authorities are never gated
         assertTrue(UserPermissionsUtil.granted(user(Authority.SYS_ADMIN, null), Resource.DEVICE, Operation.DELETE));
         assertTrue(UserPermissionsUtil.granted(user(Authority.MFA_CONFIGURATION_TOKEN, null), Resource.DEVICE, Operation.DELETE));
+    }
+
+    @Test
+    public void testGrantedEntityQueryGatesRelationsQueryOnReturnedTypes() {
+        MergedUserPermissions readOnlyDevices = DefaultUserPermissionsService.mergeRolePermissions(
+                List.of(role("{\"DEVICE\": [\"READ\"]}")));
+        SecurityUser user = user(Authority.TENANT_ADMIN, readOnlyDevices);
+
+        // the root entity type is irrelevant: what leaves the system is the RELATED entities
+        assertTrue(UserPermissionsUtil.grantedEntityQuery(user, relationsQuery(EntityType.DEVICE)));
+        assertFalse(UserPermissionsUtil.grantedEntityQuery(user, relationsQuery(EntityType.ASSET)));
+        assertFalse(UserPermissionsUtil.grantedEntityQuery(user, relationsQuery(EntityType.DEVICE, EntityType.ASSET)));
+        // no entity types named => every relation-queryable type can come back
+        assertFalse(UserPermissionsUtil.grantedEntityQuery(user, relationsQuery()));
+
+        MergedUserPermissions readAll = DefaultUserPermissionsService.mergeRolePermissions(
+                List.of(role("{\"ALL\": [\"READ\"]}")));
+        assertTrue(UserPermissionsUtil.grantedEntityQuery(user(Authority.TENANT_ADMIN, readAll), relationsQuery()));
+    }
+
+    private static RelationsQueryFilter relationsQuery(EntityType... relatedTypes) {
+        RelationsQueryFilter filter = new RelationsQueryFilter();
+        filter.setDirection(EntitySearchDirection.FROM);
+        filter.setFilters(relatedTypes.length == 0 ? List.of()
+                : List.of(new RelationEntityTypeFilter("Contains", List.of(relatedTypes))));
+        return filter;
     }
 
     @Test

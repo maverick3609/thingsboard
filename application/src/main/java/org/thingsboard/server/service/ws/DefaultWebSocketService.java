@@ -48,6 +48,7 @@ import org.thingsboard.server.common.data.kv.BaseReadTsKvQuery;
 import org.thingsboard.server.common.data.kv.BasicTsKvEntry;
 import org.thingsboard.server.common.data.kv.ReadTsKvQuery;
 import org.thingsboard.server.common.data.kv.TsKvEntry;
+import org.thingsboard.server.common.data.security.Authority;
 import org.thingsboard.server.common.data.tenant.profile.DefaultTenantProfileConfiguration;
 import org.thingsboard.server.common.msg.tools.TbRateLimitsException;
 import org.thingsboard.server.dao.attributes.AttributesService;
@@ -60,9 +61,11 @@ import org.thingsboard.server.service.security.AccessValidator;
 import org.thingsboard.server.service.security.ValidationCallback;
 import org.thingsboard.server.service.security.ValidationResult;
 import org.thingsboard.server.service.security.ValidationResultCode;
+import org.thingsboard.server.service.security.model.SecurityUser;
 import org.thingsboard.server.service.security.model.UserPrincipal;
 import org.thingsboard.server.service.security.permission.Operation;
 import org.thingsboard.server.service.security.permission.Resource;
+import org.thingsboard.server.service.security.permission.UserPermissionsService;
 import org.thingsboard.server.service.security.permission.UserPermissionsUtil;
 import org.thingsboard.server.service.subscription.SubscriptionErrorCode;
 import org.thingsboard.server.service.subscription.TbAttributeSubscription;
@@ -139,6 +142,7 @@ public class DefaultWebSocketService implements WebSocketService {
     private final TimeseriesService tsService;
     private final TbServiceInfoProvider serviceInfoProvider;
     private final TbTenantProfileCache tenantProfileCache;
+    private final UserPermissionsService userPermissionsService;
 
     @Value("${server.ws.ping_timeout:30000}")
     private long pingTimeout;
@@ -239,10 +243,31 @@ public class DefaultWebSocketService implements WebSocketService {
         }
     }
 
+    /**
+     * The SecurityUser is resolved once, at the WS handshake, and never refreshed - unlike REST,
+     * where every request re-parses the JWT and re-reads the permissions cache. Re-resolve before
+     * each gated command so a role edit takes effect on an already-open socket. Fails closed.
+     */
+    private boolean refreshPermissions(WebSocketSessionRef sessionRef) {
+        SecurityUser securityCtx = sessionRef.getSecurityCtx();
+        Authority authority = securityCtx.getAuthority();
+        if (authority != Authority.TENANT_ADMIN && authority != Authority.CUSTOMER_USER) {
+            return true;
+        }
+        try {
+            securityCtx.setUserPermissions(userPermissionsService.getMergedPermissions(securityCtx));
+            return true;
+        } catch (Exception e) {
+            log.warn("[{}] Failed to refresh user permissions", sessionRef.getSessionId(), e);
+            return false;
+        }
+    }
+
     private void handleWsEntityDataCmd(WebSocketSessionRef sessionRef, EntityDataCmd cmd) {
         if (validateSubscriptionCmd(sessionRef, cmd)) {
             // Inferrix RBAC: role-restricted users need READ on the queried entity type
-            if (cmd.getQuery() != null && !UserPermissionsUtil.grantedEntityQuery(sessionRef.getSecurityCtx(), cmd.getQuery().getEntityFilter())) {
+            if (!refreshPermissions(sessionRef)
+                    || (cmd.getQuery() != null && !UserPermissionsUtil.grantedEntityQuery(sessionRef.getSecurityCtx(), cmd.getQuery().getEntityFilter()))) {
                 sendError(sessionRef, cmd.getCmdId(), SubscriptionErrorCode.UNAUTHORIZED, SubscriptionErrorCode.UNAUTHORIZED.getDefaultMsg());
                 return;
             }
@@ -252,7 +277,8 @@ public class DefaultWebSocketService implements WebSocketService {
 
     private void handleWsEntityCountCmd(WebSocketSessionRef sessionRef, EntityCountCmd cmd) {
         if (validateSubscriptionCmd(sessionRef, cmd)) {
-            if (cmd.getQuery() != null && !UserPermissionsUtil.grantedEntityQuery(sessionRef.getSecurityCtx(), cmd.getQuery().getEntityFilter())) {
+            if (!refreshPermissions(sessionRef)
+                    || (cmd.getQuery() != null && !UserPermissionsUtil.grantedEntityQuery(sessionRef.getSecurityCtx(), cmd.getQuery().getEntityFilter()))) {
                 sendError(sessionRef, cmd.getCmdId(), SubscriptionErrorCode.UNAUTHORIZED, SubscriptionErrorCode.UNAUTHORIZED.getDefaultMsg());
                 return;
             }
@@ -262,7 +288,8 @@ public class DefaultWebSocketService implements WebSocketService {
 
     private void handleWsAlarmDataCmd(WebSocketSessionRef sessionRef, AlarmDataCmd cmd) {
         if (validateSubscriptionCmd(sessionRef, cmd)) {
-            if (!UserPermissionsUtil.granted(sessionRef.getSecurityCtx(), Resource.ALARM, Operation.READ)
+            if (!refreshPermissions(sessionRef)
+                    || !UserPermissionsUtil.granted(sessionRef.getSecurityCtx(), Resource.ALARM, Operation.READ)
                     || (cmd.getQuery() != null && !UserPermissionsUtil.grantedEntityQuery(sessionRef.getSecurityCtx(), cmd.getQuery().getEntityFilter()))) {
                 sendError(sessionRef, cmd.getCmdId(), SubscriptionErrorCode.UNAUTHORIZED, SubscriptionErrorCode.UNAUTHORIZED.getDefaultMsg());
                 return;
@@ -277,7 +304,8 @@ public class DefaultWebSocketService implements WebSocketService {
 
     private void handleWsAlarmCountCmd(WebSocketSessionRef sessionRef, AlarmCountCmd cmd) {
         if (validateCmd(sessionRef, cmd)) {
-            if (!UserPermissionsUtil.granted(sessionRef.getSecurityCtx(), Resource.ALARM, Operation.READ)
+            if (!refreshPermissions(sessionRef)
+                    || !UserPermissionsUtil.granted(sessionRef.getSecurityCtx(), Resource.ALARM, Operation.READ)
                     || (cmd.getQuery() != null && !UserPermissionsUtil.grantedEntityQuery(sessionRef.getSecurityCtx(), cmd.getQuery().getEntityFilter()))) {
                 sendError(sessionRef, cmd.getCmdId(), SubscriptionErrorCode.UNAUTHORIZED, SubscriptionErrorCode.UNAUTHORIZED.getDefaultMsg());
                 return;
@@ -288,6 +316,11 @@ public class DefaultWebSocketService implements WebSocketService {
 
     private void handleWsAlarmsStatusCmd(WebSocketSessionRef sessionRef, AlarmStatusCmd cmd) {
         if (validateCmd(sessionRef, cmd)) {
+            if (!refreshPermissions(sessionRef)
+                    || !UserPermissionsUtil.granted(sessionRef.getSecurityCtx(), Resource.ALARM, Operation.READ)) {
+                sendError(sessionRef, cmd.getCmdId(), SubscriptionErrorCode.UNAUTHORIZED, SubscriptionErrorCode.UNAUTHORIZED.getDefaultMsg());
+                return;
+            }
             entityDataSubService.handleCmd(sessionRef, cmd);
         }
     }

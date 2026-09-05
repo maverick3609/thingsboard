@@ -27,8 +27,6 @@ import java.util.List;
  */
 public interface UserRoleDao {
 
-    List<RoleId> findRoleIdsByUserId(UserId userId);
-
     List<UserId> findUserIdsByRoleId(RoleId roleId);
 
     void replaceUserRoles(TenantId tenantId, UserId userId, List<RoleId> roleIds);

@@ -66,7 +66,8 @@ export class RoleDialogComponent extends DialogComponent<RoleDialogComponent, Ro
     this.roleFormGroup = this.fb.group({
       name: [role ? role.name : '', [Validators.required, Validators.maxLength(255)]],
       description: [role?.additionalInfo?.description ?? ''],
-      permissions: this.fb.array(this.toPermissionRows(role?.permissions))
+      // a role with no permissions denies everything it is assigned to, so require at least one row
+      permissions: this.fb.array(this.toPermissionRows(role?.permissions), [Validators.required, Validators.minLength(1)])
     });
   }
 

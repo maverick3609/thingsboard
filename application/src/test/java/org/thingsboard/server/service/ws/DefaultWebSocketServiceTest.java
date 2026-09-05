@@ -28,6 +28,7 @@ import org.thingsboard.server.dao.tenant.TbTenantProfileCache;
 import org.thingsboard.server.dao.timeseries.TimeseriesService;
 import org.thingsboard.server.queue.discovery.TbServiceInfoProvider;
 import org.thingsboard.server.service.security.AccessValidator;
+import org.thingsboard.server.service.security.permission.UserPermissionsService;
 import org.thingsboard.server.service.security.model.SecurityUser;
 import org.thingsboard.server.service.security.model.UserPrincipal;
 import org.thingsboard.server.service.subscription.TbEntityDataSubscriptionService;
@@ -63,7 +64,8 @@ class DefaultWebSocketServiceTest {
                 mock(AttributesService.class),
                 mock(TimeseriesService.class),
                 mock(TbServiceInfoProvider.class),
-                tenantProfileCache
+                tenantProfileCache,
+                mock(UserPermissionsService.class)
         );
     }
 

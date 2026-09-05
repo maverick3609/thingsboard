@@ -673,7 +673,7 @@ cache:
       timeToLiveInMinutes: "${CACHE_SPECS_RELATIONS_TTL:1440}" # Relations cache TTL
       maxSize: "${CACHE_SPECS_RELATIONS_MAX_SIZE:10000}" # 0 means the cache is disabled
     permissions:
-      timeToLiveInMinutes: "${CACHE_SPECS_PERMISSIONS_TTL:1440}" # Inferrix RBAC: merged user role permissions cache TTL
+      timeToLiveInMinutes: "${CACHE_SPECS_PERMISSIONS_TTL:60}" # Inferrix RBAC: merged user role permissions cache TTL. Role edits evict this entry; the TTL only bounds staleness on nodes that did not see the evict (caffeine is node-local)
       maxSize: "${CACHE_SPECS_PERMISSIONS_MAX_SIZE:10000}" # 0 means the cache is disabled
     deviceCredentials:
       timeToLiveInMinutes: "${CACHE_SPECS_DEVICE_CREDENTIALS_TTL:1440}" # Device credentials cache TTL
@@ -1033,6 +1033,7 @@ audit-log:
       "scheduler_event": "${AUDIT_LOG_MASK_SCHEDULER_EVENT:W}" # Scheduler event logging levels.
       "report": "${AUDIT_LOG_MASK_REPORT:W}" # Report logging levels.
       "report_template": "${AUDIT_LOG_MASK_REPORT_TEMPLATE:W}" # Report template logging levels.
+      "role": "${AUDIT_LOG_MASK_ROLE:W}" # Inferrix RBAC role logging levels. Without this key role CRUD is silently dropped by AuditLogLevelFilter.
   sink:
     # Type of external sink. possible options: none, elasticsearch
     type: "${AUDIT_LOG_SINK_TYPE:none}"

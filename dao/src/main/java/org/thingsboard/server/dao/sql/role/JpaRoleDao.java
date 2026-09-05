@@ -74,6 +74,11 @@ public class JpaRoleDao extends JpaAbstractDao<RoleEntity, Role> implements Role
     }
 
     @Override
+    public List<Role> findRolesByUserId(UUID tenantId, UUID userId) {
+        return DaoUtil.convertDataList(roleRepository.findByUserId(tenantId, userId));
+    }
+
+    @Override
     public EntityType getEntityType() {
         return EntityType.ROLE;
     }

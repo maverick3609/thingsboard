@@ -107,8 +107,13 @@ public class DefaultTbRoleService extends AbstractTbEntityService implements TbR
      * the dao validator) because the Resource/Operation enums belong to the application module.
      */
     static void validatePermissionsJson(JsonNode permissions) throws ThingsboardException {
-        if (permissions == null || permissions.isNull()) {
-            return;
+        if (permissions == null || permissions.isNull() || !permissions.isObject()) {
+            throw new ThingsboardException("Role permissions should be a JSON object!", ThingsboardErrorCode.BAD_REQUEST_PARAMS);
+        }
+        if (permissions.isEmpty()) {
+            // an empty object is not a no-op role: it merges to an empty permission set, which
+            // denies every operation on every resource for everyone it is assigned to.
+            throw new ThingsboardException("Role permissions should not be empty!", ThingsboardErrorCode.BAD_REQUEST_PARAMS);
         }
         Set<String> resourceNames = new HashSet<>();
         for (Resource resource : Resource.values()) {

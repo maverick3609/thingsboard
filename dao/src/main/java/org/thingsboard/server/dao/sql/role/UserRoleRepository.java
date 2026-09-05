@@ -27,9 +27,16 @@ import java.util.UUID;
 
 public interface UserRoleRepository extends JpaRepository<UserRoleEntity, UserRoleCompositeKey> {
 
-    List<UserRoleEntity> findAllByUserId(UUID userId);
-
     List<UserRoleEntity> findAllByRoleId(UUID roleId);
+
+    /**
+     * Lock the user row so two concurrent replace-sets for the same user cannot interleave:
+     * without it the second DELETE runs against a snapshot that does not see the first
+     * transaction's freshly inserted rows, and the two role sets merge instead of the last
+     * one winning - handing the user the union of both grants.
+     */
+    @Query(value = "SELECT id FROM tb_user WHERE id = :userId FOR UPDATE", nativeQuery = true)
+    UUID lockUser(@Param("userId") UUID userId);
 
     @Modifying(flushAutomatically = true)
     @Query("DELETE FROM UserRoleEntity e WHERE e.userId = :userId")

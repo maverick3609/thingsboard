@@ -78,6 +78,7 @@ import org.thingsboard.server.service.security.model.UserPrincipal;
 import org.thingsboard.server.service.security.model.token.JwtTokenFactory;
 import org.thingsboard.server.service.security.permission.Operation;
 import org.thingsboard.server.service.security.permission.Resource;
+import org.thingsboard.server.service.security.permission.UserPermissionsUtil;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -315,6 +316,12 @@ public class UserController extends BaseController {
 
         EntityTypeFilter entityFilter = new EntityTypeFilter();
         entityFilter.setEntityType(EntityType.USER);
+        // Inferrix RBAC: this endpoint runs the same query engine as /api/entitiesQuery/find,
+        // so it needs the same role gate — otherwise USER:READ denial is trivially bypassed here.
+        if (!UserPermissionsUtil.grantedEntityQuery(securityUser, entityFilter)) {
+            throw new ThingsboardException(YOU_DON_T_HAVE_PERMISSION_TO_PERFORM_THIS_OPERATION,
+                    ThingsboardErrorCode.PERMISSION_DENIED);
+        }
         EntityDataPageLink pageLink = new EntityDataPageLink(pageSize, page, textSearch, createEntityDataSortOrder(sortProperty, sortOrder));
         List<EntityKey> entityFields = Arrays.asList(new EntityKey(ENTITY_FIELD, "firstName"),
                 new EntityKey(ENTITY_FIELD, "lastName"),

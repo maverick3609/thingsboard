@@ -40,4 +40,8 @@ public interface RoleRepository extends JpaRepository<RoleEntity, UUID> {
 
     List<RoleEntity> findByTenantIdAndIdIn(UUID tenantId, List<UUID> ids);
 
+    @Query("SELECT r FROM RoleEntity r, UserRoleEntity ur WHERE ur.roleId = r.id " +
+            "AND ur.userId = :userId AND r.tenantId = :tenantId")
+    List<RoleEntity> findByUserId(@Param("tenantId") UUID tenantId, @Param("userId") UUID userId);
+
 }

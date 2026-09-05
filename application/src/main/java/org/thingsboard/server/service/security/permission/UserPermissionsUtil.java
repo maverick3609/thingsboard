@@ -17,9 +17,16 @@ package org.thingsboard.server.service.security.permission;
 
 import org.thingsboard.server.common.data.EntityType;
 import org.thingsboard.server.common.data.query.EntityFilter;
+import org.thingsboard.server.common.data.query.RelationsQueryFilter;
+import org.thingsboard.server.common.data.relation.RelationEntityTypeFilter;
 import org.thingsboard.server.common.data.security.Authority;
 import org.thingsboard.server.dao.sql.query.DefaultEntityQueryRepository;
 import org.thingsboard.server.service.security.model.SecurityUser;
+
+import java.util.Collection;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * RBAC port (Option B): the single AND-in point used by DefaultAccessControlService.
@@ -66,10 +73,55 @@ public final class UserPermissionsUtil {
         if (user.getUserPermissions() == null || filter == null) {
             return true;
         }
+        if (filter instanceof RelationsQueryFilter relationsFilter) {
+            return grantedRelationsQuery(user, relationsFilter);
+        }
         EntityType entityType;
         try {
             entityType = DefaultEntityQueryRepository.resolveEntityType(filter);
         } catch (Exception e) {
+            return true;
+        }
+        return grantedRead(user, entityType);
+    }
+
+    /**
+     * A relations query returns the entities RELATED to the root, not the root itself, so the
+     * root's entity type says nothing about what leaves the system: the row types come from the
+     * relation filters. The user needs READ on every type the query can return.
+     */
+    private static boolean grantedRelationsQuery(SecurityUser user, RelationsQueryFilter filter) {
+        for (EntityType entityType : relationsQueryResultTypes(filter)) {
+            if (!grantedRead(user, entityType)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static Collection<EntityType> relationsQueryResultTypes(RelationsQueryFilter filter) {
+        List<RelationEntityTypeFilter> typeFilters = filter.getFilters();
+        // negate turns the where clause into its complement, and a filter without entity types
+        // matches on relation type alone — either way any relation-queryable type can come back.
+        if (filter.isNegate() || typeFilters == null || typeFilters.isEmpty()) {
+            return List.of(DefaultEntityQueryRepository.RELATION_QUERY_ENTITY_TYPES);
+        }
+        Set<EntityType> entityTypes = EnumSet.noneOf(EntityType.class);
+        for (RelationEntityTypeFilter typeFilter : typeFilters) {
+            List<EntityType> filterTypes = typeFilter.getEntityTypes();
+            if (filterTypes == null || filterTypes.isEmpty()) {
+                return List.of(DefaultEntityQueryRepository.RELATION_QUERY_ENTITY_TYPES);
+            }
+            entityTypes.addAll(filterTypes);
+        }
+        return entityTypes;
+    }
+
+    private static boolean grantedRead(SecurityUser user, EntityType entityType) {
+        // null for a dashboard alias id (CURRENT_TENANT / CURRENT_CUSTOMER / CURRENT_USER):
+        // AliasEntityIdImpl leaves entityType unset until the alias is resolved, and the alias is
+        // still unresolved when this gate runs. Not role-gated, like any other unresolvable filter.
+        if (entityType == null) {
             return true;
         }
         Resource resource;

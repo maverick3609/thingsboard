@@ -63,7 +63,9 @@ public enum Resource {
     API_KEY(EntityType.API_KEY),
     REPORT_TEMPLATE(EntityType.REPORT_TEMPLATE),
     ROLE(EntityType.ROLE),
-    REPORT(EntityType.REPORT);
+    REPORT(EntityType.REPORT),
+    // queryable via /api/entitiesQuery/*: without a Resource the role gate would fail open on it
+    QUEUE_STATS(EntityType.QUEUE_STATS);
 
     private final Set<EntityType> entityTypes;
 

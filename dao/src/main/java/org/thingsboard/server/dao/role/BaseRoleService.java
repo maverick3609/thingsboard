@@ -127,20 +127,18 @@ public class BaseRoleService extends AbstractEntityService implements RoleServic
     public List<Role> findRolesByUserId(TenantId tenantId, UserId userId) {
         log.debug("Executing findRolesByUserId, tenantId [{}], userId [{}]", tenantId, userId);
         Validator.validateId(userId, id -> INCORRECT_USER_ID + id);
-        List<RoleId> roleIds = userRoleDao.findRoleIdsByUserId(userId);
-        if (roleIds.isEmpty()) {
-            return Collections.emptyList();
-        }
-        // tenant-scoped lookup drops any row that would cross tenants
-        return roleDao.findRolesByIds(tenantId.getId(), DaoUtil.toUUIDs(roleIds));
+        // single join over user_role; tenant-scoped so a row can never cross tenants
+        return roleDao.findRolesByUserId(tenantId.getId(), userId.getId());
     }
 
     @Override
     public List<UserId> findUserIdsByRoleId(TenantId tenantId, RoleId roleId) {
         log.debug("Executing findUserIdsByRoleId, tenantId [{}], roleId [{}]", tenantId, roleId);
         Validator.validateId(roleId, id -> INCORRECT_ROLE_ID + id);
-        // honor the tenant-scoped signature: a foreign roleId must not disclose another tenant's user ids
-        if (roleDao.findById(tenantId, roleId.getId()) == null) {
+        // honor the tenant-scoped signature: a foreign roleId must not disclose another tenant's
+        // user ids. The tenantId argument of findById is ignored by JpaAbstractDao, so compare here.
+        Role role = roleDao.findById(tenantId, roleId.getId());
+        if (role == null || !tenantId.getId().equals(role.getTenantId().getId())) {
             return Collections.emptyList();
         }
         return userRoleDao.findUserIdsByRoleId(roleId);

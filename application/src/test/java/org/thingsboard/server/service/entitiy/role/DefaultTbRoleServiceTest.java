@@ -29,9 +29,6 @@ public class DefaultTbRoleServiceTest {
         assertDoesNotThrow(() -> DefaultTbRoleService.validatePermissionsJson(
                 JacksonUtil.toJsonNode("{\"DEVICE\": [\"READ\", \"WRITE\"], \"ALL\": [\"READ\"]}")));
         assertDoesNotThrow(() -> DefaultTbRoleService.validatePermissionsJson(
-                JacksonUtil.toJsonNode("{}")));
-        assertDoesNotThrow(() -> DefaultTbRoleService.validatePermissionsJson(null));
-        assertDoesNotThrow(() -> DefaultTbRoleService.validatePermissionsJson(
                 JacksonUtil.toJsonNode("{\"ALL\": [\"ALL\"]}")));
     }
 
@@ -49,6 +46,12 @@ public class DefaultTbRoleServiceTest {
         // non-textual operation entry
         assertThrows(ThingsboardException.class, () -> DefaultTbRoleService.validatePermissionsJson(
                 JacksonUtil.toJsonNode("{\"DEVICE\": [42]}")));
+        // an empty / missing permission set would deny everything for every assignee
+        assertThrows(ThingsboardException.class, () -> DefaultTbRoleService.validatePermissionsJson(
+                JacksonUtil.toJsonNode("{}")));
+        assertThrows(ThingsboardException.class, () -> DefaultTbRoleService.validatePermissionsJson(null));
+        assertThrows(ThingsboardException.class, () -> DefaultTbRoleService.validatePermissionsJson(
+                JacksonUtil.toJsonNode("[\"DEVICE\"]")));
     }
 
 }

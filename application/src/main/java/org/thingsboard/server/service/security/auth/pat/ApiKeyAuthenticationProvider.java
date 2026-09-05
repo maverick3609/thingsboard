@@ -20,29 +20,45 @@ import org.springframework.security.authentication.CredentialsExpiredException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.thingsboard.server.common.data.StringUtils;
 import org.thingsboard.server.common.data.pat.ApiKey;
+import org.thingsboard.server.common.data.security.Authority;
 import org.thingsboard.server.dao.pat.ApiKeyService;
 import org.thingsboard.server.service.security.auth.AbstractAuthenticationProvider;
 import org.thingsboard.server.service.security.model.SecurityUser;
 import org.thingsboard.server.service.security.model.token.ApiKeyAuthRequest;
+import org.thingsboard.server.service.security.permission.UserPermissionsService;
 import org.thingsboard.server.service.user.cache.UserAuthDetailsCache;
 
 @Component
 public class ApiKeyAuthenticationProvider extends AbstractAuthenticationProvider {
 
     private final ApiKeyService apiKeyService;
+    private final UserPermissionsService userPermissionsService;
 
-    public ApiKeyAuthenticationProvider(ApiKeyService apiKeyService, UserAuthDetailsCache userAuthDetailsCache) {
+    public ApiKeyAuthenticationProvider(ApiKeyService apiKeyService, UserAuthDetailsCache userAuthDetailsCache,
+                                        @Lazy UserPermissionsService userPermissionsService) {
         super(null, userAuthDetailsCache);
         this.apiKeyService = apiKeyService;
+        this.userPermissionsService = userPermissionsService;
     }
 
     @Override
     public Authentication authenticate(Authentication authentication) throws AuthenticationException {
         ApiKeyAuthRequest apiKeyAuthRequest = (ApiKeyAuthRequest) authentication.getCredentials();
         SecurityUser securityUser = authenticate(apiKeyAuthRequest.apiKey());
+        // API key requests never pass through JwtTokenFactory.parseAccessJwtToken, so the role
+        // permissions have to be attached here or the key would grant legacy full access.
+        Authority authority = securityUser.getAuthority();
+        if (authority == Authority.TENANT_ADMIN || authority == Authority.CUSTOMER_USER) {
+            try {
+                securityUser.setUserPermissions(userPermissionsService.getMergedPermissions(securityUser));
+            } catch (Exception e) {
+                throw new BadCredentialsException("Failed to get user permissions", e);
+            }
+        }
         return new ApiKeyAuthenticationToken(securityUser);
     }
 

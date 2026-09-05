@@ -50,6 +50,8 @@ export class ManageUserRolesDialogComponent extends DialogComponent<ManageUserRo
   allRoles: Role[] = [];
   loaded = false;
 
+  private hiddenRoleIds: string[] = [];
+
   constructor(protected store: Store<AppState>,
               protected router: Router,
               @Inject(MAT_DIALOG_DATA) public data: ManageUserRolesDialogData,
@@ -67,10 +69,19 @@ export class ManageUserRolesDialogComponent extends DialogComponent<ManageUserRo
     forkJoin({
       allRoles: this.roleService.getRoles(allRolesPageLink),
       userRoles: this.roleService.getUserRoles(this.data.user.id.id)
-    }).subscribe(({allRoles, userRoles}) => {
-      this.allRoles = allRoles.data;
-      this.rolesFormGroup.get('roleIds').setValue(userRoles.map(role => role.id.id));
-      this.loaded = true;
+    }).subscribe({
+      next: ({allRoles, userRoles}) => {
+        this.allRoles = allRoles.data;
+        const listedIds = new Set(allRoles.data.map(role => role.id.id));
+        // roles assigned to the user but past the first page: keep them out of the checkbox list
+        // but re-add them on save, otherwise saving would silently unassign them
+        this.hiddenRoleIds = userRoles.map(role => role.id.id).filter(id => !listedIds.has(id));
+        this.rolesFormGroup.get('roleIds').setValue(userRoles.map(role => role.id.id).filter(id => listedIds.has(id)));
+        this.loaded = true;
+      },
+      // the request already surfaced its error toast; leaving the dialog spinning forever
+      // (it is opened with disableClose) tells the user nothing
+      error: () => this.dialogRef.close(false)
     });
   }
 
@@ -80,7 +91,7 @@ export class ManageUserRolesDialogComponent extends DialogComponent<ManageUserRo
 
   save(): void {
     const roleIds: string[] = this.rolesFormGroup.get('roleIds').value;
-    this.roleService.updateUserRoles(this.data.user.id.id, roleIds)
+    this.roleService.updateUserRoles(this.data.user.id.id, roleIds.concat(this.hiddenRoleIds))
       .subscribe(() => this.dialogRef.close(true));
   }
 

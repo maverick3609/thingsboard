@@ -35,12 +35,6 @@ public class JpaUserRoleDao implements UserRoleDao {
     private final UserRoleRepository userRoleRepository;
 
     @Override
-    public List<RoleId> findRoleIdsByUserId(UserId userId) {
-        return userRoleRepository.findAllByUserId(userId.getId()).stream()
-                .map(entity -> new RoleId(entity.getRoleId())).toList();
-    }
-
-    @Override
     public List<UserId> findUserIdsByRoleId(RoleId roleId) {
         return userRoleRepository.findAllByRoleId(roleId.getId()).stream()
                 .map(entity -> new UserId(entity.getUserId())).toList();
@@ -49,6 +43,7 @@ public class JpaUserRoleDao implements UserRoleDao {
     @Override
     @Transactional
     public void replaceUserRoles(TenantId tenantId, UserId userId, List<RoleId> roleIds) {
+        userRoleRepository.lockUser(userId.getId());
         userRoleRepository.deleteAllByUserId(userId.getId());
         if (roleIds != null && !roleIds.isEmpty()) {
             long ts = System.currentTimeMillis();

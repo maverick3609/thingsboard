@@ -18,8 +18,8 @@ package org.thingsboard.server.service.security.permission;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.stereotype.Service;
-import org.thingsboard.server.cache.TbCacheValueWrapper;
 import org.thingsboard.server.cache.TbTransactionalCache;
 import org.thingsboard.server.common.data.id.RoleId;
 import org.thingsboard.server.common.data.id.TenantId;
@@ -33,6 +33,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 @RequiredArgsConstructor
@@ -41,20 +42,30 @@ public class DefaultUserPermissionsService implements UserPermissionsService {
 
     private final RoleService roleService;
     private final TbTransactionalCache<UserPermissionCacheKey, MergedUserPermissions> cache;
+    private final AtomicBoolean schemaMissingReported = new AtomicBoolean();
 
     @Override
     public MergedUserPermissions getMergedPermissions(SecurityUser user) {
         UserPermissionCacheKey key = new UserPermissionCacheKey(user.getTenantId(), user.getId());
-        TbCacheValueWrapper<MergedUserPermissions> cached = cache.get(key);
-        if (cached != null) {
-            return cached.get();
+        // Transactional get-or-load: a concurrent evict (role edited / unassigned while this
+        // request is reading the DB) fails the put, so a revocation can never be overwritten by
+        // an in-flight stale read. cacheNullValue=true keeps "no roles => legacy access" cached.
+        return cache.getAndPutInTransaction(key, () -> loadPermissions(user), true);
+    }
+
+    private MergedUserPermissions loadPermissions(SecurityUser user) {
+        try {
+            return mergeRolePermissions(roleService.findRolesByUserId(user.getTenantId(), user.getId()));
+        } catch (InvalidDataAccessResourceUsageException e) {
+            // role / user_role are missing: the RBAC DDL was never applied on this install (jar
+            // swapped without an upgrade run). Every authenticated request would otherwise fail
+            // authentication and lock the whole tenant out, so fall back to legacy access.
+            if (schemaMissingReported.compareAndSet(false, true)) {
+                log.error("RBAC tables are missing - roles are not enforced until the database upgrade is run. " +
+                        "Apply dao/src/main/resources/sql/schema-inferrix.sql or run the upgrade.", e);
+            }
+            return null;
         }
-        List<Role> roles = roleService.findRolesByUserId(user.getTenantId(), user.getId());
-        MergedUserPermissions result = mergeRolePermissions(roles);
-        // null (no roles => legacy authority-based access) is cached too — the wrapper
-        // distinguishes "cached null" from "not cached".
-        cache.put(key, result);
-        return result;
     }
 
     @Override

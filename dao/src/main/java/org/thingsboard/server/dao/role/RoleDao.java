@@ -29,4 +29,6 @@ public interface RoleDao extends Dao<Role>, TenantEntityDao<Role> {
 
     List<Role> findRolesByIds(UUID tenantId, List<UUID> roleIds);
 
+    List<Role> findRolesByUserId(UUID tenantId, UUID userId);
+
 }

@@ -25,6 +25,8 @@ import {
 } from '@angular/core';
 import { Store } from '@ngrx/store';
 import { AppState } from '@core/core.state';
+import { getCurrentAuthState } from '@core/auth/auth.selectors';
+import { applyRolePermissions } from '@home/models/entity/entity-table-permissions';
 import { EntityTableConfig } from '@home/models/entity/entities-table-config.models';
 import { BaseData, HasId } from '@shared/models/base-data';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -56,6 +58,7 @@ export class EntityDetailsPageComponent extends EntityDetailsPanelComponent impl
     if (this.entitiesTableConfigValue !== entitiesTableConfig) {
       this.entitiesTableConfigValue = entitiesTableConfig;
       if (this.entitiesTableConfigValue) {
+        applyRolePermissions(this.entitiesTableConfigValue, () => getCurrentAuthState(this.store).userPermissions);
         this.entitiesTableConfigValue.setEntityDetailsPage(this);
         this.isEdit = false;
         this.entity = null;

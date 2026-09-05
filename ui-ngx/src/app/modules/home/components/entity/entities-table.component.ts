@@ -33,6 +33,13 @@ import {
 import { PageComponent } from '@shared/components/page.component';
 import { Store } from '@ngrx/store';
 import { AppState } from '@core/core.state';
+import { getCurrentAuthState } from '@core/auth/auth.selectors';
+import {
+  applyRolePermissions,
+  CREATE,
+  DELETE,
+  entityOperationGranted
+} from '@home/models/entity/entity-table-permissions';
 import { MAX_SAFE_PAGE_SIZE, PageLink, PageQueryParam, TimePageLink } from '@shared/models/page/page-link';
 import { MatDialog } from '@angular/material/dialog';
 import { MatPaginator } from '@angular/material/paginator';
@@ -115,6 +122,9 @@ export class EntitiesTableComponent extends PageComponent implements IEntitiesTa
   cellActionType = CellActionDescriptorType;
 
   isDetailsOpen = false;
+
+  private addRoleGranted = true;
+
   detailsPanelOpened = new EventEmitter<boolean>();
 
   @ViewChild('entityTableHeader', {static: true}) entityTableHeaderAnchor: TbAnchorComponent;
@@ -192,6 +202,10 @@ export class EntitiesTableComponent extends PageComponent implements IEntitiesTa
 
   private init(entitiesTableConfig: EntityTableConfig<BaseData<HasId>>) {
     this.isDetailsOpen = false;
+    const userPermissions = () => getCurrentAuthState(this.store).userPermissions;
+    applyRolePermissions(entitiesTableConfig, userPermissions);
+    this.addRoleGranted = entityOperationGranted(entitiesTableConfig.entityType, userPermissions(), CREATE);
+    const deleteRoleGranted = entityOperationGranted(entitiesTableConfig.entityType, userPermissions(), DELETE);
     this.entitiesTableConfig = entitiesTableConfig;
     this.pageMode = this.entitiesTableConfig.pageMode;
     if (this.entitiesTableConfig.headerComponent) {
@@ -209,7 +223,7 @@ export class EntitiesTableComponent extends PageComponent implements IEntitiesTa
     this.groupActionDescriptors = [...this.entitiesTableConfig.groupActionDescriptors];
     this.cellActionDescriptors = [...this.entitiesTableConfig.cellActionDescriptors];
 
-    if (this.entitiesTableConfig.entitiesDeleteEnabled) {
+    if (this.entitiesTableConfig.entitiesDeleteEnabled && deleteRoleGranted) {
       this.cellActionDescriptors.push(
         {
           name: this.translate.instant('action.delete'),
@@ -398,7 +412,7 @@ export class EntitiesTableComponent extends PageComponent implements IEntitiesTa
   }
 
   addEnabled() {
-    return this.entitiesTableConfig.addEnabled;
+    return this.entitiesTableConfig.addEnabled && this.addRoleGranted;
   }
 
   clearSelection() {

@@ -20,6 +20,8 @@ import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.id.UserId;
 import org.thingsboard.server.service.security.model.SecurityUser;
 
+import java.util.List;
+
 public interface UserPermissionsService {
 
     /**
@@ -30,6 +32,15 @@ public interface UserPermissionsService {
     MergedUserPermissions getMergedPermissions(SecurityUser user);
 
     void onRoleUpdated(TenantId tenantId, RoleId roleId);
+
+    /**
+     * Same as {@link #onRoleUpdated} for a role that no longer exists: the assignees have to be
+     * captured before the delete, because the assignment rows go with it. The capture is not
+     * serialised against a concurrent assignment, so a user assigned the role while it was being
+     * deleted may be missing from the list and keep the now-deleted role's permissions until the
+     * cache entry expires.
+     */
+    void onRoleDeleted(TenantId tenantId, RoleId roleId, List<UserId> assignees);
 
     void onUserRolesUpdated(TenantId tenantId, UserId userId);
 

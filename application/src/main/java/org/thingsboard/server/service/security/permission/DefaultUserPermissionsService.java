@@ -16,9 +16,12 @@
 package org.thingsboard.server.service.security.permission;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
+import org.thingsboard.common.util.JacksonUtil;
 import org.springframework.context.event.EventListener;
 import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.stereotype.Service;
@@ -35,9 +38,11 @@ import org.thingsboard.server.common.msg.plugin.ComponentLifecycleMsg;
 import org.thingsboard.server.dao.role.RoleService;
 import org.thingsboard.server.service.security.model.SecurityUser;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.UUID;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -52,6 +57,9 @@ public class DefaultUserPermissionsService implements UserPermissionsService {
     @Lazy
     private final TbClusterService clusterService;
     private final AtomicBoolean schemaMissingReported = new AtomicBoolean();
+
+    static final String USER_IDS = "userIds";
+    static final int EVICTION_BATCH_SIZE = 1000;
 
     @Override
     public MergedUserPermissions getMergedPermissions(SecurityUser user) {
@@ -79,63 +87,124 @@ public class DefaultUserPermissionsService implements UserPermissionsService {
 
     @Override
     public void onRoleUpdated(TenantId tenantId, RoleId roleId) {
-        evictAssignees(tenantId, roleId);
-        // one ROLE message for the whole role: every node expands it with its own assignee lookup,
-        // so a role held by hundreds of users does not turn into hundreds of cluster messages
-        broadcast(tenantId, roleId);
+        evictAndBroadcast(tenantId, roleId, ComponentLifecycleEvent.UPDATED, roleService.findUserIdsByRoleId(tenantId, roleId));
+    }
+
+    @Override
+    public void onRoleDeleted(TenantId tenantId, RoleId roleId, List<UserId> assignees) {
+        evictAndBroadcast(tenantId, roleId, ComponentLifecycleEvent.DELETED, assignees);
     }
 
     @Override
     public void onUserRolesUpdated(TenantId tenantId, UserId userId) {
-        cache.evict(new UserPermissionCacheKey(tenantId, userId));
-        broadcast(tenantId, userId);
+        evict(tenantId, userId);
+        broadcast(ComponentLifecycleMsg.builder()
+                .tenantId(tenantId).entityId(userId).event(ComponentLifecycleEvent.UPDATED).build());
     }
 
     /**
      * The permissions cache is node-local whenever `cache.type` is caffeine (the default), so a
      * role change on one node would leave every other node enforcing the old permissions until the
-     * entry expired. The callers evict locally for an immediate effect on this node, then this
-     * tells the others to do the same — the shape TB uses for its own per-user security cache
-     * (`DefaultUserAuthDetailsCache`). Redis deployments share one cache and only need the local
-     * evict, but the message is harmless there.
+     * entry expired. Evict here for an immediate effect on this node, then tell the others to do
+     * the same — the shape TB uses for its own per-user security cache
+     * (`DefaultUserAuthDetailsCache`). Redis deployments share one cache and only need the evict,
+     * but the message is harmless there.
      *
-     * <p>Never fatal: the DB write is already committed by the time we get here, and a queue that
+     * <p>The affected users ride along in the message rather than being looked up again on each
+     * node: after a delete there is nothing left to look up, and one role edit should not turn
+     * into one message per assignee through every node's high-priority actor mailbox. The list is
+     * batched so a role held by tens of thousands of users cannot build a message the queue would
+     * refuse.
+     */
+    private void evictAndBroadcast(TenantId tenantId, RoleId roleId, ComponentLifecycleEvent event, List<UserId> userIds) {
+        evictAll(tenantId, userIds);
+        for (int from = 0; from < userIds.size(); from += EVICTION_BATCH_SIZE) {
+            List<UserId> batch = userIds.subList(from, Math.min(from + EVICTION_BATCH_SIZE, userIds.size()));
+            broadcast(ComponentLifecycleMsg.builder()
+                    .tenantId(tenantId).entityId(roleId).event(event).info(toInfo(batch)).build());
+        }
+    }
+
+    private static JsonNode toInfo(List<UserId> userIds) {
+        ObjectNode info = JacksonUtil.newObjectNode();
+        ArrayNode ids = info.putArray(USER_IDS);
+        userIds.forEach(userId -> ids.add(userId.getId().toString()));
+        return info;
+    }
+
+    /**
+     * Never fatal: the DB write is already committed by the time we get here, and a queue that
      * refuses the message would otherwise strand the evictions that come after it and report a
      * change that did apply as a failure. A lost message costs the other nodes nothing worse than
      * the cache TTL they had before any of this existed.
      */
-    private void broadcast(TenantId tenantId, EntityId entityId) {
+    private void broadcast(ComponentLifecycleMsg msg) {
         try {
-            clusterService.broadcastEntityStateChangeEvent(tenantId, entityId, ComponentLifecycleEvent.UPDATED);
+            clusterService.broadcast(msg);
         } catch (Exception e) {
             log.error("[{}][{}] Failed to broadcast the permissions cache eviction. Other nodes keep " +
-                    "the old permissions until the cache entry expires.", tenantId, entityId, e);
-        }
-    }
-
-    private void evictAssignees(TenantId tenantId, RoleId roleId) {
-        for (UserId userId : roleService.findUserIdsByRoleId(tenantId, roleId)) {
-            cache.evict(new UserPermissionCacheKey(tenantId, userId));
+                    "the old permissions until the cache entry expires.", msg.getTenantId(), msg.getEntityId(), e);
         }
     }
 
     /**
      * Receiving half of {@link #broadcast}. Also fires for the user edits TB broadcasts itself,
      * which is why it only evicts and never broadcasts — a listener that re-broadcast would loop
-     * forever. A role delete arrives as one message per assignee instead, since by the time it
-     * lands the assignment rows are gone and the lookup here would find nobody.
+     * forever. It must not throw either: the consumer publishes this event before handing the
+     * message to the actor system, so an exception here would swallow the rest of that delivery
+     * (the remaining listeners AND `tellWithHighPriority`) for a message that is then committed
+     * rather than retried.
      */
     @EventListener(ComponentLifecycleMsg.class)
     public void onComponentLifecycleEvent(ComponentLifecycleMsg event) {
-        EntityId entityId = event.getEntityId();
-        if (entityId == null) {
+        try {
+            EntityId entityId = event.getEntityId();
+            if (entityId == null) {
+                return;
+            }
+            if (EntityType.USER.equals(entityId.getEntityType())) {
+                evict(event.getTenantId(), new UserId(entityId.getId()));
+            } else if (EntityType.ROLE.equals(entityId.getEntityType())) {
+                evictCarriedUsers(event, new RoleId(entityId.getId()));
+            }
+        } catch (Exception e) {
+            log.error("Failed to evict the permissions cache for {}", event, e);
+        }
+    }
+
+    /**
+     * Evicts the users the writing node put in the message, one at a time: a single unusable id
+     * must cost its own eviction only, not the other 999 in the batch.
+     *
+     * <p>A message with no ids can only come from a node running an older build during a rolling
+     * upgrade, so fall back to the lookup — which still resolves for an update, the case that
+     * build could produce.
+     */
+    private void evictCarriedUsers(ComponentLifecycleMsg event, RoleId roleId) {
+        JsonNode info = event.getInfo();
+        JsonNode ids = info != null ? info.get(USER_IDS) : null;
+        if (ids == null || !ids.isArray()) {
+            evictAll(event.getTenantId(), roleService.findUserIdsByRoleId(event.getTenantId(), roleId));
             return;
         }
-        if (EntityType.USER.equals(entityId.getEntityType())) {
-            cache.evict(new UserPermissionCacheKey(event.getTenantId(), new UserId(entityId.getId())));
-        } else if (EntityType.ROLE.equals(entityId.getEntityType())) {
-            evictAssignees(event.getTenantId(), new RoleId(entityId.getId()));
+        for (JsonNode id : ids) {
+            try {
+                evict(event.getTenantId(), new UserId(UUID.fromString(id.asText())));
+            } catch (Exception e) {
+                log.error("[{}][{}] Skipping an unusable user id in a permissions cache eviction: {}",
+                        event.getTenantId(), roleId, id, e);
+            }
         }
+    }
+
+    private void evictAll(TenantId tenantId, List<UserId> userIds) {
+        for (UserId userId : userIds) {
+            evict(tenantId, userId);
+        }
+    }
+
+    private void evict(TenantId tenantId, UserId userId) {
+        cache.evict(new UserPermissionCacheKey(tenantId, userId));
     }
 
     /**

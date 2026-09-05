@@ -77,7 +77,7 @@ public class DefaultTbRoleService extends AbstractTbEntityService implements TbR
             // capture assignees before the delete: the FK cascade removes user_role rows
             List<UserId> assignees = roleService.findUserIdsByRoleId(user.getTenantId(), roleId);
             roleService.deleteRole(user.getTenantId(), roleId);
-            assignees.forEach(userId -> userPermissionsService.onUserRolesUpdated(user.getTenantId(), userId));
+            userPermissionsService.onRoleDeleted(user.getTenantId(), roleId, assignees);
             logEntityActionService.logEntityAction(user.getTenantId(), (EntityId) roleId, role, null, ActionType.DELETED, user, roleId.getId());
             log.info("[{}][{}] Deleted role [{}]", user.getTenantId(), roleId, role.getName());
         } catch (Exception e) {

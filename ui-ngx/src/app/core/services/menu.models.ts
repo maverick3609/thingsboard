@@ -17,6 +17,7 @@
 import { AuthState } from '@core/auth/auth.models';
 import { Authority } from '@shared/models/authority.enum';
 import { deepClone } from '@core/utils';
+import { hasGenericPermission, menuGroups, menuResources, READ } from '@core/services/menu-permissions';
 
 export declare type MenuSectionType = 'link' | 'toggle';
 
@@ -867,8 +868,16 @@ const menuFilters = new Map<MenuId, MenuFilter>([
     MenuId.edge_management, (authState) => authState.edgesSupportEnabled
   ],
   [
-    MenuId.rulechain_templates, (authState) => authState.edgesSupportEnabled
-  ]
+    MenuId.rulechain_templates, (authState) =>
+      authState.edgesSupportEnabled && hasGenericPermission(authState.userPermissions, menuResources.rulechain_templates, READ)
+  ],
+  // Inferrix RBAC (phase 4b): a role hides the pages it denies. Cosmetic - the server enforces.
+  // Groups are listed with a pass-through filter so filterMenuReference evaluates their pages and
+  // drops a group whose every page is hidden.
+  ...Object.keys(menuResources).filter(id => id !== MenuId.rulechain_templates).map(id =>
+    [id as MenuId, ((authState: AuthState) =>
+      hasGenericPermission(authState.userPermissions, menuResources[id], READ)) as MenuFilter] as [MenuId, MenuFilter]),
+  ...menuGroups.map(id => [id as MenuId, (() => true) as MenuFilter] as [MenuId, MenuFilter])
 ]);
 
 const defaultUserMenuMap = new Map<Authority, MenuReference[]>([

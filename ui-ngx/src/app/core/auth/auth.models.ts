@@ -18,6 +18,7 @@ import { AuthUser, User } from '@shared/models/user.model';
 import { UserSettings } from '@shared/models/user-settings.models';
 import { TrendzSettings } from '@shared/models/trendz-settings.models';
 import { NullsOrderStrategy } from '@shared/models/page/page-link';
+import { MergedUserPermissions } from '@shared/models/role.models';
 
 export interface SysParamsState {
   userTokenAccessEnabled: boolean;
@@ -44,6 +45,8 @@ export interface SysParamsState {
   nullsOrderStrategy: NullsOrderStrategy;
   edqsEnabled: boolean;
   iotHubBaseUrl: string;
+  // Inferrix RBAC: merged role permissions of the current user, null when the user has no roles
+  userPermissions?: MergedUserPermissions;
 }
 
 export interface SysParams extends SysParamsState {

@@ -165,6 +165,10 @@ public class SystemInfoController extends BaseController {
         systemParams.setMaxDatapointsLimit(maxDatapointsLimit);
         systemParams.setNullsOrderStrategy(ACCEPTED_NULLS_ORDER_STRATEGIES.contains(nullsOrderStrategy) ? nullsOrderStrategy : "default");
         systemParams.setEdqsEnabled(edqsService.isApiEnabled());
+        // Inferrix RBAC: already resolved for this request by JwtTokenFactory, so this costs nothing
+        if (currentUser.getUserPermissions() != null) {
+            systemParams.setUserPermissions(JacksonUtil.valueToTree(currentUser.getUserPermissions()));
+        }
         if (!currentUser.isSystemAdmin()) {
             DefaultTenantProfileConfiguration tenantProfileConfiguration = tenantProfileCache.get(tenantId).getDefaultProfileConfiguration();
             systemParams.setMaxResourceSize(tenantProfileConfiguration.getMaxResourceSize());

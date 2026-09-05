@@ -58,8 +58,8 @@ export class RoleService {
 
   // The resource/operation vocabularies are constant for a server build, so the role editor
   // should not re-fetch them on every dialog open. Note the response also carries the acting
-  // user's userPermissions: that part is a session snapshot, so permission-aware UI gating must
-  // fetch it separately rather than reuse this cache.
+  // user's userPermissions: that part is a session snapshot, so do not gate UI on it — the menu
+  // gating reads authState.userPermissions, which /api/system/params refreshes on every load.
   public getAllowedPermissions(config?: RequestConfig): Observable<AllowedPermissionsInfo> {
     if (!this.allowedPermissions$) {
       this.allowedPermissions$ = this.http.get<AllowedPermissionsInfo>('/api/permissions/allowedPermissions',

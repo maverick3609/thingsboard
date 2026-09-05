@@ -48,4 +48,8 @@ public class SystemParams {
     String nullsOrderStrategy;
     boolean edqsEnabled;
     String iotHubBaseUrl;
+    // Inferrix RBAC: the caller's merged role permissions ({"genericPermissions": {...}}), or null
+    // for a role-less user (legacy full access). Carried here so the UI can hide what a role
+    // denies without a second request; the server remains the enforcer.
+    JsonNode userPermissions;
 }

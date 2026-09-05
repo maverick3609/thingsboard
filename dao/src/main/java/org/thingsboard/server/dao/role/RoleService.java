@@ -40,6 +40,13 @@ public interface RoleService extends EntityDaoService {
 
     void deleteRole(TenantId tenantId, RoleId roleId);
 
+    /**
+     * Deletes the role and returns the users that held it, in one transaction that locks the role
+     * first — so a role assignment committing at the same time is either included in the returned
+     * list or refused, never silently dropped by the cascade after the list was read.
+     */
+    List<UserId> deleteRoleAndCollectAssignees(TenantId tenantId, RoleId roleId);
+
     List<Role> findRolesByUserId(TenantId tenantId, UserId userId);
 
     List<UserId> findUserIdsByRoleId(TenantId tenantId, RoleId roleId);

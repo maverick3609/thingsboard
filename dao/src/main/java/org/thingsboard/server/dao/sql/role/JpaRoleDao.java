@@ -79,6 +79,11 @@ public class JpaRoleDao extends JpaAbstractDao<RoleEntity, Role> implements Role
     }
 
     @Override
+    public boolean lockRole(UUID tenantId, UUID roleId) {
+        return roleRepository.lockRole(tenantId, roleId) != null;
+    }
+
+    @Override
     public EntityType getEntityType() {
         return EntityType.ROLE;
     }

@@ -25,6 +25,12 @@ import java.util.UUID;
 
 public interface RoleDao extends Dao<Role>, TenantEntityDao<Role> {
 
+    /**
+     * Takes a FOR UPDATE lock on the role row and returns whether it exists in that tenant;
+     * see RoleRepository#lockRole.
+     */
+    boolean lockRole(UUID tenantId, UUID roleId);
+
     Optional<Role> findByTenantIdAndName(UUID tenantId, String name);
 
     List<Role> findRolesByIds(UUID tenantId, List<UUID> roleIds);

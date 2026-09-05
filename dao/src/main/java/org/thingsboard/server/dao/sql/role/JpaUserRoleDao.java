@@ -36,18 +36,26 @@ public class JpaUserRoleDao implements UserRoleDao {
 
     @Override
     public List<UserId> findUserIdsByRoleId(RoleId roleId) {
-        return userRoleRepository.findAllByRoleId(roleId.getId()).stream()
-                .map(entity -> new UserId(entity.getUserId())).toList();
+        // ids only: this runs while the role row is locked, so it must not hydrate a row per
+        // assignment for a role held by thousands of users
+        return userRoleRepository.findUserIdsByRoleId(roleId.getId()).stream().map(UserId::new).toList();
     }
 
     @Override
     @Transactional
     public void replaceUserRoles(TenantId tenantId, UserId userId, List<RoleId> roleIds) {
         userRoleRepository.lockUser(userId.getId());
+        List<RoleId> distinctRoleIds = roleIds == null ? List.of() : roleIds.stream().distinct().toList();
+        if (!distinctRoleIds.isEmpty()) {
+            // before touching user_role, and in id order: a role delete takes the role row first
+            // and the assignment rows second, so this path must do the same or the two deadlock
+            // over each other's rows. Sorting keeps two concurrent assignments from inverting.
+            userRoleRepository.lockRoles(distinctRoleIds.stream().map(RoleId::getId).sorted().toList());
+        }
         userRoleRepository.deleteAllByUserId(userId.getId());
-        if (roleIds != null && !roleIds.isEmpty()) {
+        if (!distinctRoleIds.isEmpty()) {
             long ts = System.currentTimeMillis();
-            List<UserRoleEntity> rows = roleIds.stream().distinct()
+            List<UserRoleEntity> rows = distinctRoleIds.stream()
                     .map(roleId -> new UserRoleEntity(userId.getId(), roleId.getId(), tenantId.getId(), ts))
                     .toList();
             userRoleRepository.saveAll(rows);

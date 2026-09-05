@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.thingsboard.server.common.data.EntityType;
 import org.thingsboard.server.common.data.HasName;
 import org.thingsboard.server.common.data.User;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.thingsboard.server.common.data.audit.ActionType;
 import org.thingsboard.server.common.data.exception.ThingsboardErrorCode;
 import org.thingsboard.server.common.data.exception.ThingsboardException;
@@ -74,9 +75,9 @@ public class DefaultTbRoleService extends AbstractTbEntityService implements TbR
         RoleId roleId = role.getId();
         log.debug("[{}][{}] Deleting role [{}]", user.getTenantId(), roleId, role.getName());
         try {
-            // capture assignees before the delete: the FK cascade removes user_role rows
-            List<UserId> assignees = roleService.findUserIdsByRoleId(user.getTenantId(), roleId);
-            roleService.deleteRole(user.getTenantId(), roleId);
+            // one transaction: the assignees are read under a lock on the role, so an assignment
+            // racing the delete cannot be cascaded away without being evicted
+            List<UserId> assignees = roleService.deleteRoleAndCollectAssignees(user.getTenantId(), roleId);
             userPermissionsService.onRoleDeleted(user.getTenantId(), roleId, assignees);
             logEntityActionService.logEntityAction(user.getTenantId(), (EntityId) roleId, role, null, ActionType.DELETED, user, roleId.getId());
             log.info("[{}][{}] Deleted role [{}]", user.getTenantId(), roleId, role.getName());
@@ -95,7 +96,13 @@ public class DefaultTbRoleService extends AbstractTbEntityService implements TbR
                 throw new ThingsboardException("One or more roles do not exist!", ThingsboardErrorCode.BAD_REQUEST_PARAMS);
             }
         }
-        roleService.updateUserRoles(user.getTenantId(), targetUser.getId(), roleIds);
+        try {
+            roleService.updateUserRoles(user.getTenantId(), targetUser.getId(), roleIds);
+        } catch (DataIntegrityViolationException e) {
+            // the role was deleted between the check above and the insert: the assignment blocks
+            // on the delete's lock and then fails its foreign key. Same answer as the check.
+            throw new ThingsboardException("One or more roles do not exist!", ThingsboardErrorCode.BAD_REQUEST_PARAMS);
+        }
         userPermissionsService.onUserRolesUpdated(user.getTenantId(), targetUser.getId());
         logEntityActionService.logEntityAction(user.getTenantId(), targetUser.getId(), targetUser,
                 targetUser.getCustomerId(), ActionType.UPDATED, user);

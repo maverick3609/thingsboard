@@ -124,6 +124,24 @@ public class BaseRoleService extends AbstractEntityService implements RoleServic
     }
 
     @Override
+    @Transactional
+    public List<UserId> deleteRoleAndCollectAssignees(TenantId tenantId, RoleId roleId) {
+        log.debug("Executing deleteRoleAndCollectAssignees, tenantId [{}], roleId [{}]", tenantId, roleId);
+        Validator.validateId(roleId, id -> INCORRECT_ROLE_ID + id);
+        // Lock before reading: an assignment committing between the read and the cascade would
+        // otherwise be deleted without ever appearing in the list, leaving that user holding the
+        // deleted role's permissions until their cache entry expired. The lock is tenant-scoped
+        // because deleteRole does not check the tenant itself - JpaAbstractDao.findById ignores
+        // its tenantId argument - and a foreign roleId must neither delete nor even lock a row.
+        if (!roleDao.lockRole(tenantId.getId(), roleId.getId())) {
+            return Collections.emptyList();
+        }
+        List<UserId> assignees = userRoleDao.findUserIdsByRoleId(roleId);
+        deleteRole(tenantId, roleId);
+        return assignees;
+    }
+
+    @Override
     public List<Role> findRolesByUserId(TenantId tenantId, UserId userId) {
         log.debug("Executing findRolesByUserId, tenantId [{}], userId [{}]", tenantId, userId);
         Validator.validateId(userId, id -> INCORRECT_USER_ID + id);

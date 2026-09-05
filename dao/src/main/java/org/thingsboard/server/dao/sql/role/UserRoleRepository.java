@@ -27,7 +27,16 @@ import java.util.UUID;
 
 public interface UserRoleRepository extends JpaRepository<UserRoleEntity, UserRoleCompositeKey> {
 
-    List<UserRoleEntity> findAllByRoleId(UUID roleId);
+    @Query("SELECT e.userId FROM UserRoleEntity e WHERE e.roleId = :roleId")
+    List<UUID> findUserIdsByRoleId(@Param("roleId") UUID roleId);
+
+    /**
+     * Lock the roles about to be assigned, in a caller-fixed order. A role delete locks the role
+     * row before it touches user_role, so the assignment has to take the same two in the same
+     * order or the two transactions deadlock over one another's rows.
+     */
+    @Query(value = "SELECT id FROM role WHERE id IN (:roleIds) ORDER BY id FOR UPDATE", nativeQuery = true)
+    List<UUID> lockRoles(@Param("roleIds") List<UUID> roleIds);
 
     /**
      * Lock the user row so two concurrent replace-sets for the same user cannot interleave:

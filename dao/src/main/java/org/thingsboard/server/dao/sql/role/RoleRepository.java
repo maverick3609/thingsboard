@@ -44,4 +44,15 @@ public interface RoleRepository extends JpaRepository<RoleEntity, UUID> {
             "AND ur.userId = :userId AND r.tenantId = :tenantId")
     List<RoleEntity> findByUserId(@Param("tenantId") UUID tenantId, @Param("userId") UUID userId);
 
+
+    /**
+     * Lock the role row so a concurrent role assignment cannot slip in while the role is being
+     * deleted. Inserting a user_role row takes a FOR KEY SHARE lock on the role it references,
+     * which conflicts with FOR UPDATE — so once this returns, the assignee list the caller reads
+     * cannot go stale before the delete commits, and the blocked assignment then fails its
+     * foreign key rather than leaving a user holding a deleted role's grants.
+     */
+    @Query(value = "SELECT id FROM role WHERE id = :roleId AND tenant_id = :tenantId FOR UPDATE", nativeQuery = true)
+    UUID lockRole(@Param("tenantId") UUID tenantId, @Param("roleId") UUID roleId);
+
 }

@@ -16,7 +16,6 @@
 package org.thingsboard.server.controller;
 
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -65,6 +64,8 @@ public class RoleController extends BaseController {
 
     private static final String ROLE_DESCRIPTION = "The Role represents a named set of permissions: a JSON object where each key is a resource " +
             "(DEVICE, ASSET, DASHBOARD, ALL, ...) and the value is an array of allowed operations (READ, WRITE, DELETE, ALL, ...). " +
+            "Operations are matched exactly - READ does NOT imply READ_TELEMETRY, READ_ATTRIBUTES or READ_CREDENTIALS, so a role that must " +
+            "serve dashboards has to list those operations explicitly (or use ALL). " +
             "Users with at least one assigned role are restricted to the union of their roles' permissions; users without roles keep the default authority-based access. ";
     private static final String INVALID_ROLE_ID = "Referencing non-existing Role Id will cause 'Not Found' error.";
 
@@ -137,24 +138,6 @@ public class RoleController extends BaseController {
         accessControlService.checkPermission(currentUser, Resource.ROLE, Operation.READ);
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
         return checkNotNull(roleService.findRolesByTenantId(currentUser.getTenantId(), pageLink));
-    }
-
-    @ApiOperation(value = "Get Roles By Ids (getRolesByIds)",
-            notes = "Requested roles must be owned by tenant which is performing the request. " +
-                    "\n\nAvailable for users with 'TENANT_ADMIN' authority.")
-    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
-    @GetMapping(value = "/roles", params = {"roleIds"})
-    public List<Role> getRolesByIds(
-            @Parameter(description = "A list of role ids, separated by comma ','", array = @ArraySchema(schema = @Schema(type = "string")), required = true)
-            @RequestParam("roleIds") String[] strRoleIds) throws ThingsboardException {
-        checkArrayParameter("roleIds", strRoleIds);
-        SecurityUser currentUser = getCurrentUser();
-        accessControlService.checkPermission(currentUser, Resource.ROLE, Operation.READ);
-        List<RoleId> roleIds = new ArrayList<>();
-        for (String strRoleId : strRoleIds) {
-            roleIds.add(new RoleId(toUUID(strRoleId)));
-        }
-        return checkNotNull(roleService.findRolesByIds(currentUser.getTenantId(), roleIds));
     }
 
     @ApiOperation(value = "Get User Roles (getUserRoles)",

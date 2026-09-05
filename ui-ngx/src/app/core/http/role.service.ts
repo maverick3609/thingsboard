@@ -17,6 +17,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { shareReplay } from 'rxjs/operators';
 import { defaultHttpOptionsFromConfig, RequestConfig } from '@core/http/http-utils';
 import { PageLink } from '@shared/models/page/page-link';
 import { PageData } from '@shared/models/page/page-data';
@@ -26,6 +27,8 @@ import { AllowedPermissionsInfo, Role } from '@shared/models/role.models';
   providedIn: 'root'
 })
 export class RoleService {
+
+  private allowedPermissions$: Observable<AllowedPermissionsInfo>;
 
   constructor(private http: HttpClient) {}
 
@@ -53,8 +56,16 @@ export class RoleService {
     return this.http.post(`/api/user/${userId}/roles`, roleIds, defaultHttpOptionsFromConfig(config));
   }
 
+  // The resource/operation vocabularies are constant for a server build, so the role editor
+  // should not re-fetch them on every dialog open. Note the response also carries the acting
+  // user's userPermissions: that part is a session snapshot, so permission-aware UI gating must
+  // fetch it separately rather than reuse this cache.
   public getAllowedPermissions(config?: RequestConfig): Observable<AllowedPermissionsInfo> {
-    return this.http.get<AllowedPermissionsInfo>('/api/permissions/allowedPermissions', defaultHttpOptionsFromConfig(config));
+    if (!this.allowedPermissions$) {
+      this.allowedPermissions$ = this.http.get<AllowedPermissionsInfo>('/api/permissions/allowedPermissions',
+        defaultHttpOptionsFromConfig(config)).pipe(shareReplay({bufferSize: 1, refCount: false}));
+    }
+    return this.allowedPermissions$;
   }
 
 }

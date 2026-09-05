@@ -22,20 +22,30 @@ import { EntityDetailsPageComponent } from '@home/components/entity/entity-detai
 import { ConfirmOnExitGuard } from '@core/guards/confirm-on-exit.guard';
 import { entityDetailsPageBreadcrumbLabelFunction } from '@home/pages/home-pages.models';
 import { BreadCrumbConfig } from '@shared/components/breadcrumb';
+import { EntitiesTableComponent } from '@home/components/entity/entities-table.component';
+import { MenuId } from '@core/services/menu.models';
 
 const routes: Routes = [
   {
     path: 'users',
     data: {
       breadcrumb: {
-        skip: true
+        menuId: MenuId.users
       }
     },
     children: [
       {
         path: '',
-        redirectTo: '/',
-        pathMatch: 'full'
+        component: EntitiesTableComponent,
+        data: {
+          auth: [Authority.TENANT_ADMIN],
+          title: 'user.users',
+          // Inferrix RBAC: lists every user of the tenant, admins included
+          usersType: 'tenant'
+        },
+        resolve: {
+          entitiesTableConfig: UsersTableConfigResolver
+        }
       },
       {
         path: ':entityId',
@@ -48,6 +58,7 @@ const routes: Routes = [
           } as BreadCrumbConfig<EntityDetailsPageComponent>,
           auth: [Authority.SYS_ADMIN, Authority.TENANT_ADMIN],
           title: 'user.user',
+          usersType: 'tenant',
         },
         resolve: {
           entitiesTableConfig: UsersTableConfigResolver

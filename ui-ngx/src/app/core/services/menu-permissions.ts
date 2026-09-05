@@ -82,6 +82,7 @@ export const menuResources: { [menuId: string]: string } = {
   ai_models: 'AI_MODEL',
   white_labeling: 'WHITE_LABELING',
   roles: 'ROLE',
+  users: 'USER',
   otaUpdates: 'OTA_PACKAGE',
   queues: 'QUEUE',
   audit_log: 'AUDIT_LOG',

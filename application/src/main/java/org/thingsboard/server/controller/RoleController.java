@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.thingsboard.server.common.data.User;
+import org.thingsboard.server.common.data.exception.ThingsboardErrorCode;
 import org.thingsboard.server.common.data.exception.ThingsboardException;
 import org.thingsboard.server.common.data.id.RoleId;
 import org.thingsboard.server.common.data.id.UserId;
@@ -158,6 +159,7 @@ public class RoleController extends BaseController {
     @ApiOperation(value = "Update User Roles (updateUserRoles)",
             notes = "Replaces the set of roles assigned to the user with the provided list of role ids. " +
                     "An empty list removes all roles and restores the default authority-based access. " +
+                    "A user may not change their own roles. " +
                     "\n\nAvailable for users with 'TENANT_ADMIN' authority.")
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @PostMapping(value = "/user/{userId}/roles")
@@ -171,6 +173,11 @@ public class RoleController extends BaseController {
         // so a role-restricted admin without ROLE grants cannot strip restrictions off users
         accessControlService.checkPermission(getCurrentUser(), Resource.ROLE, Operation.WRITE);
         UserId userId = new UserId(toUUID(strUserId));
+        // never your own roles: clearing them restores unrestricted authority-based access, and
+        // adding one that lacks ROLE WRITE locks you out of the only endpoint that could undo it
+        if (userId.equals(getCurrentUser().getId())) {
+            throw new ThingsboardException("You are not allowed to change your own roles!", ThingsboardErrorCode.PERMISSION_DENIED);
+        }
         User targetUser = checkUserId(userId, Operation.WRITE);
         List<RoleId> roleIds = new ArrayList<>();
         if (strRoleIds != null) {

@@ -68,6 +68,7 @@ export class UsersTableConfigResolver  {
   private tenantId: string;
   private customerId: string;
   private authority: Authority;
+  private tenantUsers: boolean;
   private authUser: User;
 
   constructor(private store: Store<AppState>,
@@ -93,7 +94,6 @@ export class UsersTableConfigResolver  {
       new EntityTableColumn<User>('email', 'user.email', '33%')
     );
 
-    this.config.deleteEnabled = user => user && user.id && user.id.id !== this.authUser.id.id;
     this.config.deleteEntityTitle = user => this.translate.instant('user.delete-user-title', { userEmail: user.email });
     this.config.deleteEntityContent = () => this.translate.instant('user.delete-user-text');
     this.config.deleteEntitiesTitle = count => this.translate.instant('user.delete-users-title', {count});
@@ -112,7 +112,16 @@ export class UsersTableConfigResolver  {
       tap((auth) => {
         this.authUser = auth.userDetails;
         this.authority = routeParams.tenantId ? Authority.TENANT_ADMIN : Authority.CUSTOMER_USER;
-        if (this.authority === Authority.TENANT_ADMIN) {
+        // Inferrix RBAC: '/users' lists every user of the tenant, admins included, so a tenant
+        // admin has somewhere to assign a role to a peer. Read-only on purpose — a user is still
+        // created, edited and deleted from the tenant or customer page that owns its authority,
+        // which is also what keeps saveUser() from rewriting the authority of a mixed list.
+        this.tenantUsers = route.data.usersType === 'tenant';
+        if (this.tenantUsers) {
+          this.tenantId = this.authUser.tenantId.id;
+          this.customerId = NULL_UUID;
+          this.config.entitiesFetchFunction = pageLink => this.userService.getUsers(pageLink);
+        } else if (this.authority === Authority.TENANT_ADMIN) {
           this.tenantId = routeParams.tenantId;
           this.customerId = NULL_UUID;
           this.config.entitiesFetchFunction = pageLink => this.userService.getTenantAdmins(this.tenantId, pageLink);
@@ -121,9 +130,18 @@ export class UsersTableConfigResolver  {
           this.customerId = routeParams.customerId;
           this.config.entitiesFetchFunction = pageLink => this.userService.getCustomerUsers(this.customerId, pageLink);
         }
+        this.config.addEnabled = !this.tenantUsers;
+        this.config.entitiesDeleteEnabled = !this.tenantUsers;
+        // also drives the "Delete user" button of the details view (UserComponent.hideDelete),
+        // which entitiesDeleteEnabled does not reach
+        this.config.deleteEnabled = user => !this.tenantUsers && user?.id?.id !== this.authUser?.id?.id;
+        this.config.detailsReadonly = () => this.tenantUsers;
         this.updateActionCellDescriptors(auth);
       }),
       mergeMap(() => {
+        if (this.tenantUsers) {
+          return of({title: ''});
+        }
         if (this.authority === Authority.TENANT_ADMIN) {
           return this.tenantService.getTenant(this.tenantId);
         } else if (isDefinedAndNotNull(this.customerId)) {
@@ -132,7 +150,9 @@ export class UsersTableConfigResolver  {
         return of({title: ''});
       }),
       map((parentEntity) => {
-        if (this.authority === Authority.TENANT_ADMIN) {
+        if (this.tenantUsers) {
+          this.config.tableTitle = this.translate.instant('user.users');
+        } else if (this.authority === Authority.TENANT_ADMIN) {
           this.config.tableTitle = parentEntity.title + ': ' + this.translate.instant('user.tenant-admins');
         } else {
           this.config.tableTitle = parentEntity.title + ': ' + this.translate.instant('user.customer-users');
@@ -144,7 +164,7 @@ export class UsersTableConfigResolver  {
 
   updateActionCellDescriptors(auth: AuthState) {
     this.config.cellActionDescriptors.splice(0);
-    if (auth.userTokenAccessEnabled) {
+    if (auth.userTokenAccessEnabled && !this.tenantUsers) {
       this.config.cellActionDescriptors.push(
         {
           name: this.authority === Authority.TENANT_ADMIN ?
@@ -163,7 +183,9 @@ export class UsersTableConfigResolver  {
         {
           name: this.translate.instant('role.manage-roles'),
           icon: 'manage_accounts',
-          isEnabled: () => true,
+          // mirrors the server guard in RoleController.updateUserRoles: nobody edits their own
+          // roles, since clearing them would restore unrestricted access
+          isEnabled: (user) => user?.id?.id !== this.authUser?.id?.id,
           onAction: ($event, entity) => this.manageUserRoles($event, entity)
         }
       );

@@ -65,7 +65,14 @@ public enum Resource {
     ROLE(EntityType.ROLE),
     REPORT(EntityType.REPORT),
     // queryable via /api/entitiesQuery/*: without a Resource the role gate would fail open on it
-    QUEUE_STATS(EntityType.QUEUE_STATS);
+    QUEUE_STATS(EntityType.QUEUE_STATS),
+    // no EntityType: audit log rows are not entities, but they carry the payloads of the entities
+    // a role restricts, so a role must be able to deny reading them
+    AUDIT_LOG,
+    // tenant-wide calculated-field and alarm-rule lists span every owner entity type, so they
+    // cannot be gated as the owner's resource. Per-ENTITY calculated field access is unchanged:
+    // it still checks the owner's resource with Operation.READ_CALCULATED_FIELD.
+    CALCULATED_FIELD(EntityType.CALCULATED_FIELD);
 
     private final Set<EntityType> entityTypes;
 

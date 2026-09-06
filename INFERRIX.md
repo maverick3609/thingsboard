@@ -48,12 +48,48 @@ Three things regularly surprise people:
 
 ### Assigning
 
-**Administration → Users** lists every user in the tenant (read-only — create and delete stay on the
-customer's own users page). The *Manage roles* action replaces a user's whole set; an empty selection
-removes all roles and restores default access.
+**Administration → Users** lists every user in the tenant for a tenant admin (read-only — creating and
+deleting a user stays on the page that owns its authority, the tenant's or the customer's own users page).
+The *Manage roles* action replaces a user's whole set; an empty selection removes all roles and restores
+default access. The same page shown to a *customer* user lists only their own customer's users, and is
+read-only unless they hold the customer-administrator grant described below.
 
 Nobody may change their **own** roles, in the UI or over the API — clearing them would restore
 unrestricted access to the person doing the clearing.
+
+### The two seeded roles
+
+The first time a tenant opens **Administration → Roles**, two roles are created if they are absent
+(PE parity with `findOrCreateCustomerAdminRole` / `findOrCreateCustomerUserRole`):
+
+| Role | Grants | For |
+|------|--------|-----|
+| `Customer Administrator` | `All: [All]` | a customer user who manages their own customer's users |
+| `Customer User` | `All: [Read, Read credentials, Read attributes, Read telemetry, RPC call]` | plain read-only access |
+
+They are ordinary roles — edit them, or ignore them and author your own. Note they are re-created on the
+next visit to the Roles page if deleted, so removing one is not permanent; edit it to empty instead.
+Seeding is idempotent and never touches a role that already exists under that name.
+
+### The customer administrator
+
+Give a customer user a role granting `User` **Write** — the seeded *Customer Administrator* does, via its
+`All: [All]` — and they may manage the other users of **their own customer**:
+
+- **Administration → Users** becomes read-write for them, and lists only their own customer's users.
+- Create, edit and delete a colleague, and copy an activation link so the colleague can set a password.
+- Add and Delete additionally require `User` **Create** / **Delete**; `All: [All]` covers both.
+
+Scope is pinned on the server, never taken from the request body: a new user's tenant, customer and
+authority all come from the caller. An attempt to create a `TENANT_ADMIN`, or a user inside another
+customer, is silently downgraded to a customer user of the caller's own customer rather than refused.
+
+Still refused for a customer administrator, and the buttons are hidden accordingly: impersonation
+(*Login as user*), assigning roles (a tenant admin only), disabling an account, and resending activation
+mail. The activation **link** is available — that is the intended way to hand off a new account.
+
+The capability is **explicit**: it needs a role that names `User` Write. A customer user with no role sees
+the page exactly as read-only as before, so shipping this widened nobody's access by default.
 
 ### How it is enforced
 

@@ -24,6 +24,7 @@ import { selectAuth } from '@core/auth/auth.selectors';
 import { map } from 'rxjs/operators';
 import { Authority } from '@shared/models/authority.enum';
 import { isDefinedAndNotNull, validateEmail } from '@core/utils';
+import { explicitlyHasGenericPermission } from '@core/services/menu-permissions';
 import { EntityTableConfig } from '@home/models/entity/entities-table-config.models';
 import { ActionNotificationShow } from '@app/core/notification/notification.actions';
 import { TranslateService } from '@ngx-translate/core';
@@ -45,6 +46,23 @@ export class UserComponent extends EntityComponent<User>{
   loginAsUserEnabled$ = this.store.pipe(
     select(selectAuth),
     map((auth) => auth.userTokenAccessEnabled)
+  );
+
+  // Inferrix RBAC: '/users' is reachable by customer users now, but these two buttons post to
+  // tenant-admin-only endpoints (setUserCredentialsEnabled, sendActivationMail), so for a customer
+  // user they can only ever answer 403. Hide rather than widen - disabling an account is a lockout
+  // primitive we deliberately kept on the tenant.
+  hideTenantAccountActions$ = this.store.pipe(
+    select(selectAuth),
+    map((auth) => auth.authUser?.authority === Authority.CUSTOMER_USER)
+  );
+
+  // The activation link IS open to a customer administrator (UserController.getActivationLinkInfo
+  // checks USER WRITE on the target), so it follows the same explicit grant the table config uses.
+  hideActivationLink$ = this.store.pipe(
+    select(selectAuth),
+    map((auth) => auth.authUser?.authority === Authority.CUSTOMER_USER
+      && !explicitlyHasGenericPermission(auth.userPermissions, 'USER', 'WRITE'))
   );
 
   constructor(protected store: Store<AppState>,

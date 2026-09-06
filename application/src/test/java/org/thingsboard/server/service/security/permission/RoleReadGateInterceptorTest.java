@@ -38,6 +38,8 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -105,6 +107,15 @@ public class RoleReadGateInterceptorTest {
         authenticate(restrictedUser("{\"ALL\": [\"ALL\"]}"));
         assertTrue(preHandle(GATED_PATTERN, new MockHttpServletResponse()));
         verify(errorResponseHandler, never()).handle(any(), any(HttpServletResponse.class));
+    }
+
+    @Test
+    public void testWidgetLibraryListsAreGatedButTheRenderPathIsNot() {
+        assertEquals(Resource.WIDGETS_BUNDLE, RoleReadGateInterceptor.GATED_READS.get("/api/widgetsBundles"));
+        assertEquals(Resource.WIDGET_TYPE, RoleReadGateInterceptor.GATED_READS.get("/api/widgetTypes"));
+        assertEquals(Resource.WIDGET_TYPE, RoleReadGateInterceptor.GATED_READS.get("/api/widgetTypesInfos"));
+        // a dashboard resolves every widget through this one; gating it blanks out the dashboard
+        assertNull(RoleReadGateInterceptor.GATED_READS.get("/api/widgetType"));
     }
 
     /**

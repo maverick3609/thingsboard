@@ -189,6 +189,18 @@ public class RoleReadGateInterceptor implements HandlerInterceptor {
             entry("/api/notification/templates", Resource.NOTIFICATION),
             entry("/api/notification/slack/conversations", Resource.NOTIFICATION),
 
+            // Widget library. /api/widgetType?fqn= is deliberately NOT here: it is how a dashboard
+            // loads each widget's definition at render time, so gating it would blank out every
+            // dashboard a restricted user is otherwise allowed to open.
+            entry("/api/widgetsBundles", Resource.WIDGETS_BUNDLE),
+            entry("/api/widgetsBundles/all", Resource.WIDGETS_BUNDLE),
+            entry("/api/widgetsBundles/list", Resource.WIDGETS_BUNDLE),
+            entry("/api/widgetTypes", Resource.WIDGET_TYPE),
+            entry("/api/widgetTypesDetails", Resource.WIDGET_TYPE),
+            entry("/api/widgetTypesInfos", Resource.WIDGET_TYPE),
+            entry("/api/widgetTypeFqns", Resource.WIDGET_TYPE),
+            entry("/api/widgetsBundle/{widgetsBundleId}/widgetTypes", Resource.WIDGET_TYPE),
+
             entry("/api/oauth2/client/infos", Resource.OAUTH2_CLIENT),
             entry("/api/oauth2/client/list", Resource.OAUTH2_CLIENT),
 

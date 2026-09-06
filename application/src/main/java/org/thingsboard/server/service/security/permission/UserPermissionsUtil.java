@@ -16,6 +16,7 @@
 package org.thingsboard.server.service.security.permission;
 
 import org.thingsboard.server.common.data.EntityType;
+import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.query.EntityFilter;
 import org.thingsboard.server.common.data.query.RelationsQueryFilter;
 import org.thingsboard.server.common.data.relation.RelationEntityTypeFilter;
@@ -57,6 +58,19 @@ public final class UserPermissionsUtil {
             return true;
         }
         return userPermissions.hasGenericPermission(resource, operation);
+    }
+
+    /**
+     * Entity-scoped role gate. Reading your own user record is never role-gated: every
+     * authenticated session bootstraps with {@code GET /api/user/{self}}, so a role without
+     * {@code USER:READ} would make its holders unable to log in at all. Only READ is exempt -
+     * editing your own profile still needs the grant.
+     */
+    public static boolean granted(SecurityUser user, Resource resource, Operation operation, EntityId entityId) {
+        if (resource == Resource.USER && operation == Operation.READ && user.getId().equals(entityId)) {
+            return true;
+        }
+        return granted(user, resource, operation);
     }
 
     /**

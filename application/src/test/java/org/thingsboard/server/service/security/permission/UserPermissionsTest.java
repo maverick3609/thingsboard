@@ -18,6 +18,7 @@ package org.thingsboard.server.service.security.permission;
 import org.junit.jupiter.api.Test;
 import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.common.data.EntityType;
+import org.thingsboard.server.common.data.id.UserId;
 import org.thingsboard.server.common.data.query.RelationsQueryFilter;
 import org.thingsboard.server.common.data.relation.EntitySearchDirection;
 import org.thingsboard.server.common.data.relation.RelationEntityTypeFilter;
@@ -27,6 +28,7 @@ import org.thingsboard.server.common.data.security.Authority;
 import org.thingsboard.server.service.security.model.SecurityUser;
 
 import java.util.Collections;
+import java.util.UUID;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -128,6 +130,26 @@ public class UserPermissionsTest {
         assertTrue(UserPermissionsUtil.granted(user, Resource.DEVICE, Operation.READ));
         assertFalse(UserPermissionsUtil.granted(user, Resource.DEVICE, Operation.WRITE));
         assertFalse(UserPermissionsUtil.granted(user, Resource.DASHBOARD, Operation.READ));
+    }
+
+    /**
+     * Every authenticated session bootstraps with GET /api/user/{self}; gating it locks the user
+     * out of the platform entirely, so the entity-scoped gate exempts a self READ - and only that.
+     */
+    @Test
+    public void testSelfUserReadIsNeverRoleGated() {
+        MergedUserPermissions readOnlyDevices = DefaultUserPermissionsService.mergeRolePermissions(
+                List.of(role("{\"DEVICE\": [\"READ\"]}")));
+        SecurityUser user = user(Authority.TENANT_ADMIN, readOnlyDevices);
+        UserId self = new UserId(UUID.randomUUID());
+        user.setId(self);
+
+        assertTrue(UserPermissionsUtil.granted(user, Resource.USER, Operation.READ, self));
+        assertFalse(UserPermissionsUtil.granted(user, Resource.USER, Operation.READ, new UserId(UUID.randomUUID())));
+        assertFalse(UserPermissionsUtil.granted(user, Resource.USER, Operation.WRITE, self));
+        assertFalse(UserPermissionsUtil.granted(user, Resource.USER, Operation.READ));
+        // the exemption is scoped to USER: a self id must not unlock another resource
+        assertFalse(UserPermissionsUtil.granted(user, Resource.DASHBOARD, Operation.READ, self));
     }
 
 }

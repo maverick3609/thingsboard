@@ -1,0 +1,234 @@
+- generic [ref=f26e6]:
+  - generic [ref=f26e9]:
+    - banner [ref=f26e10]:
+      - link [ref=f26e14] [cursor=pointer]:
+        - /url: /home
+        - img "logo" [ref=f26e15]
+    - navigation [ref=f26e16]:
+      - list [ref=f26e18]:
+        - listitem [ref=f26e19]:
+          - link "Home" [ref=f26e21] [cursor=pointer]:
+            - /url: /home
+            - img [ref=f26e22]: home
+        - listitem [ref=f26e27]:
+          - link "Alarms" [ref=f26e29] [cursor=pointer]:
+            - /url: /alarms
+        - listitem [ref=f26e37]:
+          - link "Dashboards" [ref=f26e39] [cursor=pointer]:
+            - /url: /dashboards
+            - img [ref=f26e40]: dashboards
+        - listitem [ref=f26e45]:
+          - link "IoT Hub NEW" [ref=f26e47] [cursor=pointer]:
+            - /url: /iot-hub
+            - img [ref=f26e48]: hub
+            - generic [ref=f26e49]: IoT Hub
+            - text: NEW
+        - listitem [ref=f26e53]:
+          - generic [ref=f26e54]:
+            - generic [ref=f26e55]:
+              - img [ref=f26e56]: category
+              - generic [ref=f26e57]:
+                - generic [ref=f26e58]: Entities
+                - generic [ref=f26e59]: 
+            - list:
+              - listitem [ref=f26e62]:
+                - link "Devices" [ref=f26e64] [cursor=pointer]:
+                  - /url: /entities/devices
+                  - img [ref=f26e65]: devices_other
+              - listitem [ref=f26e70]:
+                - link "Assets" [ref=f26e72] [cursor=pointer]:
+                  - /url: /entities/assets
+                  - img [ref=f26e73]: domain
+              - listitem [ref=f26e78]:
+                - link "Entity views" [ref=f26e80] [cursor=pointer]:
+                  - /url: /entities/entityViews
+                  - img [ref=f26e81]: view_quilt
+              - listitem [ref=f26e86]:
+                - link "Gateways" [ref=f26e88] [cursor=pointer]:
+                  - /url: /entities/gateways
+                  - img [ref=f26e89]: lan
+        - listitem [ref=f26e94]:
+          - generic [ref=f26e95]:
+            - generic [ref=f26e96]:
+              - img [ref=f26e97]: badge
+              - generic [ref=f26e98]:
+                - generic [ref=f26e99]: Profiles
+                - generic [ref=f26e100]: 
+            - list:
+              - listitem [ref=f26e103]:
+                - link "Device profiles" [ref=f26e105] [cursor=pointer]:
+                  - /url: /profiles/deviceProfiles
+              - listitem [ref=f26e113]:
+                - link "Asset profiles" [ref=f26e115] [cursor=pointer]:
+                  - /url: /profiles/assetProfiles
+        - listitem [ref=f26e123]:
+          - link "Customers" [ref=f26e125] [cursor=pointer]:
+            - /url: /customers
+            - img [ref=f26e126]: supervisor_account
+        - listitem [ref=f26e131]:
+          - link "Calculated fields" [ref=f26e133] [cursor=pointer]:
+            - /url: /calculatedFields
+        - listitem [ref=f26e141]:
+          - link "Rule chains" [ref=f26e143] [cursor=pointer]:
+            - /url: /ruleChains
+            - img [ref=f26e144]: settings_ethernet
+        - listitem [ref=f26e149]:
+          - generic [ref=f26e150]:
+            - generic [ref=f26e151]:
+              - img [ref=f26e152]: construction
+              - generic [ref=f26e153]:
+                - generic [ref=f26e154]: Advanced features
+                - generic [ref=f26e155]: 
+            - list:
+              - listitem [ref=f26e158]:
+                - link "Version control" [ref=f26e160] [cursor=pointer]:
+                  - /url: /features/vc
+                  - img [ref=f26e161]: history
+              - listitem [ref=f26e166]:
+                - link "Scheduler" [ref=f26e168] [cursor=pointer]:
+                  - /url: /features/scheduler
+                  - img [ref=f26e169]: schedule
+        - listitem [ref=f26e174]:
+          - generic [ref=f26e175]:
+            - generic [ref=f26e176]:
+              - img [ref=f26e177]: folder
+              - generic [ref=f26e178]:
+                - generic [ref=f26e179]: Resources
+                - generic [ref=f26e180]: 
+            - list:
+              - listitem [ref=f26e183]:
+                - link "Widgets library" [ref=f26e185] [cursor=pointer]:
+                  - /url: /resources/widgets-library
+                  - img [ref=f26e186]: now_widgets
+              - listitem [ref=f26e191]:
+                - link "Image gallery" [ref=f26e193] [cursor=pointer]:
+                  - /url: /resources/images
+                  - img [ref=f26e194]: filter
+              - listitem [ref=f26e199]:
+                - link "SCADA symbols" [ref=f26e201] [cursor=pointer]:
+                  - /url: /resources/scada-symbols
+                  - img [ref=f26e202]: view_in_ar
+              - listitem [ref=f26e207]:
+                - link "JavaScript library" [ref=f26e209] [cursor=pointer]:
+                  - /url: /resources/javascript-library
+              - listitem [ref=f26e217]:
+                - link "Resources library" [ref=f26e219] [cursor=pointer]:
+                  - /url: /resources/resources-library
+        - listitem [ref=f26e227]:
+          - generic [ref=f26e228]:
+            - generic [ref=f26e229]:
+              - img [ref=f26e230]: build
+              - generic [ref=f26e231]:
+                - generic [ref=f26e232]: Utilities
+                - generic [ref=f26e233]: 
+            - list:
+              - listitem [ref=f26e236]:
+                - link "API usage" [ref=f26e238] [cursor=pointer]:
+                  - /url: /usage
+                  - img [ref=f26e239]: insert_chart
+              - listitem [ref=f26e244]:
+                - link "Mobile center" [ref=f26e246] [cursor=pointer]:
+                  - /url: /mobile-center
+                  - img [ref=f26e247]: smartphone
+        - listitem [ref=f26e252]:
+          - generic [ref=f26e253]:
+            - generic [ref=f26e254]:
+              - img [ref=f26e255]: admin_panel_settings
+              - generic [ref=f26e256]:
+                - generic [ref=f26e257]: Administration
+                - generic [ref=f26e258]: 
+            - list:
+              - listitem [ref=f26e261]:
+                - link "Settings" [ref=f26e263] [cursor=pointer]:
+                  - /url: /settings
+                  - img [ref=f26e264]: settings
+              - listitem [ref=f26e269]:
+                - link "White labeling" [ref=f26e271] [cursor=pointer]:
+                  - /url: /white-labeling
+                  - img [ref=f26e272]: format_paint
+              - listitem [ref=f26e277]:
+                - link "Roles" [ref=f26e279] [cursor=pointer]:
+                  - /url: /roles
+                  - img [ref=f26e280]: manage_accounts
+              - listitem [ref=f26e285]:
+                - link "Users" [ref=f26e287] [cursor=pointer]:
+                  - /url: /users
+                  - img [ref=f26e288]: account_circle
+              - listitem [ref=f26e293]:
+                - link "Notification center" [ref=f26e295] [cursor=pointer]:
+                  - /url: /notification
+        - listitem [ref=f26e303]:
+          - generic [ref=f26e304]:
+            - generic [ref=f26e305]:
+              - img [ref=f26e306]: security
+              - generic [ref=f26e307]:
+                - generic [ref=f26e308]: Security
+                - generic [ref=f26e309]: 
+            - list:
+              - listitem [ref=f26e312]:
+                - link "Audit logs" [ref=f26e314] [cursor=pointer]:
+                  - /url: /security-settings/auditLogs
+                  - img [ref=f26e315]: track_changes
+              - listitem [ref=f26e320]:
+                - link "OAuth 2.0" [ref=f26e322] [cursor=pointer]:
+                  - /url: /security-settings/oauth2
+        - listitem [ref=f26e330]:
+          - link "Reporting" [ref=f26e332] [cursor=pointer]:
+            - /url: /reporting
+            - img [ref=f26e333]: assessment
+  - main [ref=f26e340]:
+    - generic [ref=f26e341]:
+      - generic [ref=f26e345]:
+        - img [ref=f26e346]: manage_accounts
+        - text: Roles
+      - button [ref=f26e347] [cursor=pointer]:
+        - img [aria-hidden] [ref=f26e348]: fullscreen
+      - button [ref=f26e352] [cursor=pointer]:
+        - img [ref=f26e353]:
+          - text: notifications
+          - generic [aria-hidden]: "81"
+      - generic [ref=f26e357]:
+        - generic [ref=f26e358]:
+          - img [aria-hidden] [ref=f26e359]: account_circle
+          - generic [ref=f26e360]:
+            - generic [ref=f26e361]: tenant@inferrix.com
+            - generic [ref=f26e362]: Tenant administrator
+        - button [ref=f26e363] [cursor=pointer]:
+          - img [aria-hidden] [ref=f26e364]: more_vert
+    - generic [ref=f26e372]:
+      - generic [ref=f26e374]:
+        - generic [ref=f26e375]: Roles
+        - button [ref=f26e377] [cursor=pointer]:
+          - img [aria-hidden] [ref=f26e378]: refresh
+        - button [ref=f26e381] [cursor=pointer]:
+          - img [aria-hidden] [ref=f26e382]: search
+        - button "Add role" [ref=f26e386]:
+          - img [aria-hidden] [ref=f26e387]: add
+      - generic [ref=f26e391]:
+        - table [ref=f26e392]:
+          - rowgroup [ref=f26e393]:
+            - row [ref=f26e394]:
+              - columnheader [ref=f26e395]:
+                - checkbox [ref=f26e400] [cursor=pointer]
+              - columnheader [ref=f26e401] [cursor=pointer]:
+                - button "Created time" [ref=f26e402]
+              - columnheader [ref=f26e407] [cursor=pointer]:
+                - button "Name" [ref=f26e408]
+              - columnheader "Description" [ref=f26e413]
+              - columnheader "Permissions" [ref=f26e416]
+              - columnheader [ref=f26e419]
+          - rowgroup
+        - generic [ref=f26e420]: No roles found
+      - separator [ref=f26e421]
+      - group [ref=f26e422]:
+        - generic [ref=f26e424]:
+          - generic [ref=f26e425]:
+            - generic [ref=f26e426]: "Items per page:"
+            - combobox "Items per page:" [ref=f26e431] [cursor=pointer]:
+              - generic [ref=f26e432]: "10"
+          - generic [ref=f26e440]:
+            - generic [ref=f26e441]: 1 – 0 of 0
+            - button "First page" [disabled] [ref=f26e442]
+            - button "Previous page" [disabled] [ref=f26e447]
+            - button "Next page" [disabled] [ref=f26e452]
+            - button "Last page" [disabled] [ref=f26e457]

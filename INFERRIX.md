@@ -74,6 +74,11 @@ They are ordinary roles — edit them, or ignore them and author your own. Note 
 next visit to the Roles page if deleted, so removing one is not permanent; edit it to empty instead.
 Seeding is idempotent and never touches a role that already exists under that name.
 
+Note the seeded `Customer User` role does grant `Read credentials` and `RPC call` — PE's read-only set
+includes both. That is a deliberate contrast with the anonymous viewer further down, who is refused both:
+a named customer user is someone the tenant chose to create and can revoke, while a public dashboard link
+is held by whoever happens to have the URL.
+
 PE seeds five roles per tenant; we seed these two. The other three do not port:
 
 | PE role | Why not |

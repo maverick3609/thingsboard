@@ -41,10 +41,13 @@ Three things regularly surprise people:
   the page renders as a column of *"Problem loading widget configuration. Probably associated widget type
   was removed."* That is ThingsBoard's generic message; nothing in it says "permission". Browsing the
   widget library additionally needs `Widgets bundle` Read.
-- **A customer user needs nothing extra for their own customer.** Reading your own user record and, for a
-  customer user, your own customer record are never role-gated — every session bootstraps with
-  `GET /api/user/{self}`, and `checkCustomerId` fronts every customer-scoped list, so gating either one
-  would lock the account out rather than restrict it. Only READ is exempt.
+- **A user needs nothing extra to be themselves.** Reading your own user record, editing your own
+  profile, and — for a customer user — reading your own customer record are never role-gated. Every
+  session bootstraps with `GET /api/user/{self}`, `checkCustomerId` fronts every customer-scoped list,
+  and editing your own name or language is something the platform gives every user, so gating any of
+  them would lock the account down rather than restrict it. The exemption stops there: **deleting**
+  your own account is never exempt, and the write exemption is your *user record* only — a customer
+  user still has no write on their own Customer.
 
 ### Assigning
 

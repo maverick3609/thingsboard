@@ -90,10 +90,24 @@ public final class UserPermissionsUtil {
      * Only READ is exempt: editing your own profile or customer still needs the grant.
      */
     public static boolean granted(SecurityUser user, Resource resource, Operation operation, EntityId entityId) {
-        if (operation == Operation.READ && ownEntity(user, resource, entityId)) {
+        if (selfService(resource, operation) && ownEntity(user, resource, entityId)) {
             return true;
         }
         return granted(user, resource, operation);
+    }
+
+    /**
+     * Operations on the entity a user IS, rather than an entity they can see. The authority checkers
+     * already confine these to the user themselves, so a role gate adds no security here and only
+     * breaks the account.
+     *
+     * WRITE is USER-only on purpose: stock CE gives a customer user READ on their own Customer and
+     * nothing more (CustomerUserPermissions.customerPermissionChecker), so exempting WRITE for
+     * CUSTOMER would grant something the authority baseline never allowed. DELETE is never exempt.
+     */
+    private static boolean selfService(Resource resource, Operation operation) {
+        return operation == Operation.READ
+                || (operation == Operation.WRITE && resource == Resource.USER);
     }
 
     private static boolean ownEntity(SecurityUser user, Resource resource, EntityId entityId) {

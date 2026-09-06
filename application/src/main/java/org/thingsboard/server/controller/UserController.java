@@ -276,6 +276,13 @@ public class UserController extends BaseController {
         if (user.getAuthority() == Authority.SYS_ADMIN && getCurrentUser().getId().equals(userId)) {
             throw new ThingsboardException("Sysadmin is not allowed to delete himself", ThingsboardErrorCode.PERMISSION_DENIED);
         }
+        // Inferrix RBAC: a CUSTOMER_USER only reaches this endpoint since the customer-administrator
+        // change widened the authority list. CustomerUserPermissions waves through EVERY operation on
+        // yourself, so without this guard a customer user could delete their own account - which the
+        // old SYS_ADMIN/TENANT_ADMIN list refused outright.
+        if (Authority.CUSTOMER_USER.equals(getCurrentUser().getAuthority()) && getCurrentUser().getId().equals(userId)) {
+            throw new ThingsboardException("You are not allowed to delete your own user!", ThingsboardErrorCode.PERMISSION_DENIED);
+        }
         if (user.getAuthority() == Authority.TENANT_ADMIN && userService.countTenantAdmins(user.getTenantId()) == 1) {
             throw new ThingsboardException("At least one tenant administrator must remain!", ThingsboardErrorCode.BAD_REQUEST_PARAMS);
         }

@@ -155,11 +155,12 @@ public class UserPermissionsTest {
     }
 
     /**
-     * Every authenticated session bootstraps with GET /api/user/{self}; gating it locks the user
-     * out of the platform entirely, so the entity-scoped gate exempts a self READ - and only that.
+     * Every authenticated session bootstraps with GET /api/user/{self}, and editing your own profile
+     * is something stock CE gives every customer user, so the entity-scoped gate exempts a self READ
+     * and a self WRITE. DELETE is never exempt.
      */
     @Test
-    public void testSelfUserReadIsNeverRoleGated() {
+    public void testSelfUserReadAndWriteAreNeverRoleGated() {
         MergedUserPermissions readOnlyDevices = DefaultUserPermissionsService.mergeRolePermissions(
                 List.of(role("{\"DEVICE\": [\"READ\"]}")));
         SecurityUser user = user(Authority.CUSTOMER_USER, readOnlyDevices);
@@ -167,8 +168,12 @@ public class UserPermissionsTest {
         user.setId(self);
 
         assertTrue(UserPermissionsUtil.granted(user, Resource.USER, Operation.READ, self));
+        // your own profile: a role that omits USER:WRITE must not stop you editing yourself
+        assertTrue(UserPermissionsUtil.granted(user, Resource.USER, Operation.WRITE, self));
+        // ... but only yourself, and only up to WRITE
         assertFalse(UserPermissionsUtil.granted(user, Resource.USER, Operation.READ, new UserId(UUID.randomUUID())));
-        assertFalse(UserPermissionsUtil.granted(user, Resource.USER, Operation.WRITE, self));
+        assertFalse(UserPermissionsUtil.granted(user, Resource.USER, Operation.WRITE, new UserId(UUID.randomUUID())));
+        assertFalse(UserPermissionsUtil.granted(user, Resource.USER, Operation.DELETE, self));
         assertFalse(UserPermissionsUtil.granted(user, Resource.USER, Operation.READ));
         // the exemption is scoped to USER: a self id must not unlock another resource
         assertFalse(UserPermissionsUtil.granted(user, Resource.DASHBOARD, Operation.READ, self));
@@ -219,6 +224,7 @@ public class UserPermissionsTest {
         customerUser.setCustomerId(own);
         assertTrue(UserPermissionsUtil.granted(customerUser, Resource.CUSTOMER, Operation.READ, own));
         assertFalse(UserPermissionsUtil.granted(customerUser, Resource.CUSTOMER, Operation.READ, other));
+        // WRITE is exempt for USER only - stock CE gives a customer user no write on their own Customer
         assertFalse(UserPermissionsUtil.granted(customerUser, Resource.CUSTOMER, Operation.WRITE, own));
 
         // a tenant admin is not gated at all now, own customer or not

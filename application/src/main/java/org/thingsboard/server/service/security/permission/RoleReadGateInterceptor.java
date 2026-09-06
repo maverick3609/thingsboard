@@ -189,9 +189,11 @@ public class RoleReadGateInterceptor implements HandlerInterceptor {
             entry("/api/notification/templates", Resource.NOTIFICATION),
             entry("/api/notification/slack/conversations", Resource.NOTIFICATION),
 
-            // Widget library. /api/widgetType?fqn= is deliberately NOT here: it is how a dashboard
-            // loads each widget's definition at render time, so gating it would blank out every
-            // dashboard a restricted user is otherwise allowed to open.
+            // Widget library. These eight list handlers do tenant/authority scoping only and make
+            // no permission call at all. The single-entity reads are absent because they already
+            // enforce it themselves - /api/widgetType?fqn=, the dashboard render path, ends in
+            // accessControlService.checkPermission(WIDGET_TYPE, READ). Consequence: a role that
+            // must serve dashboards needs WIDGET_TYPE READ regardless of this table.
             entry("/api/widgetsBundles", Resource.WIDGETS_BUNDLE),
             entry("/api/widgetsBundles/all", Resource.WIDGETS_BUNDLE),
             entry("/api/widgetsBundles/list", Resource.WIDGETS_BUNDLE),

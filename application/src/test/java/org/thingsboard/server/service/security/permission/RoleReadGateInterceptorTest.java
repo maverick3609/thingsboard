@@ -114,7 +114,7 @@ public class RoleReadGateInterceptorTest {
         assertEquals(Resource.WIDGETS_BUNDLE, RoleReadGateInterceptor.GATED_READS.get("/api/widgetsBundles"));
         assertEquals(Resource.WIDGET_TYPE, RoleReadGateInterceptor.GATED_READS.get("/api/widgetTypes"));
         assertEquals(Resource.WIDGET_TYPE, RoleReadGateInterceptor.GATED_READS.get("/api/widgetTypesInfos"));
-        // a dashboard resolves every widget through this one; gating it blanks out the dashboard
+        // already enforced per-entity inside the controller; a second gate here would be dead code
         assertNull(RoleReadGateInterceptor.GATED_READS.get("/api/widgetType"));
     }
 

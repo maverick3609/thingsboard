@@ -118,8 +118,8 @@ database row, so no role can be assigned to it. Its permissions are therefore fi
 (`DefaultUserPermissionsService.PUBLIC_USER_PERMISSIONS`) rather than seeded as a role, which is the one
 place this fork *has* to diverge from PE's shape while matching its effect.
 
-The set is PE's two public roles unioned — `{ALL: [READ, RPC_CALL, READ_ATTRIBUTES, READ_TELEMETRY]}` —
-because we have no entity groups to carry the second half. `CustomerUserPermissions` still confines the
+The set is PE's two public roles unioned, minus RPC — `{ALL: [READ, READ_ATTRIBUTES, READ_TELEMETRY]}` —
+unioned because we have no entity groups to carry the second half. `CustomerUserPermissions` still confines the
 viewer to the public customer's own entities, which is what group membership did in PE.
 
 Stock ThingsBoard grants a public viewer far more than reading. Measured against a published dashboard,
@@ -131,6 +131,7 @@ before and after:
 | write shared attributes | ✅ 200 | ⛔ 403 |
 | write timeseries | ✅ 200 | ⛔ 403 |
 | rename or otherwise modify the device | ✅ 200 | ⛔ 403 |
+| send RPC to the device (actuate it) | ✅ 200 | ⛔ 403 |
 | read the dashboard, device, attributes, telemetry, alarms | ✅ 200 | ✅ 200 |
 | delete the device, list tenant devices | ⛔ 403 | ⛔ 403 |
 
@@ -138,12 +139,12 @@ The credentials read is the one worth dwelling on: the access token does not exp
 a public dashboard could publish data as that device indefinitely, from anywhere, long after the link was
 withdrawn.
 
-> **One capability deliberately left open.** `RPC_CALL` stays, because PE keeps it and public dashboards
-> may carry control widgets — so whoever has the link can actuate the devices on that dashboard. This is
-> pre-existing behaviour, not something the clamp introduced (verified with the clamp disabled). If you do
-> not want anonymous actuation, delete `RPC_CALL` from the permission string in
-> `DefaultUserPermissionsService` — it is a one-word change and the test
-> `publicViewerCanStillSendRpcAsInPe` will tell you it took effect.
+> **Stricter than PE in one place, on purpose.** PE's public entity-group permissions include
+> `RPC_CALL`, so a PE public dashboard can carry working control widgets. We drop it: anyone holding a
+> dashboard link could otherwise actuate the devices on it. The consequence is that a **control widget on
+> a public dashboard is inert** — it renders, and the command is refused with 403. If a public dashboard
+> ever legitimately needs to actuate, that is the line to revisit (`PUBLIC_USER_PERMISSIONS` in
+> `DefaultUserPermissionsService`), not a per-widget workaround.
 
 ### How it is enforced
 

@@ -24,7 +24,6 @@ import org.thingsboard.server.common.data.Device;
 import org.thingsboard.server.common.data.ShortCustomerInfo;
 import org.thingsboard.server.dao.service.DaoSqlTest;
 
-import static org.junit.Assert.assertThrows;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -36,8 +35,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * role holder there is nothing to assign a role TO. The permission set is therefore fixed in code.
  *
  * Stock CE gives this viewer everything {@code CustomerUserPermissions.customerEntityPermissionChecker}
- * allows on the public customer's entities, which measurably included reading device CREDENTIALS and
- * writing attributes, timeseries and the device itself. Anyone holding the public link had those.
+ * allows on the public customer's entities, which measurably included reading device CREDENTIALS,
+ * writing attributes, timeseries and the device itself, and sending RPC. Anyone holding the public
+ * link had those.
  */
 @DaoSqlTest
 public class PublicUserPermissionsControllerTest extends AbstractControllerTest {
@@ -105,22 +105,18 @@ public class PublicUserPermissionsControllerTest extends AbstractControllerTest 
     }
 
     /**
-     * RPC survives the clamp, deliberately: PE's public entity-group set carries {@code RPC_CALL},
-     * ours mirrors it, and stock CE allowed it too - measured identically with the clamp disabled.
-     * So this is pre-existing behaviour, not something the clamp introduced.
+     * Anonymous actuation is refused - the one place this set is deliberately stricter than PE,
+     * whose public entity-group permissions carry {@code RPC_CALL}. Stock CE allowed this too, so
+     * it is a real removal rather than a no-op: before the clamp the same call was authorized and
+     * simply hung waiting for the offline device, never completing.
      *
-     * It is nonetheless the one write-shaped capability an anonymous link holder keeps: whoever has
-     * the public dashboard URL can actuate the devices on it. Delete {@code RPC_CALL} from
-     * {@code DefaultUserPermissionsService.PUBLIC_USER_PERMISSIONS} to close it.
-     *
-     * Authorized + device offline means the async result never arrives; a refusal would have
-     * completed as 403 straight away. Asserting the timeout is therefore asserting "not refused".
+     * A refusal completes as 403 immediately, which is why this can assert a status at all.
      */
     @Test
-    public void publicViewerCanStillSendRpcAsInPe() {
-        assertThrows(IllegalStateException.class, () ->
-                doPostAsync("/api/rpc/oneway/" + device.getId().getId(),
-                        JacksonUtil.toJsonNode("{\"method\":\"probe\",\"params\":{}}"), 5000L));
+    public void publicViewerCannotSendRpcToTheDevice() throws Exception {
+        doPostAsync("/api/rpc/oneway/" + device.getId().getId(),
+                JacksonUtil.toJsonNode("{\"method\":\"probe\",\"params\":{}}"), 5000L)
+                .andExpect(status().isForbidden());
     }
 
     private static String publicCustomerId(Dashboard dashboard) {

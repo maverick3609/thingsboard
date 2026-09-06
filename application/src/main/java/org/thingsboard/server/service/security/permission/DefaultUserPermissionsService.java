@@ -81,8 +81,10 @@ public class DefaultUserPermissionsService implements UserPermissionsService {
      * Stock CE grants every one of those to a public viewer through
      * {@code CustomerUserPermissions.customerEntityPermissionChecker}.
      *
-     * {@code RPC_CALL} is kept because PE keeps it - public dashboards may carry control widgets.
-     * Drop it from this one string if anonymous actuation is not wanted.
+     * {@code RPC_CALL} is deliberately DROPPED, which is the one place this set is stricter than
+     * PE's. PE keeps it so public dashboards can carry control widgets; here it meant that anyone
+     * holding a dashboard link could actuate the devices on it, which is not a trade this product
+     * wants. A public dashboard that needs a control widget will find the widget inert.
      */
     private static final MergedUserPermissions PUBLIC_USER_PERMISSIONS = publicUserPermissions();
 
@@ -90,7 +92,7 @@ public class DefaultUserPermissionsService implements UserPermissionsService {
         Role role = new Role();
         role.setType(RoleType.GENERIC);
         role.setPermissions(JacksonUtil.toJsonNode(
-                "{\"ALL\": [\"READ\", \"RPC_CALL\", \"READ_ATTRIBUTES\", \"READ_TELEMETRY\"]}"));
+                "{\"ALL\": [\"READ\", \"READ_ATTRIBUTES\", \"READ_TELEMETRY\"]}"));
         return mergeRolePermissions(List.of(role));
     }
 

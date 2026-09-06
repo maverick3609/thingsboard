@@ -74,6 +74,22 @@ They are ordinary roles — edit them, or ignore them and author your own. Note 
 next visit to the Roles page if deleted, so removing one is not permanent; edit it to empty instead.
 Seeding is idempotent and never touches a role that already exists under that name.
 
+PE seeds five roles per tenant; we seed these two. The other three do not port:
+
+| PE role | Why not |
+|---------|---------|
+| `Tenant Administrator` | PE reaches full tenant access by *seeding* an `ALL: [ALL]` role. Here a tenant admin has full rights inherently, so the role would grant nothing that is not already true. |
+| `Tenant User` | Its whole purpose is to restrict a tenant admin to read-only. Roles restrict customer users only here, so no tenant admin could ever hold it. |
+| `Public User` | No CE analogue — CE has no public-user authority to attach it to. |
+
+The cost of leaving the tenant pair out is a **read-only junior tenant administrator**: someone who can see
+everything in the tenant but change nothing. That role is not expressible here, and will not be while roles
+stay customer-scoped. Reversing it means dropping three guards — the authority checks at the top of
+`DefaultUserPermissionsService.getMergedPermissions` and in `UserPermissionsUtil.granted`, and the
+"customer users only" check in `RoleController.updateUserRoles` — after which an explicitly assigned role
+would restrict a tenant admin too. Nobody's access would change until a role is actually assigned, since a
+role-less user keeps full authority-based access either way.
+
 ### The customer administrator
 
 Give a customer user a role granting `User` **Write** — the seeded *Customer Administrator* does, via its

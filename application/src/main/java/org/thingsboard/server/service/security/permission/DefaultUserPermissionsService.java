@@ -30,6 +30,7 @@ import org.thingsboard.server.cluster.TbClusterService;
 import org.thingsboard.server.common.data.EntityType;
 import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.id.RoleId;
+import org.thingsboard.server.common.data.security.Authority;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.id.UserId;
 import org.thingsboard.server.common.data.plugin.ComponentLifecycleEvent;
@@ -63,6 +64,16 @@ public class DefaultUserPermissionsService implements UserPermissionsService {
 
     @Override
     public MergedUserPermissions getMergedPermissions(SecurityUser user) {
+        // Roles govern CUSTOMER_USER only. A tenant admin owns their domain outright and a sys
+        // admin the platform, so neither is ever role-restricted - null here means "legacy
+        // authority-based access" all the way through UserPermissionsUtil, the read gate and the
+        // UI gates, and it also spares those users a role lookup on every request.
+        // (PE reaches the same end state by auto-assigning tenant admins a GENERIC role of
+        // ALL:ALL - RoleServiceImpl.findOrCreateTenantAdminRole - rather than by exempting the
+        // authority; we exempt, so a tenant admin cannot be restricted even by assignment.)
+        if (user.getAuthority() != Authority.CUSTOMER_USER) {
+            return null;
+        }
         UserPermissionCacheKey key = new UserPermissionCacheKey(user.getTenantId(), user.getId());
         // Transactional get-or-load: a concurrent evict (role edited / unassigned while this
         // request is reading the DB) fails the put, so a revocation can never be overwritten by

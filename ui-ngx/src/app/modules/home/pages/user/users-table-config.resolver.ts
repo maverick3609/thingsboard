@@ -183,9 +183,11 @@ export class UsersTableConfigResolver  {
         {
           name: this.translate.instant('role.manage-roles'),
           icon: 'manage_accounts',
-          // mirrors the server guard in RoleController.updateUserRoles: nobody edits their own
-          // roles, since clearing them would restore unrestricted access
-          isEnabled: (user) => user?.id?.id !== this.authUser?.id?.id,
+          // mirrors the two server guards in RoleController.updateUserRoles: nobody edits their
+          // own roles (clearing them would restore unrestricted access), and roles apply to
+          // customer users only - a tenant admin owns their domain outright
+          isEnabled: (user) => user?.id?.id !== this.authUser?.id?.id
+            && user?.authority === Authority.CUSTOMER_USER,
           onAction: ($event, entity) => this.manageUserRoles($event, entity)
         }
       );

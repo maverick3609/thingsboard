@@ -266,7 +266,7 @@ public class UserPermissionsCacheEvictionTest {
         SecurityUser user = new SecurityUser();
         user.setId(USER_ID);
         user.setTenantId(TENANT_ID);
-        user.setAuthority(Authority.TENANT_ADMIN);
+        user.setAuthority(Authority.CUSTOMER_USER); // only customer users are role-restricted
         service.getMergedPermissions(user);
         ArgumentCaptor<UserPermissionCacheKey> loaded = ArgumentCaptor.forClass(UserPermissionCacheKey.class);
         verify(cache).getAndPutInTransaction(loaded.capture(), any(), anyBoolean());

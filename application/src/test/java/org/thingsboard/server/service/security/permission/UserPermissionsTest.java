@@ -91,17 +91,38 @@ public class UserPermissionsTest {
     @Test
     public void testGrantedFallbacks() {
         // role-less user keeps legacy access
-        assertTrue(UserPermissionsUtil.granted(user(Authority.TENANT_ADMIN, null), Resource.DEVICE, Operation.DELETE));
+        assertTrue(UserPermissionsUtil.granted(user(Authority.CUSTOMER_USER, null), Resource.DEVICE, Operation.DELETE));
         // non-restrictable authorities are never gated
         assertTrue(UserPermissionsUtil.granted(user(Authority.SYS_ADMIN, null), Resource.DEVICE, Operation.DELETE));
         assertTrue(UserPermissionsUtil.granted(user(Authority.MFA_CONFIGURATION_TOKEN, null), Resource.DEVICE, Operation.DELETE));
+    }
+
+    /**
+     * Roles restrict customer users only - a tenant admin owns their domain outright. Enforced
+     * twice: DefaultUserPermissionsService never loads permissions for them, and this gate ignores
+     * any that some other call site attaches anyway.
+     */
+    @Test
+    public void testTenantAdminIsNeverRoleRestricted() {
+        MergedUserPermissions readOnlyDevices = DefaultUserPermissionsService.mergeRolePermissions(
+                List.of(role("{\"DEVICE\": [\"READ\"]}")));
+        SecurityUser tenantAdmin = user(Authority.TENANT_ADMIN, readOnlyDevices);
+
+        assertTrue(UserPermissionsUtil.granted(tenantAdmin, Resource.DASHBOARD, Operation.READ));
+        assertTrue(UserPermissionsUtil.granted(tenantAdmin, Resource.DEVICE, Operation.DELETE));
+        assertTrue(UserPermissionsUtil.granted(tenantAdmin, Resource.ROLE, Operation.WRITE));
+        assertTrue(UserPermissionsUtil.grantedEntityQuery(tenantAdmin, relationsQuery(EntityType.ASSET)));
+
+        // ... while the very same role still restricts a customer user
+        SecurityUser customerUser = user(Authority.CUSTOMER_USER, readOnlyDevices);
+        assertFalse(UserPermissionsUtil.granted(customerUser, Resource.DASHBOARD, Operation.READ));
     }
 
     @Test
     public void testGrantedEntityQueryGatesRelationsQueryOnReturnedTypes() {
         MergedUserPermissions readOnlyDevices = DefaultUserPermissionsService.mergeRolePermissions(
                 List.of(role("{\"DEVICE\": [\"READ\"]}")));
-        SecurityUser user = user(Authority.TENANT_ADMIN, readOnlyDevices);
+        SecurityUser user = user(Authority.CUSTOMER_USER, readOnlyDevices);
 
         // the root entity type is irrelevant: what leaves the system is the RELATED entities
         assertTrue(UserPermissionsUtil.grantedEntityQuery(user, relationsQuery(EntityType.DEVICE)));
@@ -112,7 +133,7 @@ public class UserPermissionsTest {
 
         MergedUserPermissions readAll = DefaultUserPermissionsService.mergeRolePermissions(
                 List.of(role("{\"ALL\": [\"READ\"]}")));
-        assertTrue(UserPermissionsUtil.grantedEntityQuery(user(Authority.TENANT_ADMIN, readAll), relationsQuery()));
+        assertTrue(UserPermissionsUtil.grantedEntityQuery(user(Authority.CUSTOMER_USER, readAll), relationsQuery()));
     }
 
     private static RelationsQueryFilter relationsQuery(EntityType... relatedTypes) {
@@ -127,7 +148,7 @@ public class UserPermissionsTest {
     public void testGrantedRestrictsByRole() {
         MergedUserPermissions readOnlyDevices = DefaultUserPermissionsService.mergeRolePermissions(
                 List.of(role("{\"DEVICE\": [\"READ\"]}")));
-        SecurityUser user = user(Authority.TENANT_ADMIN, readOnlyDevices);
+        SecurityUser user = user(Authority.CUSTOMER_USER, readOnlyDevices);
         assertTrue(UserPermissionsUtil.granted(user, Resource.DEVICE, Operation.READ));
         assertFalse(UserPermissionsUtil.granted(user, Resource.DEVICE, Operation.WRITE));
         assertFalse(UserPermissionsUtil.granted(user, Resource.DASHBOARD, Operation.READ));
@@ -141,7 +162,7 @@ public class UserPermissionsTest {
     public void testSelfUserReadIsNeverRoleGated() {
         MergedUserPermissions readOnlyDevices = DefaultUserPermissionsService.mergeRolePermissions(
                 List.of(role("{\"DEVICE\": [\"READ\"]}")));
-        SecurityUser user = user(Authority.TENANT_ADMIN, readOnlyDevices);
+        SecurityUser user = user(Authority.CUSTOMER_USER, readOnlyDevices);
         UserId self = new UserId(UUID.randomUUID());
         user.setId(self);
 
@@ -170,9 +191,10 @@ public class UserPermissionsTest {
         assertFalse(UserPermissionsUtil.granted(customerUser, Resource.CUSTOMER, Operation.READ, other));
         assertFalse(UserPermissionsUtil.granted(customerUser, Resource.CUSTOMER, Operation.WRITE, own));
 
+        // a tenant admin is not gated at all now, own customer or not
         SecurityUser tenantAdmin = user(Authority.TENANT_ADMIN, readOnlyDevices);
         tenantAdmin.setCustomerId(own);
-        assertFalse(UserPermissionsUtil.granted(tenantAdmin, Resource.CUSTOMER, Operation.READ, own));
+        assertTrue(UserPermissionsUtil.granted(tenantAdmin, Resource.CUSTOMER, Operation.READ, other));
     }
 
 }

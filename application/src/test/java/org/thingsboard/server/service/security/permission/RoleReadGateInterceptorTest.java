@@ -77,6 +77,16 @@ public class RoleReadGateInterceptorTest {
     }
 
     @Test
+    public void testTenantAdminIsNotGatedEvenWithARole() {
+        Role role = new Role();
+        role.setType(RoleType.GENERIC);
+        role.setPermissions(JacksonUtil.toJsonNode("{\"DASHBOARD\": [\"READ\"]}"));
+        authenticate(user(Authority.TENANT_ADMIN, DefaultUserPermissionsService.mergeRolePermissions(List.of(role))));
+        assertTrue(preHandle(GATED_PATTERN, new MockHttpServletResponse()));
+        verify(errorResponseHandler, never()).handle(any(), any(HttpServletResponse.class));
+    }
+
+    @Test
     public void testLegacyAndSysAdminUsersAreNotGated() {
         // no roles assigned: keeps the pre-RBAC behaviour
         authenticate(user(Authority.TENANT_ADMIN, null));
@@ -146,7 +156,7 @@ public class RoleReadGateInterceptorTest {
         Role role = new Role();
         role.setType(RoleType.GENERIC);
         role.setPermissions(JacksonUtil.toJsonNode(permissionsJson));
-        return user(Authority.TENANT_ADMIN, DefaultUserPermissionsService.mergeRolePermissions(List.of(role)));
+        return user(Authority.CUSTOMER_USER, DefaultUserPermissionsService.mergeRolePermissions(List.of(role)));
     }
 
     private static SecurityUser user(Authority authority, MergedUserPermissions permissions) {

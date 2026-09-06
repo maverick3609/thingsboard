@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.thingsboard.server.common.data.User;
+import org.thingsboard.server.common.data.security.Authority;
 import org.thingsboard.server.common.data.exception.ThingsboardErrorCode;
 import org.thingsboard.server.common.data.exception.ThingsboardException;
 import org.thingsboard.server.common.data.id.RoleId;
@@ -184,6 +185,13 @@ public class RoleController extends BaseController {
             for (String strRoleId : strRoleIds) {
                 roleIds.add(new RoleId(toUUID(strRoleId)));
             }
+        }
+        // Roles restrict customer users only - a tenant admin owns their domain outright. Assigning
+        // one to a tenant admin would be inert, and an inert restriction reads as an applied one,
+        // so refuse it outright. Clearing (empty list) stays allowed so stale rows can be removed.
+        if (!roleIds.isEmpty() && targetUser.getAuthority() != Authority.CUSTOMER_USER) {
+            throw new ThingsboardException("Roles may only be assigned to customer users!",
+                    ThingsboardErrorCode.PERMISSION_DENIED);
         }
         tbRoleService.updateUserRoles(targetUser, roleIds, getCurrentUser());
     }

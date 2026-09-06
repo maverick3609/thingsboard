@@ -43,14 +43,16 @@ public final class UserPermissionsUtil {
     /**
      * True when the user's roles allow the operation on the resource.
      * <ul>
-     *   <li>Authorities other than TENANT_ADMIN / CUSTOMER_USER (SYS_ADMIN, MFA / pre-verification
-     *       tokens) are never role-restricted.</li>
+     *   <li>Only CUSTOMER_USER is ever role-restricted. A tenant admin has full rights over their
+     *       own domain and a sys admin over the platform, so both are exempt - and
+     *       {@code DefaultUserPermissionsService} never even loads permissions for them. This
+     *       check is the second half of that invariant, so a stray call site that attaches
+     *       permissions to a tenant admin still cannot restrict one.</li>
      *   <li>A user with no roles ({@code userPermissions == null}) keeps legacy full access.</li>
      * </ul>
      */
     public static boolean granted(SecurityUser user, Resource resource, Operation operation) {
-        Authority authority = user.getAuthority();
-        if (authority != Authority.TENANT_ADMIN && authority != Authority.CUSTOMER_USER) {
+        if (user.getAuthority() != Authority.CUSTOMER_USER) {
             return true;
         }
         MergedUserPermissions userPermissions = user.getUserPermissions();
@@ -100,8 +102,7 @@ public final class UserPermissionsUtil {
      * role-gated (legacy behavior); tenant/customer scoping inside the query builder still applies.
      */
     public static boolean grantedEntityQuery(SecurityUser user, EntityFilter filter) {
-        Authority authority = user.getAuthority();
-        if (authority != Authority.TENANT_ADMIN && authority != Authority.CUSTOMER_USER) {
+        if (user.getAuthority() != Authority.CUSTOMER_USER) {
             return true;
         }
         if (user.getUserPermissions() == null || filter == null) {

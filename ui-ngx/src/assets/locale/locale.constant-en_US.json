@@ -5581,7 +5581,7 @@
         "name-required": "Role name is required.",
         "description": "Description",
         "permissions": "Permissions",
-        "permissions-hint": "Each row grants a set of operations on one resource. \"All\" acts as a wildcard. Operations are matched exactly: \"Read\" does not include \"Read telemetry\", \"Read attributes\" or \"Read credentials\", so add those explicitly for a role that must serve dashboards. A user with at least one role is limited to the union of the granted permissions; a user without roles keeps full default access.",
+        "permissions-hint": "Each row grants a set of operations on one resource. \"All\" acts as a wildcard. Operations are matched exactly: \"Read\" does not include \"Read telemetry\", \"Read attributes\" or \"Read credentials\", so add those explicitly for a role that must serve dashboards. Rendering any dashboard, including the Home page, also needs \"Widget type\" Read; browsing the widget library needs \"Widgets bundle\" Read. A user with at least one role is limited to the union of the granted permissions; a user without roles keeps full default access.",
         "resource": "Resource",
         "operations": "Operations",
         "add-role": "Add role",

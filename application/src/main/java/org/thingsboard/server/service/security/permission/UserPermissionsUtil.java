@@ -61,16 +61,36 @@ public final class UserPermissionsUtil {
     }
 
     /**
-     * Entity-scoped role gate. Reading your own user record is never role-gated: every
-     * authenticated session bootstraps with {@code GET /api/user/{self}}, so a role without
-     * {@code USER:READ} would make its holders unable to log in at all. Only READ is exempt -
-     * editing your own profile still needs the grant.
+     * Entity-scoped role gate, with two READ exemptions for the entities a user IS rather than
+     * the entities a user can see. Both are things the authority checker already confines to the
+     * user themselves, so gating them buys no security and only breaks the account:
+     * <ul>
+     *   <li>your own user record - every authenticated session bootstraps with
+     *       {@code GET /api/user/{self}}, so a role without {@code USER:READ} would lock its
+     *       holders out of the platform entirely;</li>
+     *   <li>a customer user's own customer - {@code checkCustomerId} guards every customer-scoped
+     *       list ({@code /api/customer/{id}/devices} and friends), so a role without
+     *       {@code CUSTOMER:READ} would deny them regardless of what else it grants.</li>
+     * </ul>
+     * Only READ is exempt: editing your own profile or customer still needs the grant.
      */
     public static boolean granted(SecurityUser user, Resource resource, Operation operation, EntityId entityId) {
-        if (resource == Resource.USER && operation == Operation.READ && user.getId().equals(entityId)) {
+        if (operation == Operation.READ && ownEntity(user, resource, entityId)) {
             return true;
         }
         return granted(user, resource, operation);
+    }
+
+    private static boolean ownEntity(SecurityUser user, Resource resource, EntityId entityId) {
+        if (resource == Resource.USER) {
+            return user.getId() != null && user.getId().equals(entityId);
+        }
+        if (resource == Resource.CUSTOMER) {
+            // tenant admins read many customers - only a customer user's own customer is exempt
+            return user.getAuthority() == Authority.CUSTOMER_USER
+                    && user.getCustomerId() != null && user.getCustomerId().equals(entityId);
+        }
+        return false;
     }
 
     /**

@@ -18,6 +18,7 @@ package org.thingsboard.server.service.security.permission;
 import org.junit.jupiter.api.Test;
 import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.common.data.EntityType;
+import org.thingsboard.server.common.data.id.CustomerId;
 import org.thingsboard.server.common.data.id.UserId;
 import org.thingsboard.server.common.data.query.RelationsQueryFilter;
 import org.thingsboard.server.common.data.relation.EntitySearchDirection;
@@ -150,6 +151,28 @@ public class UserPermissionsTest {
         assertFalse(UserPermissionsUtil.granted(user, Resource.USER, Operation.READ));
         // the exemption is scoped to USER: a self id must not unlock another resource
         assertFalse(UserPermissionsUtil.granted(user, Resource.DASHBOARD, Operation.READ, self));
+    }
+
+    /**
+     * checkCustomerId guards every customer-scoped list, so a customer user must be able to read
+     * the customer they belong to whatever else the role denies. Tenant admins are not exempt.
+     */
+    @Test
+    public void testOwnCustomerReadIsExemptForCustomerUsersOnly() {
+        MergedUserPermissions readOnlyDevices = DefaultUserPermissionsService.mergeRolePermissions(
+                List.of(role("{\"DEVICE\": [\"READ\"]}")));
+        CustomerId own = new CustomerId(UUID.randomUUID());
+        CustomerId other = new CustomerId(UUID.randomUUID());
+
+        SecurityUser customerUser = user(Authority.CUSTOMER_USER, readOnlyDevices);
+        customerUser.setCustomerId(own);
+        assertTrue(UserPermissionsUtil.granted(customerUser, Resource.CUSTOMER, Operation.READ, own));
+        assertFalse(UserPermissionsUtil.granted(customerUser, Resource.CUSTOMER, Operation.READ, other));
+        assertFalse(UserPermissionsUtil.granted(customerUser, Resource.CUSTOMER, Operation.WRITE, own));
+
+        SecurityUser tenantAdmin = user(Authority.TENANT_ADMIN, readOnlyDevices);
+        tenantAdmin.setCustomerId(own);
+        assertFalse(UserPermissionsUtil.granted(tenantAdmin, Resource.CUSTOMER, Operation.READ, own));
     }
 
 }

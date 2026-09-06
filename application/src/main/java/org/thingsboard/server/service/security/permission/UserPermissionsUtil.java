@@ -63,6 +63,19 @@ public final class UserPermissionsUtil {
     }
 
     /**
+     * A capability that is OFF until a role explicitly turns it on — the inverse of
+     * {@link #granted}, which reads "no roles" as legacy full access.
+     * <p>
+     * Use this, never {@code granted}, when opening an operation the authority baseline has never
+     * allowed. With {@code granted} a role-less user would sail straight through the null check and
+     * silently gain the new power; here they are denied until someone assigns a role that names it.
+     */
+    public static boolean explicitlyGranted(SecurityUser user, Resource resource, Operation operation) {
+        MergedUserPermissions userPermissions = user.getUserPermissions();
+        return userPermissions != null && userPermissions.hasGenericPermission(resource, operation);
+    }
+
+    /**
      * Entity-scoped role gate, with two READ exemptions for the entities a user IS rather than
      * the entities a user can see. Both are things the authority checker already confines to the
      * user themselves, so gating them buys no security and only breaks the account:

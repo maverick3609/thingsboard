@@ -46,6 +46,18 @@ export const hasGenericPermission = (permissions: MergedUserPermissions | undefi
   return allows(granted[resource], operation) || allows(granted[ALL_RESOURCES], operation);
 };
 
+/**
+ * A capability that is OFF until a role explicitly names it — the mirror of the backend's
+ * `UserPermissionsUtil.explicitlyGranted`. Unlike `hasGenericPermission`, a user with no roles is
+ * denied rather than waved through, so an operation the authority baseline never allowed does not
+ * appear for everyone the day it ships.
+ */
+export const explicitlyHasGenericPermission = (permissions: MergedUserPermissions | undefined | null,
+                                               resource: string, operation: string): boolean => {
+  const granted = permissions?.genericPermissions;
+  return !!granted && (allows(granted[resource], operation) || allows(granted[ALL_RESOURCES], operation));
+};
+
 const allows = (operations: string[] | undefined, operation: string): boolean =>
   !!operations && (operations.includes(ALL_OPERATIONS) || operations.includes(operation));
 

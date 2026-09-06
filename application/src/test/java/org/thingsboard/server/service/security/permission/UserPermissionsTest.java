@@ -175,6 +175,36 @@ public class UserPermissionsTest {
     }
 
     /**
+     * The customer-administrator capability is opt-in: it must stay OFF for a role-less customer
+     * user, who would otherwise inherit peer-user management the day the feature shipped.
+     */
+    @Test
+    public void testExplicitlyGrantedHasNoLegacyFallback() {
+        MergedUserPermissions all = DefaultUserPermissionsService.mergeRolePermissions(
+                List.of(role("{\"ALL\": [\"ALL\"]}")));
+        MergedUserPermissions readOnly = DefaultUserPermissionsService.mergeRolePermissions(
+                List.of(role("{\"ALL\": [\"READ\", \"RPC_CALL\", \"READ_CREDENTIALS\", \"READ_ATTRIBUTES\", \"READ_TELEMETRY\"]}")));
+
+        // role-less: granted() says yes (legacy access), explicitlyGranted() says no
+        SecurityUser roleless = user(Authority.CUSTOMER_USER, null);
+        assertTrue(UserPermissionsUtil.granted(roleless, Resource.USER, Operation.WRITE));
+        assertFalse(UserPermissionsUtil.explicitlyGranted(roleless, Resource.USER, Operation.WRITE));
+
+        // Customer Administrator (PE's ALL:ALL) turns it on
+        SecurityUser admin = user(Authority.CUSTOMER_USER, all);
+        assertTrue(UserPermissionsUtil.explicitlyGranted(admin, Resource.USER, Operation.CREATE));
+        assertTrue(UserPermissionsUtil.explicitlyGranted(admin, Resource.USER, Operation.WRITE));
+        assertTrue(UserPermissionsUtil.explicitlyGranted(admin, Resource.USER, Operation.DELETE));
+
+        // Customer User (PE's read-only map) does not
+        SecurityUser plain = user(Authority.CUSTOMER_USER, readOnly);
+        assertTrue(UserPermissionsUtil.explicitlyGranted(plain, Resource.USER, Operation.READ));
+        assertFalse(UserPermissionsUtil.explicitlyGranted(plain, Resource.USER, Operation.CREATE));
+        assertFalse(UserPermissionsUtil.explicitlyGranted(plain, Resource.USER, Operation.WRITE));
+        assertFalse(UserPermissionsUtil.explicitlyGranted(plain, Resource.USER, Operation.DELETE));
+    }
+
+    /**
      * checkCustomerId guards every customer-scoped list, so a customer user must be able to read
      * the customer they belong to whatever else the role denies. Tenant admins are not exempt.
      */

@@ -229,7 +229,15 @@ public class CustomerUserPermissions extends AbstractPermissions {
                 return true;
             }
 
-            return user.getId().equals(userId);
+            if (user.getId().equals(userId)) {
+                return true;
+            }
+
+            // Customer administrator (PE parity): an EXPLICIT USER grant lets a customer user
+            // manage peers inside their own customer - both guards above have already confined the
+            // target to a CUSTOMER_USER of this customer. Explicit on purpose: with the ordinary
+            // granted() a role-less customer user would inherit this the day it shipped.
+            return UserPermissionsUtil.explicitlyGranted(user, Resource.USER, operation);
         }
 
     };

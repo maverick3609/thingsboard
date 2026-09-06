@@ -38,9 +38,11 @@ const routes: Routes = [
         path: '',
         component: EntitiesTableComponent,
         data: {
-          auth: [Authority.TENANT_ADMIN],
+          auth: [Authority.TENANT_ADMIN, Authority.CUSTOMER_USER],
           title: 'user.users',
-          // Inferrix RBAC: lists every user of the tenant, admins included
+          // Inferrix RBAC: for a tenant admin this lists every user of the tenant, admins included;
+          // GET /api/users scopes a customer user to their own customer, which is the page a
+          // customer administrator manages their colleagues from
           usersType: 'tenant'
         },
         resolve: {
@@ -56,7 +58,7 @@ const routes: Routes = [
             labelFunction: entityDetailsPageBreadcrumbLabelFunction,
             icon: 'account_circle'
           } as BreadCrumbConfig<EntityDetailsPageComponent>,
-          auth: [Authority.SYS_ADMIN, Authority.TENANT_ADMIN],
+          auth: [Authority.SYS_ADMIN, Authority.TENANT_ADMIN, Authority.CUSTOMER_USER],
           title: 'user.user',
           usersType: 'tenant',
         },

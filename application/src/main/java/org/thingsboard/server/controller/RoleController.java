@@ -138,6 +138,14 @@ public class RoleController extends BaseController {
             @RequestParam(required = false) String sortOrder) throws ThingsboardException {
         SecurityUser currentUser = getCurrentUser();
         accessControlService.checkPermission(currentUser, Resource.ROLE, Operation.READ);
+        // Seed PE's two default roles on first sight of the tenant's role list. Lazy rather than a
+        // migration so existing tenants get them too; idempotent, and a failure here must never
+        // stop the listing itself.
+        try {
+            roleService.createDefaultRoles(currentUser.getTenantId());
+        } catch (Exception e) {
+            log.warn("[{}] Failed to create the default roles", currentUser.getTenantId(), e);
+        }
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
         return checkNotNull(roleService.findRolesByTenantId(currentUser.getTenantId(), pageLink));
     }

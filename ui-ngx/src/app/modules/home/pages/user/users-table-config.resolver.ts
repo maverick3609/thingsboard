@@ -32,6 +32,10 @@ import { CustomerService } from '@core/http/customer.service';
 import { map, mergeMap, take, tap } from 'rxjs/operators';
 import { Observable, of } from 'rxjs';
 import { Authority } from '@shared/models/authority.enum';
+import { explicitlyHasGenericPermission } from '@core/services/menu-permissions';
+import { CREATE, DELETE, WRITE } from '@home/models/entity/entity-table-permissions';
+
+const USER_RESOURCE = 'USER';
 import {
   ManageUserRolesDialogComponent,
   ManageUserRolesDialogData
@@ -119,7 +123,10 @@ export class UsersTableConfigResolver  {
         this.tenantUsers = route.data.usersType === 'tenant';
         if (this.tenantUsers) {
           this.tenantId = this.authUser.tenantId.id;
-          this.customerId = NULL_UUID;
+          // a customer administrator only ever creates users inside their own customer; the server
+          // pins both fields as well (UserController.saveUser), this keeps the form honest
+          this.customerId = auth.authUser?.authority === Authority.CUSTOMER_USER
+            ? this.authUser.customerId.id : NULL_UUID;
           this.config.entitiesFetchFunction = pageLink => this.userService.getUsers(pageLink);
         } else if (this.authority === Authority.TENANT_ADMIN) {
           this.tenantId = routeParams.tenantId;
@@ -130,12 +137,21 @@ export class UsersTableConfigResolver  {
           this.customerId = routeParams.customerId;
           this.config.entitiesFetchFunction = pageLink => this.userService.getCustomerUsers(this.customerId, pageLink);
         }
-        this.config.addEnabled = !this.tenantUsers;
-        this.config.entitiesDeleteEnabled = !this.tenantUsers;
+        // A customer administrator manages their colleagues from this same '/users' page, so the
+        // tenant-wide scope is only read-only when the viewer cannot manage users. The grant must be
+        // EXPLICIT (mirrors CustomerUserPermissions): a role-less customer user sees the list exactly
+        // as read-only as they do today.
+        const manageUsers = this.tenantUsers && auth.authUser?.authority === Authority.CUSTOMER_USER
+          && explicitlyHasGenericPermission(auth.userPermissions, USER_RESOURCE, WRITE);
+        const readOnlyScope = this.tenantUsers && !manageUsers;
+        this.config.addEnabled = !readOnlyScope
+          && (!this.tenantUsers || explicitlyHasGenericPermission(auth.userPermissions, USER_RESOURCE, CREATE));
+        this.config.entitiesDeleteEnabled = !readOnlyScope
+          && (!this.tenantUsers || explicitlyHasGenericPermission(auth.userPermissions, USER_RESOURCE, DELETE));
         // also drives the "Delete user" button of the details view (UserComponent.hideDelete),
         // which entitiesDeleteEnabled does not reach
-        this.config.deleteEnabled = user => !this.tenantUsers && user?.id?.id !== this.authUser?.id?.id;
-        this.config.detailsReadonly = () => this.tenantUsers;
+        this.config.deleteEnabled = user => this.config.entitiesDeleteEnabled && user?.id?.id !== this.authUser?.id?.id;
+        this.config.detailsReadonly = () => readOnlyScope;
         this.updateActionCellDescriptors(auth);
       }),
       mergeMap(() => {

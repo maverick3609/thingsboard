@@ -199,6 +199,14 @@ public class UserController extends BaseController {
         if (!Authority.SYS_ADMIN.equals(getCurrentUser().getAuthority())) {
             user.setTenantId(getCurrentUser().getTenantId());
         }
+        // Inferrix RBAC: a customer administrator may only ever produce a customer user of their
+        // OWN customer, so pin both fields from the caller instead of trusting the body. Also
+        // covers the create form omitting authority, which the permission checker would read as
+        // "not a customer user" and refuse.
+        if (Authority.CUSTOMER_USER.equals(getCurrentUser().getAuthority())) {
+            user.setCustomerId(getCurrentUser().getCustomerId());
+            user.setAuthority(Authority.CUSTOMER_USER);
+        }
         checkEntity(user.getId(), user, Resource.USER);
         return tbUserService.save(getTenantId(), getCurrentUser().getCustomerId(), user, sendActivationMail, request, getCurrentUser());
     }
@@ -227,7 +235,7 @@ public class UserController extends BaseController {
     @ApiOperation(value = "Get activation link (getActivationLink)",
             notes = "Get the activation link for the user. " +
                     "The base url for activation link is configurable in the general settings of system administrator. " + SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
-    @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @GetMapping(value = "/user/{userId}/activationLink", produces = "text/plain")
     public String getActivationLink(@Parameter(description = USER_ID_PARAM_DESCRIPTION)
                                     @PathVariable(USER_ID) String strUserId,
@@ -238,14 +246,17 @@ public class UserController extends BaseController {
     @ApiOperation(value = "Get activation link info (getActivationLinkInfo)",
             notes = "Get the activation link info for the user. " +
                     "The base url for activation link is configurable in the general settings of system administrator. " + SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
-    @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @GetMapping(value = "/user/{userId}/activationLinkInfo")
     public UserActivationLink getActivationLinkInfo(@Parameter(description = USER_ID_PARAM_DESCRIPTION)
                                                     @PathVariable(USER_ID) String strUserId,
                                                     HttpServletRequest request) throws ThingsboardException {
         checkParameter(USER_ID, strUserId);
         UserId userId = new UserId(toUUID(strUserId));
-        checkUserId(userId, Operation.READ);
+        // WRITE, not READ: this link lets the bearer set that user's password, so minting one is a
+        // write-class action. A customer user has READ on every peer in their customer, so gating it
+        // on READ would hand any of them an account-takeover primitive.
+        checkUserId(userId, Operation.WRITE);
         SecurityUser securityUser = getCurrentUser();
         return tbUserService.getActivationLink(securityUser.getTenantId(), securityUser.getCustomerId(), userId, request);
     }
@@ -253,7 +264,7 @@ public class UserController extends BaseController {
     @ApiOperation(value = "Delete User (deleteUser)",
             notes = "Deletes the User, it's credentials and all the relations (from and to the User). " +
                     "Referencing non-existing User Id will cause an error. " + SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
-    @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @DeleteMapping(value = "/user/{userId}")
     @ResponseStatus(value = HttpStatus.OK)
     public void deleteUser(

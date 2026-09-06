@@ -1099,6 +1099,7 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
         ]
       },
       {id: MenuId.scheduler},
+      {id: MenuId.users},
       {id: MenuId.white_labeling}
     ]
   ]

@@ -36,6 +36,8 @@ public interface RoleService extends EntityDaoService {
 
     PageData<Role> findRolesByTenantId(TenantId tenantId, PageLink pageLink);
 
+    void createDefaultRoles(TenantId tenantId);
+
     Optional<Role> findRoleByTenantIdAndName(TenantId tenantId, String name);
 
     void deleteRole(TenantId tenantId, RoleId roleId);

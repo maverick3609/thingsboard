@@ -9,6 +9,77 @@ unrelated, older `INFERRIX.md` (commit `f2e6ce9aa9`) documenting the superseded 
 `src/inferrix/` branding overlay — the two branches are divergent, these are not versions of the same
 document, and they should not be merged or reconciled as if they were.
 
+## Roles and Permissions
+
+PE-style role-based access control, ported as *generic roles assigned directly to users*. A role is a set
+of `resource -> [operations]` grants; a user may hold several and gets the union.
+
+### Who a role applies to
+
+**Customer users only.** A tenant administrator has full rights over their own tenant and cannot be
+restricted by a role — assigning one is refused (`403 Roles may only be assigned to customer users!`), and
+the *Manage roles* action is disabled on non-customer rows. A sys admin is never restricted either.
+
+A customer user with **no** role keeps the plain authority-based access ThingsBoard has always given them,
+so the feature is opt-in per user and needs no migration or backfill.
+
+> ThingsBoard PE differs here. PE routes tenant admins through the same role machinery and merely seeds
+> them a generic `ALL: [ALL]` role, so PE *can* restrict a tenant admin. This fork deliberately cannot.
+> The behaviour out of the box is identical; the capability is narrower.
+
+### Authoring a role
+
+**Administration → Roles → Add role.** Each row grants a set of operations on one resource; `All` is a
+wildcard on either side.
+
+Three things regularly surprise people:
+
+- **Operations match exactly.** `Read` does **not** imply `Read telemetry`, `Read attributes` or
+  `Read credentials`. A role that must serve a dashboard needs those listed explicitly.
+- **Dashboards need `Widget type` Read.** Every dashboard — including the built-in Home page — resolves
+  each of its widgets through `GET /api/widgetType?fqn=`, which is permission-checked. Without the grant
+  the page renders as a column of *"Problem loading widget configuration. Probably associated widget type
+  was removed."* That is ThingsBoard's generic message; nothing in it says "permission". Browsing the
+  widget library additionally needs `Widgets bundle` Read.
+- **A customer user needs nothing extra for their own customer.** Reading your own user record and, for a
+  customer user, your own customer record are never role-gated — every session bootstraps with
+  `GET /api/user/{self}`, and `checkCustomerId` fronts every customer-scoped list, so gating either one
+  would lock the account out rather than restrict it. Only READ is exempt.
+
+### Assigning
+
+**Administration → Users** lists every user in the tenant (read-only — create and delete stay on the
+customer's own users page). The *Manage roles* action replaces a user's whole set; an empty selection
+removes all roles and restores default access.
+
+Nobody may change their **own** roles, in the UI or over the API — clearing them would restore
+unrestricted access to the person doing the clearing.
+
+### How it is enforced
+
+- Roles are AND-ed in after the normal authority check, in `DefaultAccessControlService`. A role can only
+  ever **restrict** what the authority already allows, never extend it.
+- Collection endpoints that read entity data without a per-entity check are covered by a read gate keyed
+  on the URL pattern (115 endpoints; it logs `RBAC read gate active on 115 endpoints` at boot, and logs an
+  error naming any pattern that no longer resolves, so an upstream rename cannot silently open a hole).
+- `/api/entitiesQuery/*` and the WS v2 commands are gated on the entity type the query resolves to.
+- The UI hides menu entries, Add/Delete buttons and details-panel actions the role denies. That is
+  **cosmetic** — the server is the enforcer. A few entity-specific buttons (Unassign from customer, Manage
+  credentials) are still drawn; the server refuses them.
+
+### Operational notes
+
+- **Permissions are never in the JWT.** They are cached per user and re-read each request, so a role edit
+  applies on the **next request** — no logout needed. The menu follows on the next page load.
+- **Cache eviction is cluster-wide.** A role change broadcasts one message to every tb-core node carrying
+  the affected user ids, so a revocation cannot linger on another node. This matters because
+  `cache.type` defaults to node-local caffeine.
+- **The `role` and `user_role` tables must exist.** They ship in the Inferrix schema overlay
+  (`dao/src/main/resources/sql/schema-inferrix.sql`). If the jar is swapped without applying it, the
+  platform logs `RBAC tables are missing - roles are not enforced until the database upgrade is run.` once
+  and falls back to legacy access for every customer user rather than failing their requests — a
+  deliberate fail-open, chosen so a missed migration cannot lock a whole tenant out. Apply the overlay.
+
 ## License Control
 
 Offline, install-wide licence enforcement. A signed key caps the number of devices and assets a

@@ -101,7 +101,9 @@ the page exactly as read-only as before, so shipping this widened nobody's acces
 - `/api/entitiesQuery/*` and the WS v2 commands are gated on the entity type the query resolves to.
 - The UI hides menu entries, Add/Delete buttons and details-panel actions the role denies. That is
   **cosmetic** — the server is the enforcer. A few entity-specific buttons (Unassign from customer, Manage
-  credentials) are still drawn; the server refuses them.
+  credentials) are still drawn; the server refuses them. The **Users** page is fully covered: a customer
+  user never sees Disable/Enable Account or Resend activation (tenant-only endpoints), and sees Display
+  activation link only with the customer-administrator grant.
 
 ### Operational notes
 

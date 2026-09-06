@@ -35,8 +35,10 @@ import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.id.UserId;
 import org.thingsboard.server.common.data.plugin.ComponentLifecycleEvent;
 import org.thingsboard.server.common.data.role.Role;
+import org.thingsboard.server.common.data.role.RoleType;
 import org.thingsboard.server.common.msg.plugin.ComponentLifecycleMsg;
 import org.thingsboard.server.dao.role.RoleService;
+import org.thingsboard.server.service.security.model.UserPrincipal;
 import org.thingsboard.server.service.security.model.SecurityUser;
 
 import java.util.ArrayList;
@@ -62,6 +64,36 @@ public class DefaultUserPermissionsService implements UserPermissionsService {
     static final String USER_IDS = "userIds";
     static final int EVICTION_BATCH_SIZE = 1000;
 
+    /**
+     * What an anonymous public-dashboard viewer may do (PE parity).
+     *
+     * PE expresses this as two seeded roles - {@code GroupPermission.PUBLIC_USER_PERMISSIONS}
+     * ({@code DASHBOARD/WIDGETS_BUNDLE/WIDGET_TYPE/ALARM: [READ]}) plus
+     * {@code PUBLIC_USER_ENTITY_GROUP_PERMISSIONS} ({@code [READ, RPC_CALL, READ_ATTRIBUTES,
+     * READ_TELEMETRY]}) on the public entity group. This fork has no entity groups to hang the
+     * second half on, so the two are unioned onto every resource; {@link CustomerUserPermissions}
+     * still confines the viewer to the public customer's own entities, which is what the group
+     * membership did in PE.
+     *
+     * Read-only on purpose, and note what is NOT here: {@code READ_CREDENTIALS} (PE omits it from
+     * the public group set too - it would hand anyone with the link the device's access token),
+     * {@code WRITE}, {@code WRITE_ATTRIBUTES}, {@code WRITE_TELEMETRY} and {@code CLAIM_DEVICES}.
+     * Stock CE grants every one of those to a public viewer through
+     * {@code CustomerUserPermissions.customerEntityPermissionChecker}.
+     *
+     * {@code RPC_CALL} is kept because PE keeps it - public dashboards may carry control widgets.
+     * Drop it from this one string if anonymous actuation is not wanted.
+     */
+    private static final MergedUserPermissions PUBLIC_USER_PERMISSIONS = publicUserPermissions();
+
+    private static MergedUserPermissions publicUserPermissions() {
+        Role role = new Role();
+        role.setType(RoleType.GENERIC);
+        role.setPermissions(JacksonUtil.toJsonNode(
+                "{\"ALL\": [\"READ\", \"RPC_CALL\", \"READ_ATTRIBUTES\", \"READ_TELEMETRY\"]}"));
+        return mergeRolePermissions(List.of(role));
+    }
+
     @Override
     public MergedUserPermissions getMergedPermissions(SecurityUser user) {
         // Roles govern CUSTOMER_USER only. A tenant admin owns their domain outright and a sys
@@ -71,6 +103,15 @@ public class DefaultUserPermissionsService implements UserPermissionsService {
         // (PE reaches the same end state by auto-assigning tenant admins a GENERIC role of
         // ALL:ALL - RoleServiceImpl.findOrCreateTenantAdminRole - rather than by exempting the
         // authority; we exempt, so a tenant admin cannot be restricted even by assignment.)
+        // A public dashboard viewer authenticates anonymously with nothing but the public link, and
+        // arrives here as a CUSTOMER_USER of the public customer - so it must be caught BEFORE the
+        // authority check below. It is a synthetic user (UserId(NULL_UUID), no database row), so no
+        // role can ever be assigned to one; the permission set has to be fixed in code the way PE
+        // fixes it in seeded data.
+        if (user.getUserPrincipal() != null
+                && UserPrincipal.Type.PUBLIC_ID == user.getUserPrincipal().getType()) {
+            return PUBLIC_USER_PERMISSIONS;
+        }
         if (user.getAuthority() != Authority.CUSTOMER_USER) {
             return null;
         }

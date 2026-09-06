@@ -80,7 +80,7 @@ PE seeds five roles per tenant; we seed these two. The other three do not port:
 |---------|---------|
 | `Tenant Administrator` | PE reaches full tenant access by *seeding* an `ALL: [ALL]` role. Here a tenant admin has full rights inherently, so the role would grant nothing that is not already true. |
 | `Tenant User` | Its whole purpose is to restrict a tenant admin to read-only. Roles restrict customer users only here, so no tenant admin could ever hold it. |
-| `Public User` | No CE analogue — CE has no public-user authority to attach it to. |
+| `Public User` | Ported, but **not as a role** — see below. CE does have public users, but they are synthetic (no database row), so there is nothing to assign a role to. |
 
 The cost of leaving the tenant pair out is a **read-only junior tenant administrator**: someone who can see
 everything in the tenant but change nothing. That role is not expressible here, and will not be while roles
@@ -109,6 +109,41 @@ mail. The activation **link** is available — that is the intended way to hand 
 
 The capability is **explicit**: it needs a role that names `User` Write. A customer user with no role sees
 the page exactly as read-only as before, so shipping this widened nobody's access by default.
+
+### The anonymous public-dashboard viewer
+
+Publishing a dashboard makes it readable by anyone holding the link. That viewer authenticates with
+nothing but the public id and arrives as a **customer user of the public customer** — synthetic, with no
+database row, so no role can be assigned to it. Its permissions are therefore fixed in code
+(`DefaultUserPermissionsService.PUBLIC_USER_PERMISSIONS`) rather than seeded as a role, which is the one
+place this fork *has* to diverge from PE's shape while matching its effect.
+
+The set is PE's two public roles unioned — `{ALL: [READ, RPC_CALL, READ_ATTRIBUTES, READ_TELEMETRY]}` —
+because we have no entity groups to carry the second half. `CustomerUserPermissions` still confines the
+viewer to the public customer's own entities, which is what group membership did in PE.
+
+Stock ThingsBoard grants a public viewer far more than reading. Measured against a published dashboard,
+before and after:
+
+| An anonymous link holder could… | before | now |
+|---|---|---|
+| read the device's **access token** (`/credentials`) | ✅ 200 | ⛔ 403 |
+| write shared attributes | ✅ 200 | ⛔ 403 |
+| write timeseries | ✅ 200 | ⛔ 403 |
+| rename or otherwise modify the device | ✅ 200 | ⛔ 403 |
+| read the dashboard, device, attributes, telemetry, alarms | ✅ 200 | ✅ 200 |
+| delete the device, list tenant devices | ⛔ 403 | ⛔ 403 |
+
+The credentials read is the one worth dwelling on: the access token does not expire, so anyone who opened
+a public dashboard could publish data as that device indefinitely, from anywhere, long after the link was
+withdrawn.
+
+> **One capability deliberately left open.** `RPC_CALL` stays, because PE keeps it and public dashboards
+> may carry control widgets — so whoever has the link can actuate the devices on that dashboard. This is
+> pre-existing behaviour, not something the clamp introduced (verified with the clamp disabled). If you do
+> not want anonymous actuation, delete `RPC_CALL` from the permission string in
+> `DefaultUserPermissionsService` — it is a one-word change and the test
+> `publicViewerCanStillSendRpcAsInPe` will tell you it took effect.
 
 ### How it is enforced
 

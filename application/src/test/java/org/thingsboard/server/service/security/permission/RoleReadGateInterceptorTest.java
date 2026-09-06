@@ -18,12 +18,15 @@ package org.thingsboard.server.service.security.permission;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.event.ContextRefreshedEvent;
+import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerMapping;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.common.data.role.Role;
 import org.thingsboard.server.common.data.role.RoleType;
@@ -34,6 +37,7 @@ import org.thingsboard.server.service.security.model.SecurityUser;
 import java.util.Collections;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -46,7 +50,7 @@ public class RoleReadGateInterceptorTest {
     private static final String GATED_PATTERN = "/api/tenant/devices";
 
     private final ThingsboardErrorResponseHandler errorResponseHandler = mock(ThingsboardErrorResponseHandler.class);
-    private final RoleReadGateInterceptor interceptor = new RoleReadGateInterceptor(errorResponseHandler, null);
+    private final RoleReadGateInterceptor interceptor = new RoleReadGateInterceptor(errorResponseHandler);
 
     @AfterEach
     void clearContext() {
@@ -101,6 +105,19 @@ public class RoleReadGateInterceptorTest {
         authenticate(restrictedUser("{\"ALL\": [\"ALL\"]}"));
         assertTrue(preHandle(GATED_PATTERN, new MockHttpServletResponse()));
         verify(errorResponseHandler, never()).handle(any(), any(HttpServletResponse.class));
+    }
+
+    /**
+     * Actuator publishes a second RequestMappingHandlerMapping (controllerEndpointHandlerMapping),
+     * so resolving the mapping by type aborts startup with NoUniqueBeanDefinitionException.
+     */
+    @Test
+    public void testStartupCheckSurvivesASecondHandlerMappingBean() {
+        StaticApplicationContext context = new StaticApplicationContext();
+        context.registerSingleton("requestMappingHandlerMapping", RequestMappingHandlerMapping.class);
+        context.registerSingleton("controllerEndpointHandlerMapping", RequestMappingHandlerMapping.class);
+        context.refresh();
+        assertDoesNotThrow(() -> interceptor.verifyPatterns(new ContextRefreshedEvent(context)));
     }
 
     private boolean preHandle(String pattern, MockHttpServletResponse response) {

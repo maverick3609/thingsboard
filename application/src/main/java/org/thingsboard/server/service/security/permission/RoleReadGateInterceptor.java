@@ -19,7 +19,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.security.core.Authentication;
@@ -206,11 +206,9 @@ public class RoleReadGateInterceptor implements HandlerInterceptor {
             entry("/api/lwm2m/deviceProfile/bootstrap/{isBootstrapServer}", Resource.DEVICE_PROFILE)
     );
 
-    private final ThingsboardErrorResponseHandler errorResponseHandler;
+    private static final String MVC_HANDLER_MAPPING_BEAN = "requestMappingHandlerMapping";
 
-    // ObjectProvider, not a direct dependency: the mapping is built from the WebMvcConfigurers,
-    // one of which registers this interceptor, so requiring the bean here would be a cycle.
-    private final ObjectProvider<RequestMappingHandlerMapping> handlerMappingProvider;
+    private final ThingsboardErrorResponseHandler errorResponseHandler;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
@@ -245,11 +243,19 @@ public class RoleReadGateInterceptor implements HandlerInterceptor {
      * against the mappings Spring actually registered and complain loudly if one has rotted.
      */
     @EventListener(ContextRefreshedEvent.class)
-    public void verifyPatterns() {
-        RequestMappingHandlerMapping handlerMapping = handlerMappingProvider.getIfAvailable();
-        if (handlerMapping == null) {
+    public void verifyPatterns(ContextRefreshedEvent event) {
+        // By name, not by type: actuator contributes a second RequestMappingHandlerMapping
+        // (controllerEndpointHandlerMapping), so a by-type lookup is ambiguous and aborts startup.
+        // Read off the event rather than injecting it - the mapping is built from the
+        // WebMvcConfigurers, one of which registers this interceptor, so injecting it is a cycle.
+        ApplicationContext context = event.getApplicationContext();
+        if (!context.containsBean(MVC_HANDLER_MAPPING_BEAN)) {
+            log.warn("No '{}' bean - cannot verify that the RBAC read gate patterns are still mapped",
+                    MVC_HANDLER_MAPPING_BEAN);
             return;
         }
+        RequestMappingHandlerMapping handlerMapping =
+                context.getBean(MVC_HANDLER_MAPPING_BEAN, RequestMappingHandlerMapping.class);
         Set<String> registered = new TreeSet<>();
         for (RequestMappingInfo info : handlerMapping.getHandlerMethods().keySet()) {
             var pathPatterns = info.getPathPatternsCondition();

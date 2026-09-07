@@ -1,0 +1,79 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<form [formGroup]="adoptForm" (ngSubmit)="adopt()">
+  <mat-toolbar color="primary">
+    <h2 translate>inferrix.adopt-controller</h2>
+    <span class="flex-1"></span>
+    <button mat-icon-button type="button" (click)="cancel()">
+      <mat-icon class="material-icons">close</mat-icon>
+    </button>
+  </mat-toolbar>
+  <mat-progress-bar color="warn" mode="indeterminate" *ngIf="submitting"></mat-progress-bar>
+  <div style="height: 4px;" *ngIf="!submitting"></div>
+  <div mat-dialog-content>
+    <div *ngIf="controller" class="tb-adopt-target">
+      <div><b translate>inferrix.uid</b>: <span class="tb-controller-uid">{{ controller.uid }}</span></div>
+      <div><b translate>inferrix.address</b>: {{ controller.ip }}</div>
+    </div>
+
+    <mat-form-field class="mat-block" *ngIf="!controller">
+      <mat-label translate>inferrix.address</mat-label>
+      <input matInput formControlName="host" placeholder="192.168.1.150" required>
+      <mat-hint translate>inferrix.address-hint</mat-hint>
+      <mat-error *ngIf="adoptForm.get('host').hasError('required')">
+        {{ 'inferrix.address-required' | translate }}
+      </mat-error>
+    </mat-form-field>
+
+    <mat-form-field class="mat-block">
+      <mat-label translate>inferrix.deployment-name</mat-label>
+      <input matInput formControlName="name" maxlength="31">
+      <mat-hint translate>inferrix.deployment-name-hint</mat-hint>
+    </mat-form-field>
+
+    <mat-form-field class="mat-block">
+      <mat-label translate>inferrix.location</mat-label>
+      <input matInput formControlName="location" maxlength="63">
+    </mat-form-field>
+
+    <mat-form-field class="mat-block">
+      <mat-label translate>inferrix.label</mat-label>
+      <input matInput formControlName="label">
+    </mat-form-field>
+
+    <mat-form-field class="mat-block">
+      <mat-label translate>inferrix.existing-password</mat-label>
+      <input matInput type="password" formControlName="password" autocomplete="new-password">
+      <mat-hint translate>inferrix.existing-password-hint</mat-hint>
+    </mat-form-field>
+
+    <div *ngIf="errorMessage" class="tb-adopt-error">
+      <mat-icon>error_outline</mat-icon>
+      <span>{{ errorMessage }}</span>
+    </div>
+  </div>
+  <div mat-dialog-actions class="flex items-center justify-end">
+    <button mat-button type="button" [disabled]="submitting" (click)="cancel()">
+      {{ 'action.cancel' | translate }}
+    </button>
+    <button mat-raised-button color="primary" type="submit"
+            [disabled]="submitting || adoptForm.invalid">
+      {{ 'inferrix.adopt' | translate }}
+    </button>
+  </div>
+</form>

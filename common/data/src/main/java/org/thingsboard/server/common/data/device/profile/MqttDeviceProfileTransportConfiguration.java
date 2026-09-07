@@ -39,6 +39,11 @@ public class MqttDeviceProfileTransportConfiguration implements DeviceProfileTra
     @NoXss
     private String deviceAttributesSubscribeTopic = MqttTopics.DEVICE_ATTRIBUTES_TOPIC;
 
+    @Schema(description = "Root of the Inferrix controller topic scheme, e.g. com/inferrix. " +
+            "Blank disables Inferrix handling entirely, which is the default for every profile.")
+    @NoXss
+    private String inferrixTopicRoot;
+
     @Schema
     private TransportPayloadTypeConfiguration transportPayloadTypeConfiguration;
     @Schema
@@ -67,6 +72,21 @@ public class MqttDeviceProfileTransportConfiguration implements DeviceProfileTra
 
     public String getDeviceAttributesSubscribeTopic() {
         return StringUtils.notBlankOrDefault(deviceAttributesSubscribeTopic, MqttTopics.DEVICE_ATTRIBUTES_TOPIC);
+    }
+
+    /**
+     * Normalized Inferrix topic root, or null when the profile does not opt in. Trailing slashes are
+     * stripped so that "com/inferrix" and "com/inferrix/" configure the same scheme.
+     */
+    public String getInferrixTopicRoot() {
+        if (inferrixTopicRoot == null) {
+            return null;
+        }
+        String root = inferrixTopicRoot.trim();
+        while (root.endsWith("/")) {
+            root = root.substring(0, root.length() - 1);
+        }
+        return root.isEmpty() ? null : root;
     }
 
 }

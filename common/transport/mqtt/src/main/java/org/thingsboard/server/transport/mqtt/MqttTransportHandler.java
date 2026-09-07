@@ -81,6 +81,7 @@ import org.thingsboard.server.gen.transport.mqtt.SparkplugBProto;
 import org.thingsboard.server.queue.scheduler.SchedulerComponent;
 import org.thingsboard.server.transport.mqtt.adaptors.MqttTransportAdaptor;
 import org.thingsboard.server.transport.mqtt.adaptors.ProtoMqttAdaptor;
+import org.thingsboard.server.transport.mqtt.inferrix.InferrixMqttHandler;
 import org.thingsboard.server.transport.mqtt.limits.GatewaySessionLimits;
 import org.thingsboard.server.transport.mqtt.limits.SessionLimits;
 import org.thingsboard.server.transport.mqtt.session.DeviceSessionCtx;
@@ -558,7 +559,11 @@ public class MqttTransportHandler extends ChannelInboundHandlerAdapter implement
         try {
             Matcher fwMatcher;
             MqttTransportAdaptor payloadAdaptor = deviceSessionCtx.getPayloadAdaptor();
-            if (deviceSessionCtx.isDeviceAttributesTopic(topicName)) {
+            InferrixMqttHandler inferrix = deviceSessionCtx.getInferrixHandler();
+            if (inferrix != null && inferrix.owns(topicName)) {
+                inferrix.onPublish(topicName, mqttMsg, getMetadata(deviceSessionCtx, topicName),
+                        getPubAckCallback(ctx, msgId, topicName));
+            } else if (deviceSessionCtx.isDeviceAttributesTopic(topicName)) {
                 TransportProtos.PostAttributeMsg postAttributeMsg = payloadAdaptor.convertToPostAttributes(deviceSessionCtx, mqttMsg);
                 transportService.process(deviceSessionCtx.getSessionInfo(), postAttributeMsg, getMetadata(deviceSessionCtx, topicName),
                         getPubAckCallback(ctx, msgId, postAttributeMsg));
@@ -846,6 +851,12 @@ public class MqttTransportHandler extends ChannelInboundHandlerAdapter implement
                     log.debug("[{}][{}] Failed to subscribe because this session is provision only [{}][{}]", deviceSessionCtx.getTenantId(), sessionId, topic, reqQoS);
                     grantedQoSList.add(ReturnCodeResolver.getSubscriptionReturnCode(deviceSessionCtx.getMqttVersion(), MqttReasonCodes.SubAck.TOPIC_FILTER_INVALID));
                 }
+                activityReported = true;
+                continue;
+            }
+            InferrixMqttHandler inferrix = deviceSessionCtx.getInferrixHandler();
+            if (inferrix != null && inferrix.onSubscribe(topic)) {
+                registerSubQoS(topic, grantedQoSList, reqQoS);
                 activityReported = true;
                 continue;
             }
@@ -1463,7 +1474,14 @@ public class MqttTransportHandler extends ChannelInboundHandlerAdapter implement
     public void onToDeviceRpcRequest(UUID sessionId, TransportProtos.ToDeviceRpcRequestMsg rpcRequest) {
         log.trace("[{}][{}] Received RPC command to device: {}", deviceSessionCtx.getDeviceId(), sessionId, rpcRequest);
         try {
-            if (sparkplugSessionHandler != null) {
+            InferrixMqttHandler inferrix = deviceSessionCtx.getInferrixHandler();
+            if (inferrix != null) {
+                if (!inferrix.onRpcRequest(rpcRequest)) {
+                    this.sendErrorRpcResponse(deviceSessionCtx.getSessionInfo(), rpcRequest.getRequestId(),
+                            ThingsboardErrorCode.INVALID_ARGUMENTS,
+                            "Failed to route RPC to the Inferrix controller command topic");
+                }
+            } else if (sparkplugSessionHandler != null) {
                 handleToSparkplugDeviceRpcRequest(rpcRequest);
             } else {
                 String baseTopic = rpcSubTopicType.getRpcRequestTopicBase();

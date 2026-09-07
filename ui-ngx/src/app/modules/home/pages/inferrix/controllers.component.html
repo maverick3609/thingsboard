@@ -1,0 +1,98 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<div class="tb-controllers-page flex flex-1 flex-col">
+  <div class="tb-controllers-toolbar flex flex-row items-center">
+    <mat-form-field class="tb-controllers-search" subscriptSizing="dynamic">
+      <mat-label translate>inferrix.search-controllers</mat-label>
+      <input matInput [(ngModel)]="textSearch" (keyup.enter)="reload()">
+    </mat-form-field>
+    <span class="flex-1"></span>
+    <button mat-icon-button (click)="reload()" [matTooltip]="'action.refresh' | translate">
+      <mat-icon>refresh</mat-icon>
+    </button>
+    <button mat-stroked-button *ngIf="isTenantAdmin" routerLink="/controllers/discovered">
+      <mat-icon>wifi_tethering</mat-icon>
+      <span translate>inferrix.discover</span>
+    </button>
+  </div>
+
+  <mat-progress-bar *ngIf="loading" mode="indeterminate"></mat-progress-bar>
+
+  <div *ngIf="!loading && controllers.length === 0" class="tb-controllers-empty">
+    <mat-icon>developer_board_off</mat-icon>
+    <div translate>inferrix.no-controllers</div>
+    <div class="tb-controllers-empty-hint" translate>inferrix.no-controllers-hint</div>
+  </div>
+
+  <table mat-table [dataSource]="controllers" *ngIf="controllers.length > 0" class="tb-controllers-table">
+    <ng-container matColumnDef="active">
+      <th mat-header-cell *matHeaderCellDef></th>
+      <td mat-cell *matCellDef="let controller">
+        <mat-icon class="tb-controller-state"
+                  [class.tb-online]="controller.active"
+                  [matTooltip]="(controller.active ? 'inferrix.online' : 'inferrix.offline') | translate">
+          {{ controller.active ? 'cloud_done' : 'cloud_off' }}
+        </mat-icon>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="name">
+      <th mat-header-cell *matHeaderCellDef translate>inferrix.controller-name</th>
+      <td mat-cell *matCellDef="let controller">
+        <div class="tb-controller-name">{{ controller.name }}</div>
+        <div class="tb-controller-uid">{{ controller.uid }}</div>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="location">
+      <th mat-header-cell *matHeaderCellDef translate>inferrix.location</th>
+      <td mat-cell *matCellDef="let controller">{{ controller.location || '—' }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="ip">
+      <th mat-header-cell *matHeaderCellDef translate>inferrix.address</th>
+      <td mat-cell *matCellDef="let controller">{{ controller.ip || '—' }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="model">
+      <th mat-header-cell *matHeaderCellDef translate>inferrix.model</th>
+      <td mat-cell *matCellDef="let controller">{{ controller.model || '—' }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="fw">
+      <th mat-header-cell *matHeaderCellDef translate>inferrix.firmware</th>
+      <td mat-cell *matCellDef="let controller">{{ controller.fw ?? '—' }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="icc">
+      <th mat-header-cell *matHeaderCellDef translate>inferrix.config-version</th>
+      <td mat-cell *matCellDef="let controller">{{ controller.icc ?? '—' }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="lastActivity">
+      <th mat-header-cell *matHeaderCellDef translate>inferrix.last-seen</th>
+      <td mat-cell *matCellDef="let controller">
+        {{ controller.lastActivityTs ? (controller.lastActivityTs | date:'yyyy-MM-dd HH:mm:ss') : '—' }}
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns"
+        class="tb-controller-row" (click)="open(row)"></tr>
+  </table>
+</div>

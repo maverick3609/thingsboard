@@ -1,0 +1,77 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<div class="tb-controller-software">
+  <mat-progress-bar color="warn" mode="indeterminate" *ngIf="loading"></mat-progress-bar>
+
+  <mat-card appearance="outlined" *ngFor="let entry of kinds" class="tb-software-card">
+    <mat-card-header>
+      <mat-card-title>{{ entry.titleKey | translate }}</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="tb-kv" *ngIf="deviceStatus[entry.kind]">
+        <span translate>inferrix.current-state</span>
+        <b>{{ stateLabel(entry.kind) }}</b>
+      </div>
+      <div class="tb-kv" *ngIf="entry.kind === 'FIRMWARE' && deviceStatus.FIRMWARE?.attempts !== undefined">
+        <span translate>inferrix.boot-attempts</span>
+        <b>{{ deviceStatus.FIRMWARE.attempts }}</b>
+      </div>
+
+      <div class="tb-software-note">{{ entry.noteKey | translate }}</div>
+
+      <div class="tb-software-picker flex flex-row items-center">
+        <button mat-stroked-button type="button" [disabled]="readonly"
+                (click)="fileInput.click()">
+          <mat-icon>attach_file</mat-icon>
+          <span translate>inferrix.choose-file</span>
+        </button>
+        <input #fileInput type="file" hidden [accept]="entry.accept"
+               (change)="pick(entry.kind, $event)"/>
+        <span class="tb-software-filename">
+          {{ selected[entry.kind]?.name || ('inferrix.no-file-chosen' | translate) }}
+          <span *ngIf="selected[entry.kind]"> · {{ selected[entry.kind].size }} B</span>
+        </span>
+        <span class="flex-1"></span>
+        <button mat-raised-button color="primary"
+                [disabled]="readonly || !selected[entry.kind] || job[entry.kind]?.state === 'RUNNING'"
+                (click)="upload(entry.kind)">
+          {{ 'inferrix.upload' | translate }}
+        </button>
+      </div>
+
+      <div class="tb-settings-error" *ngIf="errors[entry.kind]">{{ errors[entry.kind] }}</div>
+
+      <div class="tb-software-job" *ngIf="job[entry.kind] as status">
+        <mat-progress-bar mode="determinate" [value]="progress(entry.kind)"
+                          [color]="status.state === 'FAILED' ? 'warn' : 'primary'"></mat-progress-bar>
+        <div class="tb-software-job-line">
+          <span *ngIf="status.state === 'RUNNING'">
+            {{ 'inferrix.upload-progress' | translate: {sent: status.sent, total: status.total,
+               percent: progress(entry.kind)} }}
+          </span>
+          <span *ngIf="status.state === 'DONE'" class="tb-good">
+            {{ 'inferrix.upload-done' | translate: {activation: status.activation || 'reboot'} }}
+          </span>
+          <span *ngIf="status.state === 'FAILED'" class="tb-bad">
+            {{ 'inferrix.upload-failed' | translate }} — {{ status.message }}
+          </span>
+        </div>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>

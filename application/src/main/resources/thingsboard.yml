@@ -2276,6 +2276,27 @@ iot-hub:
   max-archive-entry-count: "${IOT_HUB_MAX_ARCHIVE_ENTRY_COUNT:10000}" # maximum number of entries allowed inside a solution template archive.
   max-install-timeout-ms: "${IOT_HUB_MAX_INSTALL_TIMEOUT_MS:60000}" # upper clamp in milliseconds for the post-install wait declared in a solution template's solution.json. Prevents a malicious or misconfigured template from pinning an HTTP worker thread.
 
+# Inferrix soft-PLC controller integration (see INFERRIX.md).
+inferrix:
+  controller:
+    discovery:
+      # Plain-TCP listener for the controller's unauthenticated discovery announce
+      # (src/comms/discovery.c in the controller firmware). It is the only way to see a controller
+      # that has never been adopted, because MQTT requires credentials the device does not have yet.
+      # Unauthenticated by nature, so it is off unless deliberately switched on. It never writes to
+      # the database: an announce is an in-memory sighting, and adoption is an authenticated action.
+      enabled: "${INFERRIX_DISCOVERY_ENABLED:false}"
+      bind_address: "${INFERRIX_DISCOVERY_BIND_ADDRESS:0.0.0.0}"
+      port: "${INFERRIX_DISCOVERY_PORT:9700}"
+    # Base64 32-byte key sealing the controller ownership password and bearer token before they are
+    # stored as server attributes. Must live here rather than in the database, which is the point.
+    # Generate with: openssl rand -base64 32
+    # Adoption refuses to run without it rather than storing those credentials in the clear.
+    credentials_key: "${INFERRIX_CONTROLLER_CREDENTIALS_KEY:}"
+    # The broker address handed to a controller during adoption lives in the 'inferrixController'
+    # admin settings (host, port, tls, caCert, topicRoot), not here: it is fleet configuration an
+    # operator changes, not a deployment secret.
+
 license:
   # Inferrix licence key. Obtain it from Inferrix using the instance ID the server prints on its first boot.
   # Set it via INFERRIX_LICENSE_KEY in thingsboard.conf. The platform will not start without it.

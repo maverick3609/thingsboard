@@ -1,0 +1,137 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<div class="tb-controller-page">
+  <div class="tb-controller-heading">
+    <button mat-icon-button (click)="back()" [matTooltip]="'action.back' | translate">
+      <mat-icon>arrow_back</mat-icon>
+    </button>
+    <div class="tb-controller-heading-text">
+      <div class="tb-controller-title">
+        <span class="tb-controller-dot" [class.tb-active]="controller?.active"></span>
+        {{ controller?.deploymentName || controller?.name || '' }}
+      </div>
+      <div class="tb-controller-subtitle">
+        {{ controller?.location || ('inferrix.no-location' | translate) }}
+        <span *ngIf="controller?.ip"> · {{ controller.ip }}</span>
+        <span *ngIf="controller?.uid"> · {{ controller.uid }}</span>
+      </div>
+    </div>
+    <span class="flex-1"></span>
+    <button mat-stroked-button (click)="reload()" [disabled]="loading">
+      <mat-icon>refresh</mat-icon>
+      <span>{{ 'action.refresh' | translate }}</span>
+    </button>
+  </div>
+
+  <!--
+    Each tab body is a matTabContent template so it is only created when the tab is first
+    opened. Without it every tab loads at once, and the firmware serves two clients at a
+    time — eleven simultaneous calls would queue on the platform's per-device semaphore and
+    hold a request thread each while they wait.
+  -->
+  <mat-tab-group dynamicHeight="false">
+    <mat-tab [label]="'inferrix.tab-overview' | translate">
+      <div class="tb-controller-tab">
+        <div class="tb-overview-cards">
+          <mat-card appearance="outlined">
+            <mat-card-header><mat-card-title>{{ 'inferrix.identity' | translate }}</mat-card-title></mat-card-header>
+            <mat-card-content>
+              <div class="tb-kv"><span>{{ 'inferrix.device-name' | translate }}</span><b>{{ controller?.name }}</b></div>
+              <div class="tb-kv"><span>{{ 'inferrix.uid' | translate }}</span><b>{{ controller?.uid || '—' }}</b></div>
+              <div class="tb-kv"><span>{{ 'inferrix.model' | translate }}</span><b>{{ controller?.model || info?.model || '—' }}</b></div>
+              <div class="tb-kv"><span>{{ 'inferrix.firmware' | translate }}</span><b>{{ controller?.fw || info?.fw || '—' }}</b></div>
+              <div class="tb-kv"><span>{{ 'inferrix.icc-version' | translate }}</span><b>{{ controller?.icc ?? info?.icc ?? '—' }}</b></div>
+              <div class="tb-kv"><span>{{ 'inferrix.mac' | translate }}</span><b>{{ controller?.mac || '—' }}</b></div>
+              <div class="tb-kv"><span>{{ 'inferrix.last-activity' | translate }}</span>
+                <b>{{ controller?.lastActivityTs ? (controller.lastActivityTs | date: 'yyyy-MM-dd HH:mm:ss') : '—' }}</b></div>
+            </mat-card-content>
+          </mat-card>
+
+          <mat-card appearance="outlined">
+            <mat-card-header>
+              <mat-card-title>{{ 'inferrix.health' | translate }}</mat-card-title>
+              <span class="flex-1"></span>
+              <button mat-icon-button (click)="reloadLive()" [disabled]="healthLoading">
+                <mat-icon>refresh</mat-icon>
+              </button>
+            </mat-card-header>
+            <mat-progress-bar color="warn" mode="indeterminate" *ngIf="healthLoading"></mat-progress-bar>
+            <mat-card-content>
+              <div class="tb-settings-error" *ngIf="healthError">{{ healthError | translate }}</div>
+              <ng-container *ngIf="health">
+                <div class="tb-kv"><span>{{ 'inferrix.uptime' | translate }}</span><b>{{ uptimeLabel() }}</b></div>
+                <div class="tb-kv"><span>{{ 'inferrix.fault' | translate }}</span>
+                  <b [class.tb-bad]="health.fault">{{ (health.fault ? 'inferrix.yes' : 'inferrix.no') | translate }}</b></div>
+                <div class="tb-kv"><span>{{ 'inferrix.mqtt-session' | translate }}</span><b>{{ mqttStateLabel() }}</b></div>
+                <div class="tb-kv"><span>{{ 'inferrix.time-sync' | translate }}</span><b>{{ timeSyncLabel() }}</b></div>
+                <div class="tb-kv"><span>{{ 'inferrix.scan-last' | translate }}</span><b>{{ health.scan?.last_ms ?? '—' }} ms</b></div>
+                <div class="tb-kv"><span>{{ 'inferrix.scan-max' | translate }}</span><b>{{ health.scan?.max_ms ?? '—' }} ms</b></div>
+                <div class="tb-kv"><span>{{ 'inferrix.scan-overruns' | translate }}</span>
+                  <b [class.tb-bad]="health.scan?.overruns">{{ health.scan?.overruns ?? '—' }}</b></div>
+                <div class="tb-kv" *ngFor="let bus of health.bus">
+                  <span>{{ 'inferrix.bus' | translate }} {{ bus.bus_id }}</span>
+                  <b [class.tb-bad]="bus.fails">{{ bus.fails }} {{ 'inferrix.fails' | translate }}</b>
+                </div>
+              </ng-container>
+            </mat-card-content>
+          </mat-card>
+        </div>
+      </div>
+    </mat-tab>
+
+    <mat-tab [label]="'inferrix.tab-points' | translate">
+      <ng-template matTabContent>
+        <div class="tb-controller-tab">
+          <tb-controller-points [deviceId]="deviceId"></tb-controller-points>
+        </div>
+      </ng-template>
+    </mat-tab>
+
+    <mat-tab [label]="'inferrix.tab-settings' | translate">
+      <ng-template matTabContent>
+        <div class="tb-controller-tab">
+          <tb-controller-settings [deviceId]="deviceId" [readonly]="readonly"></tb-controller-settings>
+        </div>
+      </ng-template>
+    </mat-tab>
+
+    <mat-tab [label]="'inferrix.tab-config' | translate">
+      <ng-template matTabContent>
+        <div class="tb-controller-tab">
+          <tb-controller-config [deviceId]="deviceId" [readonly]="readonly"></tb-controller-config>
+        </div>
+      </ng-template>
+    </mat-tab>
+
+    <mat-tab [label]="'inferrix.tab-software' | translate">
+      <ng-template matTabContent>
+        <div class="tb-controller-tab">
+          <tb-controller-software [deviceId]="deviceId" [readonly]="readonly"></tb-controller-software>
+        </div>
+      </ng-template>
+    </mat-tab>
+
+    <mat-tab [label]="'inferrix.tab-diagnostics' | translate">
+      <ng-template matTabContent>
+        <div class="tb-controller-tab">
+          <tb-controller-diagnostics [deviceId]="deviceId" [readonly]="readonly"></tb-controller-diagnostics>
+        </div>
+      </ng-template>
+    </mat-tab>
+  </mat-tab-group>
+</div>

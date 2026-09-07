@@ -1,0 +1,101 @@
+/**
+ * Copyright © 2016-2026 The Inferrix Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+:host {
+  display: block;
+}
+
+.tb-diag-toolbar {
+  display: flex;
+  align-items: center;
+  padding-bottom: 8px;
+}
+
+.tb-diag-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+
+  mat-card {
+    flex: 1 1 380px;
+    min-width: 320px;
+  }
+}
+
+.tb-kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 4px 0;
+  font-size: 13px;
+
+  span {
+    color: rgba(0, 0, 0, 0.54);
+  }
+}
+
+.tb-bad {
+  color: #da1e28;
+}
+
+.tb-ping-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.tb-ping-target {
+  flex: 1 1 200px;
+}
+
+.tb-ping-small {
+  width: 100px;
+}
+
+.tb-ping-result {
+  padding-top: 8px;
+}
+
+.tb-attempts {
+  display: flex;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.tb-attempt {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.tb-diag-note {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.54);
+  padding: 4px 0 8px;
+}
+
+.tb-diag-divider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.12);
+  margin: 12px 0;
+}
+
+.tb-settings-error {
+  color: #da1e28;
+  font-size: 13px;
+  padding: 8px 0;
+}

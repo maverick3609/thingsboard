@@ -1,0 +1,140 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<div class="tb-controller-diagnostics">
+  <div class="tb-diag-toolbar">
+    <span class="flex-1"></span>
+    <button mat-stroked-button (click)="reload()" [disabled]="loading">
+      <mat-icon>refresh</mat-icon>
+      <span>{{ 'action.refresh' | translate }}</span>
+    </button>
+  </div>
+  <mat-progress-bar color="warn" mode="indeterminate" *ngIf="loading"></mat-progress-bar>
+  <div class="tb-settings-error" *ngIf="error">{{ error | translate }}</div>
+
+  <div class="tb-diag-cards">
+    <mat-card appearance="outlined" *ngIf="network">
+      <mat-card-header><mat-card-title>{{ 'inferrix.diag-network' | translate }}</mat-card-title></mat-card-header>
+      <mat-card-content>
+        <div class="tb-kv"><span>{{ 'inferrix.link' | translate }}</span>
+          <b [class.tb-bad]="!network.link_up">{{ (network.link_up ? 'inferrix.up' : 'inferrix.down') | translate }}</b></div>
+        <div class="tb-kv"><span>{{ 'inferrix.network-mode' | translate }}</span><b>{{ network.dhcp ? 'DHCP' : 'Static' }}</b></div>
+        <div class="tb-kv"><span>{{ 'inferrix.network-ip' | translate }}</span><b>{{ network.ip }}</b></div>
+        <div class="tb-kv"><span>{{ 'inferrix.network-mask' | translate }}</span><b>{{ network.netmask }}</b></div>
+        <div class="tb-kv"><span>{{ 'inferrix.network-gateway' | translate }}</span><b>{{ network.gateway }}</b></div>
+        <div class="tb-kv"><span>{{ 'inferrix.network-dns' | translate }}</span><b>{{ network.dns }}</b></div>
+        <div class="tb-kv"><span>{{ 'inferrix.mac' | translate }}</span><b>{{ network.mac }}</b></div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined" *ngIf="logic || firmware">
+      <mat-card-header><mat-card-title>{{ 'inferrix.diag-program' | translate }}</mat-card-title></mat-card-header>
+      <mat-card-content>
+        <ng-container *ngIf="logic">
+          <div class="tb-kv"><span>{{ 'inferrix.logic-state' | translate }}</span>
+            <b [class.tb-bad]="logic.state === 2 || logic.state === 3">
+              {{ (logicStates[logic.state] || 'inferrix.unknown') | translate }}</b></div>
+          <div class="tb-kv"><span>{{ 'inferrix.scan-count' | translate }}</span><b>{{ logic.scanCount }}</b></div>
+          <div class="tb-kv"><span>{{ 'inferrix.logic-fault' | translate }}</span>
+            <b [class.tb-bad]="logic.fault">{{ logic.fault }}</b></div>
+          <div class="tb-kv"><span>{{ 'inferrix.logic-out-drops' | translate }}</span>
+            <b [class.tb-bad]="logic.outDrops">{{ logic.outDrops }}</b></div>
+          <div class="tb-kv"><span>{{ 'inferrix.logic-binding-fault' | translate }}</span>
+            <b [class.tb-bad]="logic.bindingFault">{{ logic.bindingFault ? ('inferrix.yes' | translate) : ('inferrix.no' | translate) }}</b></div>
+        </ng-container>
+        <div class="tb-kv" *ngIf="firmware"><span>{{ 'inferrix.firmware-state' | translate }}</span><b>{{ firmware.state }}</b></div>
+      </mat-card-content>
+      <mat-card-actions align="end">
+        <button mat-stroked-button [disabled]="readonly || restartRunning" (click)="restartLogic()">
+          {{ 'inferrix.restart-logic' | translate }}
+        </button>
+      </mat-card-actions>
+    </mat-card>
+
+    <mat-card appearance="outlined" *ngIf="memory">
+      <mat-card-header><mat-card-title>{{ 'inferrix.diag-resources' | translate }}</mat-card-title></mat-card-header>
+      <mat-card-content>
+        <div class="tb-kv" *ngFor="let stack of memory.stacks">
+          <span>{{ 'inferrix.stack' | translate }} {{ stack.n }}</span>
+          <b [class.tb-bad]="stack.free < stack.size * 0.1">{{ stack.free }} / {{ stack.size }} B</b>
+        </div>
+        <div class="tb-kv" *ngFor="let pool of memory.net_pools">
+          <span>{{ 'inferrix.pool' | translate }} {{ pool.n }}</span>
+          <b [class.tb-bad]="pool.avail === 0">{{ pool.avail }} / {{ pool.size }}</b>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined">
+      <mat-card-header><mat-card-title>{{ 'inferrix.diag-reachability' | translate }}</mat-card-title></mat-card-header>
+      <mat-card-content>
+        <form [formGroup]="pingForm" (ngSubmit)="ping()">
+          <div class="tb-ping-fields">
+            <mat-form-field appearance="outline" class="tb-ping-target">
+              <mat-label>{{ 'inferrix.ping-target' | translate }}</mat-label>
+              <input matInput formControlName="target"/>
+              <mat-hint>{{ 'inferrix.ping-target-hint' | translate }}</mat-hint>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="tb-ping-small">
+              <mat-label>{{ 'inferrix.ping-count' | translate }}</mat-label>
+              <input matInput type="number" formControlName="count"/>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="tb-ping-small">
+              <mat-label>{{ 'inferrix.ping-port' | translate }}</mat-label>
+              <input matInput type="number" formControlName="port"/>
+            </mat-form-field>
+            <button mat-raised-button color="primary" type="submit"
+                    [disabled]="readonly || pingRunning || pingForm.invalid">
+              {{ 'inferrix.ping' | translate }}
+            </button>
+          </div>
+        </form>
+        <div class="tb-diag-note">{{ 'inferrix.ping-tcp-note' | translate }}</div>
+        <div class="tb-settings-error" *ngIf="pingError">{{ pingError }}</div>
+        <div class="tb-ping-result" *ngIf="pingResult">
+          <div class="tb-kv"><span>{{ 'inferrix.ping-resolved' | translate }}</span>
+            <b>{{ pingResult.host }}:{{ pingResult.port }}</b></div>
+          <div class="tb-kv"><span>{{ 'inferrix.ping-received' | translate }}</span>
+            <b [class.tb-bad]="!pingResult.received">{{ pingResult.received }} / {{ pingResult.count }}</b></div>
+          <div class="tb-attempts">
+            <span *ngFor="let attempt of pingResult.attempts" class="tb-attempt"
+                  [class.tb-bad]="!attempt.ok">
+              {{ attempt.ok ? attempt.rtt_ms + ' ms' : ('inferrix.ping-failed' | translate) }}
+            </span>
+          </div>
+        </div>
+
+        <div class="tb-diag-divider"></div>
+
+        <button mat-stroked-button [disabled]="readonly || mqttTestRunning" (click)="testMqtt()">
+          {{ 'inferrix.test-broker' | translate }}
+        </button>
+        <div class="tb-settings-error" *ngIf="mqttTestError">{{ mqttTestError }}</div>
+        <div class="tb-ping-result" *ngIf="mqttTestResult">
+          <div class="tb-kv" *ngFor="let entry of mqttTestSteps()">
+            <span>{{ entry.name }}</span>
+            <b *ngIf="entry.step.attempted" [class.tb-bad]="!entry.step.ok">
+              {{ (entry.step.ok ? 'inferrix.ok' : 'inferrix.failed') | translate }} · {{ entry.step.ms }} ms
+            </b>
+            <b *ngIf="!entry.step.attempted">{{ 'inferrix.skipped' | translate }}</b>
+          </div>
+          <div class="tb-diag-note">{{ 'inferrix.broker-test-note' | translate }}</div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+</div>

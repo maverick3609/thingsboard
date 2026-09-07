@@ -1,0 +1,76 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<form [formGroup]="recordForm" (ngSubmit)="save()">
+  <mat-toolbar color="primary">
+    <h2>{{ (isAdd ? 'inferrix.add-record' : 'inferrix.edit-record') | translate }}
+      · {{ section.titleKey | translate }}</h2>
+    <span class="flex-1"></span>
+    <button mat-icon-button type="button" (click)="cancel()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </mat-toolbar>
+  <mat-progress-bar color="warn" mode="indeterminate" *ngIf="submitting"></mat-progress-bar>
+  <div mat-dialog-content>
+    <div class="tb-settings-error" *ngIf="errorMessage">{{ errorMessage }}</div>
+    <div class="tb-settings-fields">
+      <ng-container *ngFor="let field of section.fields">
+
+        <div *ngIf="field.type === 'flags'" class="tb-settings-field tb-settings-wide">
+          <div class="tb-flags-label">{{ field.label | translate }}</div>
+          <mat-checkbox *ngFor="let bit of field.bits" class="tb-flag-bit"
+                        [checked]="hasBit(field, bit.value)"
+                        (change)="setBit(field, bit.value, $event.checked)">
+            {{ bit.label | translate }}
+          </mat-checkbox>
+        </div>
+
+        <mat-form-field *ngIf="field.type === 'select'" class="tb-settings-field" appearance="outline">
+          <mat-label>{{ field.label | translate }}</mat-label>
+          <mat-select [formControlName]="field.key">
+            <mat-option *ngFor="let option of field.options" [value]="option.value">
+              {{ option.label }}
+            </mat-option>
+          </mat-select>
+          <mat-hint *ngIf="field.hint">{{ field.hint | translate }}</mat-hint>
+        </mat-form-field>
+
+        <mat-form-field *ngIf="field.type === 'text' || field.type === 'number'"
+                        class="tb-settings-field" appearance="outline">
+          <mat-label>{{ field.label | translate }}</mat-label>
+          <input matInput [formControlName]="field.key"
+                 [type]="field.type === 'number' ? 'number' : 'text'"
+                 [maxlength]="field.maxLength"/>
+          <mat-hint *ngIf="field.hint">{{ field.hint | translate }}</mat-hint>
+          <mat-error *ngIf="recordForm.get(field.key).invalid">
+            {{ 'inferrix.field-invalid' | translate }}
+          </mat-error>
+        </mat-form-field>
+
+      </ng-container>
+    </div>
+  </div>
+  <div mat-dialog-actions class="flex items-center justify-end">
+    <button mat-button type="button" [disabled]="submitting" (click)="cancel()">
+      {{ 'action.cancel' | translate }}
+    </button>
+    <button mat-raised-button color="primary" type="submit"
+            [disabled]="submitting || recordForm.invalid">
+      {{ 'action.save' | translate }}
+    </button>
+  </div>
+</form>

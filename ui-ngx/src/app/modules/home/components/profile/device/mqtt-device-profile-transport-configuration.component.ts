@@ -94,6 +94,7 @@ export class MqttDeviceProfileTransportConfigurationComponent implements Control
         deviceTelemetryTopic: [null, [Validators.required, this.validationMQTTTopic()]],
         sparkplug: [false],
         sparkplugAttributesMetricNames: [null],
+        inferrixTopicRoot: [null, Validators.pattern(/^[^#+\s]*$/)],
         sendAckOnValidationException: [false, Validators.required],
         transportPayloadTypeConfiguration: this.fb.group({
           transportPayloadType: [TransportPayloadType.JSON, Validators.required],

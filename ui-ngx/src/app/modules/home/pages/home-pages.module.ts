@@ -53,6 +53,7 @@ import { MobileModule } from '@home/pages/mobile/mobile.module';
 import { AiModelModule } from '@home/pages/ai-model/ai-model.module';
 import { WhiteLabelingModule } from '@home/pages/white-labeling/white-labeling.module';
 import { IotHubModule } from '@home/pages/iot-hub/iot-hub.module';
+import { InferrixModule } from '@home/pages/inferrix/inferrix.module';
 
 @NgModule({
   exports: [
@@ -93,6 +94,7 @@ import { IotHubModule } from '@home/pages/iot-hub/iot-hub.module';
     AiModelModule,
     WhiteLabelingModule,
     IotHubModule,
+    InferrixModule,
   ]
 })
 export class HomePagesModule { }

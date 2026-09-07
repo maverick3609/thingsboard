@@ -166,6 +166,16 @@
     </fieldset>
   </section>
   <div style="padding-bottom: 20px">
+    <mat-form-field class="mat-block">
+      <mat-label translate>device-profile.inferrix-topic-root</mat-label>
+      <input matInput formControlName="inferrixTopicRoot" placeholder="com/inferrix">
+      <mat-error *ngIf="mqttDeviceProfileTransportConfigurationFormGroup.get('inferrixTopicRoot').hasError('pattern')">
+        {{ 'device-profile.inferrix-topic-root-invalid' | translate }}
+      </mat-error>
+    </mat-form-field>
+    <div class="tb-hint" style="max-width: 800px">{{ 'device-profile.inferrix-topic-root-hint' | translate }}</div>
+  </div>
+  <div style="padding-bottom: 20px">
     <mat-checkbox formControlName="sendAckOnValidationException">
       {{ 'device-profile.mqtt-send-ack-on-validation-exception' | translate }}
     </mat-checkbox>

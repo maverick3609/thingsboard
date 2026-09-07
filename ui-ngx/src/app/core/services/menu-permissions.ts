@@ -82,6 +82,7 @@ export const menuResources: { [menuId: string]: string } = {
   rulechain_templates: 'RULE_CHAIN',
   edge_instances: 'EDGE',
   scheduler: 'SCHEDULER_EVENT',
+  controllers: 'DEVICE',
   images: 'TB_RESOURCE',
   scada_symbols: 'TB_RESOURCE',
   javascript_library: 'TB_RESOURCE',

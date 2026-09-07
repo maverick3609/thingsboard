@@ -257,6 +257,7 @@ export interface MqttDeviceProfileTransportConfiguration {
   deviceAttributesTopic?: string;
   deviceAttributesSubscribeTopic?: string;
   sparkplug?: boolean;
+  inferrixTopicRoot?: string;
   sendAckOnValidationException?: boolean;
   transportPayloadTypeConfiguration?: {
     transportPayloadType?: TransportPayloadType;
@@ -382,6 +383,7 @@ export const createDeviceProfileTransportConfiguration = (type: DeviceTransportT
           deviceAttributesSubscribeTopic: 'v1/devices/me/attributes',
           sparkplug: false,
           sparkplugAttributesMetricNames: ['Node Control/*', 'Device Control/*', 'Properties/*'],
+          inferrixTopicRoot: null,
           sendAckOnValidationException: false,
           transportPayloadTypeConfiguration: {
             transportPayloadType: TransportPayloadType.JSON,

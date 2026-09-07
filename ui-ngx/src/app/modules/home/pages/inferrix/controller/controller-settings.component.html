@@ -1,0 +1,94 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<div class="tb-controller-settings">
+  <mat-card appearance="outlined" *ngFor="let form of forms" class="tb-settings-card">
+    <mat-card-header>
+      <mat-card-title>{{ form.titleKey | translate }}</mat-card-title>
+    </mat-card-header>
+    <mat-progress-bar color="warn" mode="indeterminate" *ngIf="loading[form.path]"></mat-progress-bar>
+    <mat-card-content>
+      <div class="tb-settings-error" *ngIf="errors[form.path]">{{ errors[form.path] }}</div>
+
+      <div class="tb-network-confirm" *ngIf="form.path === '/api/v1/network' && (confirmPending || confirmSecondsLeft > 0)">
+        <mat-icon color="warn">warning</mat-icon>
+        <span *ngIf="confirmSecondsLeft > 0">
+          {{ 'inferrix.network-confirm-countdown' | translate: {seconds: confirmSecondsLeft} }}
+        </span>
+        <span *ngIf="confirmSecondsLeft <= 0">{{ 'inferrix.network-confirm-pending' | translate }}</span>
+        <button mat-raised-button color="primary" [disabled]="readonly" (click)="confirmNetwork()">
+          {{ 'inferrix.network-confirm' | translate }}
+        </button>
+      </div>
+
+      <form [formGroup]="formGroups[form.path]" (ngSubmit)="save(form)">
+        <div class="tb-settings-fields">
+          <ng-container *ngFor="let field of form.fields">
+
+            <mat-checkbox *ngIf="field.type === 'boolean'" [formControlName]="field.key"
+                          class="tb-settings-field tb-settings-checkbox">
+              {{ field.label | translate }}
+            </mat-checkbox>
+
+            <mat-form-field *ngIf="field.type === 'select'" class="tb-settings-field" appearance="outline">
+              <mat-label>{{ field.label | translate }}</mat-label>
+              <mat-select [formControlName]="field.key">
+                <mat-option *ngFor="let option of field.options" [value]="option.value">
+                  {{ option.label }}
+                </mat-option>
+              </mat-select>
+              <mat-hint *ngIf="field.hint">{{ field.hint | translate }}</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field *ngIf="field.type === 'textarea'" class="tb-settings-field tb-settings-wide"
+                            appearance="outline">
+              <mat-label>{{ field.label | translate }}</mat-label>
+              <textarea matInput rows="4" [formControlName]="field.key"
+                        [maxlength]="field.maxLength"></textarea>
+              <mat-hint *ngIf="field.hint">{{ field.hint | translate }}</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field *ngIf="field.type === 'text' || field.type === 'number' || field.type === 'password'"
+                            class="tb-settings-field" appearance="outline">
+              <mat-label>{{ field.label | translate }}</mat-label>
+              <input matInput [formControlName]="field.key"
+                     [type]="field.type === 'number' ? 'number' : field.type === 'password' ? 'password' : 'text'"
+                     [maxlength]="field.maxLength"/>
+              <mat-hint *ngIf="field.hint">{{ field.hint | translate }}</mat-hint>
+              <mat-error *ngIf="formGroups[form.path].get(field.key).invalid">
+                {{ 'inferrix.field-invalid' | translate }}
+              </mat-error>
+            </mat-form-field>
+
+          </ng-container>
+        </div>
+
+        <div class="tb-settings-actions">
+          <span class="tb-settings-saved" *ngIf="saved[form.path]">{{ 'inferrix.saved' | translate }}</span>
+          <button mat-stroked-button type="button" [disabled]="loading[form.path]" (click)="load(form)">
+            {{ 'action.refresh' | translate }}
+          </button>
+          <button mat-raised-button color="primary" type="submit"
+                  [disabled]="readonly || loading[form.path] || formGroups[form.path].pristine
+                              || formGroups[form.path].invalid">
+            {{ 'action.save' | translate }}
+          </button>
+        </div>
+      </form>
+    </mat-card-content>
+  </mat-card>
+</div>

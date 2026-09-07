@@ -122,7 +122,9 @@ export enum MenuId {
   trendz_settings = 'trendz_settings',
   ai_models = 'ai_models',
   white_labeling = 'white_labeling',
-  iot_hub = 'iot_hub'
+  iot_hub = 'iot_hub',
+  controllers = 'controllers',
+  discovered_controllers = 'discovered_controllers'
 }
 
 declare type MenuFilter = (authState: AuthState) => boolean;
@@ -744,6 +746,26 @@ export const menuSectionMap = new Map<MenuId, MenuSection>([
     }
   ],
   [
+    MenuId.controllers,
+    {
+      id: MenuId.controllers,
+      name: 'inferrix.controllers',
+      type: 'link',
+      path: '/controllers',
+      icon: 'developer_board'
+    }
+  ],
+  [
+    MenuId.discovered_controllers,
+    {
+      id: MenuId.discovered_controllers,
+      name: 'inferrix.discovered-controllers',
+      type: 'link',
+      path: '/controllers/discovered',
+      icon: 'wifi_tethering'
+    }
+  ],
+  [
     MenuId.reports,
     {
       id: MenuId.reports,
@@ -898,6 +920,7 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
       {id: MenuId.home},
       {id: MenuId.tenants},
       {id: MenuId.tenant_profiles},
+      {id: MenuId.discovered_controllers},
       {
         id: MenuId.resources,
         pages: [
@@ -989,6 +1012,7 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
         ]
       },
       {id: MenuId.customers},
+      {id: MenuId.controllers},
       {id: MenuId.calculated_fields},
       {id: MenuId.rule_chains},
       {
@@ -1098,6 +1122,7 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
           {id: MenuId.notification_inbox}
         ]
       },
+      {id: MenuId.controllers},
       {id: MenuId.scheduler},
       {id: MenuId.users},
       {id: MenuId.white_labeling}

@@ -36,6 +36,7 @@ import org.thingsboard.server.transport.mqtt.MqttTransportContext;
 import org.thingsboard.server.transport.mqtt.TopicType;
 import org.thingsboard.server.transport.mqtt.adaptors.BackwardCompatibilityAdaptor;
 import org.thingsboard.server.transport.mqtt.adaptors.MqttTransportAdaptor;
+import org.thingsboard.server.transport.mqtt.inferrix.InferrixMqttHandler;
 import org.thingsboard.server.transport.mqtt.util.MqttTopicFilter;
 import org.thingsboard.server.transport.mqtt.util.MqttTopicFilterFactory;
 
@@ -98,6 +99,18 @@ public class DeviceSessionCtx extends MqttDeviceAwareSessionContext {
     @Getter
     private volatile boolean deviceProfileMqttTransportType;
 
+    /** Non-null only for profiles that opt into the Inferrix controller topic scheme. */
+    @Getter
+    private volatile String inferrixTopicRoot;
+
+    /**
+     * Built here rather than lazily on first use so that the Netty event loop and the transport
+     * callback thread that delivers RPC always see the same instance — a lazily created one can be
+     * built twice under that race and lose the RPC correlation state held in it.
+     */
+    @Getter
+    private volatile InferrixMqttHandler inferrixHandler;
+
     @Getter
     @Setter
     private TransportPayloadType provisionPayloadType = payloadType;
@@ -155,6 +168,7 @@ public class DeviceSessionCtx extends MqttDeviceAwareSessionContext {
             telemetryTopicFilter = MqttTopicFilterFactory.toFilter(mqttConfig.getDeviceTelemetryTopic());
             attributesPublishTopicFilter = MqttTopicFilterFactory.toFilter(mqttConfig.getDeviceAttributesTopic());
             attributesSubscribeTopicFilter = MqttTopicFilterFactory.toFilter(mqttConfig.getDeviceAttributesSubscribeTopic());
+            applyInferrixTopicRoot(validInferrixTopicRoot(mqttConfig.getInferrixTopicRoot()));
             sendAckOnValidationException = mqttConfig.isSendAckOnValidationException();
             if (TransportPayloadType.PROTOBUF.equals(payloadType)) {
                 ProtoTransportPayloadConfiguration protoTransportPayloadConfig = (ProtoTransportPayloadConfiguration) transportPayloadTypeConfiguration;
@@ -167,9 +181,33 @@ public class DeviceSessionCtx extends MqttDeviceAwareSessionContext {
             attributesPublishTopicFilter = MqttTopicFilterFactory.getDefaultAttributesFilter();
             payloadType = TransportPayloadType.JSON;
             deviceProfileMqttTransportType = false;
+            applyInferrixTopicRoot(null);
             sendAckOnValidationException = false;
         }
         updateAdaptor();
+    }
+
+    private void applyInferrixTopicRoot(String root) {
+        if (root == null) {
+            inferrixTopicRoot = null;
+            inferrixHandler = null;
+        } else if (!root.equals(inferrixTopicRoot)) {
+            inferrixTopicRoot = root;
+            inferrixHandler = new InferrixMqttHandler(this, context.getTransportService(), root);
+        }
+    }
+
+    /**
+     * The Inferrix root is a literal topic prefix the transport both matches against and publishes
+     * under, so a wildcard in it would produce an unpublishable downlink topic. Treat that as
+     * misconfiguration and disable the scheme rather than fail the session.
+     */
+    private String validInferrixTopicRoot(String root) {
+        if (root != null && (root.contains("+") || root.contains("#"))) {
+            log.warn("[{}] Ignoring inferrixTopicRoot [{}]: wildcards are not allowed in a topic root", getSessionId(), root);
+            return null;
+        }
+        return root;
     }
 
     private void updateDynamicMessageDescriptors(ProtoTransportPayloadConfiguration protoTransportPayloadConfig) {

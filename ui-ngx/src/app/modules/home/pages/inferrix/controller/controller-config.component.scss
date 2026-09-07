@@ -1,0 +1,137 @@
+/**
+ * Copyright © 2016-2026 The Inferrix Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+:host {
+  display: block;
+}
+
+.tb-config-owner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.tb-config-toolbar {
+  gap: 8px;
+  padding-bottom: 8px;
+}
+
+.tb-config-note {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.54);
+  padding-bottom: 8px;
+  max-width: 860px;
+}
+
+.tb-config-applied {
+  color: #198038;
+  font-size: 13px;
+  padding: 8px 0;
+}
+
+.tb-config-body {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.tb-config-sections {
+  flex: 0 0 200px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+
+  a {
+    cursor: pointer;
+  }
+
+  .tb-selected {
+    background: rgba(0, 0, 0, 0.06);
+    font-weight: 500;
+  }
+}
+
+.tb-config-records {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.tb-config-records-header {
+  gap: 8px;
+  padding-bottom: 8px;
+}
+
+.tb-config-count {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.54);
+}
+
+.tb-config-table {
+  width: 100%;
+
+  th {
+    font-family: monospace;
+    font-size: 11px;
+  }
+}
+
+.tb-config-actions {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.tb-config-empty {
+  padding: 24px;
+  text-align: center;
+  color: rgba(0, 0, 0, 0.54);
+}
+
+.tb-settings-error {
+  color: #da1e28;
+  font-size: 13px;
+  padding: 8px 0;
+}
+
+.tb-settings-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 16px;
+  padding-top: 8px;
+}
+
+.tb-settings-field {
+  flex: 1 1 240px;
+  min-width: 240px;
+}
+
+.tb-settings-wide {
+  flex-basis: 100%;
+}
+
+.tb-flags-label {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.54);
+  padding-bottom: 4px;
+}
+
+.tb-flag-bit {
+  margin-right: 16px;
+}

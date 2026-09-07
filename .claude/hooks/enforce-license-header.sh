@@ -2,8 +2,16 @@
 # PostToolUse hook: prepend Apache 2.0 license header to newly-written *.java files
 # so `mvn license:check` doesn't break the build.
 #
+# Owner is "The Inferrix Authors", matching the root pom's <owner>. A file created here is
+# Inferrix-owned by the new-tb-core-patch skill's own Step 0 rule; the Thingsboard template stays
+# accepted via <validHeaders>, so existing upstream files are unaffected.
+#
+# BLIND SPOT: this only fires on the Write tool, so a file created with a `cat > f <<EOF` heredoc
+# through Bash is never seen — that is how controllers.component.scss reached a commit unheaded.
+# It also only covers *.java. The catch-all is the pre-commit hook, check-license-headers.sh,
+# which works on staged content and so does not care how a file was authored.
+#
 # Excludes:
-#   - inferrix-reporting/   (Inferrix-owned, license excluded in root pom.xml)
 #   - target/, node_modules/ (build output)
 #   - files that already start with /** (header present)
 #
@@ -16,7 +24,6 @@ file_path=$(printf '%s' "$input" | jq -r '.tool_input.file_path // ""')
 
 [[ -z "$file_path" ]] && exit 0
 [[ "$file_path" != *.java ]] && exit 0
-[[ "$file_path" == */inferrix-reporting/* ]] && exit 0
 [[ "$file_path" == */target/* ]] && exit 0
 [[ "$file_path" == */node_modules/* ]] && exit 0
 [[ ! -f "$file_path" ]] && exit 0
@@ -28,7 +35,7 @@ fi
 
 year=$(date +%Y)
 header="/**
- * Copyright © 2016-${year} The Thingsboard Authors
+ * Copyright © 2016-${year} The Inferrix Authors
  *
  * Licensed under the Apache License, Version 2.0 (the \"License\");
  * you may not use this file except in compliance with the License.

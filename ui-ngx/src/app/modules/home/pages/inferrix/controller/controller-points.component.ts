@@ -14,9 +14,10 @@
 /// limitations under the License.
 ///
 
-import { Component, Input, OnDestroy, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { Subscription, timer } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
+import { switchMap, takeUntil } from 'rxjs/operators';
+import { ControllerPanelComponent } from '@home/pages/inferrix/controller/controller-panel.component';
 import { InferrixControllerService } from '@core/http/inferrix-controller.service';
 import { ControllerPoint, pointQualityColor } from '@shared/models/inferrix-controller.models';
 
@@ -30,12 +31,9 @@ import { ControllerPoint, pointQualityColor } from '@shared/models/inferrix-cont
 @Component({
   selector: 'tb-controller-points',
   templateUrl: './controller-points.component.html',
-  styleUrls: ['./controller-points.component.scss'],
   standalone: false
 })
-export class ControllerPointsComponent implements OnInit, OnDestroy {
-
-  @Input() deviceId: string;
+export class ControllerPointsComponent extends ControllerPanelComponent {
 
   points: ControllerPoint[] = [];
   total = 0;
@@ -49,14 +47,17 @@ export class ControllerPointsComponent implements OnInit, OnDestroy {
 
   private refreshSubscription: Subscription;
 
-  constructor(private controllerService: InferrixControllerService) {}
-
-  ngOnInit(): void {
-    this.reload();
+  constructor(private controllerService: InferrixControllerService) {
+    super();
   }
 
-  ngOnDestroy(): void {
+  override ngOnDestroy(): void {
     this.refreshSubscription?.unsubscribe();
+    super.ngOnDestroy();
+  }
+
+  protected load(): void {
+    this.reload();
   }
 
   /**
@@ -70,7 +71,8 @@ export class ControllerPointsComponent implements OnInit, OnDestroy {
     if (enabled) {
       this.refreshSubscription = timer(5000, 5000).pipe(
         switchMap(() => this.controllerService.proxy<any>(this.deviceId, 'GET', '/api/v1/points',
-          null, {ignoreErrors: true}))
+          null, {ignoreErrors: true})),
+        takeUntil(this.destroy$)
       ).subscribe({
         next: response => this.apply(response),
         error: error => {
@@ -114,7 +116,4 @@ export class ControllerPointsComponent implements OnInit, OnDestroy {
     this.truncated = !!response?.truncated;
   }
 
-  private messageOf(error: any): string {
-    return error?.error?.message || error?.message || 'Request failed';
-  }
 }

@@ -14,6 +14,9 @@
 /// limitations under the License.
 ///
 
+import { DeviceInfo } from '@shared/models/device.models';
+import { HasUUID } from '@shared/models/id/has-uuid';
+
 /** The device profile the platform creates on first adoption; see InferrixAdoptionService. */
 export const INFERRIX_CONTROLLER_PROFILE = 'Inferrix Controller';
 
@@ -34,6 +37,27 @@ export interface DiscoveredController {
   assignedTenantId?: string;
 }
 
+/**
+ * Escapes a value for an entities-table cell.
+ *
+ * ThingsBoard inserts cell content with `bypassSecurityTrustHtml`, and everything a controller
+ * reports about itself is written by the controller: adopted controllers publish their identity
+ * over MQTT, and discovery sightings arrive over an unauthenticated plain-TCP announce that anyone
+ * on the network can send. Without this, a crafted `location` or `uid` would run as script in the
+ * operator's browser.
+ */
+export const escapeCell = (value: any): string => value === undefined || value === null ? '' :
+  String(value).replace(/[&<>"']/g, character =>
+    ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;'})[character]);
+
+/**
+ * A discovered sighting as an entities-table row. The list is not a platform entity — nothing has
+ * been created yet — so the row carries the controller's own uid as its id.
+ */
+export interface DiscoveredControllerRow extends DiscoveredController {
+  id: HasUUID;
+}
+
 export interface AdoptControllerRequest {
   uid?: string;
   host?: string;
@@ -51,17 +75,22 @@ export interface AdoptControllerRequest {
  * is no reason to ship those to a browser even sealed.
  */
 export const CONTROLLER_ATTRIBUTE_KEYS = [
-  'active', 'lastActivityTime',
+  'lastActivityTime',
   'uid', 'ip', 'model', 'fw', 'icc', 'mac', 'location', 'name',
   'controllerUid', 'controllerIp'
 ];
 
-/** Live identity and status of an adopted controller, assembled from its device attributes. */
-export interface ControllerInfo {
-  deviceId: string;
-  name: string;
-  label?: string;
-  active: boolean;
+/**
+ * An adopted controller: the platform's own device record, plus the identity the device publishes
+ * about itself.
+ *
+ * Extends {@link DeviceInfo} rather than restating it, so the entities table gets `id`, `name`,
+ * `createdTime` and the rest of the device fields for free and the row is a real device everywhere
+ * it is handed to a ThingsBoard component.
+ */
+export interface ControllerInfo extends DeviceInfo {
+  // `active` is inherited from DeviceInfo: it is the platform's own connectivity state, which is
+  // authoritative and needs no attribute read.
   lastActivityTs?: number;
   uid?: string;
   ip?: string;

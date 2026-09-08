@@ -14,11 +14,12 @@
 /// limitations under the License.
 ///
 
-import { Component, Input, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { concat, of } from 'rxjs';
 import { catchError, toArray } from 'rxjs/operators';
 import { InferrixControllerService } from '@core/http/inferrix-controller.service';
+import { ControllerPanelComponent } from '@home/pages/inferrix/controller/controller-panel.component';
 
 /**
  * The controller's own diagnostics: what it can see of the network, what it is running, and two
@@ -34,10 +35,7 @@ import { InferrixControllerService } from '@core/http/inferrix-controller.servic
   styleUrls: ['./controller-diagnostics.component.scss'],
   standalone: false
 })
-export class ControllerDiagnosticsComponent implements OnInit {
-
-  @Input() deviceId: string;
-  @Input() readonly = false;
+export class ControllerDiagnosticsComponent extends ControllerPanelComponent {
 
   network: any;
   memory: any;
@@ -67,9 +65,8 @@ export class ControllerDiagnosticsComponent implements OnInit {
   };
 
   constructor(private fb: UntypedFormBuilder,
-              private controllerService: InferrixControllerService) {}
-
-  ngOnInit(): void {
+              private controllerService: InferrixControllerService) {
+    super();
     this.pingForm = this.fb.group({
       // The device rejects anything outside this charset with 400 bad_request; rejecting it here
       // keeps a typo from looking like a device fault.
@@ -77,6 +74,9 @@ export class ControllerDiagnosticsComponent implements OnInit {
       count: [3, [Validators.min(1), Validators.max(5)]],
       port: [null, [Validators.min(1), Validators.max(65535)]]
     });
+  }
+
+  protected load(): void {
     this.reload();
   }
 
@@ -178,7 +178,4 @@ export class ControllerDiagnosticsComponent implements OnInit {
       .pipe(catchError(() => of(null)));
   }
 
-  private messageOf(error: any): string {
-    return error?.error?.message || error?.message || 'Request failed';
-  }
 }

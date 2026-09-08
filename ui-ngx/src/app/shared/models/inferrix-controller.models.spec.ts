@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 
-import { bitsToFloat, CONTROLLER_CONFIG_SECTIONS, floatToBits } from './inferrix-controller.models';
+import { bitsToFloat, CONTROLLER_CONFIG_SECTIONS, escapeCell, floatToBits } from './inferrix-controller.models';
 
 describe('Inferrix controller config models', () => {
 
@@ -64,5 +64,22 @@ describe('Inferrix controller config models', () => {
         section.fields.filter(field => field.type === 'flags').forEach(field =>
           expect(field.defaultValue).withContext(`${section.key}.${field.key}`).toBe(0)));
     });
+  });
+
+  describe('escapeCell', () => {
+
+    it('neutralises markup a controller could put in its own attributes', () => {
+      expect(escapeCell('<img src=x onerror=alert(1)>'))
+        .toBe('&lt;img src=x onerror=alert(1)&gt;');
+      expect(escapeCell(`" onmouseover='x'`)).toBe('&quot; onmouseover=&#39;x&#39;');
+      expect(escapeCell('a & b')).toBe('a &amp; b');
+    });
+
+    it('renders absent values as empty and keeps 0', () => {
+      expect(escapeCell(null)).toBe('');
+      expect(escapeCell(undefined)).toBe('');
+      expect(escapeCell(0)).toBe('0');
+    });
+
   });
 });

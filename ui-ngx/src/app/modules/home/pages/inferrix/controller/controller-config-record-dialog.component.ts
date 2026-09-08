@@ -42,7 +42,7 @@ export interface ControllerConfigRecordDialogData {
 @Component({
   selector: 'tb-controller-config-record-dialog',
   templateUrl: './controller-config-record-dialog.component.html',
-  styleUrls: ['./controller-config.component.scss'],
+  styleUrls: ['./controller-config-record-dialog.component.scss'],
   standalone: false
 })
 export class ControllerConfigRecordDialogComponent
@@ -52,7 +52,6 @@ export class ControllerConfigRecordDialogComponent
   readonly isAdd: boolean;
 
   recordForm: UntypedFormGroup;
-  submitting = false;
   errorMessage: string = null;
 
   constructor(protected store: Store<AppState>,
@@ -88,15 +87,11 @@ export class ControllerConfigRecordDialogComponent
       this.recordForm.markAllAsTouched();
       return;
     }
-    this.submitting = true;
     this.errorMessage = null;
     this.controllerService.upsertConfigRecord(this.data.deviceId, this.section, this.payload())
       .subscribe({
         next: () => this.dialogRef.close(true),
-        error: error => {
-          this.submitting = false;
-          this.errorMessage = error?.error?.message || error?.message || 'Save failed';
-        }
+        error: error => this.errorMessage = error?.error?.message || error?.message || 'Save failed'
       });
   }
 

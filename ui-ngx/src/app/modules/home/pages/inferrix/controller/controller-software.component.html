@@ -15,63 +15,56 @@
     limitations under the License.
 
 -->
-<div class="tb-controller-software">
+<div class="mat-padding flex flex-col gap-4">
   <mat-progress-bar color="warn" mode="indeterminate" *ngIf="loading"></mat-progress-bar>
 
-  <mat-card appearance="outlined" *ngFor="let entry of kinds" class="tb-software-card">
-    <mat-card-header>
-      <mat-card-title>{{ entry.titleKey | translate }}</mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
-      <div class="tb-kv" *ngIf="deviceStatus[entry.kind]">
-        <span translate>inferrix.current-state</span>
-        <b>{{ stateLabel(entry.kind) }}</b>
-      </div>
-      <div class="tb-kv" *ngIf="entry.kind === 'FIRMWARE' && deviceStatus.FIRMWARE?.attempts !== undefined">
-        <span translate>inferrix.boot-attempts</span>
-        <b>{{ deviceStatus.FIRMWARE.attempts }}</b>
-      </div>
+  <div class="tb-form-panel stroked" *ngFor="let entry of kinds">
+    <div class="tb-form-panel-title">{{ entry.titleKey | translate }}</div>
+    <div class="tb-form-panel-hint">{{ entry.noteKey | translate }}</div>
 
-      <div class="tb-software-note">{{ entry.noteKey | translate }}</div>
+    <div class="tb-form-row space-between" *ngIf="deviceStatus[entry.kind]">
+      <div translate>inferrix.current-state</div>
+      <div>{{ stateLabel(entry.kind) }}</div>
+    </div>
+    <div class="tb-form-row space-between"
+         *ngIf="entry.kind === 'FIRMWARE' && deviceStatus.FIRMWARE?.attempts !== undefined">
+      <div translate>inferrix.boot-attempts</div>
+      <div>{{ deviceStatus.FIRMWARE.attempts }}</div>
+    </div>
 
-      <div class="tb-software-picker flex flex-row items-center">
-        <button mat-stroked-button type="button" [disabled]="readonly"
-                (click)="fileInput.click()">
-          <mat-icon>attach_file</mat-icon>
-          <span translate>inferrix.choose-file</span>
-        </button>
-        <input #fileInput type="file" hidden [accept]="entry.accept"
-               (change)="pick(entry.kind, $event)"/>
-        <span class="tb-software-filename">
-          {{ selected[entry.kind]?.name || ('inferrix.no-file-chosen' | translate) }}
-          <span *ngIf="selected[entry.kind]"> · {{ selected[entry.kind].size }} B</span>
-        </span>
-        <span class="flex-1"></span>
-        <button mat-raised-button color="primary"
-                [disabled]="readonly || !selected[entry.kind] || job[entry.kind]?.state === 'RUNNING'"
-                (click)="upload(entry.kind)">
-          {{ 'inferrix.upload' | translate }}
-        </button>
+    <div class="tb-form-row">
+      <button mat-stroked-button type="button" [disabled]="readonly" (click)="fileInput.click()">
+        <mat-icon>attach_file</mat-icon>
+        <span translate>inferrix.choose-file</span>
+      </button>
+      <input #fileInput type="file" hidden [accept]="entry.accept"
+             (change)="pick(entry.kind, $event)"/>
+      <div class="flex-1">
+        {{ selected[entry.kind]?.name || ('inferrix.no-file-chosen' | translate) }}
+        <span *ngIf="selected[entry.kind]"> · {{ selected[entry.kind].size }} B</span>
       </div>
+      <button mat-raised-button color="primary"
+              [disabled]="readonly || !selected[entry.kind] || job[entry.kind]?.state === 'RUNNING'"
+              (click)="upload(entry.kind)">
+        {{ 'inferrix.upload' | translate }}
+      </button>
+    </div>
 
-      <div class="tb-settings-error" *ngIf="errors[entry.kind]">{{ errors[entry.kind] }}</div>
+    <div class="tb-error-message" *ngIf="errors[entry.kind]">{{ errors[entry.kind] }}</div>
 
-      <div class="tb-software-job" *ngIf="job[entry.kind] as status">
-        <mat-progress-bar mode="determinate" [value]="progress(entry.kind)"
-                          [color]="status.state === 'FAILED' ? 'warn' : 'primary'"></mat-progress-bar>
-        <div class="tb-software-job-line">
-          <span *ngIf="status.state === 'RUNNING'">
-            {{ 'inferrix.upload-progress' | translate: {sent: status.sent, total: status.total,
-               percent: progress(entry.kind)} }}
-          </span>
-          <span *ngIf="status.state === 'DONE'" class="tb-good">
-            {{ 'inferrix.upload-done' | translate: {activation: status.activation || 'reboot'} }}
-          </span>
-          <span *ngIf="status.state === 'FAILED'" class="tb-bad">
-            {{ 'inferrix.upload-failed' | translate }} — {{ status.message }}
-          </span>
-        </div>
+    <ng-container *ngIf="job[entry.kind] as status">
+      <mat-progress-bar mode="determinate" [value]="progress(entry.kind)"
+                        [color]="status.state === 'FAILED' ? 'warn' : 'primary'"></mat-progress-bar>
+      <div class="tb-form-panel-hint" *ngIf="status.state === 'RUNNING'">
+        {{ 'inferrix.upload-progress' | translate: {sent: status.sent, total: status.total,
+           percent: progress(entry.kind)} }}
       </div>
-    </mat-card-content>
-  </mat-card>
+      <div class="tb-form-panel-hint" *ngIf="status.state === 'DONE'">
+        {{ 'inferrix.upload-done' | translate: {activation: status.activation || 'reboot'} }}
+      </div>
+      <div class="tb-error-message" *ngIf="status.state === 'FAILED'">
+        {{ 'inferrix.upload-failed' | translate }} — {{ status.message }}
+      </div>
+    </ng-container>
+  </div>
 </div>

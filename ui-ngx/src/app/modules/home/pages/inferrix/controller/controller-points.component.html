@@ -15,64 +15,67 @@
     limitations under the License.
 
 -->
-<div class="tb-controller-points">
-  <div class="tb-points-toolbar">
-    <span class="tb-points-count" *ngIf="!loading">
-      {{ 'inferrix.points-count' | translate: {shown: points.length, total: total} }}
-    </span>
-    <span class="flex-1"></span>
-    <mat-slide-toggle [checked]="autoRefresh" (change)="toggleAutoRefresh($event.checked)">
-      {{ 'inferrix.auto-refresh' | translate }}
-    </mat-slide-toggle>
-    <button mat-stroked-button (click)="reload()" [disabled]="loading">
-      <mat-icon>refresh</mat-icon>
-      <span>{{ 'action.refresh' | translate }}</span>
-    </button>
-  </div>
-
-  <mat-progress-bar color="warn" mode="indeterminate" *ngIf="loading"></mat-progress-bar>
-  <div class="tb-settings-error" *ngIf="error">{{ error }}</div>
-  <div class="tb-points-warning" *ngIf="truncated">
-    <mat-icon color="warn">warning</mat-icon>
-    <span>{{ 'inferrix.points-truncated' | translate }}</span>
-  </div>
-
-  <table mat-table [dataSource]="points" class="tb-points-table">
-    <ng-container matColumnDef="id">
-      <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.point-id' | translate }}</th>
-      <td mat-cell *matCellDef="let point">{{ point.id }}</td>
-    </ng-container>
-    <ng-container matColumnDef="n">
-      <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.point-name' | translate }}</th>
-      <td mat-cell *matCellDef="let point">{{ point.n }}</td>
-    </ng-container>
-    <ng-container matColumnDef="type">
-      <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.point-type' | translate }}</th>
-      <td mat-cell *matCellDef="let point">{{ point.type }}</td>
-    </ng-container>
-    <ng-container matColumnDef="address">
-      <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.point-address' | translate }}</th>
-      <td mat-cell *matCellDef="let point">{{ address(point) }}</td>
-    </ng-container>
-    <ng-container matColumnDef="v">
-      <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.point-value' | translate }}</th>
-      <td mat-cell *matCellDef="let point"><b>{{ value(point) }}</b></td>
-    </ng-container>
-    <ng-container matColumnDef="q">
-      <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.point-quality' | translate }}</th>
-      <td mat-cell *matCellDef="let point">
-        <span class="tb-quality" [style.color]="qualityColor(point.q)">{{ point.q }}</span>
-      </td>
-    </ng-container>
-    <ng-container matColumnDef="age">
-      <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.point-age' | translate }}</th>
-      <td mat-cell *matCellDef="let point">{{ point.age_ms }} ms</td>
-    </ng-container>
-    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-    <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
-  </table>
-
-  <div class="tb-points-empty" *ngIf="!loading && !error && points.length === 0">
-    {{ 'inferrix.no-points' | translate }}
+<div class="mat-padding tb-entity-table tb-absolute-fill">
+  <div class="tb-entity-table-content tb-outlined-border flex flex-1 flex-col">
+    <mat-toolbar class="mat-mdc-table-toolbar">
+      <div class="mat-toolbar-tools">
+        <span class="tb-entity-table-title">{{ 'inferrix.tab-points' | translate }}</span>
+        <span class="tb-entity-table-info" *ngIf="!loading">
+          {{ 'inferrix.points-count' | translate: {shown: points.length, total: total} }}
+        </span>
+        <span class="flex-1"></span>
+        <mat-slide-toggle class="mat-slide" [checked]="autoRefresh"
+                          (change)="toggleAutoRefresh($event.checked)">
+          {{ 'inferrix.auto-refresh' | translate }}
+        </mat-slide-toggle>
+        <button mat-icon-button [disabled]="loading" (click)="reload()"
+                matTooltip="{{ 'action.refresh' | translate }}"
+                matTooltipPosition="above">
+          <mat-icon>refresh</mat-icon>
+        </button>
+      </div>
+    </mat-toolbar>
+    <mat-progress-bar color="warn" mode="indeterminate" *ngIf="loading"></mat-progress-bar>
+    <div style="height: 4px;" *ngIf="!loading"></div>
+    <div class="tb-error-message" *ngIf="error">{{ error }}</div>
+    <div class="tb-form-hint" *ngIf="truncated">{{ 'inferrix.points-truncated' | translate }}</div>
+    <div class="table-container flex-1">
+      <table mat-table [dataSource]="points">
+        <ng-container matColumnDef="id">
+          <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.point-id' | translate }}</th>
+          <td mat-cell *matCellDef="let point">{{ point.id }}</td>
+        </ng-container>
+        <ng-container matColumnDef="n">
+          <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.point-name' | translate }}</th>
+          <td mat-cell *matCellDef="let point">{{ point.n }}</td>
+        </ng-container>
+        <ng-container matColumnDef="type">
+          <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.point-type' | translate }}</th>
+          <td mat-cell *matCellDef="let point">{{ point.type }}</td>
+        </ng-container>
+        <ng-container matColumnDef="address">
+          <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.point-address' | translate }}</th>
+          <td mat-cell *matCellDef="let point">{{ address(point) }}</td>
+        </ng-container>
+        <ng-container matColumnDef="v">
+          <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.point-value' | translate }}</th>
+          <td mat-cell *matCellDef="let point">{{ value(point) }}</td>
+        </ng-container>
+        <ng-container matColumnDef="q">
+          <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.point-quality' | translate }}</th>
+          <td mat-cell *matCellDef="let point">
+            <span [style.color]="qualityColor(point.q)">{{ point.q }}</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="age">
+          <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.point-age' | translate }}</th>
+          <td mat-cell *matCellDef="let point">{{ point.age_ms }} ms</td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+      </table>
+      <span class="no-data-found flex items-center justify-center"
+            *ngIf="!loading && !error && points.length === 0" translate>inferrix.no-points</span>
+    </div>
   </div>
 </div>

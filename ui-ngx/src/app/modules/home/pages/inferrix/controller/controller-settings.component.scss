@@ -13,22 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-:host {
-  display: block;
-}
-
-.tb-controller-settings {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 8px 0;
-}
-
+/* Layout only: the settings forms are generated from a field spec, so the wrapping grid cannot be
+   expressed field by field in the template. Everything else uses the platform's own form styles. */
 .tb-settings-fields {
   display: flex;
   flex-wrap: wrap;
   gap: 0 16px;
-  padding-top: 8px;
 }
 
 .tb-settings-field {
@@ -43,33 +33,4 @@
 .tb-settings-checkbox {
   align-self: center;
   padding-bottom: 22px;
-}
-
-.tb-settings-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.tb-settings-saved {
-  color: #198038;
-  font-size: 12px;
-}
-
-.tb-settings-error {
-  color: #da1e28;
-  font-size: 13px;
-  padding-bottom: 8px;
-}
-
-.tb-network-confirm {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  margin-bottom: 8px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 4px;
-  background: rgba(255, 193, 7, 0.12);
 }

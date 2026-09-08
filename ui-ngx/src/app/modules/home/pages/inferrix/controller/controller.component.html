@@ -15,123 +15,131 @@
     limitations under the License.
 
 -->
-<div class="tb-controller-page">
-  <div class="tb-controller-heading">
-    <button mat-icon-button (click)="back()" [matTooltip]="'action.back' | translate">
-      <mat-icon>arrow_back</mat-icon>
-    </button>
-    <div class="tb-controller-heading-text">
-      <div class="tb-controller-title">
-        <span class="tb-controller-dot" [class.tb-active]="controller?.active"></span>
-        {{ controller?.deploymentName || controller?.name || '' }}
+<div class="tb-details-buttons xs:flex xs:flex-col">
+  <button mat-raised-button color="primary"
+          [disabled]="(isLoading$ | async)"
+          (click)="onEntityAction($event, 'open')"
+          [class.!hidden]="isEdit || isDetailsPage">
+    {{ 'common.open-details-page' | translate }}
+  </button>
+  <button mat-raised-button color="primary"
+          [disabled]="(isLoading$ | async)"
+          (click)="onEntityAction($event, 'delete')"
+          [class.!hidden]="hideDelete() || isEdit">
+    {{ 'inferrix.delete-controller' | translate }}
+  </button>
+</div>
+<div class="mat-padding flex flex-col">
+  <form [formGroup]="entityForm">
+    <fieldset [disabled]="(isLoading$ | async) || !isEdit">
+      <mat-form-field class="mat-block">
+        <mat-label translate>inferrix.controller-name</mat-label>
+        <input matInput formControlName="name" required>
+        <mat-error *ngIf="entityForm.get('name').hasError('required')">
+          {{ 'inferrix.controller-name-required' | translate }}
+        </mat-error>
+        <mat-error *ngIf="entityForm.get('name').hasError('maxlength')">
+          {{ 'device.name-max-length' | translate }}
+        </mat-error>
+      </mat-form-field>
+      <mat-form-field class="mat-block">
+        <mat-label translate>device.label</mat-label>
+        <input matInput formControlName="label">
+        <mat-error *ngIf="entityForm.get('label').hasError('maxlength')">
+          {{ 'device.label-max-length' | translate }}
+        </mat-error>
+      </mat-form-field>
+      <div formGroupName="additionalInfo" class="flex flex-col">
+        <mat-form-field class="mat-block">
+          <mat-label translate>device.description</mat-label>
+          <textarea matInput formControlName="description" rows="2"></textarea>
+        </mat-form-field>
       </div>
-      <div class="tb-controller-subtitle">
-        {{ controller?.location || ('inferrix.no-location' | translate) }}
-        <span *ngIf="controller?.ip"> · {{ controller.ip }}</span>
-        <span *ngIf="controller?.uid"> · {{ controller.uid }}</span>
+    </fieldset>
+  </form>
+
+  <div class="flex flex-col gap-4" [class.!hidden]="isEdit">
+    <div class="tb-form-panel stroked">
+      <div class="tb-form-panel-title" translate>inferrix.identity</div>
+      <div class="tb-form-panel-hint" translate>inferrix.identity-hint</div>
+      <div class="tb-form-row space-between">
+        <div translate>inferrix.uid</div>
+        <div>{{ entity?.uid || '—' }}</div>
+      </div>
+      <div class="tb-form-row space-between">
+        <div translate>inferrix.location</div>
+        <div>{{ entity?.location || ('inferrix.no-location' | translate) }}</div>
+      </div>
+      <div class="tb-form-row space-between">
+        <div translate>inferrix.address</div>
+        <div>{{ entity?.ip || '—' }}</div>
+      </div>
+      <div class="tb-form-row space-between">
+        <div translate>inferrix.mac</div>
+        <div>{{ entity?.mac || '—' }}</div>
+      </div>
+      <div class="tb-form-row space-between">
+        <div translate>inferrix.model</div>
+        <div>{{ entity?.model || info?.model || '—' }}</div>
+      </div>
+      <div class="tb-form-row space-between">
+        <div translate>inferrix.firmware</div>
+        <div>{{ entity?.fw || info?.fw || '—' }}</div>
+      </div>
+      <div class="tb-form-row space-between">
+        <div translate>inferrix.icc-version</div>
+        <div>{{ entity?.icc ?? info?.icc ?? '—' }}</div>
+      </div>
+      <div class="tb-form-row space-between">
+        <div translate>inferrix.last-activity</div>
+        <div>{{ entity?.lastActivityTs ? (entity.lastActivityTs | date: 'yyyy-MM-dd HH:mm:ss') : '—' }}</div>
       </div>
     </div>
-    <span class="flex-1"></span>
-    <button mat-stroked-button (click)="reload()" [disabled]="loading">
-      <mat-icon>refresh</mat-icon>
-      <span>{{ 'action.refresh' | translate }}</span>
-    </button>
-  </div>
 
-  <!--
-    Each tab body is a matTabContent template so it is only created when the tab is first
-    opened. Without it every tab loads at once, and the firmware serves two clients at a
-    time — eleven simultaneous calls would queue on the platform's per-device semaphore and
-    hold a request thread each while they wait.
-  -->
-  <mat-tab-group dynamicHeight="false">
-    <mat-tab [label]="'inferrix.tab-overview' | translate">
-      <div class="tb-controller-tab">
-        <div class="tb-overview-cards">
-          <mat-card appearance="outlined">
-            <mat-card-header><mat-card-title>{{ 'inferrix.identity' | translate }}</mat-card-title></mat-card-header>
-            <mat-card-content>
-              <div class="tb-kv"><span>{{ 'inferrix.device-name' | translate }}</span><b>{{ controller?.name }}</b></div>
-              <div class="tb-kv"><span>{{ 'inferrix.uid' | translate }}</span><b>{{ controller?.uid || '—' }}</b></div>
-              <div class="tb-kv"><span>{{ 'inferrix.model' | translate }}</span><b>{{ controller?.model || info?.model || '—' }}</b></div>
-              <div class="tb-kv"><span>{{ 'inferrix.firmware' | translate }}</span><b>{{ controller?.fw || info?.fw || '—' }}</b></div>
-              <div class="tb-kv"><span>{{ 'inferrix.icc-version' | translate }}</span><b>{{ controller?.icc ?? info?.icc ?? '—' }}</b></div>
-              <div class="tb-kv"><span>{{ 'inferrix.mac' | translate }}</span><b>{{ controller?.mac || '—' }}</b></div>
-              <div class="tb-kv"><span>{{ 'inferrix.last-activity' | translate }}</span>
-                <b>{{ controller?.lastActivityTs ? (controller.lastActivityTs | date: 'yyyy-MM-dd HH:mm:ss') : '—' }}</b></div>
-            </mat-card-content>
-          </mat-card>
-
-          <mat-card appearance="outlined">
-            <mat-card-header>
-              <mat-card-title>{{ 'inferrix.health' | translate }}</mat-card-title>
-              <span class="flex-1"></span>
-              <button mat-icon-button (click)="reloadLive()" [disabled]="healthLoading">
-                <mat-icon>refresh</mat-icon>
-              </button>
-            </mat-card-header>
-            <mat-progress-bar color="warn" mode="indeterminate" *ngIf="healthLoading"></mat-progress-bar>
-            <mat-card-content>
-              <div class="tb-settings-error" *ngIf="healthError">{{ healthError | translate }}</div>
-              <ng-container *ngIf="health">
-                <div class="tb-kv"><span>{{ 'inferrix.uptime' | translate }}</span><b>{{ uptimeLabel() }}</b></div>
-                <div class="tb-kv"><span>{{ 'inferrix.fault' | translate }}</span>
-                  <b [class.tb-bad]="health.fault">{{ (health.fault ? 'inferrix.yes' : 'inferrix.no') | translate }}</b></div>
-                <div class="tb-kv"><span>{{ 'inferrix.mqtt-session' | translate }}</span><b>{{ mqttStateLabel() }}</b></div>
-                <div class="tb-kv"><span>{{ 'inferrix.time-sync' | translate }}</span><b>{{ timeSyncLabel() }}</b></div>
-                <div class="tb-kv"><span>{{ 'inferrix.scan-last' | translate }}</span><b>{{ health.scan?.last_ms ?? '—' }} ms</b></div>
-                <div class="tb-kv"><span>{{ 'inferrix.scan-max' | translate }}</span><b>{{ health.scan?.max_ms ?? '—' }} ms</b></div>
-                <div class="tb-kv"><span>{{ 'inferrix.scan-overruns' | translate }}</span>
-                  <b [class.tb-bad]="health.scan?.overruns">{{ health.scan?.overruns ?? '—' }}</b></div>
-                <div class="tb-kv" *ngFor="let bus of health.bus">
-                  <span>{{ 'inferrix.bus' | translate }} {{ bus.bus_id }}</span>
-                  <b [class.tb-bad]="bus.fails">{{ bus.fails }} {{ 'inferrix.fails' | translate }}</b>
-                </div>
-              </ng-container>
-            </mat-card-content>
-          </mat-card>
-        </div>
+    <div class="tb-form-panel stroked">
+      <div class="flex flex-row items-center">
+        <div class="tb-form-panel-title flex-1" translate>inferrix.health</div>
+        <button mat-icon-button (click)="reloadLive()" [disabled]="healthLoading"
+                [matTooltip]="'action.refresh' | translate" matTooltipPosition="above">
+          <mat-icon>refresh</mat-icon>
+        </button>
       </div>
-    </mat-tab>
-
-    <mat-tab [label]="'inferrix.tab-points' | translate">
-      <ng-template matTabContent>
-        <div class="tb-controller-tab">
-          <tb-controller-points [deviceId]="deviceId"></tb-controller-points>
+      <mat-progress-bar color="warn" mode="indeterminate" *ngIf="healthLoading"></mat-progress-bar>
+      <div class="tb-error-message" *ngIf="healthError">{{ healthError | translate }}</div>
+      <ng-container *ngIf="health">
+        <div class="tb-form-row space-between">
+          <div translate>inferrix.uptime</div>
+          <div>{{ uptimeLabel() }}</div>
         </div>
-      </ng-template>
-    </mat-tab>
-
-    <mat-tab [label]="'inferrix.tab-settings' | translate">
-      <ng-template matTabContent>
-        <div class="tb-controller-tab">
-          <tb-controller-settings [deviceId]="deviceId" [readonly]="readonly"></tb-controller-settings>
+        <div class="tb-form-row space-between">
+          <div translate>inferrix.fault</div>
+          <div>{{ (health.fault ? 'inferrix.yes' : 'inferrix.no') | translate }}</div>
         </div>
-      </ng-template>
-    </mat-tab>
-
-    <mat-tab [label]="'inferrix.tab-config' | translate">
-      <ng-template matTabContent>
-        <div class="tb-controller-tab">
-          <tb-controller-config [deviceId]="deviceId" [readonly]="readonly"></tb-controller-config>
+        <div class="tb-form-row space-between">
+          <div translate>inferrix.mqtt-session</div>
+          <div>{{ mqttStateLabel() }}</div>
         </div>
-      </ng-template>
-    </mat-tab>
-
-    <mat-tab [label]="'inferrix.tab-software' | translate">
-      <ng-template matTabContent>
-        <div class="tb-controller-tab">
-          <tb-controller-software [deviceId]="deviceId" [readonly]="readonly"></tb-controller-software>
+        <div class="tb-form-row space-between">
+          <div translate>inferrix.time-sync</div>
+          <div>{{ timeSyncLabel() }}</div>
         </div>
-      </ng-template>
-    </mat-tab>
-
-    <mat-tab [label]="'inferrix.tab-diagnostics' | translate">
-      <ng-template matTabContent>
-        <div class="tb-controller-tab">
-          <tb-controller-diagnostics [deviceId]="deviceId" [readonly]="readonly"></tb-controller-diagnostics>
+        <div class="tb-form-row space-between">
+          <div translate>inferrix.scan-last</div>
+          <div>{{ health.scan?.last_ms ?? '—' }} ms</div>
         </div>
-      </ng-template>
-    </mat-tab>
-  </mat-tab-group>
+        <div class="tb-form-row space-between">
+          <div translate>inferrix.scan-max</div>
+          <div>{{ health.scan?.max_ms ?? '—' }} ms</div>
+        </div>
+        <div class="tb-form-row space-between">
+          <div translate>inferrix.scan-overruns</div>
+          <div>{{ health.scan?.overruns ?? '—' }}</div>
+        </div>
+        <div class="tb-form-row space-between" *ngFor="let bus of health.bus">
+          <div>{{ 'inferrix.bus' | translate }} {{ bus.bus_id }}</div>
+          <div>{{ bus.fails }} {{ 'inferrix.fails' | translate }}</div>
+        </div>
+      </ng-container>
+    </div>
+  </div>
 </div>

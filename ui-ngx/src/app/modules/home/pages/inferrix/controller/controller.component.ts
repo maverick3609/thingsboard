@@ -14,122 +14,111 @@
 /// limitations under the License.
 ///
 
-import { Component, OnDestroy, OnInit } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ChangeDetectorRef, Component, Inject } from '@angular/core';
 import { Store } from '@ngrx/store';
-import { forkJoin, of, Subject } from 'rxjs';
-import { catchError, map, switchMap, takeUntil } from 'rxjs/operators';
+import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { AppState } from '@core/core.state';
-import { PageComponent } from '@shared/components/page.component';
-import { DeviceService } from '@core/http/device.service';
-import { AttributeService } from '@core/http/attribute.service';
+import { EntityComponent } from '@home/components/entity/entity.component';
+import { EntityTableConfig } from '@home/models/entity/entities-table-config.models';
 import { EntityType } from '@shared/models/entity-type.models';
-import { Authority } from '@shared/models/authority.enum';
-import { getCurrentAuthUser } from '@core/auth/auth.selectors';
 import { InferrixControllerService } from '@core/http/inferrix-controller.service';
-import { CONTROLLER_ATTRIBUTE_KEYS, ControllerHealth, ControllerInfo }
-  from '@shared/models/inferrix-controller.models';
+import { ControllerHealth, ControllerInfo } from '@shared/models/inferrix-controller.models';
 
 /**
- * One adopted controller: what it says it is, how it is doing, and everything that can be changed
- * on it.
+ * The Details tab of an adopted controller.
  *
- * The identity block comes from the device's own attributes, which arrive over MQTT and are
- * therefore available whether or not the controller is reachable over REST. Everything else is a
- * live call through the platform's proxy and needs the device on the network right now.
+ * The editable part is the plain device record — name, label, description — so it is the standard
+ * entity form. Below it sits what the controller says about itself: the identity block comes from
+ * attributes and so is readable whether or not the device is up, while health is a live call
+ * through the proxy and needs the controller on the network right now.
  */
 @Component({
   selector: 'tb-inferrix-controller',
   templateUrl: './controller.component.html',
-  styleUrls: ['./controller.component.scss'],
+  styleUrls: [],
   standalone: false
 })
-export class ControllerComponent extends PageComponent implements OnInit, OnDestroy {
+export class ControllerComponent extends EntityComponent<ControllerInfo> {
 
-  deviceId: string;
-  controller: ControllerInfo;
+  entityType = EntityType;
+
   health: ControllerHealth;
   info: {[key: string]: any};
-
-  loading = true;
   healthLoading = false;
   healthError: string;
-  readonly = true;
 
-  private destroy$ = new Subject<void>();
+  /** The controller the health block currently describes. */
+  private liveDeviceId: string;
 
   constructor(protected store: Store<AppState>,
-              private route: ActivatedRoute,
-              private router: Router,
-              private deviceService: DeviceService,
-              private attributeService: AttributeService,
+              @Inject('entity') protected entityValue: ControllerInfo,
+              @Inject('entitiesTableConfig') protected entitiesTableConfigValue: EntityTableConfig<ControllerInfo>,
+              public fb: UntypedFormBuilder,
+              protected cd: ChangeDetectorRef,
               private controllerService: InferrixControllerService) {
-    super();
+    super(store, fb, entityValue, entitiesTableConfigValue, cd);
   }
 
-  ngOnInit(): void {
-    this.readonly = getCurrentAuthUser(this.store).authority !== Authority.TENANT_ADMIN;
-    this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
-      this.deviceId = params.entityId;
-      this.reload();
+  buildForm(entity: ControllerInfo): UntypedFormGroup {
+    return this.fb.group({
+      name: [entity ? entity.name : '', [Validators.required, Validators.maxLength(255)]],
+      label: [entity ? entity.label : '', [Validators.maxLength(255)]],
+      additionalInfo: this.fb.group({
+        description: [entity && entity.additionalInfo ? entity.additionalInfo.description : '']
+      })
     });
   }
 
-  ngOnDestroy(): void {
-    this.destroy$.next();
-    this.destroy$.complete();
-    super.ngOnDestroy();
-  }
-
-  reload(): void {
-    this.loading = true;
-    this.deviceService.getDevice(this.deviceId).pipe(
-      switchMap(device => forkJoin([
-        of(device),
-        this.attributeService.getEntityAttributes({entityType: EntityType.DEVICE, id: this.deviceId}, null,
-          CONTROLLER_ATTRIBUTE_KEYS).pipe(catchError(() => of([])))
-      ])),
-      map(([device, attributes]) => this.toControllerInfo(device, attributes)),
-      takeUntil(this.destroy$)
-    ).subscribe({
-      next: controller => {
-        this.controller = controller;
-        this.loading = false;
-        this.reloadLive();
-      },
-      error: () => this.loading = false
+  updateForm(entity: ControllerInfo) {
+    this.entityForm.patchValue({
+      name: entity.name,
+      label: entity.label,
+      additionalInfo: {description: entity.additionalInfo ? entity.additionalInfo.description : ''}
     });
+    // The details panel re-sets the entity whenever edit mode is toggled, and the device serves two
+    // clients at a time — so only a different controller is worth two live calls.
+    if (entity?.id?.id !== this.liveDeviceId) {
+      this.liveDeviceId = entity?.id?.id;
+      this.health = null;
+      this.info = null;
+      this.reloadLive();
+    }
   }
 
-  /** Health and info are two calls the device can only answer while it is reachable. */
+  hideDelete() {
+    return this.entitiesTableConfig ? !this.entitiesTableConfig.deleteEnabled(this.entity) : false;
+  }
+
+  /** Health and info are the two calls the device can only answer while it is reachable. */
   reloadLive(): void {
+    if (!this.entity?.id?.id) {
+      return;
+    }
+    const deviceId = this.entity.id.id;
     this.healthLoading = true;
     this.healthError = null;
     forkJoin([
-      this.controllerService.proxy<ControllerHealth>(this.deviceId, 'GET', '/api/v1/health',
+      this.controllerService.proxy<ControllerHealth>(deviceId, 'GET', '/api/v1/health',
         null, {ignoreErrors: true}).pipe(catchError(() => of(null))),
-      this.controllerService.proxy<any>(this.deviceId, 'GET', '/api/v1/info',
+      this.controllerService.proxy<any>(deviceId, 'GET', '/api/v1/info',
         null, {ignoreErrors: true}).pipe(catchError(() => of(null)))
-    ]).pipe(takeUntil(this.destroy$)).subscribe(([health, info]) => {
+    ]).subscribe(([health, info]) => {
       this.health = health;
       this.info = info;
       this.healthLoading = false;
-      if (!health && !info) {
-        this.healthError = 'inferrix.controller-unreachable';
-      }
+      this.healthError = (!health && !info) ? 'inferrix.controller-unreachable' : null;
+      this.cd.markForCheck();
     });
   }
 
-  back(): void {
-    this.router.navigateByUrl('/controllers');
-  }
-
   mqttStateLabel(): string {
-    return label(this.health?.mqtt?.state, MQTT_STATES);
+    return stateLabel(this.health?.mqtt?.state, MQTT_STATES);
   }
 
   timeSyncLabel(): string {
-    return label(this.health?.time_sync?.state, TIME_SYNC_STATES);
+    return stateLabel(this.health?.time_sync?.state, TIME_SYNC_STATES);
   }
 
   uptimeLabel(): string {
@@ -142,25 +131,6 @@ export class ControllerComponent extends PageComponent implements OnInit, OnDest
     const hours = Math.floor((seconds % 86400) / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     return days > 0 ? `${days}d ${hours}h` : hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
-  }
-
-  private toControllerInfo(device: any, attributes: any[]): ControllerInfo {
-    const byKey = new Map<string, any>(attributes.map(a => [a.key, a.value]));
-    return {
-      deviceId: device.id.id,
-      name: device.name,
-      label: device.label,
-      active: byKey.get('active') === true || byKey.get('active') === 'true',
-      lastActivityTs: byKey.get('lastActivityTime'),
-      uid: byKey.get('uid') ?? byKey.get('controllerUid'),
-      ip: byKey.get('ip') ?? byKey.get('controllerIp'),
-      model: byKey.get('model'),
-      fw: byKey.get('fw'),
-      icc: byKey.get('icc'),
-      mac: byKey.get('mac'),
-      location: byKey.get('location'),
-      deploymentName: byKey.get('name')
-    };
   }
 }
 
@@ -181,7 +151,7 @@ const TIME_SYNC_STATES: {[state: number]: string} = {
   2: 'synced'
 };
 
-const label = (state: number | string, states: {[state: number]: string}): string => {
+const stateLabel = (state: number | string, states: {[state: number]: string}): string => {
   if (state === undefined || state === null) {
     return '—';
   }

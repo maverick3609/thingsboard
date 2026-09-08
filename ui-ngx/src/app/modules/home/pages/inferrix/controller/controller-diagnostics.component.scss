@@ -13,89 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-:host {
-  display: block;
-}
-
-.tb-diag-toolbar {
-  display: flex;
-  align-items: center;
-  padding-bottom: 8px;
-}
-
-.tb-diag-cards {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-
-  mat-card {
-    flex: 1 1 380px;
-    min-width: 320px;
-  }
-}
-
-.tb-kv {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 4px 0;
-  font-size: 13px;
-
-  span {
-    color: rgba(0, 0, 0, 0.54);
-  }
-}
-
+/* Layout only, plus the one colour the platform has no class for: a bad reading inside an otherwise
+   normal row. #d12730 is the same red ThingsBoard's own device table uses for an inactive device. */
 .tb-bad {
-  color: #da1e28;
+  color: #d12730;
 }
 
-.tb-ping-fields {
+.tb-diag-ping-fields {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 12px;
+  gap: 0 16px;
 }
 
-.tb-ping-target {
-  flex: 1 1 200px;
+.tb-diag-ping-target {
+  flex: 1 1 240px;
+  min-width: 240px;
 }
 
-.tb-ping-small {
-  width: 100px;
-}
-
-.tb-ping-result {
-  padding-top: 8px;
-}
-
-.tb-attempts {
-  display: flex;
-  gap: 8px;
-  padding-top: 4px;
-}
-
-.tb-attempt {
-  font-size: 12px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.06);
-}
-
-.tb-diag-note {
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.54);
-  padding: 4px 0 8px;
-}
-
-.tb-diag-divider {
-  height: 1px;
-  background: rgba(0, 0, 0, 0.12);
-  margin: 12px 0;
-}
-
-.tb-settings-error {
-  color: #da1e28;
-  font-size: 13px;
-  padding: 8px 0;
+.tb-diag-ping-small {
+  flex: 0 0 110px;
 }

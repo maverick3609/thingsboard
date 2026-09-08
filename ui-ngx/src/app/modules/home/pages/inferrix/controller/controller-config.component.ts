@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 
-import { Component, Input, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { TranslateService } from '@ngx-translate/core';
 import { DialogService } from '@core/services/dialog.service';
@@ -29,6 +29,7 @@ import {
   POINT_SOURCES
 } from '@shared/models/inferrix-controller.models';
 import { ControllerConfigRecordDialogComponent } from './controller-config-record-dialog.component';
+import { ControllerPanelComponent } from '@home/pages/inferrix/controller/controller-panel.component';
 
 /**
  * The controller's config plane: the buses, queries, points, scalings, publish policies and peer
@@ -47,10 +48,7 @@ import { ControllerConfigRecordDialogComponent } from './controller-config-recor
   styleUrls: ['./controller-config.component.scss'],
   standalone: false
 })
-export class ControllerConfigComponent implements OnInit {
-
-  @Input() deviceId: string;
-  @Input() readonly = false;
+export class ControllerConfigComponent extends ControllerPanelComponent {
 
   readonly sections = CONTROLLER_CONFIG_SECTIONS;
 
@@ -71,9 +69,11 @@ export class ControllerConfigComponent implements OnInit {
   constructor(private controllerService: InferrixControllerService,
               private dialog: MatDialog,
               private dialogService: DialogService,
-              private translate: TranslateService) {}
+              private translate: TranslateService) {
+    super();
+  }
 
-  ngOnInit(): void {
+  protected load(): void {
     this.controllerService.getConfigOwner(this.deviceId).subscribe({
       next: value => this.owner = value?.owner,
       error: () => this.owner = null
@@ -263,7 +263,4 @@ export class ControllerConfigComponent implements OnInit {
     return name ? `${name}` : this.messageOf(error);
   }
 
-  private messageOf(error: any): string {
-    return error?.error?.message || error?.message || 'Request failed';
-  }
 }

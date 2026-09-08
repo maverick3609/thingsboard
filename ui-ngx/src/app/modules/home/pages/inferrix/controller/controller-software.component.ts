@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 
-import { Component, Input, OnDestroy, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { TranslateService } from '@ngx-translate/core';
 import { Subscription, timer } from 'rxjs';
 import { switchMap, takeWhile } from 'rxjs/operators';
@@ -22,6 +22,7 @@ import { DialogService } from '@core/services/dialog.service';
 import { InferrixControllerService } from '@core/http/inferrix-controller.service';
 import { CONTROLLER_UPLOAD_LIMITS, ControllerUploadKind, ControllerUploadStatus }
   from '@shared/models/inferrix-controller.models';
+import { ControllerPanelComponent } from '@home/pages/inferrix/controller/controller-panel.component';
 
 /**
  * Writing a firmware image or a logic program to the controller.
@@ -37,13 +38,9 @@ import { CONTROLLER_UPLOAD_LIMITS, ControllerUploadKind, ControllerUploadStatus 
 @Component({
   selector: 'tb-controller-software',
   templateUrl: './controller-software.component.html',
-  styleUrls: ['./controller-software.component.scss'],
   standalone: false
 })
-export class ControllerSoftwareComponent implements OnInit, OnDestroy {
-
-  @Input() deviceId: string;
-  @Input() readonly = false;
+export class ControllerSoftwareComponent extends ControllerPanelComponent {
 
   readonly kinds: {kind: ControllerUploadKind; titleKey: string; noteKey: string;
     statusPath: string; accept: string}[] = [
@@ -64,9 +61,11 @@ export class ControllerSoftwareComponent implements OnInit, OnDestroy {
 
   constructor(private controllerService: InferrixControllerService,
               private dialogService: DialogService,
-              private translate: TranslateService) {}
+              private translate: TranslateService) {
+    super();
+  }
 
-  ngOnInit(): void {
+  protected load(): void {
     this.reload();
     // An upload started before this page was loaded is still running on the platform; pick it back
     // up rather than showing a device that refuses a second upload and no reason why.
@@ -81,8 +80,9 @@ export class ControllerSoftwareComponent implements OnInit, OnDestroy {
     });
   }
 
-  ngOnDestroy(): void {
+  override ngOnDestroy(): void {
     Object.values(this.polls).forEach(poll => poll?.unsubscribe());
+    super.ngOnDestroy();
   }
 
   reload(): void {
@@ -190,9 +190,6 @@ export class ControllerSoftwareComponent implements OnInit, OnDestroy {
     });
   }
 
-  private messageOf(error: any): string {
-    return error?.error?.message || error?.message || 'Request failed';
-  }
 }
 
 const LOGIC_STATES: {[state: number]: string} = {

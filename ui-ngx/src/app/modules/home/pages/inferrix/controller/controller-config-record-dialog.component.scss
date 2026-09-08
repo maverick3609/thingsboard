@@ -13,46 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-:host {
-  display: block;
-}
-
-.tb-points-toolbar {
+/* Layout only: the record fields are generated from the section spec, so the wrapping grid cannot
+   be expressed field by field in the template. */
+.tb-record-fields {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 0 16px;
 }
 
-.tb-points-count {
-  font-size: 13px;
-  color: rgba(0, 0, 0, 0.54);
+.tb-record-field {
+  flex: 1 1 240px;
+  min-width: 240px;
 }
 
-.tb-points-table {
-  width: 100%;
+.tb-record-wide {
+  flex-basis: 100%;
+  padding-bottom: 16px;
 }
 
-.tb-quality {
-  font-weight: 500;
-}
-
-.tb-points-warning {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  padding: 8px 0;
-}
-
-.tb-points-empty {
-  padding: 24px;
-  text-align: center;
-  color: rgba(0, 0, 0, 0.54);
-}
-
-.tb-settings-error {
-  color: #da1e28;
-  font-size: 13px;
-  padding: 8px 0;
+.tb-record-flag {
+  margin-right: 16px;
 }

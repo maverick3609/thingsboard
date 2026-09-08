@@ -1,0 +1,57 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<form [formGroup]="assignForm" (ngSubmit)="assign()">
+  <mat-toolbar color="primary">
+    <h2 translate>inferrix.assign-controller</h2>
+    <span class="flex-1"></span>
+    <button mat-icon-button
+            (click)="cancel()"
+            type="button">
+      <mat-icon class="material-icons">close</mat-icon>
+    </button>
+  </mat-toolbar>
+  <mat-progress-bar color="warn" mode="indeterminate" *ngIf="isLoading$ | async">
+  </mat-progress-bar>
+  <div style="height: 4px;" *ngIf="!(isLoading$ | async)"></div>
+  <div mat-dialog-content>
+    <fieldset [disabled]="isLoading$ | async">
+      <div style="padding-bottom: 0.5em;">
+        {{ 'inferrix.assign-controller-text' | translate: {uid: controller.uid} }}
+      </div>
+      <tb-entity-autocomplete
+        formControlName="tenantId"
+        required
+        [entityType]="entityType.TENANT">
+      </tb-entity-autocomplete>
+      <div class="tb-error-message" *ngIf="errorMessage">{{ errorMessage }}</div>
+    </fieldset>
+  </div>
+  <div mat-dialog-actions class="flex flex-row items-center justify-end">
+    <button mat-button color="primary"
+            type="button"
+            [disabled]="(isLoading$ | async)"
+            (click)="cancel()" cdkFocusInitial>
+      {{ 'action.cancel' | translate }}
+    </button>
+    <button mat-raised-button color="primary"
+            type="submit"
+            [disabled]="(isLoading$ | async) || assignForm.invalid">
+      {{ 'action.assign' | translate }}
+    </button>
+  </div>
+</form>

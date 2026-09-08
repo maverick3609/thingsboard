@@ -15,126 +15,158 @@
     limitations under the License.
 
 -->
-<div class="tb-controller-diagnostics">
-  <div class="tb-diag-toolbar">
+<div class="mat-padding flex flex-col gap-4">
+  <div class="flex flex-row items-center">
     <span class="flex-1"></span>
-    <button mat-stroked-button (click)="reload()" [disabled]="loading">
+    <button mat-icon-button (click)="reload()" [disabled]="loading"
+            matTooltip="{{ 'action.refresh' | translate }}" matTooltipPosition="above">
       <mat-icon>refresh</mat-icon>
-      <span>{{ 'action.refresh' | translate }}</span>
     </button>
   </div>
   <mat-progress-bar color="warn" mode="indeterminate" *ngIf="loading"></mat-progress-bar>
-  <div class="tb-settings-error" *ngIf="error">{{ error | translate }}</div>
+  <div class="tb-error-message" *ngIf="error">{{ error | translate }}</div>
 
-  <div class="tb-diag-cards">
-    <mat-card appearance="outlined" *ngIf="network">
-      <mat-card-header><mat-card-title>{{ 'inferrix.diag-network' | translate }}</mat-card-title></mat-card-header>
-      <mat-card-content>
-        <div class="tb-kv"><span>{{ 'inferrix.link' | translate }}</span>
-          <b [class.tb-bad]="!network.link_up">{{ (network.link_up ? 'inferrix.up' : 'inferrix.down') | translate }}</b></div>
-        <div class="tb-kv"><span>{{ 'inferrix.network-mode' | translate }}</span><b>{{ network.dhcp ? 'DHCP' : 'Static' }}</b></div>
-        <div class="tb-kv"><span>{{ 'inferrix.network-ip' | translate }}</span><b>{{ network.ip }}</b></div>
-        <div class="tb-kv"><span>{{ 'inferrix.network-mask' | translate }}</span><b>{{ network.netmask }}</b></div>
-        <div class="tb-kv"><span>{{ 'inferrix.network-gateway' | translate }}</span><b>{{ network.gateway }}</b></div>
-        <div class="tb-kv"><span>{{ 'inferrix.network-dns' | translate }}</span><b>{{ network.dns }}</b></div>
-        <div class="tb-kv"><span>{{ 'inferrix.mac' | translate }}</span><b>{{ network.mac }}</b></div>
-      </mat-card-content>
-    </mat-card>
+  <div class="tb-form-panel stroked" *ngIf="network">
+    <div class="tb-form-panel-title" translate>inferrix.diag-network</div>
+    <div class="tb-form-row space-between">
+      <div translate>inferrix.link</div>
+      <div [class.tb-bad]="!network.link_up">{{ (network.link_up ? 'inferrix.up' : 'inferrix.down') | translate }}</div>
+    </div>
+    <div class="tb-form-row space-between">
+      <div translate>inferrix.network-mode</div>
+      <div>{{ network.dhcp ? 'DHCP' : 'Static' }}</div>
+    </div>
+    <div class="tb-form-row space-between">
+      <div translate>inferrix.network-ip</div>
+      <div>{{ network.ip }}</div>
+    </div>
+    <div class="tb-form-row space-between">
+      <div translate>inferrix.network-mask</div>
+      <div>{{ network.netmask }}</div>
+    </div>
+    <div class="tb-form-row space-between">
+      <div translate>inferrix.network-gateway</div>
+      <div>{{ network.gateway }}</div>
+    </div>
+    <div class="tb-form-row space-between">
+      <div translate>inferrix.network-dns</div>
+      <div>{{ network.dns }}</div>
+    </div>
+    <div class="tb-form-row space-between">
+      <div translate>inferrix.mac</div>
+      <div>{{ network.mac }}</div>
+    </div>
+  </div>
 
-    <mat-card appearance="outlined" *ngIf="logic || firmware">
-      <mat-card-header><mat-card-title>{{ 'inferrix.diag-program' | translate }}</mat-card-title></mat-card-header>
-      <mat-card-content>
-        <ng-container *ngIf="logic">
-          <div class="tb-kv"><span>{{ 'inferrix.logic-state' | translate }}</span>
-            <b [class.tb-bad]="logic.state === 2 || logic.state === 3">
-              {{ (logicStates[logic.state] || 'inferrix.unknown') | translate }}</b></div>
-          <div class="tb-kv"><span>{{ 'inferrix.scan-count' | translate }}</span><b>{{ logic.scanCount }}</b></div>
-          <div class="tb-kv"><span>{{ 'inferrix.logic-fault' | translate }}</span>
-            <b [class.tb-bad]="logic.fault">{{ logic.fault }}</b></div>
-          <div class="tb-kv"><span>{{ 'inferrix.logic-out-drops' | translate }}</span>
-            <b [class.tb-bad]="logic.outDrops">{{ logic.outDrops }}</b></div>
-          <div class="tb-kv"><span>{{ 'inferrix.logic-binding-fault' | translate }}</span>
-            <b [class.tb-bad]="logic.bindingFault">{{ logic.bindingFault ? ('inferrix.yes' | translate) : ('inferrix.no' | translate) }}</b></div>
-        </ng-container>
-        <div class="tb-kv" *ngIf="firmware"><span>{{ 'inferrix.firmware-state' | translate }}</span><b>{{ firmware.state }}</b></div>
-      </mat-card-content>
-      <mat-card-actions align="end">
-        <button mat-stroked-button [disabled]="readonly || restartRunning" (click)="restartLogic()">
-          {{ 'inferrix.restart-logic' | translate }}
-        </button>
-      </mat-card-actions>
-    </mat-card>
-
-    <mat-card appearance="outlined" *ngIf="memory">
-      <mat-card-header><mat-card-title>{{ 'inferrix.diag-resources' | translate }}</mat-card-title></mat-card-header>
-      <mat-card-content>
-        <div class="tb-kv" *ngFor="let stack of memory.stacks">
-          <span>{{ 'inferrix.stack' | translate }} {{ stack.n }}</span>
-          <b [class.tb-bad]="stack.free < stack.size * 0.1">{{ stack.free }} / {{ stack.size }} B</b>
+  <div class="tb-form-panel stroked" *ngIf="logic || firmware">
+    <div class="tb-form-panel-title" translate>inferrix.diag-program</div>
+    <ng-container *ngIf="logic">
+      <div class="tb-form-row space-between">
+        <div translate>inferrix.logic-state</div>
+        <div [class.tb-bad]="logic.state === 2 || logic.state === 3">
+          {{ (logicStates[logic.state] || 'inferrix.unknown') | translate }}
         </div>
-        <div class="tb-kv" *ngFor="let pool of memory.net_pools">
-          <span>{{ 'inferrix.pool' | translate }} {{ pool.n }}</span>
-          <b [class.tb-bad]="pool.avail === 0">{{ pool.avail }} / {{ pool.size }}</b>
+      </div>
+      <div class="tb-form-row space-between">
+        <div translate>inferrix.scan-count</div>
+        <div>{{ logic.scanCount }}</div>
+      </div>
+      <div class="tb-form-row space-between">
+        <div translate>inferrix.logic-fault</div>
+        <div [class.tb-bad]="logic.fault">{{ logic.fault }}</div>
+      </div>
+      <div class="tb-form-row space-between">
+        <div translate>inferrix.logic-out-drops</div>
+        <div [class.tb-bad]="logic.outDrops">{{ logic.outDrops }}</div>
+      </div>
+      <div class="tb-form-row space-between">
+        <div translate>inferrix.logic-binding-fault</div>
+        <div [class.tb-bad]="logic.bindingFault">
+          {{ (logic.bindingFault ? 'inferrix.yes' : 'inferrix.no') | translate }}
         </div>
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </ng-container>
+    <div class="tb-form-row space-between" *ngIf="firmware">
+      <div translate>inferrix.firmware-state</div>
+      <div>{{ firmware.state }}</div>
+    </div>
+    <div class="flex flex-row items-center justify-end">
+      <button mat-stroked-button [disabled]="readonly || restartRunning" (click)="restartLogic()">
+        {{ 'inferrix.restart-logic' | translate }}
+      </button>
+    </div>
+  </div>
 
-    <mat-card appearance="outlined">
-      <mat-card-header><mat-card-title>{{ 'inferrix.diag-reachability' | translate }}</mat-card-title></mat-card-header>
-      <mat-card-content>
-        <form [formGroup]="pingForm" (ngSubmit)="ping()">
-          <div class="tb-ping-fields">
-            <mat-form-field appearance="outline" class="tb-ping-target">
-              <mat-label>{{ 'inferrix.ping-target' | translate }}</mat-label>
-              <input matInput formControlName="target"/>
-              <mat-hint>{{ 'inferrix.ping-target-hint' | translate }}</mat-hint>
-            </mat-form-field>
-            <mat-form-field appearance="outline" class="tb-ping-small">
-              <mat-label>{{ 'inferrix.ping-count' | translate }}</mat-label>
-              <input matInput type="number" formControlName="count"/>
-            </mat-form-field>
-            <mat-form-field appearance="outline" class="tb-ping-small">
-              <mat-label>{{ 'inferrix.ping-port' | translate }}</mat-label>
-              <input matInput type="number" formControlName="port"/>
-            </mat-form-field>
-            <button mat-raised-button color="primary" type="submit"
-                    [disabled]="readonly || pingRunning || pingForm.invalid">
-              {{ 'inferrix.ping' | translate }}
-            </button>
-          </div>
-        </form>
-        <div class="tb-diag-note">{{ 'inferrix.ping-tcp-note' | translate }}</div>
-        <div class="tb-settings-error" *ngIf="pingError">{{ pingError }}</div>
-        <div class="tb-ping-result" *ngIf="pingResult">
-          <div class="tb-kv"><span>{{ 'inferrix.ping-resolved' | translate }}</span>
-            <b>{{ pingResult.host }}:{{ pingResult.port }}</b></div>
-          <div class="tb-kv"><span>{{ 'inferrix.ping-received' | translate }}</span>
-            <b [class.tb-bad]="!pingResult.received">{{ pingResult.received }} / {{ pingResult.count }}</b></div>
-          <div class="tb-attempts">
-            <span *ngFor="let attempt of pingResult.attempts" class="tb-attempt"
-                  [class.tb-bad]="!attempt.ok">
-              {{ attempt.ok ? attempt.rtt_ms + ' ms' : ('inferrix.ping-failed' | translate) }}
-            </span>
-          </div>
+  <div class="tb-form-panel stroked" *ngIf="memory">
+    <div class="tb-form-panel-title" translate>inferrix.diag-resources</div>
+    <div class="tb-form-row space-between" *ngFor="let stack of memory.stacks">
+      <div>{{ 'inferrix.stack' | translate }} {{ stack.n }}</div>
+      <div [class.tb-bad]="stack.free < stack.size * 0.1">{{ stack.free }} / {{ stack.size }} B</div>
+    </div>
+    <div class="tb-form-row space-between" *ngFor="let pool of memory.net_pools">
+      <div>{{ 'inferrix.pool' | translate }} {{ pool.n }}</div>
+      <div [class.tb-bad]="pool.avail === 0">{{ pool.avail }} / {{ pool.size }}</div>
+    </div>
+  </div>
+
+  <div class="tb-form-panel stroked">
+    <div class="tb-form-panel-title" translate>inferrix.diag-reachability</div>
+    <form [formGroup]="pingForm" (ngSubmit)="ping()">
+      <fieldset [disabled]="readonly || pingRunning">
+        <div class="tb-diag-ping-fields">
+          <mat-form-field class="tb-diag-ping-target">
+            <mat-label>{{ 'inferrix.ping-target' | translate }}</mat-label>
+            <input matInput formControlName="target"/>
+            <mat-hint>{{ 'inferrix.ping-target-hint' | translate }}</mat-hint>
+          </mat-form-field>
+          <mat-form-field class="tb-diag-ping-small">
+            <mat-label>{{ 'inferrix.ping-count' | translate }}</mat-label>
+            <input matInput type="number" formControlName="count"/>
+          </mat-form-field>
+          <mat-form-field class="tb-diag-ping-small">
+            <mat-label>{{ 'inferrix.ping-port' | translate }}</mat-label>
+            <input matInput type="number" formControlName="port"/>
+          </mat-form-field>
+          <button mat-raised-button color="primary" type="submit"
+                  [disabled]="readonly || pingRunning || pingForm.invalid">
+            {{ 'inferrix.ping' | translate }}
+          </button>
         </div>
-
-        <div class="tb-diag-divider"></div>
-
-        <button mat-stroked-button [disabled]="readonly || mqttTestRunning" (click)="testMqtt()">
-          {{ 'inferrix.test-broker' | translate }}
-        </button>
-        <div class="tb-settings-error" *ngIf="mqttTestError">{{ mqttTestError }}</div>
-        <div class="tb-ping-result" *ngIf="mqttTestResult">
-          <div class="tb-kv" *ngFor="let entry of mqttTestSteps()">
-            <span>{{ entry.name }}</span>
-            <b *ngIf="entry.step.attempted" [class.tb-bad]="!entry.step.ok">
-              {{ (entry.step.ok ? 'inferrix.ok' : 'inferrix.failed') | translate }} · {{ entry.step.ms }} ms
-            </b>
-            <b *ngIf="!entry.step.attempted">{{ 'inferrix.skipped' | translate }}</b>
-          </div>
-          <div class="tb-diag-note">{{ 'inferrix.broker-test-note' | translate }}</div>
+      </fieldset>
+    </form>
+    <div class="tb-form-panel-hint">{{ 'inferrix.ping-tcp-note' | translate }}</div>
+    <div class="tb-error-message" *ngIf="pingError">{{ pingError }}</div>
+    <ng-container *ngIf="pingResult">
+      <div class="tb-form-row space-between">
+        <div translate>inferrix.ping-resolved</div>
+        <div>{{ pingResult.host }}:{{ pingResult.port }}</div>
+      </div>
+      <div class="tb-form-row space-between">
+        <div translate>inferrix.ping-received</div>
+        <div [class.tb-bad]="!pingResult.received">{{ pingResult.received }} / {{ pingResult.count }}</div>
+      </div>
+      <div class="tb-form-row">
+        <div *ngFor="let attempt of pingResult.attempts" [class.tb-bad]="!attempt.ok">
+          {{ attempt.ok ? attempt.rtt_ms + ' ms' : ('inferrix.ping-failed' | translate) }}
         </div>
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </ng-container>
+
+    <div class="flex flex-row items-center">
+      <button mat-stroked-button [disabled]="readonly || mqttTestRunning" (click)="testMqtt()">
+        {{ 'inferrix.test-broker' | translate }}
+      </button>
+    </div>
+    <div class="tb-error-message" *ngIf="mqttTestError">{{ mqttTestError }}</div>
+    <ng-container *ngIf="mqttTestResult">
+      <div class="tb-form-row space-between" *ngFor="let entry of mqttTestSteps()">
+        <div>{{ entry.name }}</div>
+        <div *ngIf="entry.step.attempted" [class.tb-bad]="!entry.step.ok">
+          {{ (entry.step.ok ? 'inferrix.ok' : 'inferrix.failed') | translate }} · {{ entry.step.ms }} ms
+        </div>
+        <div *ngIf="!entry.step.attempted">{{ 'inferrix.skipped' | translate }}</div>
+      </div>
+      <div class="tb-form-panel-hint">{{ 'inferrix.broker-test-note' | translate }}</div>
+    </ng-container>
   </div>
 </div>

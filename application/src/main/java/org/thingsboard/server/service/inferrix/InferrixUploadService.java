@@ -23,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.thingsboard.common.util.JacksonUtil;
+import org.thingsboard.common.util.ThingsBoardThreadFactory;
 import org.thingsboard.server.common.data.id.DeviceId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.queue.util.TbCoreComponent;
@@ -104,11 +105,7 @@ public class InferrixUploadService {
     private final ExecutorService executor = new ThreadPoolExecutor(
             MAX_CONCURRENT_UPLOADS, MAX_CONCURRENT_UPLOADS, 0L, TimeUnit.MILLISECONDS,
             new ArrayBlockingQueue<>(MAX_QUEUED_UPLOADS),
-            runnable -> {
-                Thread thread = new Thread(runnable, "inferrix-upload");
-                thread.setDaemon(true);
-                return thread;
-            });
+            ThingsBoardThreadFactory.forName("inferrix-upload"));
 
     private final InferrixControllerAccess controllerAccess;
 

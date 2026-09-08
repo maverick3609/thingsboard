@@ -4191,6 +4191,18 @@
         }
     },
     "inferrix": {
+    "no-discovered-controllers": "No controllers have announced themselves yet.",
+    "search-discovered-controllers": "Search discovered controllers",
+    "announces": "Announces",
+    "assign-controller": "Assign controller to tenant",
+    "assign-controller-text": "Allocate controller {{uid}} to a tenant. Its administrator can then adopt it.",
+    "controller-name-required": "Controller name is required.",
+    "delete-controller": "Delete controller",
+    "delete-controller-title": "Are you sure you want to delete the controller '{{controllerName}}'?",
+    "delete-controller-text": "Be careful, after the confirmation the controller and all related data will become unrecoverable. The device itself keeps its configuration and has to be adopted again.",
+    "delete-controllers-title": "Are you sure you want to delete { count, plural, 1 {1 controller} other {# controllers} }?",
+    "delete-controllers-text": "Be careful, after the confirmation all selected controllers will be removed and all related data will become unrecoverable.",
+    "identity-hint": "Reported by the controller itself over MQTT, so it is readable whether or not the device is reachable right now.",
         "file-too-large": "That file is {{size}} bytes, over the {{limit}}-byte limit for this kind of upload.",
         "tab-software": "Software",
         "logic-program": "Logic program",

@@ -15,97 +15,97 @@
     limitations under the License.
 
 -->
-<div class="tb-controller-config">
-  <div class="tb-config-owner" *ngIf="owner">
-    <mat-icon>{{ owner === 'local' ? 'edit' : 'lock' }}</mat-icon>
-    <span *ngIf="owner === 'local'" translate>inferrix.owner-local</span>
-    <span *ngIf="owner !== 'local'" translate>inferrix.owner-platform</span>
-    <span class="flex-1"></span>
-    <button mat-stroked-button *ngIf="owner !== 'local' && !readonly" (click)="setOwner('local')">
-      {{ 'inferrix.take-local-ownership' | translate }}
-    </button>
-    <button mat-stroked-button *ngIf="owner === 'local' && !readonly" (click)="setOwner('platform')">
-      {{ 'inferrix.hand-back-ownership' | translate }}
-    </button>
+<div class="mat-padding flex flex-col gap-4">
+  <div class="tb-form-panel stroked no-gap">
+    <div class="tb-form-row no-border no-padding">
+      <mat-icon>{{ !owner ? 'help_outline' : owner === 'local' ? 'edit' : 'lock' }}</mat-icon>
+      <div class="flex-1" *ngIf="owner === 'local'" translate>inferrix.owner-local</div>
+      <div class="flex-1" *ngIf="owner && owner !== 'local'" translate>inferrix.owner-platform</div>
+      <div class="flex-1" *ngIf="!owner" translate>inferrix.owner-unknown</div>
+      <button mat-stroked-button *ngIf="owner && owner !== 'local' && !readonly" (click)="setOwner('local')">
+        {{ 'inferrix.take-local-ownership' | translate }}
+      </button>
+      <button mat-stroked-button *ngIf="owner === 'local' && !readonly" (click)="setOwner('platform')">
+        {{ 'inferrix.hand-back-ownership' | translate }}
+      </button>
+    </div>
   </div>
 
-  <div class="tb-config-owner" *ngIf="!owner">
-    <mat-icon>help_outline</mat-icon>
-    <span translate>inferrix.owner-unknown</span>
+  <div class="tb-form-panel stroked">
+    <div class="flex flex-row items-center gap-2">
+      <mat-button-toggle-group [value]="showDraft" (change)="toggleDraft($event.value)">
+        <mat-button-toggle [value]="true">{{ 'inferrix.draft' | translate }}</mat-button-toggle>
+        <mat-button-toggle [value]="false">{{ 'inferrix.active' | translate }}</mat-button-toggle>
+      </mat-button-toggle-group>
+      <span class="flex-1"></span>
+      <button mat-stroked-button [disabled]="!editable" (click)="discard()">
+        {{ 'inferrix.discard' | translate }}
+      </button>
+      <button mat-raised-button color="primary" [disabled]="!editable" (click)="apply()">
+        {{ 'inferrix.apply' | translate }}
+      </button>
+    </div>
+    <div class="tb-form-panel-hint" *ngIf="showDraft" translate>inferrix.draft-note</div>
+    <div class="tb-form-panel-hint" *ngIf="!showDraft" translate>inferrix.active-note</div>
+    <mat-progress-bar color="warn" mode="indeterminate" *ngIf="loading"></mat-progress-bar>
+    <div class="tb-error-message" *ngIf="error">{{ error }}</div>
+    <div class="tb-form-panel-hint" *ngIf="applyResult">{{ applyResult }}</div>
   </div>
 
-  <div class="tb-config-toolbar flex flex-row items-center">
-    <mat-button-toggle-group [value]="showDraft" (change)="toggleDraft($event.value)">
-      <mat-button-toggle [value]="true">{{ 'inferrix.draft' | translate }}</mat-button-toggle>
-      <mat-button-toggle [value]="false">{{ 'inferrix.active' | translate }}</mat-button-toggle>
-    </mat-button-toggle-group>
-    <span class="flex-1"></span>
-    <button mat-stroked-button [disabled]="!editable" (click)="discard()">
-      <mat-icon>undo</mat-icon>
-      <span>{{ 'inferrix.discard' | translate }}</span>
-    </button>
-    <button mat-raised-button color="primary" [disabled]="!editable" (click)="apply()">
-      <mat-icon>publish</mat-icon>
-      <span>{{ 'inferrix.apply' | translate }}</span>
-    </button>
-  </div>
-
-  <div class="tb-config-note" *ngIf="showDraft" translate>inferrix.draft-note</div>
-  <div class="tb-config-note" *ngIf="!showDraft" translate>inferrix.active-note</div>
-
-  <mat-progress-bar color="warn" mode="indeterminate" *ngIf="loading"></mat-progress-bar>
-  <div class="tb-settings-error" *ngIf="error">{{ error }}</div>
-  <div class="tb-config-applied" *ngIf="applyResult">{{ applyResult }}</div>
-
-  <div class="tb-config-body">
-    <mat-nav-list class="tb-config-sections">
+  <div class="flex flex-col gap-4 gt-sm:flex-row gt-sm:items-start">
+    <mat-nav-list class="tb-outlined-border tb-config-sections">
       <a mat-list-item *ngFor="let candidate of sections"
-         [class.tb-selected]="candidate.key === section.key"
+         [activated]="candidate.key === section.key"
          (click)="selectSection(candidate)">
         {{ candidate.titleKey | translate }}
       </a>
     </mat-nav-list>
 
-    <div class="tb-config-records">
-      <div class="tb-config-records-header flex flex-row items-center">
-        <span class="tb-config-count">
-          {{ 'inferrix.records-count' | translate: {count: records.length, limit: section.limit} }}
-        </span>
-        <span class="flex-1"></span>
-        <button mat-icon-button (click)="reload()" [matTooltip]="'action.refresh' | translate">
-          <mat-icon>refresh</mat-icon>
-        </button>
-        <button mat-stroked-button color="primary"
-                [disabled]="!editable || records.length >= section.limit" (click)="addRecord()">
-          <mat-icon>add</mat-icon>
-          <span>{{ 'inferrix.add-record' | translate }}</span>
-        </button>
-      </div>
-
-      <table mat-table [dataSource]="records" *ngIf="records.length > 0" class="tb-config-table">
-        <ng-container *ngFor="let column of section.columns" [matColumnDef]="column">
-          <th mat-header-cell *matHeaderCellDef>{{ column }}</th>
-          <td mat-cell *matCellDef="let record">{{ display(record, column) }}</td>
-        </ng-container>
-        <ng-container matColumnDef="actions">
-          <th mat-header-cell *matHeaderCellDef></th>
-          <td mat-cell *matCellDef="let record" class="tb-config-actions">
-            <button mat-icon-button [disabled]="!editable" (click)="editRecord(record)"
-                    [matTooltip]="'action.edit' | translate">
-              <mat-icon>edit</mat-icon>
+    <div class="tb-entity-table flex flex-1 flex-col tb-config-records">
+      <div class="tb-entity-table-content tb-outlined-border flex flex-1 flex-col">
+        <mat-toolbar class="mat-mdc-table-toolbar">
+          <div class="mat-toolbar-tools">
+            <span class="tb-entity-table-title">{{ section.titleKey | translate }}</span>
+            <span class="tb-entity-table-info">
+              {{ 'inferrix.records-count' | translate: {count: records.length, limit: section.limit} }}
+            </span>
+            <span class="flex-1"></span>
+            <button mat-icon-button [disabled]="!editable || records.length >= section.limit"
+                    (click)="addRecord()"
+                    matTooltip="{{ 'inferrix.add-record' | translate }}" matTooltipPosition="above">
+              <mat-icon>add</mat-icon>
             </button>
-            <button mat-icon-button [disabled]="!editable" (click)="deleteRecord(record)"
-                    [matTooltip]="'action.delete' | translate">
-              <mat-icon>delete</mat-icon>
+            <button mat-icon-button (click)="reload()"
+                    matTooltip="{{ 'action.refresh' | translate }}" matTooltipPosition="above">
+              <mat-icon>refresh</mat-icon>
             </button>
-          </td>
-        </ng-container>
-        <tr mat-header-row *matHeaderRowDef="columns"></tr>
-        <tr mat-row *matRowDef="let row; columns: columns"></tr>
-      </table>
-
-      <div class="tb-config-empty" *ngIf="!loading && !error && records.length === 0">
-        {{ 'inferrix.no-records' | translate }}
+          </div>
+        </mat-toolbar>
+        <div class="table-container flex-1">
+          <table mat-table [dataSource]="records" *ngIf="records.length > 0">
+            <ng-container *ngFor="let column of section.columns" [matColumnDef]="column">
+              <th mat-header-cell *matHeaderCellDef>{{ column }}</th>
+              <td mat-cell *matCellDef="let record">{{ display(record, column) }}</td>
+            </ng-container>
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef></th>
+              <td mat-cell *matCellDef="let record" class="tb-config-actions">
+                <button mat-icon-button [disabled]="!editable" (click)="editRecord(record)"
+                        matTooltip="{{ 'action.edit' | translate }}" matTooltipPosition="above">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button [disabled]="!editable" (click)="deleteRecord(record)"
+                        matTooltip="{{ 'action.delete' | translate }}" matTooltipPosition="above">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="columns"></tr>
+            <tr mat-row *matRowDef="let row; columns: columns"></tr>
+          </table>
+          <span class="no-data-found flex items-center justify-center"
+                *ngIf="!loading && !error && records.length === 0" translate>inferrix.no-records</span>
+        </div>
       </div>
     </div>
   </div>

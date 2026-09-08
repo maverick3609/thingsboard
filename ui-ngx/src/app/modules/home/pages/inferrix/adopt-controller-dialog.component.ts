@@ -48,7 +48,6 @@ export class AdoptControllerDialogComponent extends DialogComponent<AdoptControl
 
   adoptForm: UntypedFormGroup;
   readonly controller: DiscoveredController;
-  submitting = false;
   errorMessage: string = null;
 
   constructor(protected store: Store<AppState>,
@@ -76,7 +75,6 @@ export class AdoptControllerDialogComponent extends DialogComponent<AdoptControl
       this.adoptForm.markAllAsTouched();
       return;
     }
-    this.submitting = true;
     this.errorMessage = null;
     const value = this.adoptForm.getRawValue();
     this.controllerService.adoptController({
@@ -88,10 +86,7 @@ export class AdoptControllerDialogComponent extends DialogComponent<AdoptControl
       label: value.label || undefined
     }, {ignoreErrors: true}).subscribe({
       next: device => this.dialogRef.close(device),
-      error: error => {
-        this.submitting = false;
-        this.errorMessage = error?.error?.message || error?.message || 'Adoption failed';
-      }
+      error: error => this.errorMessage = error?.error?.message || error?.message || 'Adoption failed'
     });
   }
 

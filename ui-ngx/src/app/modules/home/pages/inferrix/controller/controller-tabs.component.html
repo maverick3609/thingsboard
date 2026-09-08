@@ -1,0 +1,60 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+@if (entity) {
+  <mat-tab label="{{ 'inferrix.tab-points' | translate }}" #pointsTab="matTab">
+    <tb-controller-points [active]="pointsTab.isActive" [deviceId]="entity.id.id"></tb-controller-points>
+  </mat-tab>
+  <mat-tab label="{{ 'inferrix.tab-settings' | translate }}" #settingsTab="matTab">
+    <tb-controller-settings [active]="settingsTab.isActive" [deviceId]="entity.id.id"
+                            [readonly]="readonly"></tb-controller-settings>
+  </mat-tab>
+  <mat-tab label="{{ 'inferrix.tab-config' | translate }}" #configTab="matTab">
+    <tb-controller-config [active]="configTab.isActive" [deviceId]="entity.id.id"
+                          [readonly]="readonly"></tb-controller-config>
+  </mat-tab>
+  <mat-tab label="{{ 'inferrix.tab-software' | translate }}" #softwareTab="matTab">
+    <tb-controller-software [active]="softwareTab.isActive" [deviceId]="entity.id.id"
+                            [readonly]="readonly"></tb-controller-software>
+  </mat-tab>
+  <mat-tab label="{{ 'inferrix.tab-diagnostics' | translate }}" #diagnosticsTab="matTab">
+    <tb-controller-diagnostics [active]="diagnosticsTab.isActive" [deviceId]="entity.id.id"
+                               [readonly]="readonly"></tb-controller-diagnostics>
+  </mat-tab>
+  <mat-tab label="{{ 'attribute.attributes' | translate }}" #attributesTab="matTab">
+    <tb-attribute-table [defaultAttributeScope]="attributeScopes.CLIENT_SCOPE"
+                        [active]="attributesTab.isActive"
+                        [entityId]="entity.id"
+                        [entityName]="entity.name">
+    </tb-attribute-table>
+  </mat-tab>
+  <mat-tab label="{{ 'attribute.latest-telemetry' | translate }}" #telemetryTab="matTab">
+    <tb-attribute-table [defaultAttributeScope]="latestTelemetryTypes.LATEST_TELEMETRY"
+                        disableAttributeScopeSelection
+                        [active]="telemetryTab.isActive"
+                        [entityId]="entity.id"
+                        [entityName]="entity.name">
+    </tb-attribute-table>
+  </mat-tab>
+  <mat-tab label="{{ 'alarm.alarms' | translate }}" #alarmsTab="matTab">
+    <tb-alarm-table [active]="alarmsTab.isActive" [entityId]="entity.id"></tb-alarm-table>
+  </mat-tab>
+  <mat-tab label="{{ 'audit-log.audit-logs' | translate }}" #auditLogsTab="matTab">
+    <tb-audit-log-table detailsMode="true" [active]="auditLogsTab.isActive"
+                        [auditLogMode]="auditLogModes.ENTITY" [entityId]="entity.id"></tb-audit-log-table>
+  </mat-tab>
+}

@@ -14,12 +14,13 @@
 /// limitations under the License.
 ///
 
-import { Component, Input, OnDestroy, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
-import { from, interval, Observable, of, Subject, Subscription } from 'rxjs';
+import { from, interval, Observable, of, Subscription } from 'rxjs';
 import { catchError, concatMap, finalize, takeUntil, tap } from 'rxjs/operators';
 import { InferrixControllerService } from '@core/http/inferrix-controller.service';
 import { ControllerSettingField, ControllerSettingsForm } from '@shared/models/inferrix-controller.models';
+import { ControllerPanelComponent } from '@home/pages/inferrix/controller/controller-panel.component';
 
 /**
  * The controller's settings endpoints are all one shape — GET a flat JSON object, edit it, PUT it
@@ -33,13 +34,10 @@ import { ControllerSettingField, ControllerSettingsForm } from '@shared/models/i
   styleUrls: ['./controller-settings.component.scss'],
   standalone: false
 })
-export class ControllerSettingsComponent implements OnInit, OnDestroy {
+export class ControllerSettingsComponent extends ControllerPanelComponent {
 
   /** The device's masked-secret sentinel: sending it back leaves the stored value untouched. */
   static readonly MASKED = '***';
-
-  @Input() deviceId: string;
-  @Input() readonly = false;
 
   readonly forms = CONTROLLER_SETTINGS_FORMS;
 
@@ -59,15 +57,18 @@ export class ControllerSettingsComponent implements OnInit, OnDestroy {
   confirmSecondsLeft = 0;
   confirmPending = false;
   private confirmTimer: Subscription;
-  private destroy$ = new Subject<void>();
 
+  // The groups are built here, not on activation: the template binds [formGroup] as soon as the
+  // component exists, and a tab that has not been opened yet would otherwise bind undefined.
   constructor(private fb: UntypedFormBuilder,
-              private controllerService: InferrixControllerService) {}
+              private controllerService: InferrixControllerService) {
+    super();
+    this.forms.forEach(form => this.formGroups[form.path] = this.fb.group(
+      Object.fromEntries(form.fields.map(field => [field.key, [null, this.validatorsFor(field)]]))));
+  }
 
-  ngOnInit(): void {
+  protected load(): void {
     this.forms.forEach(form => {
-      this.formGroups[form.path] = this.fb.group(
-        Object.fromEntries(form.fields.map(field => [field.key, [null, this.validatorsFor(field)]])));
       if (this.readonly) {
         this.formGroups[form.path].disable();
       }
@@ -78,13 +79,12 @@ export class ControllerSettingsComponent implements OnInit, OnDestroy {
     from(this.forms).pipe(concatMap(form => this.read(form)), takeUntil(this.destroy$)).subscribe();
   }
 
-  ngOnDestroy(): void {
+  override ngOnDestroy(): void {
     this.stopConfirmWindow();
-    this.destroy$.next();
-    this.destroy$.complete();
+    super.ngOnDestroy();
   }
 
-  load(form: ControllerSettingsForm): void {
+  reload(form: ControllerSettingsForm): void {
     this.loading[form.path] = true;
     this.read(form).subscribe();
   }
@@ -176,7 +176,7 @@ export class ControllerSettingsComponent implements OnInit, OnDestroy {
         // The window closed. Whether the device reverted or the confirm landed is not knowable from
         // here, so re-read rather than guess.
         this.stopConfirmWindow();
-        this.load(this.forms.find(f => f.path === NETWORK_PATH));
+        this.reload(this.forms.find(f => f.path === NETWORK_PATH));
       }
     });
   }
@@ -204,9 +204,6 @@ export class ControllerSettingsComponent implements OnInit, OnDestroy {
     return validators;
   }
 
-  private messageOf(error: any): string {
-    return error?.error?.message || error?.message || 'Request failed';
-  }
 }
 
 const NETWORK_PATH = '/api/v1/network';

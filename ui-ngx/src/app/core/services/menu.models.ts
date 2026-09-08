@@ -1001,7 +1001,8 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
           {id: MenuId.devices},
           {id: MenuId.assets},
           {id: MenuId.entity_views},
-          {id: MenuId.gateways}
+          {id: MenuId.gateways},
+          {id: MenuId.controllers}
         ]
       },
       {
@@ -1012,7 +1013,6 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
         ]
       },
       {id: MenuId.customers},
-      {id: MenuId.controllers},
       {id: MenuId.calculated_fields},
       {id: MenuId.rule_chains},
       {
@@ -1113,7 +1113,8 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
         pages: [
           {id: MenuId.devices},
           {id: MenuId.assets},
-          {id: MenuId.entity_views}
+          {id: MenuId.entity_views},
+          {id: MenuId.controllers}
         ]
       },
       {
@@ -1122,7 +1123,6 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
           {id: MenuId.notification_inbox}
         ]
       },
-      {id: MenuId.controllers},
       {id: MenuId.scheduler},
       {id: MenuId.users},
       {id: MenuId.white_labeling}

@@ -18,11 +18,12 @@ import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SharedModule } from '@shared/shared.module';
 import { HomeComponentsModule } from '@home/components/home-components.module';
+import { HomeDialogsModule } from '@home/dialogs/home-dialogs.module';
 import { InferrixRoutingModule } from '@home/pages/inferrix/inferrix-routing.module';
-import { ControllersComponent } from '@home/pages/inferrix/controllers.component';
-import { DiscoveredControllersComponent } from '@home/pages/inferrix/discovered-controllers.component';
 import { AdoptControllerDialogComponent } from '@home/pages/inferrix/adopt-controller-dialog.component';
+import { AssignControllerDialogComponent } from '@home/pages/inferrix/assign-controller-dialog.component';
 import { ControllerComponent } from '@home/pages/inferrix/controller/controller.component';
+import { ControllerTabsComponent } from '@home/pages/inferrix/controller/controller-tabs.component';
 import { ControllerPointsComponent } from '@home/pages/inferrix/controller/controller-points.component';
 import { ControllerSettingsComponent } from '@home/pages/inferrix/controller/controller-settings.component';
 import { ControllerDiagnosticsComponent } from '@home/pages/inferrix/controller/controller-diagnostics.component';
@@ -33,10 +34,10 @@ import { ControllerSoftwareComponent } from '@home/pages/inferrix/controller/con
 
 @NgModule({
   declarations: [
-    ControllersComponent,
-    DiscoveredControllersComponent,
     AdoptControllerDialogComponent,
+    AssignControllerDialogComponent,
     ControllerComponent,
+    ControllerTabsComponent,
     ControllerPointsComponent,
     ControllerSettingsComponent,
     ControllerDiagnosticsComponent,
@@ -48,6 +49,7 @@ import { ControllerSoftwareComponent } from '@home/pages/inferrix/controller/con
     CommonModule,
     SharedModule,
     HomeComponentsModule,
+    HomeDialogsModule,
     InferrixRoutingModule
   ]
 })

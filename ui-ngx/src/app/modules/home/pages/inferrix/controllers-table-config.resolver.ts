@@ -71,7 +71,18 @@ export class ControllersTableConfigResolver {
     this.config.entityType = EntityType.DEVICE;
     this.config.entityComponent = ControllerComponent;
     this.config.entityTabsComponent = ControllerTabsComponent;
-    this.config.entityTranslations = entityTypeTranslations.get(EntityType.DEVICE);
+    // The rows are devices, but the section is Controllers: taking the device translations wholesale
+    // labelled the toolbar "Add device" and the empty state "No devices found".
+    this.config.entityTranslations = {
+      ...entityTypeTranslations.get(EntityType.DEVICE),
+      type: 'inferrix.controller',
+      typePlural: 'inferrix.controllers',
+      details: 'inferrix.controller-details',
+      add: 'inferrix.adopt-controller',
+      noEntities: 'inferrix.no-controllers',
+      search: 'inferrix.search-controllers',
+      selectedEntities: 'inferrix.selected-controllers'
+    };
     this.config.entityResources = entityTypeResources.get(EntityType.DEVICE);
     this.config.tableTitle = this.translate.instant('inferrix.controllers');
     this.config.entityTitle = controller => controller ? controller.name : '';

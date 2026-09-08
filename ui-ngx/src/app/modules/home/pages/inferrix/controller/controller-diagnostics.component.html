@@ -114,7 +114,7 @@
     <form [formGroup]="pingForm" (ngSubmit)="ping()">
       <fieldset [disabled]="readonly || pingRunning">
         <div class="tb-diag-ping-fields">
-          <mat-form-field class="tb-diag-ping-target">
+          <mat-form-field class="tb-diag-ping-target" subscriptSizing="dynamic">
             <mat-label>{{ 'inferrix.ping-target' | translate }}</mat-label>
             <input matInput formControlName="target"/>
             <mat-hint>{{ 'inferrix.ping-target-hint' | translate }}</mat-hint>

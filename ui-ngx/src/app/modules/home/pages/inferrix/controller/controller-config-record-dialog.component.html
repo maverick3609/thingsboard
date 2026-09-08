@@ -44,7 +44,7 @@
             </mat-checkbox>
           </div>
 
-          <mat-form-field *ngIf="field.type === 'select'" class="tb-record-field">
+          <mat-form-field *ngIf="field.type === 'select'" class="tb-record-field" subscriptSizing="dynamic">
             <mat-label>{{ field.label | translate }}</mat-label>
             <mat-select [formControlName]="field.key">
               <mat-option *ngFor="let option of field.options" [value]="option.value">
@@ -55,7 +55,7 @@
           </mat-form-field>
 
           <mat-form-field *ngIf="field.type === 'text' || field.type === 'number'"
-                          class="tb-record-field">
+                          class="tb-record-field" subscriptSizing="dynamic">
             <mat-label>{{ field.label | translate }}</mat-label>
             <input matInput [formControlName]="field.key"
                    [type]="field.type === 'number' ? 'number' : 'text'"

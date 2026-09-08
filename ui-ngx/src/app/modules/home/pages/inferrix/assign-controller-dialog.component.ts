@@ -39,6 +39,7 @@ export interface AssignControllerDialogData {
 @Component({
   selector: 'tb-assign-controller-dialog',
   templateUrl: './assign-controller-dialog.component.html',
+  styleUrls: ['./assign-controller-dialog.component.scss'],
   standalone: false
 })
 export class AssignControllerDialogComponent

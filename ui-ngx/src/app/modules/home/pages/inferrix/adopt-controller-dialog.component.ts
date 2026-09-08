@@ -42,6 +42,7 @@ export interface AdoptControllerDialogData {
 @Component({
   selector: 'tb-adopt-controller-dialog',
   templateUrl: './adopt-controller-dialog.component.html',
+  styleUrls: ['./adopt-controller-dialog.component.scss'],
   standalone: false
 })
 export class AdoptControllerDialogComponent extends DialogComponent<AdoptControllerDialogComponent, Device> {

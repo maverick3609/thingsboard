@@ -53,7 +53,7 @@
               {{ field.label | translate }}
             </mat-checkbox>
 
-            <mat-form-field *ngIf="field.type === 'select'" class="tb-settings-field">
+            <mat-form-field *ngIf="field.type === 'select'" class="tb-settings-field" subscriptSizing="dynamic">
               <mat-label>{{ field.label | translate }}</mat-label>
               <mat-select [formControlName]="field.key">
                 <mat-option *ngFor="let option of field.options" [value]="option.value">
@@ -63,7 +63,7 @@
               <mat-hint *ngIf="field.hint">{{ field.hint | translate }}</mat-hint>
             </mat-form-field>
 
-            <mat-form-field *ngIf="field.type === 'textarea'" class="tb-settings-field tb-settings-wide">
+            <mat-form-field *ngIf="field.type === 'textarea'" class="tb-settings-field tb-settings-wide" subscriptSizing="dynamic">
               <mat-label>{{ field.label | translate }}</mat-label>
               <textarea matInput rows="4" [formControlName]="field.key"
                         [maxlength]="field.maxLength"></textarea>
@@ -71,7 +71,7 @@
             </mat-form-field>
 
             <mat-form-field *ngIf="field.type === 'text' || field.type === 'number' || field.type === 'password'"
-                            class="tb-settings-field">
+                            class="tb-settings-field" subscriptSizing="dynamic">
               <mat-label>{{ field.label | translate }}</mat-label>
               <input matInput [formControlName]="field.key"
                      [type]="field.type === 'number' ? 'number' : field.type === 'password' ? 'password' : 'text'"

@@ -4191,6 +4191,8 @@
         }
     },
     "inferrix": {
+    "controller-details": "Controller details",
+    "selected-controllers": "{ count, plural, 1 {1 controller} other {# controllers} } selected",
     "no-discovered-controllers": "No controllers have announced themselves yet.",
     "search-discovered-controllers": "Search discovered controllers",
     "announces": "Announces",

@@ -29,7 +29,7 @@ import { DiscoveredControllersTableConfigResolver }
 
 export const inferrixRoutes: Routes = [
   {
-    path: 'controllers',
+    path: 'io-controllers',
     data: {
       auth: [Authority.TENANT_ADMIN, Authority.CUSTOMER_USER, Authority.SYS_ADMIN],
       breadcrumb: {

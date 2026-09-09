@@ -751,7 +751,7 @@ export const menuSectionMap = new Map<MenuId, MenuSection>([
       id: MenuId.controllers,
       name: 'inferrix.controllers',
       type: 'link',
-      path: '/controllers',
+      path: '/io-controllers',
       icon: 'developer_board'
     }
   ],
@@ -761,7 +761,7 @@ export const menuSectionMap = new Map<MenuId, MenuSection>([
       id: MenuId.discovered_controllers,
       name: 'inferrix.discovered-controllers',
       type: 'link',
-      path: '/controllers/discovered',
+      path: '/io-controllers/discovered',
       icon: 'wifi_tethering'
     }
   ],

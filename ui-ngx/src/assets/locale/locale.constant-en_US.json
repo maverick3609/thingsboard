@@ -4200,7 +4200,7 @@
     "assign-controller-text": "Allocate IO controller {{uid}} to a tenant. Its administrator can then adopt it.",
     "controller-name-required": "IO Controller name is required.",
     "delete-controller": "Delete IO controller",
-    "delete-controller-title": "Are you sure you want to delete the IO controller '{{controllerName}}'?",
+    "delete-controller-title": "Are you sure you want to delete the IO controller '{{ioControllerName}}'?",
     "delete-controller-text": "Be careful, after the confirmation the IO controller and all related data will become unrecoverable. The device itself keeps its configuration and has to be adopted again.",
     "delete-controllers-title": "Are you sure you want to delete { count, plural, 1 {1 IO controller} other {# IO controllers} }?",
     "delete-controllers-text": "Be careful, after the confirmation all selected IO controllers will be removed and all related data will become unrecoverable.",

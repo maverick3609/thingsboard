@@ -91,7 +91,7 @@ export class ControllersTableConfigResolver {
     // adoption. Everything else is ordinary device behaviour.
     this.config.addEntity = () => this.openAdoptDialog();
     this.config.deleteEntityTitle = controller =>
-      this.translate.instant('inferrix.delete-controller-title', {controllerName: controller.name});
+      this.translate.instant('inferrix.delete-controller-title', {ioControllerName: controller.name});
     this.config.deleteEntityContent = () => this.translate.instant('inferrix.delete-controller-text');
     this.config.deleteEntitiesTitle = count => this.translate.instant('inferrix.delete-controllers-title', {count});
     this.config.deleteEntitiesContent = () => this.translate.instant('inferrix.delete-controllers-text');
@@ -105,7 +105,7 @@ export class ControllersTableConfigResolver {
       name: this.translate.instant('inferrix.discovered-controllers'),
       icon: 'wifi_tethering',
       isEnabled: () => !this.config.componentsData?.readonly,
-      onAction: () => this.router.navigateByUrl('/controllers/discovered')
+      onAction: () => this.router.navigateByUrl('/io-controllers/discovered')
     });
 
     this.config.columns.push(

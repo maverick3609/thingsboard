@@ -172,7 +172,7 @@ export class DiscoveredControllersTableConfigResolver {
       data: {controller}
     }).afterClosed().subscribe(device => {
       if (device) {
-        this.router.navigateByUrl(`/controllers/${device.id.id}`);
+        this.router.navigateByUrl(`/io-controllers/${device.id.id}`);
       }
     });
   }

@@ -160,7 +160,10 @@ public class AssetController extends BaseController {
 
     @ApiOperation(value = "Delete asset (deleteAsset)",
             notes = "Deletes the asset and all the relations (from and to the asset). Referencing non-existing asset Id will cause an error." + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH)
-    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    // A customer user reaches this only with an explicit ASSET:DELETE role grant, and
+    // checkAssetId below confines them to their own customer's assets - see
+    // CustomerProvisionableEntityPermissionChecker.
+    @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/asset/{assetId}", method = RequestMethod.DELETE)
     @ResponseStatus(value = HttpStatus.OK)
     public void deleteAsset(@Parameter(description = ASSET_ID_PARAM_DESCRIPTION) @PathVariable(ASSET_ID) String strAssetId) throws Exception {

@@ -168,8 +168,13 @@ export class AssetsTableConfigResolver  {
         this.config.addEnabled = this.config.componentsData.assetScope === 'customer_user'
           ? explicitlyHasGenericPermission(getCurrentAuthState(this.store).userPermissions, 'ASSET', 'CREATE')
           : this.config.componentsData.assetScope !== 'edge_customer_user';
-        this.config.entitiesDeleteEnabled = this.config.componentsData.assetScope === 'tenant';
-        this.config.deleteEnabled = () => this.config.componentsData.assetScope === 'tenant';
+        // Same explicit-grant rule as addEnabled: a customer user may delete assets in their own
+        // customer, but only once a role names ASSET:DELETE. deleteEnabled is the one the details
+        // view reads through hideDelete(), so both have to be set.
+        this.config.entitiesDeleteEnabled = this.config.componentsData.assetScope === 'tenant'
+          || (this.config.componentsData.assetScope === 'customer_user'
+            && explicitlyHasGenericPermission(getCurrentAuthState(this.store).userPermissions, 'ASSET', 'DELETE'));
+        this.config.deleteEnabled = () => this.config.entitiesDeleteEnabled;
         return this.config;
       })
     );
@@ -207,7 +212,13 @@ export class AssetsTableConfigResolver  {
       this.config.entitiesFetchFunction = pageLink =>
         this.assetService.getCustomerAssetInfosByAssetProfileId(this.customerId, pageLink,
           this.config.componentsData.assetProfileId !== null ? this.config.componentsData.assetProfileId.id : '');
-      this.config.deleteEntity = id => this.assetService.unassignAssetFromCustomer(id.id);
+      // 'customer' is a tenant admin looking at one customer's assets, where removal means
+      // unassign. 'customer_user' is the owner looking at their own, where the Delete button (only
+      // ever shown with an explicit ASSET:DELETE grant) has to be a real delete - unassign is
+      // TENANT_ADMIN-only and would just 403.
+      this.config.deleteEntity = assetScope === 'customer_user'
+        ? id => this.assetService.deleteAsset(id.id)
+        : id => this.assetService.unassignAssetFromCustomer(id.id);
     }
   }
 

@@ -30,14 +30,17 @@ import org.thingsboard.server.common.data.pat.ApiKeyInfo;
 import org.thingsboard.server.common.data.security.Authority;
 import org.thingsboard.server.service.security.model.SecurityUser;
 
+import java.util.Arrays;
+import java.util.Set;
+
 @Component
 public class CustomerUserPermissions extends AbstractPermissions {
 
     public CustomerUserPermissions() {
         super();
         put(Resource.ALARM, customerAlarmPermissionChecker);
-        put(Resource.ASSET, new CustomerProvisionableEntityPermissionChecker(Resource.ASSET));
-        put(Resource.DEVICE, new CustomerProvisionableEntityPermissionChecker(Resource.DEVICE));
+        put(Resource.ASSET, new CustomerProvisionableEntityPermissionChecker(Resource.ASSET, Operation.CREATE, Operation.DELETE));
+        put(Resource.DEVICE, new CustomerProvisionableEntityPermissionChecker(Resource.DEVICE, Operation.CREATE));
         put(Resource.CUSTOMER, customerPermissionChecker);
         put(Resource.DASHBOARD, customerDashboardPermissionChecker);
         put(Resource.ENTITY_VIEW, customerEntityPermissionChecker);
@@ -93,42 +96,57 @@ public class CustomerUserPermissions extends AbstractPermissions {
             };
 
     /**
-     * customerEntityPermissionChecker plus Operation.CREATE, for the two resources a customer user
-     * may provision for themselves.
+     * customerEntityPermissionChecker plus the operations a customer user may exercise on their own
+     * inventory once a role says so - CREATE for both resources, and DELETE for assets.
      * <p>
-     * Stock ThingsBoard has no CREATE in the customer baseline - assets and devices are created by a
-     * tenant admin and assigned to a customer afterwards - so a role naming ASSET:CREATE had nothing
-     * to hand back and "Add asset" stayed hidden however the role was configured.
+     * Stock ThingsBoard has neither in the customer baseline - assets and devices are created by a
+     * tenant admin, assigned to a customer, and removed by the tenant admin again - so a role naming
+     * ASSET:CREATE had nothing to hand back and the buttons stayed hidden however it was configured.
      * <p>
-     * The grant must be EXPLICIT. {@link UserPermissionsUtil#granted} reads "no roles" as legacy
-     * full access, so using it here would have opened CREATE for every customer user on the
-     * platform the day this shipped, role or no role.
+     * Every operation named here must be EXPLICITLY granted. {@link UserPermissionsUtil#granted}
+     * reads "no roles" as legacy full access, so using it would have handed these to every customer
+     * user on the platform the day they shipped, role or no role.
      * <p>
-     * The ownership tail is unchanged, so a new entity still has to belong to the user's own
-     * customer. {@code BaseController.pinnedCustomerId} stamps that customer onto it before the
-     * check runs, which is both what makes CREATE reachable and what confines it: a customer user
-     * cannot name a sibling customer on the way in.
+     * Per-resource on purpose. `DEVICE` gets CREATE but NOT DELETE: deleting a device destroys its
+     * credentials and telemetry, which is a bigger step than dropping an asset record, and
+     * {@code DeviceController.deleteDevice} is still {@code @PreAuthorize} TENANT_ADMIN-only - so
+     * listing DELETE here for devices would be a dead grant that reads as if it worked.
+     * <p>
+     * The ownership tail is unchanged, so the entity still has to belong to the caller's own
+     * customer. On a create {@code BaseController.pinnedCustomerId} stamps that customer on before
+     * the check runs, which is both what makes CREATE reachable and what confines it; on a delete
+     * the stored entity is fetched first, so the tail confines it on its own.
      */
     private static final class CustomerProvisionableEntityPermissionChecker extends PermissionChecker.GenericPermissionChecker {
 
-        private final Resource resource;
+        private static final Operation[] BASELINE = {Operation.READ, Operation.READ_CREDENTIALS,
+                Operation.READ_ATTRIBUTES, Operation.READ_TELEMETRY, Operation.RPC_CALL, Operation.CLAIM_DEVICES,
+                Operation.WRITE, Operation.WRITE_ATTRIBUTES, Operation.WRITE_TELEMETRY};
 
-        private CustomerProvisionableEntityPermissionChecker(Resource resource) {
-            super(Operation.CREATE, Operation.READ, Operation.READ_CREDENTIALS, Operation.READ_ATTRIBUTES,
-                    Operation.READ_TELEMETRY, Operation.RPC_CALL, Operation.CLAIM_DEVICES, Operation.WRITE,
-                    Operation.WRITE_ATTRIBUTES, Operation.WRITE_TELEMETRY);
+        private final Resource resource;
+        private final Set<Operation> requireExplicitGrant;
+
+        private CustomerProvisionableEntityPermissionChecker(Resource resource, Operation... requireExplicitGrant) {
+            super(baselinePlus(requireExplicitGrant));
             this.resource = resource;
+            this.requireExplicitGrant = Set.of(requireExplicitGrant);
+        }
+
+        private static Operation[] baselinePlus(Operation... extra) {
+            Operation[] operations = Arrays.copyOf(BASELINE, BASELINE.length + extra.length);
+            System.arraycopy(extra, 0, operations, BASELINE.length, extra.length);
+            return operations;
         }
 
         @Override
         public boolean hasPermission(SecurityUser user, Operation operation) {
-            return super.hasPermission(user, operation) && createGranted(user, operation);
+            return super.hasPermission(user, operation) && explicitlyGranted(user, operation);
         }
 
         @Override
         @SuppressWarnings("unchecked")
         public boolean hasPermission(SecurityUser user, Operation operation, EntityId entityId, HasTenantId entity) {
-            if (!super.hasPermission(user, operation, entityId, entity) || !createGranted(user, operation)) {
+            if (!super.hasPermission(user, operation, entityId, entity) || !explicitlyGranted(user, operation)) {
                 return false;
             }
             if (!user.getTenantId().equals(entity.getTenantId())) {
@@ -140,8 +158,9 @@ public class CustomerUserPermissions extends AbstractPermissions {
             return operation.equals(Operation.CLAIM_DEVICES) || user.getCustomerId().equals(((HasCustomerId) entity).getCustomerId());
         }
 
-        private boolean createGranted(SecurityUser user, Operation operation) {
-            return !Operation.CREATE.equals(operation) || UserPermissionsUtil.explicitlyGranted(user, resource, Operation.CREATE);
+        private boolean explicitlyGranted(SecurityUser user, Operation operation) {
+            return !requireExplicitGrant.contains(operation)
+                    || UserPermissionsUtil.explicitlyGranted(user, resource, operation);
         }
     }
 

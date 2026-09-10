@@ -40,7 +40,7 @@ public class CustomerUserPermissions extends AbstractPermissions {
         super();
         put(Resource.ALARM, customerAlarmPermissionChecker);
         put(Resource.ASSET, new CustomerProvisionableEntityPermissionChecker(Resource.ASSET, Operation.CREATE, Operation.DELETE));
-        put(Resource.DEVICE, new CustomerProvisionableEntityPermissionChecker(Resource.DEVICE, Operation.CREATE));
+        put(Resource.DEVICE, new CustomerProvisionableEntityPermissionChecker(Resource.DEVICE, Operation.CREATE, Operation.DELETE));
         put(Resource.CUSTOMER, customerPermissionChecker);
         put(Resource.DASHBOARD, customerDashboardPermissionChecker);
         put(Resource.ENTITY_VIEW, customerEntityPermissionChecker);
@@ -97,7 +97,7 @@ public class CustomerUserPermissions extends AbstractPermissions {
 
     /**
      * customerEntityPermissionChecker plus the operations a customer user may exercise on their own
-     * inventory once a role says so - CREATE for both resources, and DELETE for assets.
+     * inventory once a role says so - CREATE and DELETE, for assets and devices alike.
      * <p>
      * Stock ThingsBoard has neither in the customer baseline - assets and devices are created by a
      * tenant admin, assigned to a customer, and removed by the tenant admin again - so a role naming
@@ -107,10 +107,10 @@ public class CustomerUserPermissions extends AbstractPermissions {
      * reads "no roles" as legacy full access, so using it would have handed these to every customer
      * user on the platform the day they shipped, role or no role.
      * <p>
-     * Per-resource on purpose. `DEVICE` gets CREATE but NOT DELETE: deleting a device destroys its
-     * credentials and telemetry, which is a bigger step than dropping an asset record, and
-     * {@code DeviceController.deleteDevice} is still {@code @PreAuthorize} TENANT_ADMIN-only - so
-     * listing DELETE here for devices would be a dead grant that reads as if it worked.
+     * Still per-resource, even though both currently carry the same pair: the grant a role names has
+     * to match the resource it names it for, so ASSET:CREATE can never open a device. Anything
+     * listed here must also be reachable - an operation whose controller still refuses the authority
+     * outright would be a dead grant that reads as if it worked.
      * <p>
      * The ownership tail is unchanged, so the entity still has to belong to the caller's own
      * customer. On a create {@code BaseController.pinnedCustomerId} stamps that customer on before

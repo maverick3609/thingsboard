@@ -194,8 +194,13 @@ export class DevicesTableConfigResolver  {
         this.config.addEnabled = this.config.componentsData.deviceScope === 'customer_user'
           ? explicitlyHasGenericPermission(getCurrentAuthState(this.store).userPermissions, 'DEVICE', 'CREATE')
           : this.config.componentsData.deviceScope !== 'edge_customer_user';
-        this.config.entitiesDeleteEnabled = this.config.componentsData.deviceScope === 'tenant';
-        this.config.deleteEnabled = () => this.config.componentsData.deviceScope === 'tenant';
+        // Same explicit-grant rule as addEnabled. deleteEnabled is the one DeviceComponent reads
+        // through hideDelete(), so both have to be set or a live Delete button survives in the
+        // details view.
+        this.config.entitiesDeleteEnabled = this.config.componentsData.deviceScope === 'tenant'
+          || (this.config.componentsData.deviceScope === 'customer_user'
+            && explicitlyHasGenericPermission(getCurrentAuthState(this.store).userPermissions, 'DEVICE', 'DELETE'));
+        this.config.deleteEnabled = () => this.config.entitiesDeleteEnabled;
         return this.config;
       })
     );
@@ -277,7 +282,9 @@ export class DevicesTableConfigResolver  {
 
   configureEntityFunctions(deviceScope: string): void {
     this.config.entitiesFetchFunction = pageLink => this.deviceService.getDeviceInfosByQuery(this.prepareDeviceInfoQuery(pageLink));
-    if (deviceScope === 'tenant') {
+    // The customer-user scope deletes for real: the Delete button is only ever shown there with an
+    // explicit DEVICE:DELETE grant, and stock TB's no-op would swallow the click silently.
+    if (deviceScope === 'tenant' || deviceScope === 'customer_user') {
       this.config.deleteEntity = id => this.deviceService.deleteDevice(id.id);
     } else {
       this.config.deleteEntity = () => of();

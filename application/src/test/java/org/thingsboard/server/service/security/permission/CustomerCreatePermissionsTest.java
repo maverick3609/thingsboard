@@ -32,8 +32,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * CREATE on assets and devices - and DELETE on assets - is off for customer users until a role
- * names it.
+ * CREATE and DELETE on assets and devices are off for customer users until a role names them.
  *
  * <p>The dangerous direction is the permissive one: the baseline these checkers extend uses
  * {@code granted}, which reads "no roles" as legacy full access, and the whole point of wiring
@@ -104,30 +103,33 @@ class CustomerCreatePermissionsTest {
         SecurityUser user = customerUser("{\"ASSET\": [\"DELETE\"]}");
         assertThat(ASSET_CHECKER.hasPermission(user, Operation.DELETE, null, asset(CUSTOMER_ID))).isTrue();
         assertThat(ASSET_CHECKER.hasPermission(user, Operation.DELETE, null, asset(OTHER_CUSTOMER_ID))).isFalse();
+        assertThat(DEVICE_CHECKER.hasPermission(user, Operation.DELETE, null, device(CUSTOMER_ID))).isFalse();
     }
 
     @Test
-    void roleLessCustomerUserCannotDelete() {
+    void roleLessCustomerUserCannotDeleteAssets() {
         SecurityUser user = customerUser(null);
         assertThat(ASSET_CHECKER.hasPermission(user, Operation.DELETE, null, asset(CUSTOMER_ID))).isFalse();
         assertThat(ASSET_CHECKER.hasPermission(user, Operation.DELETE)).isFalse();
     }
 
-    /**
-     * DELETE was opened for assets only. Devices keep it shut at both layers - nothing lists it
-     * here, and DeviceController.deleteDevice is still @PreAuthorize TENANT_ADMIN-only - because
-     * deleting a device destroys its credentials and telemetry.
-     */
     @Test
-    void deviceDeleteStaysShutEvenWhenTheRoleNamesIt() {
-        SecurityUser user = customerUser("{\"DEVICE\": [\"DELETE\"], \"ASSET\": [\"DELETE\"]}");
-        assertThat(DEVICE_CHECKER.hasPermission(user, Operation.DELETE, null, device(CUSTOMER_ID))).isFalse();
-        assertThat(DEVICE_CHECKER.hasPermission(user, Operation.DELETE)).isFalse();
-        // ... and the asset half of the very same role still works, so this is not a vacuous pass
-        assertThat(ASSET_CHECKER.hasPermission(user, Operation.DELETE, null, asset(CUSTOMER_ID))).isTrue();
+    void roleNamingDeleteCanDeleteOwnDevices() {
+        SecurityUser user = customerUser("{\"DEVICE\": [\"DELETE\"]}");
+        assertThat(DEVICE_CHECKER.hasPermission(user, Operation.DELETE, null, device(CUSTOMER_ID))).isTrue();
+        assertThat(DEVICE_CHECKER.hasPermission(user, Operation.DELETE, null, device(OTHER_CUSTOMER_ID))).isFalse();
+        // the grant is per-resource: naming DEVICE:DELETE must not reach assets
+        assertThat(ASSET_CHECKER.hasPermission(user, Operation.DELETE, null, asset(CUSTOMER_ID))).isFalse();
     }
 
-    /** The rest of the customer baseline is untouched - only CREATE and DELETE are gated. */
+    @Test
+    void roleLessCustomerUserCannotDeleteDevices() {
+        SecurityUser user = customerUser(null);
+        assertThat(DEVICE_CHECKER.hasPermission(user, Operation.DELETE, null, device(CUSTOMER_ID))).isFalse();
+        assertThat(DEVICE_CHECKER.hasPermission(user, Operation.DELETE)).isFalse();
+    }
+
+    /** The rest of the customer baseline is untouched - only CREATE and DELETE go through the gate. */
     @Test
     void baselineOperationsAreUnchanged() {
         SecurityUser user = customerUser(null);
@@ -154,6 +156,7 @@ class CustomerCreatePermissionsTest {
         assertThat(ASSET_CHECKER.hasPermission(publicViewer, Operation.CREATE, null, asset(CUSTOMER_ID))).isFalse();
         assertThat(DEVICE_CHECKER.hasPermission(publicViewer, Operation.CREATE, null, device(CUSTOMER_ID))).isFalse();
         assertThat(ASSET_CHECKER.hasPermission(publicViewer, Operation.DELETE, null, asset(CUSTOMER_ID))).isFalse();
+        assertThat(DEVICE_CHECKER.hasPermission(publicViewer, Operation.DELETE, null, device(CUSTOMER_ID))).isFalse();
         // ... while the clamp's own operations still work, so the assertion above is not vacuous
         assertThat(ASSET_CHECKER.hasPermission(publicViewer, Operation.READ, null, asset(CUSTOMER_ID))).isTrue();
     }

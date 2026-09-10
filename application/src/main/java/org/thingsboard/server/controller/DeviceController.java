@@ -241,8 +241,11 @@ public class DeviceController extends BaseController {
     }
 
     @ApiOperation(value = "Delete device (deleteDevice)",
-            notes = "Deletes the device, it's credentials and all the relations (from and to the device). Referencing non-existing device Id will cause an error." + TENANT_AUTHORITY_PARAGRAPH)
-    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+            notes = "Deletes the device, it's credentials and all the relations (from and to the device). Referencing non-existing device Id will cause an error." + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH)
+    // A customer user reaches this only with an explicit DEVICE:DELETE role grant, and
+    // checkDeviceId below confines them to their own customer's devices - see
+    // CustomerProvisionableEntityPermissionChecker.
+    @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/device/{deviceId}", method = RequestMethod.DELETE)
     @ResponseStatus(value = HttpStatus.OK)
     public void deleteDevice(@Parameter(description = DEVICE_ID_PARAM_DESCRIPTION)

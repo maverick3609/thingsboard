@@ -77,7 +77,9 @@ public final class InferrixProxyRoutes {
 
             // Logic control (the program upload itself is not proxied)
             route("/api/v1/logic/restart", "POST"),
-            route("/api/v1/logic/tune", "GET", "POST"),
+            route("/api/v1/logic/tune", "POST"),
+            // The autotune outcome is read per slot: the device answers 400 on the bare path.
+            route("/api/v1/logic/tune/" + ID, "GET"),
             route("/api/v1/logic/tune/abort", "POST"),
 
             // Diagnostics and attestation

@@ -46,6 +46,17 @@ class InferrixProxyRoutesTest {
     }
 
     @Test
+    void theAutotuneOutcomeIsReadPerSlot() {
+        // The device serves the result at /logic/tune/{slot} and answers 400 on the bare path
+        // (INTEGRATION-API.md §3.5, confirmed against fw 0.1.13 hardware).
+        assertTrue(InferrixProxyRoutes.isAllowed("POST", "/api/v1/logic/tune"));
+        assertTrue(InferrixProxyRoutes.isAllowed("GET", "/api/v1/logic/tune/0"));
+        assertTrue(InferrixProxyRoutes.isAllowed("POST", "/api/v1/logic/tune/abort"));
+        assertFalse(InferrixProxyRoutes.isAllowed("GET", "/api/v1/logic/tune"));
+        assertFalse(InferrixProxyRoutes.isAllowed("GET", "/api/v1/logic/tune/abort"));
+    }
+
+    @Test
     void traversalAndSmugglingAttemptsDoNotMatch() {
         assertFalse(InferrixProxyRoutes.isAllowed("GET", "/api/v1/health/../auth/login"));
         assertFalse(InferrixProxyRoutes.isAllowed("GET", "/api/v1/../../etc/passwd"));

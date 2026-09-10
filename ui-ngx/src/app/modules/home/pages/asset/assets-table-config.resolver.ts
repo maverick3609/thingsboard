@@ -32,7 +32,8 @@ import { EntityType, entityTypeResources, entityTypeTranslations } from '@shared
 import { EntityAction } from '@home/models/entity/entity-component.models';
 import { forkJoin, Observable, of } from 'rxjs';
 import { select, Store } from '@ngrx/store';
-import { selectAuthUser } from '@core/auth/auth.selectors';
+import { getCurrentAuthState, selectAuthUser } from '@core/auth/auth.selectors';
+import { explicitlyHasGenericPermission } from '@core/services/menu-permissions';
 import { map, mergeMap, take, tap } from 'rxjs/operators';
 import { AppState } from '@core/core.state';
 import { Authority } from '@app/shared/models/authority.enum';
@@ -104,8 +105,14 @@ export class AssetsTableConfigResolver  {
         ));
     };
     this.config.onEntityAction = action => this.onAssetAction(action, this.config);
-    this.config.detailsReadonly = () => (this.config.componentsData.assetScope === 'customer_user' ||
-      this.config.componentsData.assetScope === 'edge_customer_user');
+    // Stock ThingsBoard makes the customer-user scope read-only outright, so the edit toggle stayed
+    // hidden for a role granting ASSET:WRITE - even though the server has always allowed a customer
+    // user to write an asset in their own customer (customerEntityPermissionChecker). Explicit
+    // grant, like addEnabled below: a role-less customer user stays exactly as read-only as before.
+    // Reads the store when called, not when the config is built - the config outlives a logout.
+    this.config.detailsReadonly = () => this.config.componentsData.assetScope === 'customer_user'
+      ? !explicitlyHasGenericPermission(getCurrentAuthState(this.store).userPermissions, 'ASSET', 'WRITE')
+      : this.config.componentsData.assetScope === 'edge_customer_user';
 
     this.config.headerComponent = AssetTableHeaderComponent;
 
@@ -153,7 +160,14 @@ export class AssetsTableConfigResolver  {
         this.config.cellActionDescriptors = this.configureCellActions(this.config.componentsData.assetScope);
         this.config.groupActionDescriptors = this.configureGroupActions(this.config.componentsData.assetScope);
         this.config.addActionDescriptors = this.configureAddActions(this.config.componentsData.assetScope);
-        this.config.addEnabled = !(this.config.componentsData.assetScope === 'customer_user' || this.config.componentsData.assetScope === 'edge_customer_user');
+        // Stock ThingsBoard hides "Add asset" from every customer user, so a role granting
+        // ASSET:CREATE had no way to show it. The grant must be explicit - mirrors
+        // CustomerUserPermissions, where a role-less customer user is denied CREATE - or the button
+        // would appear for every customer user and answer 403. The edge-scoped list is untouched:
+        // an asset created there would not be attached to the edge.
+        this.config.addEnabled = this.config.componentsData.assetScope === 'customer_user'
+          ? explicitlyHasGenericPermission(getCurrentAuthState(this.store).userPermissions, 'ASSET', 'CREATE')
+          : this.config.componentsData.assetScope !== 'edge_customer_user';
         this.config.entitiesDeleteEnabled = this.config.componentsData.assetScope === 'tenant';
         this.config.deleteEnabled = () => this.config.componentsData.assetScope === 'tenant';
         return this.config;

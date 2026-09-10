@@ -139,6 +139,7 @@ import org.thingsboard.server.common.data.rule.RuleChainType;
 import org.thingsboard.server.common.data.rule.RuleNode;
 import org.thingsboard.server.common.data.scheduler.SchedulerEvent;
 import org.thingsboard.server.common.data.scheduler.SchedulerEventInfo;
+import org.thingsboard.server.common.data.security.Authority;
 import org.thingsboard.server.common.data.security.UserCredentials;
 import org.thingsboard.server.common.data.util.ThrowingBiFunction;
 import org.thingsboard.server.common.data.widget.WidgetTypeDetails;
@@ -643,6 +644,24 @@ public abstract class BaseController {
 
     User checkUserId(UserId userId, Operation operation) throws ThingsboardException {
         return checkEntityId(userId, userService::findUserById, operation);
+    }
+
+    /**
+     * The customer an entity saved by the current user belongs to.
+     * <p>
+     * A customer user owns entities in their own customer and nowhere else, so whatever customerId
+     * arrived in the request body is discarded. On a create that is what makes the save reachable
+     * at all - the customer checkers in {@code CustomerUserPermissions} require the entity to match
+     * the caller's customer and a new entity carries none - and on an update it closes the mirror
+     * image, since {@code checkEntity} validates the STORED entity's owner while the body is what
+     * gets persisted: without the pin a customer user could hand one of their own entities to a
+     * sibling customer and lose sight of it.
+     * <p>
+     * Tenant admins keep the stock behaviour - create unassigned, or assign on the way in.
+     */
+    protected CustomerId pinnedCustomerId(CustomerId customerId) throws ThingsboardException {
+        SecurityUser user = getCurrentUser();
+        return Authority.CUSTOMER_USER.equals(user.getAuthority()) ? user.getCustomerId() : customerId;
     }
 
     protected <I extends EntityId, T extends HasTenantId> void checkEntity(I entityId, T entity, Resource resource) throws ThingsboardException {

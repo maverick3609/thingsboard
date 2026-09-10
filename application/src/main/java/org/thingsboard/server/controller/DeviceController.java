@@ -194,6 +194,7 @@ public class DeviceController extends BaseController {
                              @Parameter(description = UNIQUIFY_STRATEGY_DESC)
                              @RequestParam(name = "uniquifyStrategy", defaultValue = "RANDOM") UniquifyStrategy uniquifyStrategy) throws Exception {
         device.setTenantId(getCurrentUser().getTenantId());
+        device.setCustomerId(pinnedCustomerId(device.getCustomerId()));
         if (device.getId() != null) {
             checkDeviceId(device.getId(), Operation.WRITE);
         } else {
@@ -234,6 +235,7 @@ public class DeviceController extends BaseController {
         Device device = deviceAndCredentials.getDevice();
         DeviceCredentials credentials = deviceAndCredentials.getCredentials();
         device.setTenantId(getCurrentUser().getTenantId());
+        device.setCustomerId(pinnedCustomerId(device.getCustomerId()));
         checkEntity(device.getId(), device, Resource.DEVICE);
         return tbDeviceService.saveDeviceWithCredentials(device, credentials, new NameConflictStrategy(nameConflictPolicy, uniquifySeparator, uniquifyStrategy), getCurrentUser());
     }

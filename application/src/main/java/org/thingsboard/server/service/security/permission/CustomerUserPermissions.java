@@ -36,8 +36,8 @@ public class CustomerUserPermissions extends AbstractPermissions {
     public CustomerUserPermissions() {
         super();
         put(Resource.ALARM, customerAlarmPermissionChecker);
-        put(Resource.ASSET, customerEntityPermissionChecker);
-        put(Resource.DEVICE, customerEntityPermissionChecker);
+        put(Resource.ASSET, new CustomerProvisionableEntityPermissionChecker(Resource.ASSET));
+        put(Resource.DEVICE, new CustomerProvisionableEntityPermissionChecker(Resource.DEVICE));
         put(Resource.CUSTOMER, customerPermissionChecker);
         put(Resource.DASHBOARD, customerDashboardPermissionChecker);
         put(Resource.ENTITY_VIEW, customerEntityPermissionChecker);
@@ -91,6 +91,59 @@ public class CustomerUserPermissions extends AbstractPermissions {
                     return operation.equals(Operation.CLAIM_DEVICES) || user.getCustomerId().equals(((HasCustomerId) entity).getCustomerId());
                 }
             };
+
+    /**
+     * customerEntityPermissionChecker plus Operation.CREATE, for the two resources a customer user
+     * may provision for themselves.
+     * <p>
+     * Stock ThingsBoard has no CREATE in the customer baseline - assets and devices are created by a
+     * tenant admin and assigned to a customer afterwards - so a role naming ASSET:CREATE had nothing
+     * to hand back and "Add asset" stayed hidden however the role was configured.
+     * <p>
+     * The grant must be EXPLICIT. {@link UserPermissionsUtil#granted} reads "no roles" as legacy
+     * full access, so using it here would have opened CREATE for every customer user on the
+     * platform the day this shipped, role or no role.
+     * <p>
+     * The ownership tail is unchanged, so a new entity still has to belong to the user's own
+     * customer. {@code BaseController.pinnedCustomerId} stamps that customer onto it before the
+     * check runs, which is both what makes CREATE reachable and what confines it: a customer user
+     * cannot name a sibling customer on the way in.
+     */
+    private static final class CustomerProvisionableEntityPermissionChecker extends PermissionChecker.GenericPermissionChecker {
+
+        private final Resource resource;
+
+        private CustomerProvisionableEntityPermissionChecker(Resource resource) {
+            super(Operation.CREATE, Operation.READ, Operation.READ_CREDENTIALS, Operation.READ_ATTRIBUTES,
+                    Operation.READ_TELEMETRY, Operation.RPC_CALL, Operation.CLAIM_DEVICES, Operation.WRITE,
+                    Operation.WRITE_ATTRIBUTES, Operation.WRITE_TELEMETRY);
+            this.resource = resource;
+        }
+
+        @Override
+        public boolean hasPermission(SecurityUser user, Operation operation) {
+            return super.hasPermission(user, operation) && createGranted(user, operation);
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public boolean hasPermission(SecurityUser user, Operation operation, EntityId entityId, HasTenantId entity) {
+            if (!super.hasPermission(user, operation, entityId, entity) || !createGranted(user, operation)) {
+                return false;
+            }
+            if (!user.getTenantId().equals(entity.getTenantId())) {
+                return false;
+            }
+            if (!(entity instanceof HasCustomerId)) {
+                return false;
+            }
+            return operation.equals(Operation.CLAIM_DEVICES) || user.getCustomerId().equals(((HasCustomerId) entity).getCustomerId());
+        }
+
+        private boolean createGranted(SecurityUser user, Operation operation) {
+            return !Operation.CREATE.equals(operation) || UserPermissionsUtil.explicitlyGranted(user, resource, Operation.CREATE);
+        }
+    }
 
     // Like customerEntityPermissionChecker, but also allows Operation.CREATE: customer users
     // create scheduler events directly (self-service scheduling), unlike assets/devices which

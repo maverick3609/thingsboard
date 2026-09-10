@@ -40,7 +40,8 @@ import {
 import { DeviceComponent } from '@modules/home/pages/device/device.component';
 import { forkJoin, Observable, of, Subject } from 'rxjs';
 import { select, Store } from '@ngrx/store';
-import { selectAuthUser, selectUserSettingsProperty } from '@core/auth/auth.selectors';
+import { getCurrentAuthState, selectAuthUser, selectUserSettingsProperty } from '@core/auth/auth.selectors';
+import { explicitlyHasGenericPermission } from '@core/services/menu-permissions';
 import { map, mergeMap, take, tap } from 'rxjs/operators';
 import { AppState } from '@core/core.state';
 import { DeviceService } from '@app/core/http/device.service';
@@ -133,8 +134,12 @@ export class DevicesTableConfigResolver  {
         mergeMap((savedDevice) => this.deviceService.getDeviceInfo(savedDevice.id.id)
         ));
     this.config.onEntityAction = action => this.onDeviceAction(action, this.config);
-    this.config.detailsReadonly = () =>
-      (this.config.componentsData.deviceScope === 'customer_user' || this.config.componentsData.deviceScope === 'edge_customer_user');
+    // See the same block in assets-table-config.resolver. Only the device record opens up:
+    // manageCredentials stays isReadOnly for this scope because WRITE_CREDENTIALS is not in the
+    // customer baseline, so a credentials save can still only 403.
+    this.config.detailsReadonly = () => this.config.componentsData.deviceScope === 'customer_user'
+      ? !explicitlyHasGenericPermission(getCurrentAuthState(this.store).userPermissions, 'DEVICE', 'WRITE')
+      : this.config.componentsData.deviceScope === 'edge_customer_user';
     this.config.onLoadAction = (route) => this.onLoadAction(route);
 
     this.config.headerComponent = DeviceTableHeaderComponent;
@@ -184,8 +189,11 @@ export class DevicesTableConfigResolver  {
         this.config.cellActionDescriptors = this.configureCellActions(this.config.componentsData.deviceScope);
         this.config.groupActionDescriptors = this.configureGroupActions(this.config.componentsData.deviceScope);
         this.config.addActionDescriptors = this.configureAddActions(this.config.componentsData.deviceScope);
-        this.config.addEnabled = !(this.config.componentsData.deviceScope === 'customer_user' ||
-          this.config.componentsData.deviceScope === 'edge_customer_user');
+        // See the same block in assets-table-config.resolver: CREATE is not in the customer
+        // baseline, so the button only appears for a role that explicitly names DEVICE:CREATE.
+        this.config.addEnabled = this.config.componentsData.deviceScope === 'customer_user'
+          ? explicitlyHasGenericPermission(getCurrentAuthState(this.store).userPermissions, 'DEVICE', 'CREATE')
+          : this.config.componentsData.deviceScope !== 'edge_customer_user';
         this.config.entitiesDeleteEnabled = this.config.componentsData.deviceScope === 'tenant';
         this.config.deleteEnabled = () => this.config.componentsData.deviceScope === 'tenant';
         return this.config;

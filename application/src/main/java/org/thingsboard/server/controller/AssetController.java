@@ -153,6 +153,7 @@ public class AssetController extends BaseController {
                            @Parameter(description = UNIQUIFY_STRATEGY_DESC)
                            @RequestParam(name = "uniquifyStrategy", defaultValue = "RANDOM") UniquifyStrategy uniquifyStrategy) throws Exception {
         asset.setTenantId(getTenantId());
+        asset.setCustomerId(pinnedCustomerId(asset.getCustomerId()));
         checkEntity(asset.getId(), asset, Resource.ASSET);
         return tbAssetService.save(asset, new NameConflictStrategy(nameConflictPolicy, uniquifySeparator, uniquifyStrategy), getCurrentUser());
     }

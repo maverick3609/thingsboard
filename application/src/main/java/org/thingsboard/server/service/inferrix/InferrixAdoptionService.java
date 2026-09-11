@@ -97,7 +97,17 @@ public class InferrixAdoptionService {
     static final String ATTR_PASSWORD = "controllerPasswordSealed";
     static final String ATTR_TOKEN = "controllerTokenSealed";
 
-    private static final int GENERATED_PASSWORD_BYTES = 24;
+    /**
+     * The firmware's {@code settings_mqtt.password} field holds at most 31 characters and answers
+     * 400 to a 32nd (verified against fw 0.1.13). Base64url without padding turns n bytes into
+     * ceil(n × 4 / 3) characters, so 23 bytes is the most that still fits — 24 produced exactly 32
+     * and made every adoption fail at {@code PUT /api/v1/mqtt}. The same generator also mints the
+     * device's ownership password, where the limit is a far looser 8–64, so the tighter bound wins.
+     */
+    static final int GENERATED_PASSWORD_BYTES = 23;
+
+    /** What the device accepts in {@code settings_mqtt.password}; the bound the generator respects. */
+    static final int DEVICE_MQTT_PASSWORD_MAX_CHARS = 31;
     private static final long ATTRIBUTE_SAVE_TIMEOUT_SECONDS = 30;
 
     private final InferrixControllerClient client;
@@ -116,7 +126,7 @@ public class InferrixAdoptionService {
     private final AdminSettingsService adminSettingsService;
     private final TelemetrySubscriptionService tsSubService;
 
-    private final SecureRandom random = new SecureRandom();
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     public Device adopt(TenantId tenantId, User user, InferrixAdoptRequest request) throws Exception {
         if (!secretCodec.isConfigured()) {
@@ -373,9 +383,9 @@ public class InferrixAdoptionService {
         return new BaseAttributeKvEntry(new StringDataEntry(key, value), System.currentTimeMillis());
     }
 
-    private String newPassword() {
+    static String newPassword() {
         byte[] raw = new byte[GENERATED_PASSWORD_BYTES];
-        random.nextBytes(raw);
+        RANDOM.nextBytes(raw);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(raw);
     }
 

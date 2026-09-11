@@ -16,7 +16,7 @@
 
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { EMPTY, Observable } from 'rxjs';
+import { defer, EMPTY, Observable } from 'rxjs';
 import { expand, map, reduce } from 'rxjs/operators';
 import { defaultHttpOptionsFromConfig, defaultHttpUploadOptions, RequestConfig } from '@core/http/http-utils';
 import { AdoptControllerRequest, ControllerConfigSection, ControllerUploadKind,
@@ -103,22 +103,70 @@ export class InferrixControllerService {
   public readConfigSection(deviceId: string, section: ControllerConfigSection,
                            draft: boolean): Observable<any[]> {
     const base = draft ? '/api/v1/config/draft' : '/api/v1/config';
-    const fetchPage = (offset: number) =>
-      this.proxy<any>(deviceId, 'GET', `${base}?section=${section.readSection}&offset=${offset}`,
-        null, {ignoreErrors: true}).pipe(map(page => ({page, offset})));
-    let pages = 0;
-    return fetchPage(0).pipe(
-      expand(({page, offset}) => {
-        const records = recordsOf(page);
-        // Three ways out, not one: the device says it is done, it stopped returning records, or it
-        // has returned more pages than the largest section can hold. A device that answered
-        // `truncated` forever would otherwise spin here.
-        if (!page?.truncated || records.length === 0 || ++pages >= MAX_CONFIG_PAGES) {
-          return EMPTY;
-        }
-        return fetchPage(offset + records.length);
-      }),
-      reduce((all, {page}) => all.concat(recordsOf(page)), [] as any[]));
+    return this.readPaged(deviceId,
+      offset => `${base}?section=${section.readSection}&offset=${offset}`)
+      .pipe(map(result => result.records));
+  }
+
+  /**
+   * The live points list, walked to the end.
+   *
+   * `GET /api/v1/points` gained `?offset=` in firmware 0.1.14 and now shares the config sections'
+   * `{..., offset, truncated, total}` envelope. Before that a controller with more points than fit
+   * in one 2 KB reply showed only its first page — about eight or ten of a possible 1024 — with
+   * nothing but a `truncated` flag to say so.
+   */
+  public readPoints(deviceId: string): Observable<PagedRecords> {
+    return this.readPaged(deviceId, offset => `/api/v1/points?offset=${offset}`);
+  }
+
+  /**
+   * Walks one of the device's paged reads to the end.
+   *
+   * <p>Each page is capped at 2 KB and reports `truncated` with the collection's real `total`, so
+   * anything past the first page has to be asked for by `offset`. The device also warns that paging
+   * is by array index and is not a snapshot — a concurrent edit can shift records across a page
+   * boundary — which is why the config editor reads a section in one sweep and re-reads after every
+   * write rather than patching its local copy.
+   *
+   * <p>`defer` so the page counter belongs to the subscription rather than the call: these are cold
+   * observables and the points tab re-subscribes on every poll tick.
+   */
+  private readPaged(deviceId: string, pathFor: (offset: number) => string): Observable<PagedRecords> {
+    return defer(() => {
+      let pages = 0;
+      const fetchPage = (offset: number) =>
+        this.proxy<any>(deviceId, 'GET', pathFor(offset), null, {ignoreErrors: true})
+          .pipe(map(page => ({page, offset})));
+      return fetchPage(0).pipe(
+        expand(({page, offset}) => {
+          const records = recordsOf(page);
+          // Four ways out, not one: the device says it is done, it stopped returning records, it
+          // did not acknowledge the offset we asked for, or it has returned more pages than the
+          // largest collection can hold. A device that answered `truncated` forever would
+          // otherwise spin here.
+          //
+          // The offset check is what keeps this safe against older firmware: before 0.1.14 the
+          // points route had no `offset` at all and echoes none back, so asking for a second page
+          // would re-serve the first forever. Refusing to page such a device leaves it behaving
+          // exactly as it does today — one page, `truncated` shown to the operator.
+          if (!page?.truncated || records.length === 0 || page?.offset !== offset
+              || ++pages >= MAX_CONFIG_PAGES) {
+            return EMPTY;
+          }
+          return fetchPage(offset + records.length);
+        }),
+        // Each field takes the last page's value, so `truncated` ends up meaning what the operator
+        // needs it to mean: records exist that are not on screen. After a complete walk the final
+        // page says false; if the walk stopped early — the page cap, or a pre-0.1.14 device that
+        // cannot page — the page we stopped on still says true, and the warning survives.
+        reduce((acc, {page}) => ({
+          records: acc.records.concat(recordsOf(page)),
+          total: page?.total ?? acc.total,
+          truncated: !!page?.truncated
+        }), {records: [] as any[], total: 0, truncated: false} as PagedRecords),
+        map(result => ({...result, total: result.total || result.records.length})));
+    });
   }
 
   /** Upsert is a full-record write; the device replaces by id or appends. */
@@ -175,7 +223,15 @@ export class InferrixControllerService {
   }
 }
 
-/** 1024 points at the buffer's worth per page leaves plenty of room; see readConfigSection. */
+/** The outcome of walking a paged device read: every record, the collection's real size, and
+ * whether the walk stopped early on the page cap. */
+export interface PagedRecords {
+  records: any[];
+  total: number;
+  truncated: boolean;
+}
+
+/** 1024 points at the buffer's worth per page leaves plenty of room; see readPaged. */
 const MAX_CONFIG_PAGES = 256;
 
 /**

@@ -18,7 +18,7 @@ import { Component } from '@angular/core';
 import { Subscription, timer } from 'rxjs';
 import { switchMap, takeUntil } from 'rxjs/operators';
 import { ControllerPanelComponent } from '@home/pages/inferrix/controller/controller-panel.component';
-import { InferrixControllerService } from '@core/http/inferrix-controller.service';
+import { InferrixControllerService, PagedRecords } from '@core/http/inferrix-controller.service';
 import { ControllerPoint, pointQualityColor } from '@shared/models/inferrix-controller.models';
 
 /**
@@ -70,8 +70,7 @@ export class ControllerPointsComponent extends ControllerPanelComponent {
     this.refreshSubscription = null;
     if (enabled) {
       this.refreshSubscription = timer(5000, 5000).pipe(
-        switchMap(() => this.controllerService.proxy<any>(this.deviceId, 'GET', '/api/v1/points',
-          null, {ignoreErrors: true})),
+        switchMap(() => this.controllerService.readPoints(this.deviceId)),
         takeUntil(this.destroy$)
       ).subscribe({
         next: response => this.apply(response),
@@ -86,8 +85,7 @@ export class ControllerPointsComponent extends ControllerPanelComponent {
   reload(): void {
     this.loading = true;
     this.error = null;
-    this.controllerService.proxy<any>(this.deviceId, 'GET', '/api/v1/points', null,
-      {ignoreErrors: true}).subscribe({
+    this.controllerService.readPoints(this.deviceId).subscribe({
       next: response => {
         this.apply(response);
         this.loading = false;
@@ -110,10 +108,12 @@ export class ControllerPointsComponent extends ControllerPanelComponent {
     return point.v === undefined || point.v === null ? '—' : String(point.v);
   }
 
-  private apply(response: any): void {
-    this.points = response?.points ?? [];
-    this.total = response?.total ?? this.points.length;
-    this.truncated = !!response?.truncated;
+  private apply(result: PagedRecords): void {
+    this.points = result.records as ControllerPoint[];
+    this.total = result.total;
+    // True only when points exist that are not on screen: the walk hit the page cap, or the
+    // device predates the paging support and can only serve its first page.
+    this.truncated = result.truncated;
   }
 
 }

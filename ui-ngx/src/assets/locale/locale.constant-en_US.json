@@ -4452,7 +4452,7 @@
         "logic-channel": "Channel",
         "logic-point": "Point",
         "logic-register": "Metric",
-        "logic-no-points": "This controller has no points configured yet.",
+        "logic-no-points": "No points were read from this controller. It may have none configured yet, or be unreachable.",
         "logic-steps": "What the program does",
         "logic-steps-hint": "The controller runs these in order, once every scan, forever. A value computed after it is read is one scan out of date.",
         "logic-no-steps": "No steps yet.",

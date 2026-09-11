@@ -197,6 +197,48 @@ class IlbBlockCompilerTest {
     }
 
     @Test
+    void aWholeNumberTooWideToBeOneIsRefused() {
+        // Rounding a double straight into an int does not overflow, it lands somewhere arbitrary:
+        // 3000000000 arrives as -1294967296 and 1e308 as -1, so a compiled program would have run
+        // for years against a number nobody typed.
+        assertTrue(refuse(program(assign("count", literal("INT", 3.0e9, null))))
+                .contains("outside the range"));
+        assertTrue(refuse(program(assign("count", literal("INT", 1.0e308, null))))
+                .contains("outside the range"));
+        assertTrue(refuse(program(assign("count", literal("INT", -3.0e9, null))))
+                .contains("outside the range"));
+
+        // The edges themselves still compile.
+        assertTrue(IlbVerifier.verify(compile(program(
+                assign("count", literal("INT", (double) Integer.MAX_VALUE, null)))), 1, p -> true)
+                .isOk());
+        assertTrue(IlbVerifier.verify(compile(program(
+                assign("count", literal("INT", (double) Integer.MIN_VALUE, null)))), 1, p -> true)
+                .isOk());
+    }
+
+    @Test
+    void aFractionWhereAWholeNumberBelongsIsRefused() {
+        // Silently rounding 2.7 to 3 is the same drift as narrowing a REAL into an INT tag, which
+        // is already refused - a preset or a count that is quietly not what was typed.
+        assertTrue(refuse(program(assign("count", literal("INT", 2.7, null))))
+                .contains("whole number is needed"));
+
+        // A tag's starting value and SCALE's three fixed numbers narrow the same way, so they are
+        // held to the same rule.
+        List<IlbBlock.Tag> fractionalStart = List.of(
+                new IlbBlock.Tag("count", "INT", "MEMORY", "NONE", null, 2.7));
+        assertTrue(assertThrows(IlbBlockCompiler.IlbCompileException.class,
+                () -> IlbBlockCompiler.compile(new IlbBlock.Program(1, 1, 1, 1000,
+                        fractionalStart, List.of()))).getMessage().contains("whole number"));
+
+        IlbBlock.Expression scale = new IlbBlock.Expression("CALL", null, null, null, null, null,
+                "SCALE", null, List.of(tag("count"), literal("INT", 1.5, null),
+                        literal("INT", 1.0, null), literal("INT", 0.0, null)));
+        assertTrue(refuse(program(assign("command", scale))).contains("whole number"));
+    }
+
+    @Test
     void anEmptyProgramIsStillAValidOne() {
         // A controller with nothing to do runs END once a scan; refusing that would make "clear the
         // logic" impossible to express.

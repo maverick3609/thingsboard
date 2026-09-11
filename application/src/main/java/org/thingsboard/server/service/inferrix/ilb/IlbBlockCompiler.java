@@ -133,16 +133,16 @@ public final class IlbBlockCompiler {
                 tagType.put(tag.name(), type);
                 tags.add(new IlbProgram.Tag(type, cls, binding,
                         tag.address() == null ? 0 : tag.address(),
-                        initialValue(type, tag.initial()), tag.name()));
+                        initialValue(type, tag.initial(), tag.name()), tag.name()));
             }
         }
 
-        private static int initialValue(int type, Double initial) {
+        private static int initialValue(int type, Double initial, String name) {
             if (initial == null) {
                 return 0;
             }
             return type == T_REAL ? Float.floatToIntBits(initial.floatValue())
-                    : (int) Math.round(initial);
+                    : wholeNumber(initial, "the starting value of tag '" + name + "'");
         }
 
         private int tagOf(String name) {
@@ -323,13 +323,14 @@ public final class IlbBlockCompiler {
         private int literal(IlbBlock.Expression expression, String what) {
             int type = dataType(expression.dataType(), what);
             if (type == T_INT) {
-                emit(IlbProgram.Instruction.of(OP_LDI, (int) Math.round(number(expression, what))));
+                emit(IlbProgram.Instruction.of(OP_LDI,
+                        wholeNumber(number(expression, what), what)));
                 return T_INT;
             }
             int raw = switch (type) {
                 case T_REAL -> Float.floatToIntBits((float) number(expression, what));
                 case T_BOOL -> Boolean.TRUE.equals(expression.flag()) ? 1 : 0;
-                default -> (int) Math.round(number(expression, what));
+                default -> wholeNumber(number(expression, what), what);
             };
             emit(IlbProgram.Instruction.of(OP_LDC, constant(type, raw)));
             return type;
@@ -340,6 +341,32 @@ public final class IlbBlockCompiler {
                 throw fail("There is no number filled in for " + what + ".");
             }
             return expression.number();
+        }
+
+        /**
+         * A whole number, narrow enough to still be one after the cast. Rounding anything wider
+         * than an int lands somewhere arbitrary - 3000000000 arrives as -1294967296 and 1e308 as
+         * -1 - and a fraction rounds away without saying so, which is the same silent drift that
+         * is refused everywhere else here. A setpoint that quietly becomes a different setpoint
+         * is worse than one that will not compile, so all three are the operator's to fix.
+         */
+        private static int wholeNumber(double value, String what) {
+            if (!Double.isFinite(value) || value < Integer.MIN_VALUE || value > Integer.MAX_VALUE) {
+                throw fail(capitalise(what) + " is " + show(value) + ", which is outside the range "
+                        + "a whole number holds here (" + Integer.MIN_VALUE + " to "
+                        + Integer.MAX_VALUE + ").");
+            }
+            if (value != Math.rint(value)) {
+                throw fail(capitalise(what) + " is " + show(value)
+                        + ", and a whole number is needed here.");
+            }
+            return (int) value;
+        }
+
+        /** Prints 20 rather than 20.0, without claiming 1e308 is a long. */
+        private static String show(double value) {
+            return Double.isFinite(value) && value == Math.rint(value) && Math.abs(value) < 1e15
+                    ? String.valueOf((long) value) : String.valueOf(value);
         }
 
         /** Interns a const-pool entry, so the same literal used twice costs eight bytes once. */
@@ -515,7 +542,7 @@ public final class IlbBlockCompiler {
                     || expression.number() == null) {
                 throw fail(fn + "'s multiplier, divisor and offset each have to be a fixed number.");
             }
-            return (int) Math.round(expression.number());
+            return wholeNumber(expression.number(), fn + "'s multiplier, divisor or offset");
         }
 
         private static int requireArgs(List<IlbBlock.Expression> args, int wanted, String fn) {

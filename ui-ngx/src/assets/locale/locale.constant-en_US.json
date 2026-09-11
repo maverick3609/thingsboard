@@ -4426,6 +4426,7 @@
         "logic-out-drops": "Dropped outputs",
         "logic-binding-fault": "Unresolved binding",
         "restart-logic": "Restart program",
+        "restart-logic-hint": "Re-initialises the program that is already running. A newly uploaded program is not started by this: it begins at the IO controller's own next restart, which has to be done at the panel.",
         "stack": "Stack",
         "pool": "Buffer pool",
         "ping": "Probe",

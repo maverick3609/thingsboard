@@ -90,7 +90,8 @@
       <div translate>inferrix.firmware-state</div>
       <div>{{ firmware.state }}</div>
     </div>
-    <div class="flex flex-row items-center justify-end">
+    <div class="flex flex-row items-center justify-between gap-4">
+      <div class="tb-hint">{{ 'inferrix.restart-logic-hint' | translate }}</div>
       <button mat-stroked-button [disabled]="readonly || restartRunning" (click)="restartLogic()">
         {{ 'inferrix.restart-logic' | translate }}
       </button>

@@ -28,14 +28,18 @@ import org.thingsboard.server.common.data.id.DeviceId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.queue.util.TbCoreComponent;
 import org.thingsboard.server.service.inferrix.InferrixControllerClient.ControllerResponse;
+import org.thingsboard.server.service.inferrix.ilb.IlbVerifier;
 
 import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.util.HashSet;
 import java.util.HexFormat;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.IntPredicate;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -115,6 +119,9 @@ public class InferrixUploadService {
     }
 
     /** What is being written, and the limits that go with it. */
+    /** 1024 points at the device's page sizes leaves headroom; see readPointIds. */
+    private static final int MAX_POINT_PAGES = 256;
+
     public enum Kind {
 
         FIRMWARE("/api/v1/firmware", 1024 * 1024),
@@ -242,6 +249,10 @@ public class InferrixUploadService {
                     .openVerifiedCredentials(job.getTenantId(), job.getDeviceId(),
                             job.getKind().statusPath());
 
+            if (job.getKind() == Kind.LOGIC) {
+                verifyLogicOrThrow(credentials, artifact);
+            }
+
             requireOk(controllerAccess.callWith(credentials, "POST", job.getKind().beginPath(),
                     "{\"size\":" + artifact.length + "}"), "begin");
 
@@ -274,6 +285,72 @@ public class InferrixUploadService {
         } finally {
             activeByDevice.remove(job.getDeviceId(), job.getId());
         }
+    }
+
+    /**
+     * Runs the device's own boot-time container check before a byte is written.
+     *
+     * <p>Without this the upload succeeds, the operator is told the program is staged, and the
+     * controller quietly drops it at the next boot: a container that fails {@code ilb_verify} is
+     * reported by {@code GET /api/v1/logic/status} as {@code state 0}, which is the same thing it
+     * reports when nothing was ever staged. The rejection reason reaches a serial console and
+     * nowhere else. So the platform checks first and says which tag or instruction is wrong.
+     *
+     * <p>The profile comes from the device rather than from anything stored, because it is what the
+     * device will compare the container against. Points are fetched only when the program actually
+     * binds one — most programs drive local channels and need no extra round trip, and every
+     * request here costs a full TLS handshake.
+     */
+    private void verifyLogicOrThrow(InferrixControllerAccess.Credentials credentials,
+                                    byte[] artifact) throws IOException {
+        ControllerResponse info = controllerAccess.callWith(credentials, "GET", "/api/v1/info", null);
+        requireOk(info, "read of the controller's profile");
+        JsonNode infoNode = JacksonUtil.toJsonNode(info.body());
+        if (infoNode == null || !infoNode.hasNonNull("profile")) {
+            throw new IOException("The controller did not report a hardware profile, so the logic"
+                    + " program cannot be checked against it");
+        }
+        int profile = infoNode.get("profile").asInt();
+
+        IntPredicate pointExists = IlbVerifier.bindsIccPoint(artifact)
+                ? readPointIds(credentials)::contains : null;
+        IlbVerifier.Result result = IlbVerifier.verify(artifact, profile, pointExists);
+        if (!result.isOk()) {
+            throw new IOException("The controller would reject this logic program at boot: "
+                    + result.message());
+        }
+        log.info("Inferrix logic program verified: id={} version={} tags={} code={} bytes",
+                result.programId(), result.programVersion(), result.tagCount(), result.codeLength());
+    }
+
+    /** Every point id in the controller's active config, following its paging. */
+    private Set<Integer> readPointIds(InferrixControllerAccess.Credentials credentials)
+            throws IOException {
+        Set<Integer> ids = new HashSet<>();
+        int offset = 0;
+        for (int page = 0; page < MAX_POINT_PAGES; page++) {
+            ControllerResponse response = controllerAccess.callWith(credentials, "GET",
+                    "/api/v1/points?offset=" + offset, null);
+            requireOk(response, "read of the controller's points");
+            JsonNode node = JacksonUtil.toJsonNode(response.body());
+            JsonNode points = node == null ? null : node.get("points");
+            if (points == null || !points.isArray() || points.isEmpty()) {
+                break;
+            }
+            points.forEach(point -> {
+                if (point.hasNonNull("id")) {
+                    ids.add(point.get("id").asInt());
+                }
+            });
+            // Same stop conditions the browser uses: the device says it is done, or it did not
+            // acknowledge the offset we asked for, which is how firmware too old to page behaves.
+            if (!node.path("truncated").asBoolean(false)
+                    || node.path("offset").asInt(-1) != offset) {
+                break;
+            }
+            offset += points.size();
+        }
+        return ids;
     }
 
     /**

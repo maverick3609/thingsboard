@@ -34,6 +34,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import jakarta.servlet.http.HttpServletRequest;
 import org.thingsboard.server.common.data.Device;
+import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.security.Authority;
 import org.thingsboard.server.common.data.exception.ThingsboardErrorCode;
@@ -51,8 +52,13 @@ import org.thingsboard.server.service.security.model.SecurityUser;
 import org.thingsboard.server.service.security.permission.Operation;
 import org.thingsboard.server.service.security.permission.Resource;
 import org.thingsboard.server.service.inferrix.InferrixControllerClient.ControllerResponse;
+import org.thingsboard.server.service.inferrix.ilb.IlbAsmParser;
+import org.thingsboard.server.service.inferrix.ilb.IlbAssembler;
+import org.thingsboard.server.service.inferrix.ilb.IlbCompileResult;
+import org.thingsboard.server.service.inferrix.ilb.IlbVerifier;
 
 import java.io.IOException;
+import java.util.Base64;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -242,6 +248,96 @@ public class InferrixPlcController extends BaseController {
             // Wrong size, empty file, or a second upload to a device already being written: all of
             // them are the operator's to fix, so they answer 400 rather than a server error.
             throw new ThingsboardException(e.getMessage(), ThingsboardErrorCode.BAD_REQUEST_PARAMS);
+        }
+    }
+
+    @ApiOperation(value = "Compile a logic program without writing it (compileLogic)",
+            notes = "Turns a tag table and opcode listing into an ILB container and runs the "
+                    + "controller's own boot-time verifier over the result, reading the device's "
+                    + "hardware profile — and its points, if the program binds any — to check "
+                    + "against. Nothing is written to the controller. This exists because the "
+                    + "device answers a bad program with silence: one that fails verification at "
+                    + "boot reports the same logic status as one that was never uploaded, and the "
+                    + "reason reaches a serial console and nowhere else.")
+    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    @PostMapping(value = "/{deviceId}/logic/compile", consumes = MediaType.TEXT_PLAIN_VALUE)
+    public IlbCompileResult compileLogic(@PathVariable("deviceId") String strDeviceId,
+                                         @RequestBody String source) throws ThingsboardException {
+        checkParameter("deviceId", strDeviceId);
+        DeviceId deviceId = new DeviceId(toUUID(strDeviceId));
+        // A compile reads the controller but never writes it, so READ is the right gate; the
+        // matching build endpoint below takes WRITE because it does write.
+        Device device = checkDeviceId(deviceId, Operation.READ);
+        return compile(device.getTenantId(), deviceId, source);
+    }
+
+    @ApiOperation(value = "Compile a logic program and write it (buildLogic)",
+            notes = "Compiles a tag table and opcode listing, verifies it the way the controller "
+                    + "will at boot, and — only if it passes — starts streaming it to the logic "
+                    + "slot. Returns the same job to poll as a file upload. Like any logic program "
+                    + "it activates when the controller next restarts.")
+    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    @PostMapping(value = "/{deviceId}/logic/build", consumes = MediaType.TEXT_PLAIN_VALUE)
+    public UploadStatus buildLogic(@PathVariable("deviceId") String strDeviceId,
+                                   @RequestBody String source) throws ThingsboardException {
+        checkParameter("deviceId", strDeviceId);
+        DeviceId deviceId = new DeviceId(toUUID(strDeviceId));
+        Device device = checkDeviceId(deviceId, Operation.WRITE);
+        IlbCompileResult compiled = compile(device.getTenantId(), deviceId, source);
+        if (!compiled.isOk()) {
+            throw new ThingsboardException(compiled.getMessage(), ThingsboardErrorCode.BAD_REQUEST_PARAMS);
+        }
+        InferrixUploadService uploads = uploadService.getIfAvailable();
+        if (uploads == null) {
+            throw new ThingsboardException("Controller uploads are not available on this node",
+                    ThingsboardErrorCode.GENERAL);
+        }
+        try {
+            return UploadStatus.of(uploads.start(device.getTenantId(), deviceId,
+                    InferrixUploadService.Kind.LOGIC, Base64.getDecoder().decode(compiled.getImage())));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            throw new ThingsboardException(e.getMessage(), ThingsboardErrorCode.BAD_REQUEST_PARAMS);
+        }
+    }
+
+    /**
+     * Compiles and verifies, turning every failure into a result rather than an exception.
+     *
+     * <p>A syntax error and a rejected container are both the operator's to fix and both need the
+     * same thing said back — which line, which tag, which rule — so neither is an error status.
+     */
+    private IlbCompileResult compile(TenantId tenantId, DeviceId deviceId, String source)
+            throws ThingsboardException {
+        byte[] image;
+        try {
+            image = IlbAssembler.assemble(IlbAsmParser.parse(source));
+        } catch (IlbAsmParser.IlbSyntaxException e) {
+            return IlbCompileResult.failed(e.getMessage(), e.getLine());
+        } catch (IlbAssembler.IlbAssemblyException e) {
+            return IlbCompileResult.failed(e.getMessage(), 0);
+        }
+        try {
+            InferrixControllerAccess access = controllerAccess.getIfAvailable();
+            if (access == null) {
+                throw new ThingsboardException("Controller access is not available on this node",
+                        ThingsboardErrorCode.GENERAL);
+            }
+            ControllerResponse info = access.call(tenantId, deviceId, "GET", "/api/v1/info", null);
+            if (info.statusCode() != 200) {
+                throw new ThingsboardException("The controller did not answer with its hardware"
+                        + " profile, so the program cannot be checked against it",
+                        ThingsboardErrorCode.GENERAL);
+            }
+            JsonNode node = JacksonUtil.toJsonNode(info.body());
+            int profile = node != null && node.hasNonNull("profile") ? node.get("profile").asInt() : -1;
+            IlbVerifier.Result result = IlbVerifier.verify(image, profile, null);
+            return result.isOk()
+                    ? IlbCompileResult.ok(image, result)
+                    : IlbCompileResult.failed(result.message(), 0);
+        } catch (ThingsboardException e) {
+            throw e;
+        } catch (Exception e) {
+            throw handleException(e);
         }
     }
 

@@ -47,7 +47,7 @@ public class IlbCompileResult {
     private final int size;
 
     @Schema(description = "Program id from the header")
-    private final int programId;
+    private final long programId;
 
     @Schema(description = "Program version — the controller boots the highest it holds")
     private final long programVersion;
@@ -59,7 +59,7 @@ public class IlbCompileResult {
     private final int codeLength;
 
     private IlbCompileResult(boolean ok, String message, int line, String image, int size,
-                             int programId, long programVersion, int tagCount, int codeLength) {
+                             long programId, long programVersion, int tagCount, int codeLength) {
         this.ok = ok;
         this.message = message;
         this.line = line;

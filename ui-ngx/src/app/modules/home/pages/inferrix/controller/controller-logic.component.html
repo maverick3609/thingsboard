@@ -1,0 +1,165 @@
+<!--
+  Copyright © 2016-2026 The Inferrix Authors
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<div class="tb-form-panel no-border no-padding">
+
+  <div class="tb-form-panel stroked">
+    <div class="tb-form-panel-title" translate>inferrix.logic-tags</div>
+    <div class="tb-hint" translate>inferrix.logic-tags-hint</div>
+
+    @for (tag of program.tags; track $index) {
+      <div class="tb-logic-tag-row">
+        <mat-form-field class="tb-logic-name" subscriptSizing="dynamic" appearance="outline">
+          <mat-label>{{ 'inferrix.logic-tag-name' | translate }}</mat-label>
+          <input matInput [(ngModel)]="tag.name" [disabled]="readonly">
+        </mat-form-field>
+
+        <mat-form-field class="tb-logic-field" subscriptSizing="dynamic" appearance="outline">
+          <mat-label>{{ 'inferrix.logic-tag-type' | translate }}</mat-label>
+          <mat-select [(value)]="tag.dataType" [disabled]="readonly">
+            <mat-option value="BOOL">{{ 'inferrix.logic-type-bool' | translate }}</mat-option>
+            <mat-option value="INT">{{ 'inferrix.logic-type-int' | translate }}</mat-option>
+            <mat-option value="REAL">{{ 'inferrix.logic-type-real' | translate }}</mat-option>
+            <mat-option value="TIME">{{ 'inferrix.logic-type-time' | translate }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field class="tb-logic-field" subscriptSizing="dynamic" appearance="outline">
+          <mat-label>{{ 'inferrix.logic-tag-role' | translate }}</mat-label>
+          <mat-select [(value)]="tag.cls" [disabled]="readonly">
+            <mat-option value="INPUT">{{ 'inferrix.logic-role-input' | translate }}</mat-option>
+            <mat-option value="OUTPUT">{{ 'inferrix.logic-role-output' | translate }}</mat-option>
+            <mat-option value="MEMORY">{{ 'inferrix.logic-role-memory' | translate }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field class="tb-logic-field" subscriptSizing="dynamic" appearance="outline">
+          <mat-label>{{ 'inferrix.logic-tag-binding' | translate }}</mat-label>
+          <mat-select [value]="tag.binding" [disabled]="readonly"
+                      (valueChange)="tag.binding = $event; onBindingChange(tag)">
+            @for (binding of bindings; track binding.value) {
+              <mat-option [value]="binding.value">{{ binding.labelKey | translate }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        @if (bindingSpec(tag.binding)?.needsAddress) {
+          @if (bindingSpec(tag.binding)?.fromPoints) {
+            <mat-form-field class="tb-logic-address" subscriptSizing="dynamic" appearance="outline">
+              <mat-label>{{ 'inferrix.logic-point' | translate }}</mat-label>
+              <mat-select [(value)]="tag.address" [disabled]="readonly">
+                @for (point of points; track point.id) {
+                  <mat-option [value]="point.id">
+                    {{ point.id }} · {{ point.name || point.type }}
+                  </mat-option>
+                }
+              </mat-select>
+              @if (!points.length && !loadingPoints) {
+                <mat-hint>{{ 'inferrix.logic-no-points' | translate }}</mat-hint>
+              }
+            </mat-form-field>
+          } @else if (tag.binding === 'SYSTEM_REGISTER') {
+            <mat-form-field class="tb-logic-address" subscriptSizing="dynamic" appearance="outline">
+              <mat-label>{{ 'inferrix.logic-register' | translate }}</mat-label>
+              <mat-select [(value)]="tag.address" [disabled]="readonly">
+                @for (register of registers; track register.id) {
+                  <mat-option [value]="register.id">{{ register.nameKey | translate }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          } @else {
+            <mat-form-field class="tb-logic-field" subscriptSizing="dynamic" appearance="outline">
+              <mat-label>{{ 'inferrix.logic-channel' | translate }}</mat-label>
+              <input matInput type="number" min="0" [(ngModel)]="tag.address"
+                     [disabled]="readonly">
+            </mat-form-field>
+          }
+        }
+
+        @if (!readonly) {
+          <button mat-icon-button color="warn" (click)="removeTag($index)"
+                  matTooltip="{{ 'action.delete' | translate }}">
+            <mat-icon>delete</mat-icon>
+          </button>
+        }
+      </div>
+    }
+
+    @if (!program.tags.length) {
+      <div class="tb-logic-empty" translate>inferrix.logic-no-tags</div>
+    }
+
+    @if (!readonly) {
+      <button mat-stroked-button (click)="addTag()">
+        <mat-icon>add</mat-icon>{{ 'inferrix.logic-add-tag' | translate }}
+      </button>
+    }
+  </div>
+
+  <div class="tb-form-panel stroked">
+    <div class="tb-form-panel-title" translate>inferrix.logic-steps</div>
+    <div class="tb-hint" translate>inferrix.logic-steps-hint</div>
+    <tb-controller-statements [statements]="program.statements" [tags]="program.tags"
+                              [readonly]="readonly"></tb-controller-statements>
+  </div>
+
+  <div class="tb-form-panel stroked">
+    <div class="tb-form-panel-title" translate>inferrix.logic-push</div>
+    <div class="tb-hint" translate>inferrix.logic-push-hint</div>
+
+    <div class="tb-logic-actions">
+      <mat-form-field class="tb-logic-field" subscriptSizing="dynamic" appearance="outline">
+        <mat-label>{{ 'inferrix.logic-scan-period' | translate }}</mat-label>
+        <input matInput type="number" min="10" [(ngModel)]="program.scanPeriodMs"
+               [disabled]="readonly">
+        <span matTextSuffix>{{ 'inferrix.logic-ms' | translate }}</span>
+      </mat-form-field>
+
+      <button mat-stroked-button [disabled]="busy" (click)="verify()">
+        <mat-icon>fact_check</mat-icon>{{ 'inferrix.logic-verify' | translate }}
+      </button>
+      <button mat-raised-button color="primary" [disabled]="busy || readonly" (click)="push()">
+        <mat-icon>upload</mat-icon>{{ 'inferrix.logic-push-action' | translate }}
+      </button>
+      @if (busy) {
+        <mat-spinner diameter="24"></mat-spinner>
+      }
+    </div>
+
+    @if (error) {
+      <div class="tb-logic-error">{{ error }}</div>
+    }
+
+    @if (result?.ok) {
+      <div class="tb-logic-result">
+        {{ 'inferrix.logic-verified' | translate: {size: result.size, tags: result.tagCount,
+             code: result.codeLength} }}
+      </div>
+    }
+
+    @if (job) {
+      <div class="tb-logic-result">
+        {{ 'inferrix.upload-progress' | translate: {sent: job.sent, total: job.total,
+             percent: job.total ? ((job.sent / job.total) * 100 | number: '1.0-0') : 0} }}
+        @if (job.state === 'DONE') {
+          <div>{{ 'inferrix.upload-done' | translate: {activation: job.activation || 'reboot'} }}</div>
+        }
+        @if (job.state === 'FAILED') {
+          <div class="tb-logic-error">{{ job.message }}</div>
+        }
+      </div>
+    }
+  </div>
+</div>

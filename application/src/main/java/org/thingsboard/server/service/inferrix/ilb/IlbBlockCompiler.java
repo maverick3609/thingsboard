@@ -102,7 +102,10 @@ public final class IlbBlockCompiler {
                         : IlbProgram.Instruction.jump(instruction.opcode(), canonical(target))
                                 .withLabel(instruction.label()));
             }
-            return new IlbProgram(source.programId(),
+            // The id is a u32 on the wire, so it arrives as a long and is carried in an int:
+            // only the low 32 bits are ever written, and a value above 2^31 simply lands as a
+            // negative int that serialises to the same four bytes.
+            return new IlbProgram((int) source.programId(),
                     source.programVersion() == 0 ? 1 : source.programVersion(),
                     source.profile() == 0 ? 1 : source.profile(),
                     source.scanPeriodMs() == 0 ? 1000 : source.scanPeriodMs(),

@@ -1,0 +1,70 @@
+/**
+ * Copyright © 2016-2026 The Inferrix Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+.tb-logic-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+}
+
+.tb-logic-step-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.tb-logic-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tb-logic-keyword {
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+
+/* The branches of an IF are indented and ruled, so the shape of the program is readable without
+   reading any of the values in it. */
+.tb-logic-branch {
+  margin-left: 18px;
+  padding-left: 12px;
+  border-left: 2px solid rgba(0, 0, 0, 0.12);
+}
+
+.tb-logic-target {
+  width: 150px;
+}
+
+.tb-logic-small {
+  width: 96px;
+}
+
+.tb-logic-empty {
+  opacity: 0.6;
+  font-style: italic;
+  padding: 4px 0;
+}

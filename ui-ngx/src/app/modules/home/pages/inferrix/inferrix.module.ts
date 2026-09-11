@@ -31,6 +31,9 @@ import { ControllerConfigComponent } from '@home/pages/inferrix/controller/contr
 import { ControllerConfigRecordDialogComponent }
   from '@home/pages/inferrix/controller/controller-config-record-dialog.component';
 import { ControllerSoftwareComponent } from '@home/pages/inferrix/controller/controller-software.component';
+import { ControllerLogicComponent } from '@home/pages/inferrix/controller/controller-logic.component';
+import { ControllerStatementsComponent } from '@home/pages/inferrix/controller/controller-statements.component';
+import { ControllerExpressionComponent } from '@home/pages/inferrix/controller/controller-expression.component';
 
 @NgModule({
   declarations: [
@@ -43,7 +46,10 @@ import { ControllerSoftwareComponent } from '@home/pages/inferrix/controller/con
     ControllerDiagnosticsComponent,
     ControllerConfigComponent,
     ControllerConfigRecordDialogComponent,
-    ControllerSoftwareComponent
+    ControllerSoftwareComponent,
+    ControllerLogicComponent,
+    ControllerStatementsComponent,
+    ControllerExpressionComponent
   ],
   imports: [
     CommonModule,

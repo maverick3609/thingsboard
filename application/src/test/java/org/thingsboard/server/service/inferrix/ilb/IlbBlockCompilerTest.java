@@ -184,6 +184,19 @@ class IlbBlockCompilerTest {
     }
 
     @Test
+    void aProgramIdAboveTwoBillionSurvives() {
+        // The id is a u32 on the wire. Holding it as an int in the JSON model meant any id past
+        // 2^31 was refused by the parser before the compiler ever saw it, with a 500 rather than
+        // anything an operator could act on.
+        long big = 0xDEADBEEFL;
+        IlbBlock.Program source = new IlbBlock.Program(big, 1, 1, 1000, TAGS, List.of());
+        IlbVerifier.Result result = IlbVerifier.verify(compile(source), 1, p -> p == 101);
+
+        assertTrue(result.isOk(), result.message());
+        assertEquals(big, result.programId());
+    }
+
+    @Test
     void anEmptyProgramIsStillAValidOne() {
         // A controller with nothing to do runs END once a scan; refusing that would make "clear the
         // logic" impossible to express.

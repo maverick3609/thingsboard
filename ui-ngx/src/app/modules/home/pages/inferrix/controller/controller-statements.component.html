@@ -1,0 +1,235 @@
+<!--
+  Copyright © 2016-2026 The Inferrix Authors
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+@for (statement of statements; track $index) {
+  <div class="tb-logic-step">
+    <div class="tb-logic-step-body">
+
+      @switch (statement.kind) {
+        @case ('ASSIGN') {
+          <div class="tb-logic-row">
+            <span class="tb-logic-keyword">{{ 'inferrix.logic-set-to' | translate }}</span>
+            <mat-form-field class="tb-logic-target" subscriptSizing="dynamic" appearance="outline">
+              <mat-select [(value)]="statement.target" [disabled]="readonly"
+                          placeholder="{{ 'inferrix.logic-pick-tag' | translate }}">
+                @for (tag of writableTags(); track tag.name) {
+                  <mat-option [value]="tag.name">{{ tag.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <span class="tb-logic-keyword">=</span>
+            <tb-controller-expression [expression]="statement.value" [tags]="tags"
+                                      [readonly]="readonly"></tb-controller-expression>
+          </div>
+        }
+
+        @case ('IF') {
+          <div class="tb-logic-row">
+            <span class="tb-logic-keyword">{{ 'inferrix.logic-if' | translate }}</span>
+            <tb-controller-expression [expression]="statement.condition" [tags]="tags"
+                                      [readonly]="readonly"></tb-controller-expression>
+          </div>
+          <span class="tb-logic-keyword">{{ 'inferrix.logic-then' | translate }}</span>
+          <div class="tb-logic-branch">
+            <tb-controller-statements [statements]="branchOf(statement, 'then')" [tags]="tags"
+                                      [readonly]="readonly"></tb-controller-statements>
+          </div>
+          <span class="tb-logic-keyword">{{ 'inferrix.logic-else' | translate }}</span>
+          <div class="tb-logic-branch">
+            <tb-controller-statements [statements]="branchOf(statement, 'otherwise')" [tags]="tags"
+                                      [readonly]="readonly"></tb-controller-statements>
+          </div>
+        }
+
+        @case ('TIMER') {
+          <div class="tb-logic-row">
+            <mat-form-field class="tb-logic-small" subscriptSizing="dynamic" appearance="outline">
+              <mat-select [(value)]="statement.timerKind" [disabled]="readonly">
+                <mat-option value="TON">{{ 'inferrix.logic-ton' | translate }}</mat-option>
+                <mat-option value="TOF">{{ 'inferrix.logic-tof' | translate }}</mat-option>
+                <mat-option value="TP">{{ 'inferrix.logic-tp' | translate }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <span class="tb-logic-keyword">{{ 'inferrix.logic-while' | translate }}</span>
+            <tb-controller-expression [expression]="statement.input" [tags]="tags"
+                                      [readonly]="readonly"></tb-controller-expression>
+            <span class="tb-logic-keyword">{{ 'inferrix.logic-for' | translate }}</span>
+            <tb-controller-expression [expression]="statement.preset" [tags]="tags"
+                                      [only]="['LITERAL','TAG']"
+                                      [readonly]="readonly"></tb-controller-expression>
+          </div>
+          <div class="tb-logic-row">
+            <span class="tb-logic-keyword">{{ 'inferrix.logic-report-to' | translate }}</span>
+            <mat-form-field class="tb-logic-target" subscriptSizing="dynamic" appearance="outline">
+              <mat-select [(value)]="statement.target" [disabled]="readonly">
+                @for (tag of writableTags(); track tag.name) {
+                  <mat-option [value]="tag.name">{{ tag.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field class="tb-logic-small" subscriptSizing="dynamic" appearance="outline">
+              <mat-label>{{ 'inferrix.logic-slot' | translate }}</mat-label>
+              <input matInput type="number" min="0" max="63" [(ngModel)]="statement.slot"
+                     [disabled]="readonly">
+            </mat-form-field>
+          </div>
+        }
+
+        @case ('COUNTER') {
+          <div class="tb-logic-row">
+            <mat-form-field class="tb-logic-small" subscriptSizing="dynamic" appearance="outline">
+              <mat-select [(value)]="statement.counterKind" [disabled]="readonly">
+                <mat-option value="CTU">{{ 'inferrix.logic-ctu' | translate }}</mat-option>
+                <mat-option value="CTD">{{ 'inferrix.logic-ctd' | translate }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <span class="tb-logic-keyword">{{ 'inferrix.logic-counts' | translate }}</span>
+            <tb-controller-expression [expression]="statement.input" [tags]="tags"
+                                      [readonly]="readonly"></tb-controller-expression>
+            <span class="tb-logic-keyword">{{ 'inferrix.logic-up-to' | translate }}</span>
+            <tb-controller-expression [expression]="statement.preset" [tags]="tags"
+                                      [only]="['LITERAL','TAG']"
+                                      [readonly]="readonly"></tb-controller-expression>
+          </div>
+          <div class="tb-logic-row">
+            <span class="tb-logic-keyword">{{ 'inferrix.logic-reset-when' | translate }}</span>
+            <tb-controller-expression [expression]="statement.reset" [tags]="tags"
+                                      [readonly]="readonly"></tb-controller-expression>
+          </div>
+          <div class="tb-logic-row">
+            <span class="tb-logic-keyword">{{ 'inferrix.logic-report-to' | translate }}</span>
+            <mat-form-field class="tb-logic-target" subscriptSizing="dynamic" appearance="outline">
+              <mat-select [(value)]="statement.target" [disabled]="readonly">
+                @for (tag of writableTags(); track tag.name) {
+                  <mat-option [value]="tag.name">{{ tag.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field class="tb-logic-small" subscriptSizing="dynamic" appearance="outline">
+              <mat-label>{{ 'inferrix.logic-slot' | translate }}</mat-label>
+              <input matInput type="number" min="0" max="63" [(ngModel)]="statement.slot"
+                     [disabled]="readonly">
+            </mat-form-field>
+          </div>
+        }
+
+        @case ('PID') {
+          <div class="tb-logic-row">
+            <span class="tb-logic-keyword">{{ 'inferrix.logic-pid-drive' | translate }}</span>
+            <mat-form-field class="tb-logic-target" subscriptSizing="dynamic" appearance="outline">
+              <mat-select [(value)]="statement.target" [disabled]="readonly">
+                @for (tag of writableTags(); track tag.name) {
+                  <mat-option [value]="tag.name">{{ tag.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field class="tb-logic-small" subscriptSizing="dynamic" appearance="outline">
+              <mat-label>{{ 'inferrix.logic-slot' | translate }}</mat-label>
+              <input matInput type="number" min="0" max="15" [(ngModel)]="statement.slot"
+                     [disabled]="readonly">
+            </mat-form-field>
+          </div>
+          <div class="tb-logic-row">
+            <span class="tb-logic-keyword">{{ 'inferrix.logic-pid-setpoint' | translate }}</span>
+            <tb-controller-expression [expression]="statement.setpoint" [tags]="tags"
+                                      [readonly]="readonly"></tb-controller-expression>
+            <span class="tb-logic-keyword">{{ 'inferrix.logic-pid-measured' | translate }}</span>
+            <tb-controller-expression [expression]="statement.processValue" [tags]="tags"
+                                      [readonly]="readonly"></tb-controller-expression>
+          </div>
+          <div class="tb-logic-row">
+            <span class="tb-logic-keyword">P</span>
+            <tb-controller-expression [expression]="statement.kp" [tags]="tags"
+                                      [only]="['LITERAL','TAG']"
+                                      [readonly]="readonly"></tb-controller-expression>
+            <span class="tb-logic-keyword">I</span>
+            <tb-controller-expression [expression]="statement.ki" [tags]="tags"
+                                      [only]="['LITERAL','TAG']"
+                                      [readonly]="readonly"></tb-controller-expression>
+            <span class="tb-logic-keyword">D</span>
+            <tb-controller-expression [expression]="statement.kd" [tags]="tags"
+                                      [only]="['LITERAL','TAG']"
+                                      [readonly]="readonly"></tb-controller-expression>
+          </div>
+          <div class="tb-hint">{{ 'inferrix.logic-pid-hint' | translate }}</div>
+        }
+
+        @case ('SET') {
+          <div class="tb-logic-row">
+            <span class="tb-logic-keyword">{{ 'inferrix.logic-latch-on' | translate }}</span>
+            <mat-form-field class="tb-logic-target" subscriptSizing="dynamic" appearance="outline">
+              <mat-select [(value)]="statement.target" [disabled]="readonly">
+                @for (tag of writableTags(); track tag.name) {
+                  <mat-option [value]="tag.name">{{ tag.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <span class="tb-logic-keyword">{{ 'inferrix.logic-when' | translate }}</span>
+            <tb-controller-expression [expression]="statement.condition" [tags]="tags"
+                                      [readonly]="readonly"></tb-controller-expression>
+          </div>
+        }
+
+        @case ('RESET') {
+          <div class="tb-logic-row">
+            <span class="tb-logic-keyword">{{ 'inferrix.logic-latch-off' | translate }}</span>
+            <mat-form-field class="tb-logic-target" subscriptSizing="dynamic" appearance="outline">
+              <mat-select [(value)]="statement.target" [disabled]="readonly">
+                @for (tag of writableTags(); track tag.name) {
+                  <mat-option [value]="tag.name">{{ tag.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <span class="tb-logic-keyword">{{ 'inferrix.logic-when' | translate }}</span>
+            <tb-controller-expression [expression]="statement.condition" [tags]="tags"
+                                      [readonly]="readonly"></tb-controller-expression>
+          </div>
+        }
+      }
+    </div>
+
+    @if (!readonly) {
+      <div class="flex flex-col">
+        <button mat-icon-button [disabled]="$index === 0" (click)="move($index, -1)"
+                matTooltip="{{ 'inferrix.logic-move-up' | translate }}">
+          <mat-icon>arrow_upward</mat-icon>
+        </button>
+        <button mat-icon-button [disabled]="$index === statements.length - 1"
+                (click)="move($index, 1)"
+                matTooltip="{{ 'inferrix.logic-move-down' | translate }}">
+          <mat-icon>arrow_downward</mat-icon>
+        </button>
+        <button mat-icon-button color="warn" (click)="remove($index)"
+                matTooltip="{{ 'action.delete' | translate }}">
+          <mat-icon>delete</mat-icon>
+        </button>
+      </div>
+    }
+  </div>
+}
+
+@if (!statements.length) {
+  <div class="tb-logic-empty">{{ 'inferrix.logic-no-steps' | translate }}</div>
+}
+
+@if (!readonly) {
+  <div class="tb-logic-row">
+    @for (kind of kinds; track kind.value) {
+      <button mat-stroked-button (click)="add(kind.value)">
+        <mat-icon>add</mat-icon>{{ kind.labelKey | translate }}
+      </button>
+    }
+  </div>
+}

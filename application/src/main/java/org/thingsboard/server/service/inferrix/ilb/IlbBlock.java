@@ -43,7 +43,7 @@ public final class IlbBlock {
     private IlbBlock() {}
 
     /** A whole program, as posted by the editor. */
-    public record Program(int programId, long programVersion, int profile, long scanPeriodMs,
+    public record Program(long programId, long programVersion, int profile, long scanPeriodMs,
                           List<Tag> tags, List<Statement> statements) {}
 
     /**

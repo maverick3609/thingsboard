@@ -22,6 +22,7 @@ import { defaultHttpOptionsFromConfig, defaultHttpUploadOptions, RequestConfig }
 import { AdoptControllerRequest, ControllerConfigSection, ControllerUploadKind,
   ControllerUploadStatus, DiscoveredController } from '@shared/models/inferrix-controller.models';
 import { Device } from '@shared/models/device.models';
+import { LogicCompileResult, LogicProgram } from '@shared/models/inferrix-logic.models';
 
 /**
  * HTTP client for /api/inferrix/controllers.
@@ -72,6 +73,29 @@ export class InferrixControllerService {
     return this.http.post<ControllerUploadStatus>(
       `/api/inferrix/controllers/${deviceId}/upload/${kind.toLowerCase()}`, formData,
       defaultHttpUploadOptions(config?.ignoreLoading, config?.ignoreErrors, config?.resendRequest));
+  }
+
+  /**
+   * Compiles a logic program without writing anything to the controller.
+   *
+   * <p>Verification happens on the platform against the device's own rules — and against the live
+   * hardware profile, which is read for the purpose — because a controller that refuses a program
+   * says so only on a serial console: over REST a rejected program and no program at all report the
+   * same logic status. A compile error here is the only place the operator will ever see one.
+   */
+  public compileLogic(deviceId: string, program: LogicProgram,
+                      config?: RequestConfig): Observable<LogicCompileResult> {
+    return this.http.post<LogicCompileResult>(
+      `/api/inferrix/controllers/${deviceId}/logic/compile`, program,
+      defaultHttpOptionsFromConfig(config));
+  }
+
+  /** Compiles, and writes it only if the controller would accept it. Returns a job to poll. */
+  public buildLogic(deviceId: string, program: LogicProgram,
+                    config?: RequestConfig): Observable<ControllerUploadStatus> {
+    return this.http.post<ControllerUploadStatus>(
+      `/api/inferrix/controllers/${deviceId}/logic/build`, program,
+      defaultHttpOptionsFromConfig(config));
   }
 
   /**

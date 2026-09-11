@@ -53,7 +53,7 @@ public final class IlbVerifier {
      * @param error       why it was rejected, or {@link IlbVerifyError#OK}
      * @param detail      a sentence naming the specific record or offset at fault, or null
      */
-    public record Result(IlbVerifyError error, String detail, int programId, long programVersion,
+    public record Result(IlbVerifyError error, String detail, long programId, long programVersion,
                          int profile, long scanPeriodMs, int tagCount, int codeLength,
                          int constCount) {
 
@@ -244,7 +244,7 @@ public final class IlbVerifier {
         }
 
         return new Result(IlbVerifyError.OK, null,
-                (int) rd32(image, OFF_PROGRAM_ID), rd32(image, OFF_PROGRAM_VERSION),
+                rd32(image, OFF_PROGRAM_ID), rd32(image, OFF_PROGRAM_VERSION),
                 profile, rd32(image, OFF_SCAN_PERIOD_MS), tagCount, (int) codeLen, constCount);
     }
 

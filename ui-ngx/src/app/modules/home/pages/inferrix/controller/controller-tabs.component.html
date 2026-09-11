@@ -27,6 +27,10 @@
     <tb-controller-config [active]="configTab.isActive" [deviceId]="entity.id.id"
                           [readonly]="readonly"></tb-controller-config>
   </mat-tab>
+  <mat-tab label="{{ 'inferrix.tab-logic' | translate }}" #logicTab="matTab">
+    <tb-controller-logic [active]="logicTab.isActive" [deviceId]="entity.id.id"
+                         [readonly]="readonly"></tb-controller-logic>
+  </mat-tab>
   <mat-tab label="{{ 'inferrix.tab-software' | translate }}" #softwareTab="matTab">
     <tb-controller-software [active]="softwareTab.isActive" [deviceId]="entity.id.id"
                             [readonly]="readonly"></tb-controller-software>

@@ -53,6 +53,8 @@ import org.thingsboard.server.service.security.permission.Operation;
 import org.thingsboard.server.service.security.permission.Resource;
 import org.thingsboard.server.service.inferrix.InferrixControllerClient.ControllerResponse;
 import org.thingsboard.server.service.inferrix.ilb.IlbAsmParser;
+import org.thingsboard.server.service.inferrix.ilb.IlbBlock;
+import org.thingsboard.server.service.inferrix.ilb.IlbBlockCompiler;
 import org.thingsboard.server.service.inferrix.ilb.IlbAssembler;
 import org.thingsboard.server.service.inferrix.ilb.IlbCompileResult;
 import org.thingsboard.server.service.inferrix.ilb.IlbVerifier;
@@ -271,6 +273,39 @@ public class InferrixPlcController extends BaseController {
         return compile(device.getTenantId(), deviceId, source);
     }
 
+    @ApiOperation(value = "Compile a logic program from the editor (compileLogicBlocks)",
+            notes = "The same as the text form, for a program posted as tags and statements. The "
+                    + "editor works in statements because the controller runs a stack machine: "
+                    + "assigning one comparison to one output is four instructions in an order that "
+                    + "only makes sense if you are thinking about a stack. Working from statements "
+                    + "also buys type checking the device cannot do — it proves the stack is the "
+                    + "right depth, not that it holds the right kinds of value.")
+    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    @PostMapping(value = "/{deviceId}/logic/compile", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public IlbCompileResult compileLogicBlocks(@PathVariable("deviceId") String strDeviceId,
+                                               @RequestBody IlbBlock.Program program)
+            throws ThingsboardException {
+        checkParameter("deviceId", strDeviceId);
+        DeviceId deviceId = new DeviceId(toUUID(strDeviceId));
+        Device device = checkDeviceId(deviceId, Operation.READ);
+        return compile(device.getTenantId(), deviceId, program);
+    }
+
+    @ApiOperation(value = "Compile a logic program from the editor and write it (buildLogicBlocks)",
+            notes = "Compiles the editor's program, verifies it the way the controller will at "
+                    + "boot, and only then starts streaming it to the logic slot. Returns the same "
+                    + "job to poll as a file upload. It activates when the controller next restarts.")
+    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    @PostMapping(value = "/{deviceId}/logic/build", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public UploadStatus buildLogicBlocks(@PathVariable("deviceId") String strDeviceId,
+                                         @RequestBody IlbBlock.Program program)
+            throws ThingsboardException {
+        checkParameter("deviceId", strDeviceId);
+        DeviceId deviceId = new DeviceId(toUUID(strDeviceId));
+        Device device = checkDeviceId(deviceId, Operation.WRITE);
+        return startLogicUpload(device, compile(device.getTenantId(), deviceId, program));
+    }
+
     @ApiOperation(value = "Compile a logic program and write it (buildLogic)",
             notes = "Compiles a tag table and opcode listing, verifies it the way the controller "
                     + "will at boot, and — only if it passes — starts streaming it to the logic "
@@ -283,7 +318,12 @@ public class InferrixPlcController extends BaseController {
         checkParameter("deviceId", strDeviceId);
         DeviceId deviceId = new DeviceId(toUUID(strDeviceId));
         Device device = checkDeviceId(deviceId, Operation.WRITE);
-        IlbCompileResult compiled = compile(device.getTenantId(), deviceId, source);
+        return startLogicUpload(device, compile(device.getTenantId(), deviceId, source));
+    }
+
+    /** Refuses to write anything the controller would reject, then starts the upload. */
+    private UploadStatus startLogicUpload(Device device, IlbCompileResult compiled)
+            throws ThingsboardException {
         if (!compiled.isOk()) {
             throw new ThingsboardException(compiled.getMessage(), ThingsboardErrorCode.BAD_REQUEST_PARAMS);
         }
@@ -293,7 +333,7 @@ public class InferrixPlcController extends BaseController {
                     ThingsboardErrorCode.GENERAL);
         }
         try {
-            return UploadStatus.of(uploads.start(device.getTenantId(), deviceId,
+            return UploadStatus.of(uploads.start(device.getTenantId(), device.getId(),
                     InferrixUploadService.Kind.LOGIC, Base64.getDecoder().decode(compiled.getImage())));
         } catch (IllegalArgumentException | IllegalStateException e) {
             throw new ThingsboardException(e.getMessage(), ThingsboardErrorCode.BAD_REQUEST_PARAMS);
@@ -316,6 +356,29 @@ public class InferrixPlcController extends BaseController {
         } catch (IlbAssembler.IlbAssemblyException e) {
             return IlbCompileResult.failed(e.getMessage(), 0);
         }
+        return verifyAgainstDevice(tenantId, deviceId, image);
+    }
+
+    /** The same, for a program the editor posts as blocks rather than as text. */
+    private IlbCompileResult compile(TenantId tenantId, DeviceId deviceId, IlbBlock.Program source)
+            throws ThingsboardException {
+        byte[] image;
+        try {
+            image = IlbAssembler.assemble(IlbBlockCompiler.compile(source));
+        } catch (IlbBlockCompiler.IlbCompileException | IlbAssembler.IlbAssemblyException e) {
+            return IlbCompileResult.failed(e.getMessage(), 0);
+        }
+        return verifyAgainstDevice(tenantId, deviceId, image);
+    }
+
+    /**
+     * Runs the device's own container check against the controller this program is destined for.
+     *
+     * <p>The profile is read from the device rather than assumed: it is what the device compares the
+     * container against, and a program built for the wrong board is refused at boot in silence.
+     */
+    private IlbCompileResult verifyAgainstDevice(TenantId tenantId, DeviceId deviceId, byte[] image)
+            throws ThingsboardException {
         try {
             InferrixControllerAccess access = controllerAccess.getIfAvailable();
             if (access == null) {

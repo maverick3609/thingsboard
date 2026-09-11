@@ -61,9 +61,16 @@ public final class IlbVerifier {
             return error.isOk();
         }
 
-        /** What to show an operator: the rule that failed, plus the specific thing that broke it. */
+        /**
+         * What to show an operator: the rule that failed, plus the specific thing that broke it.
+         *
+         * <p>Deliberately ASCII. This string travels two ways out: as JSON from the compile
+         * endpoint, which is UTF-8, and inside a ThingsboardException from the build endpoint,
+         * where TB's error path replaces anything non-ASCII with a literal '?'. An em dash here
+         * came back mangled on one of the two routes.
+         */
         public String message() {
-            return detail == null ? error.getDetail() : error.getDetail() + " — " + detail;
+            return detail == null ? error.getDetail() : error.getDetail() + " - " + detail;
         }
     }
 

@@ -226,7 +226,7 @@ public final class IlbAsmParser {
                 address = (int) number(line, words.get(4));
             } else if (binding != B_NONE) {
                 throw new IlbSyntaxException(line, "a " + words.get(3)
-                        + " binding needs an address — a channel, point id or register id");
+                        + " binding needs an address: a channel, point id or register id");
             }
         }
         int initial = init == null ? 0 : rawValue(line, type, init);

@@ -31,9 +31,9 @@ import org.thingsboard.server.common.data.kv.BaseAttributeKvEntry;
 import org.thingsboard.server.common.data.kv.StringDataEntry;
 import org.thingsboard.server.dao.attributes.AttributesService;
 import org.thingsboard.server.service.telemetry.TelemetrySubscriptionService;
+import org.thingsboard.server.service.inferrix.InferrixControllerClient.ControllerResponse;
 
 import java.io.IOException;
-import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collection;
@@ -78,7 +78,7 @@ class InferrixControllerAccessTest {
 
     @Test
     void aWorkingTokenIsUsedAsIsWithNoLogin() throws Exception {
-        HttpResponse<String> ok = response(200, "{}");
+        ControllerResponse ok = response(200, "{}");
         when(client.call(eq("192.168.1.150"), eq(FINGERPRINT), eq("GET"), eq("/api/v1/health"),
                 eq("old-token"), any())).thenReturn(ok);
 
@@ -89,8 +89,8 @@ class InferrixControllerAccessTest {
     @Test
     void aRevokedTokenIsRefreshedFromTheSealedPasswordAndTheCallIsReplayedOnce() throws Exception {
         // Any login elsewhere revokes the platform's token; over REST that is a recoverable 401.
-        HttpResponse<String> unauthorized = response(401, "");
-        HttpResponse<String> ok = response(200, "{}");
+        ControllerResponse unauthorized = response(401, "");
+        ControllerResponse ok = response(200, "{}");
         when(client.call(any(), any(), any(), any(), eq("old-token"), any())).thenReturn(unauthorized);
         when(client.call(any(), any(), any(), any(), eq("new-token"), any())).thenReturn(ok);
         when(client.login("192.168.1.150", FINGERPRINT, "ownership-password")).thenReturn("new-token");
@@ -104,7 +104,7 @@ class InferrixControllerAccessTest {
     void aSecondFailureIsNotRetriedAgain() throws Exception {
         // One retry only: a genuinely wrong password must not turn into a login loop against the
         // firmware's doubling brute-force throttle.
-        HttpResponse<String> unauthorized = response(401, "");
+        ControllerResponse unauthorized = response(401, "");
         when(client.call(any(), any(), any(), any(), anyString(), any())).thenReturn(unauthorized);
         when(client.login(any(), any(), any())).thenReturn("new-token");
 
@@ -114,7 +114,7 @@ class InferrixControllerAccessTest {
 
     @Test
     void withoutASealedPasswordItSaysSoRatherThanLoopingOrFailingObscurely() throws Exception {
-        HttpResponse<String> unauthorized = response(401, "");
+        ControllerResponse unauthorized = response(401, "");
         stubAttributes("192.168.1.150", "old-token", null);
         when(client.call(any(), any(), any(), any(), any(), any())).thenReturn(unauthorized);
 
@@ -128,7 +128,7 @@ class InferrixControllerAccessTest {
         // The controller republishes its IP over MQTT when DHCP moves it. Trusting that is safe: the
         // certificate pin still has to match, so a wrong host fails the handshake rather than
         // receiving the token.
-        HttpResponse<String> ok = response(200, "{}");
+        ControllerResponse ok = response(200, "{}");
         stubAttributes("192.168.1.150", "old-token", "ownership-password", "192.168.1.201");
         when(client.call(eq("192.168.1.201"), any(), any(), any(), any(), any())).thenReturn(ok);
 
@@ -168,11 +168,8 @@ class InferrixControllerAccessTest {
     }
 
     @SuppressWarnings("unchecked")
-    private static HttpResponse<String> response(int status, String body) {
-        HttpResponse<String> response = mock(HttpResponse.class);
-        when(response.statusCode()).thenReturn(status);
-        when(response.body()).thenReturn(body);
-        return response;
+    private static ControllerResponse response(int status, String body) {
+        return new ControllerResponse(status, body);
     }
 
 }

@@ -28,9 +28,9 @@ import org.thingsboard.server.common.data.kv.StringDataEntry;
 import org.thingsboard.server.dao.attributes.AttributesService;
 import org.thingsboard.server.queue.util.TbCoreComponent;
 import org.thingsboard.server.service.telemetry.TelemetrySubscriptionService;
+import org.thingsboard.server.service.inferrix.InferrixControllerClient.ControllerResponse;
 
 import java.io.IOException;
-import java.net.http.HttpResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -70,10 +70,10 @@ public class InferrixControllerAccess {
     private final TelemetrySubscriptionService tsSubService;
 
     /** Performs the call, refreshing the token once if the controller rejects it. */
-    public HttpResponse<String> call(TenantId tenantId, DeviceId deviceId, String method, String path,
+    public ControllerResponse call(TenantId tenantId, DeviceId deviceId, String method, String path,
                                      String body) throws Exception {
         Credentials credentials = load(tenantId, deviceId);
-        HttpResponse<String> response = client.call(credentials.host(), credentials.fingerprint(),
+        ControllerResponse response = client.call(credentials.host(), credentials.fingerprint(),
                 method, path, credentials.token(), body);
         if (response.statusCode() != 401) {
             return response;
@@ -111,7 +111,7 @@ public class InferrixControllerAccess {
      */
     Credentials openVerifiedCredentials(TenantId tenantId, DeviceId deviceId, String probePath)
             throws Exception {
-        HttpResponse<String> probe = call(tenantId, deviceId, "GET", probePath, null);
+        ControllerResponse probe = call(tenantId, deviceId, "GET", probePath, null);
         if (probe.statusCode() != 200) {
             throw new IOException("The controller answered HTTP " + probe.statusCode() + " to "
                     + probePath + ", so an upload cannot be started");
@@ -120,14 +120,14 @@ public class InferrixControllerAccess {
     }
 
     /** One raw chunk, under credentials already opened by {@link #openVerifiedCredentials}. */
-    HttpResponse<String> callBinary(Credentials credentials, String path, byte[] chunk)
+    ControllerResponse callBinary(Credentials credentials, String path, byte[] chunk)
             throws IOException {
         return client.callBinary(credentials.host(), credentials.fingerprint(), path,
                 credentials.token(), chunk);
     }
 
     /** A JSON call under already-opened credentials, so an upload keeps one settled token. */
-    HttpResponse<String> callWith(Credentials credentials, String method, String path, String body)
+    ControllerResponse callWith(Credentials credentials, String method, String path, String body)
             throws IOException {
         return client.call(credentials.host(), credentials.fingerprint(), method, path,
                 credentials.token(), body);

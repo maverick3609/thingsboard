@@ -50,9 +50,9 @@ import org.thingsboard.server.service.inferrix.InferrixUploadService;
 import org.thingsboard.server.service.security.model.SecurityUser;
 import org.thingsboard.server.service.security.permission.Operation;
 import org.thingsboard.server.service.security.permission.Resource;
+import org.thingsboard.server.service.inferrix.InferrixControllerClient.ControllerResponse;
 
 import java.io.IOException;
-import java.net.http.HttpResponse;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -196,7 +196,7 @@ public class InferrixPlcController extends BaseController {
                     ThingsboardErrorCode.GENERAL);
         }
         try {
-            HttpResponse<String> response = access.call(device.getTenantId(), deviceId,
+            ControllerResponse response = access.call(device.getTenantId(), deviceId,
                     request.getMethod(), target, body);
             // The device's status code is meaningful to the caller (409 nothing pending, 503 hot-swap
             // draining, 429 probe busy), so it is passed through rather than flattened.

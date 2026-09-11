@@ -27,10 +27,10 @@ import org.thingsboard.common.util.ThingsBoardThreadFactory;
 import org.thingsboard.server.common.data.id.DeviceId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.queue.util.TbCoreComponent;
+import org.thingsboard.server.service.inferrix.InferrixControllerClient.ControllerResponse;
 
 import jakarta.annotation.PreDestroy;
 import java.io.IOException;
-import java.net.http.HttpResponse;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
@@ -260,7 +260,7 @@ public class InferrixUploadService {
 
             // The digest is taken over what the platform actually holds, so apply verifies the whole
             // path — operator's browser to platform to device — rather than only the device's flash.
-            HttpResponse<String> applied = controllerAccess.callWith(credentials, "POST",
+            ControllerResponse applied = controllerAccess.callWith(credentials, "POST",
                     job.getKind().applyPath(), "{\"sha256\":\"" + sha256(artifact) + "\"}");
             requireOk(applied, "apply");
             job.activation = textField(applied.body(), "activation");
@@ -281,7 +281,7 @@ public class InferrixUploadService {
      * chunk_rejected} means the slot overran or flash failed, {@code verify_failed} means the image
      * did not survive the trip — so it is carried through rather than flattened to a status code.
      */
-    private void requireOk(HttpResponse<String> response, String step) throws IOException {
+    private void requireOk(ControllerResponse response, String step) throws IOException {
         if (response.statusCode() == 200) {
             return;
         }

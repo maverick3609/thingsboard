@@ -25,9 +25,9 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.thingsboard.server.common.data.id.DeviceId;
 import org.thingsboard.server.common.data.id.TenantId;
+import org.thingsboard.server.service.inferrix.InferrixControllerClient.ControllerResponse;
 
 import java.io.ByteArrayOutputStream;
-import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -162,7 +162,7 @@ class InferrixUploadServiceTest {
     void aRejectedChunkFailsTheJobCarryingTheDevicesOwnErrorName() throws Exception {
         // Built before the when(...): a mock created inside another stubbing call leaves Mockito
         // with an unfinished stub.
-        HttpResponse<String> rejected = response(400, "{\"error\":\"chunk_rejected\"}");
+        ControllerResponse rejected = response(400, "{\"error\":\"chunk_rejected\"}");
         when(controllerAccess.callBinary(any(), anyString(), any())).thenReturn(rejected);
 
         InferrixUploadService.UploadJob job = service.start(TENANT, DEVICE,
@@ -179,7 +179,7 @@ class InferrixUploadServiceTest {
     void aNonJsonErrorBodyStillFailsTheJobRatherThanThrowingSomethingElse() throws Exception {
         // Built before the when(...): a mock created inside another stubbing call leaves Mockito
         // with an unfinished stub.
-        HttpResponse<String> gatewayError = response(500, "<html>gateway error</html>");
+        ControllerResponse gatewayError = response(500, "<html>gateway error</html>");
         when(controllerAccess.callBinary(any(), anyString(), any())).thenReturn(gatewayError);
 
         InferrixUploadService.UploadJob job = service.start(TENANT, DEVICE,
@@ -274,10 +274,7 @@ class InferrixUploadServiceTest {
     }
 
     @SuppressWarnings("unchecked")
-    private static HttpResponse<String> response(int status, String body) {
-        HttpResponse<String> response = mock(HttpResponse.class);
-        when(response.statusCode()).thenReturn(status);
-        when(response.body()).thenReturn(body);
-        return response;
+    private static ControllerResponse response(int status, String body) {
+        return new ControllerResponse(status, body);
     }
 }

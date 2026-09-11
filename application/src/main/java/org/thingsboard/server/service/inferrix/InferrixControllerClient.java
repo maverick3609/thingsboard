@@ -20,6 +20,23 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.BasicHttpClientConnectionManager;
+import org.apache.hc.client5.http.ssl.ClientTlsStrategyBuilder;
+import org.apache.hc.client5.http.ssl.HostnameVerificationPolicy;
+import org.apache.hc.client5.http.ssl.NoopHostnameVerifier;
+import org.apache.hc.client5.http.ssl.TlsSocketStrategy;
+import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.ParseException;
+import org.apache.hc.core5.http.config.RegistryBuilder;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
+import org.apache.hc.core5.util.Timeout;
 import org.springframework.stereotype.Component;
 import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.queue.util.TbCoreComponent;
@@ -28,11 +45,8 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.X509TrustManager;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.URI;
 import java.net.UnknownHostException;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateEncodingException;
@@ -63,10 +77,25 @@ import java.util.concurrent.TimeUnit;
  * First contact cannot be authenticated — that is inherent to TOFU and why the firmware
  * documentation says to commission on a bench or a private network.
  *
+ * <p><b>Why hostname verification is off.</b> The firmware's certificate carries no X.509 extensions
+ * at all, so it has no {@code subjectAltName} — and the platform dials a bare IP. Every standard
+ * verifier therefore rejects it outright ("No subject alternative names present") before the pin is
+ * ever consulted, which made the whole device-facing REST surface unusable against real hardware.
+ * Turning it off costs nothing here: the pin is a SHA-256 of the exact certificate, which is a
+ * strictly stronger statement of identity than a name match. A SAN would not even help — the only
+ * name to put in one is the device's current IP, which a DHCP move invalidates and whose cert
+ * regeneration would break the pin instead.
+ *
+ * <p>This is also why the client is Apache HttpClient rather than {@code java.net.http.HttpClient}:
+ * the JDK client re-forces endpoint identification internally and ignores any attempt to disable it
+ * per-client, leaving only a JVM-wide system property that would weaken every other caller in the
+ * platform.
+ *
  * <p>ponytail: {@code POST /api/v1/attest} would additionally bind the uid to that certificate key
- * by signing {@code SHA-256("infx-attest-v1" || nonce || uid)}. Skipped here because the signature
- * encoding is not pinned down in the device docs, and guessing it wrong would reject every adoption.
- * Add it once it can be checked against real hardware.
+ * by signing {@code SHA-256("infx-attest-v1" || nonce || uid)} — the encoding is now confirmed
+ * against hardware (message is {@code CTX || nonce_bytes || uid_ascii}, DER ECDSA-P256). Still not
+ * done here because TOFU already pins the key this would authenticate; add it when a device needs
+ * to prove itself across a cert change rather than at first contact.
  *
  * <p>Transport quirks handled: HTTPS only on 443, {@code Connection: close} with exactly one request
  * per TCP connection, at most two concurrent clients per device, and a 2048-byte cap on the whole
@@ -101,7 +130,7 @@ public class InferrixControllerClient {
     /** Unauthenticated identity read that also establishes the pin. */
     public InferrixControllerInfo fetchInfo(String host) throws IOException {
         FingerprintCapturingTrustManager trust = new FingerprintCapturingTrustManager(null);
-        HttpResponse<String> response = send(host, trust, requestBuilder(host, "/api/v1/info").GET().build());
+        ControllerResponse response = send(host, trust, requestBuilder(host, "GET", "/api/v1/info").build());
         requireOk(response, "GET /api/v1/info");
         JsonNode body = parse(response.body());
         String servedFingerprint = trust.getFingerprint();
@@ -123,7 +152,7 @@ public class InferrixControllerClient {
      * device someone else already claimed answers 409.
      */
     public void provision(String host, String fingerprint, String password) throws IOException {
-        HttpResponse<String> response = call(host, fingerprint, "POST", "/api/v1/auth/provision", null,
+        ControllerResponse response = call(host, fingerprint, "POST", "/api/v1/auth/provision", null,
                 JacksonUtil.newObjectNode().put("password", password).toString());
         if (response.statusCode() == 409) {
             throw new InferrixAlreadyProvisionedException(host);
@@ -133,7 +162,7 @@ public class InferrixControllerClient {
 
     /** Mints a fresh bearer token. Logging in revokes whatever token was active before. */
     public String login(String host, String fingerprint, String password) throws IOException {
-        HttpResponse<String> response = call(host, fingerprint, "POST", "/api/v1/auth/login", null,
+        ControllerResponse response = call(host, fingerprint, "POST", "/api/v1/auth/login", null,
                 JacksonUtil.newObjectNode().put("password", password).toString());
         requireOk(response, "POST /api/v1/auth/login");
         String token = parse(response.body()).path("token").asText(null);
@@ -154,22 +183,19 @@ public class InferrixControllerClient {
     }
 
     /** Generic pinned call, so later phases can reach the rest of the surface without new plumbing. */
-    public HttpResponse<String> call(String host, String fingerprint, String method, String path,
-                                     String token, String body) throws IOException {
+    public ControllerResponse call(String host, String fingerprint, String method, String path,
+                                   String token, String body) throws IOException {
         int estimated = (body == null ? 0 : body.length()) + path.length() + HEADER_ALLOWANCE_BYTES;
         if (estimated > MAX_REQUEST_BYTES) {
             throw new IOException("Request for " + path + " exceeds the controller's "
                     + MAX_REQUEST_BYTES + "-byte cap on the whole request");
         }
-        HttpRequest.Builder builder = requestBuilder(host, path)
-                .method(method, body == null
-                        ? HttpRequest.BodyPublishers.noBody()
-                        : HttpRequest.BodyPublishers.ofString(body));
+        ClassicRequestBuilder builder = requestBuilder(host, method, path);
         if (body != null) {
-            builder.header("Content-Type", "application/json");
+            builder.setEntity(body, ContentType.APPLICATION_JSON);
         }
         if (token != null) {
-            builder.header("Authorization", "Bearer " + token);
+            builder.setHeader("Authorization", "Bearer " + token);
         }
         return send(host, new FingerprintCapturingTrustManager(fingerprint), builder.build());
     }
@@ -183,17 +209,16 @@ public class InferrixControllerClient {
      * than characters. {@link #maxChunkBytes} is what a caller must respect to stay inside the
      * device's cap on the whole request.
      */
-    public HttpResponse<String> callBinary(String host, String fingerprint, String path,
-                                           String token, byte[] chunk) throws IOException {
+    public ControllerResponse callBinary(String host, String fingerprint, String path,
+                                         String token, byte[] chunk) throws IOException {
         if (chunk.length > maxChunkBytes(path)) {
             throw new IOException("Chunk of " + chunk.length + " bytes exceeds what fits in the"
                     + " controller's " + MAX_REQUEST_BYTES + "-byte request cap for " + path);
         }
-        HttpRequest.Builder builder = requestBuilder(host, path)
-                .POST(HttpRequest.BodyPublishers.ofByteArray(chunk))
-                .header("Content-Type", "application/octet-stream");
+        ClassicRequestBuilder builder = requestBuilder(host, "POST", path)
+                .setEntity(chunk, ContentType.APPLICATION_OCTET_STREAM);
         if (token != null) {
-            builder.header("Authorization", "Bearer " + token);
+            builder.setHeader("Authorization", "Bearer " + token);
         }
         return send(host, new FingerprintCapturingTrustManager(fingerprint), builder.build());
     }
@@ -203,14 +228,12 @@ public class InferrixControllerClient {
         return MAX_REQUEST_BYTES - HEADER_ALLOWANCE_BYTES - path.length();
     }
 
-    private HttpRequest.Builder requestBuilder(String host, String path) {
-        return HttpRequest.newBuilder()
-                .uri(URI.create("https://" + host + path))
-                .timeout(REQUEST_TIMEOUT);
+    private ClassicRequestBuilder requestBuilder(String host, String method, String path) {
+        return ClassicRequestBuilder.create(method).setUri("https://" + host + path);
     }
 
-    private HttpResponse<String> send(String host, FingerprintCapturingTrustManager trust,
-                                      HttpRequest request) throws IOException {
+    private ControllerResponse send(String host, FingerprintCapturingTrustManager trust,
+                                    ClassicHttpRequest request) throws IOException {
         requireReachableControllerAddress(host);
         Semaphore lock = deviceLocks.get(host, h -> new Semaphore(MAX_CONCURRENT_PER_DEVICE));
         boolean acquired = false;
@@ -219,14 +242,12 @@ public class InferrixControllerClient {
             if (!acquired) {
                 throw new IOException("Timed out waiting for a free connection slot on " + host);
             }
-            // One HttpClient per request: the firmware closes the connection after every response,
-            // and a fresh client is also what keeps the per-call pin from leaking across devices.
-            HttpClient client = HttpClient.newBuilder()
-                    .sslContext(sslContext(trust))
-                    .connectTimeout(CONNECT_TIMEOUT)
-                    .version(HttpClient.Version.HTTP_1_1)
-                    .build();
-            return client.send(request, HttpResponse.BodyHandlers.ofString());
+            // One client per request: the firmware closes the connection after every response, and a
+            // fresh client is also what keeps the per-call pin from leaking across devices.
+            try (CloseableHttpClient client = httpClient(trust)) {
+                return client.execute(request, response -> new ControllerResponse(
+                        response.getCode(), readBody(response.getEntity())));
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException("Interrupted while calling " + host, e);
@@ -235,6 +256,72 @@ public class InferrixControllerClient {
                 lock.release();
             }
         }
+    }
+
+    private static String readBody(HttpEntity entity) throws IOException {
+        if (entity == null) {
+            return "";
+        }
+        try {
+            return EntityUtils.toString(entity, StandardCharsets.UTF_8);
+        } catch (ParseException e) {
+            throw new IOException("The controller returned a response that could not be read", e);
+        }
+    }
+
+    /**
+     * A client pinned to one device's certificate, with hostname verification switched off for the
+     * reasons in the class javadoc.
+     *
+     * <p>{@link HostnameVerificationPolicy#CLIENT} is what actually disables it: the default policy
+     * is {@code BUILTIN}, which defers to the JSSE endpoint identification that rejects a
+     * SAN-less certificate no matter which {@link javax.net.ssl.HostnameVerifier} is supplied.
+     *
+     * <p>Retries and redirects are off — the firmware serves two clients at a time, so a silent
+     * retry spends a slot the caller did not ask for, and the device never redirects. Content
+     * compression is off and the agent string is short because the 2048-byte request cap counts
+     * every header byte.
+     */
+    private static CloseableHttpClient httpClient(FingerprintCapturingTrustManager trust) throws IOException {
+        BasicHttpClientConnectionManager connectionManager = BasicHttpClientConnectionManager.create(
+                RegistryBuilder.<TlsSocketStrategy>create().register("https", tlsStrategy(trust)).build());
+        connectionManager.setConnectionConfig(ConnectionConfig.custom()
+                .setConnectTimeout(Timeout.ofMilliseconds(CONNECT_TIMEOUT.toMillis()))
+                .build());
+
+        return HttpClients.custom()
+                .setConnectionManager(connectionManager)
+                .setDefaultRequestConfig(RequestConfig.custom()
+                        .setResponseTimeout(Timeout.ofMilliseconds(REQUEST_TIMEOUT.toMillis()))
+                        .setConnectionRequestTimeout(Timeout.ofMilliseconds(CONNECT_TIMEOUT.toMillis()))
+                        .build())
+                .disableAutomaticRetries()
+                .disableRedirectHandling()
+                .disableContentCompression()
+                .setUserAgent("Cortex")
+                .build();
+    }
+
+    /**
+     * TLS pinned to one device's certificate, with hostname verification switched off.
+     *
+     * <p>Package-private so the security decision can be tested directly: the whole point is that a
+     * certificate with no {@code subjectAltName} still completes a handshake, while one whose
+     * fingerprint does not match the pin still fails.
+     */
+    static TlsSocketStrategy tlsStrategy(FingerprintCapturingTrustManager trust) throws IOException {
+        return ClientTlsStrategyBuilder.create()
+                .setSslContext(sslContext(trust))
+                .setHostVerificationPolicy(HostnameVerificationPolicy.CLIENT)
+                .setHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+                .buildClassic();
+    }
+
+    /**
+     * What a controller answered. Mirrors the {@code statusCode()}/{@code body()} shape the callers
+     * already use, so the transport underneath can change without touching them.
+     */
+    public record ControllerResponse(int statusCode, String body) {
     }
 
     /**
@@ -271,7 +358,7 @@ public class InferrixControllerClient {
         }
     }
 
-    private static void requireOk(HttpResponse<String> response, String what) throws IOException {
+    private static void requireOk(ControllerResponse response, String what) throws IOException {
         if (response.statusCode() != 200) {
             throw new IOException(what + " failed with HTTP " + response.statusCode());
         }

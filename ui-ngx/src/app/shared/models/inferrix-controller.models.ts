@@ -277,6 +277,37 @@ export const ICC_VERIFY_ERRORS: {[name: string]: string} = {
   ICC_BAD_PEER: 'A peer-source point references a peer_id that is not in the peer table.'
 };
 
+/**
+ * What the controller said when it refused a record, or a point write.
+ *
+ * <p>Firmware 0.1.15 names the field it could not accept. Before that every rejection on this
+ * surface was a bare 400 with an empty body, so a nine-field point record that the device disliked
+ * surfaced as "Save failed" and the only way forward was changing one thing at a time. Older
+ * firmware still answers with nothing, which is why the generic message survives as the fallback.
+ */
+export const CONTROLLER_RECORD_ERRORS: {[name: string]: string} = {
+  bad_field: 'The controller would not accept one of the fields.',
+  missing_body: 'The controller received no record at all.',
+  bad_id: 'That record id is not one the controller can use.',
+  unknown_point: 'There is no point with that id in the active configuration.',
+  type_mismatch: 'That point is not of the kind this write is for.',
+  not_writable: 'That point is not marked writable.',
+  read_only: 'That point maps to a Modbus object that cannot be written.',
+  wbox_full: 'The controller is still working through queued writes; try again shortly.',
+  malformed: 'The controller could not read that request.'
+};
+
+/** The device's own words for a refused record, naming the field when the firmware gives one. */
+export const controllerRecordError = (error: any, fallback: string): string => {
+  const name = error?.error?.error;
+  const field = error?.error?.field;
+  if (!name) {
+    return fallback;
+  }
+  const described = CONTROLLER_RECORD_ERRORS[name] ?? name;
+  return field ? `${described} (${field})` : described;
+};
+
 /** The deadband is held as the raw 32 bits of an f32, never as a decimal (§6.3). */
 export const floatToBits = (value: number): number => {
   const view = new DataView(new ArrayBuffer(4));

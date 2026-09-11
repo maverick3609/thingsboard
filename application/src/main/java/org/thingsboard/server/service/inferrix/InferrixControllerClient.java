@@ -43,6 +43,7 @@ import org.thingsboard.server.queue.util.TbCoreComponent;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.X509TrustManager;
+import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -221,6 +222,96 @@ public class InferrixControllerClient {
             builder.setHeader("Authorization", "Bearer " + token);
         }
         return send(host, new FingerprintCapturingTrustManager(fingerprint), builder.build());
+    }
+
+    /**
+     * Opens one connection and holds it for a whole upload.
+     *
+     * <p>Firmware 0.1.15 answers {@code Connection: keep-alive} on the two upload routes and closes
+     * everything else, which is worth a great deal: a chunk is ~1.5 KB and a TLS handshake against a
+     * microcontroller costs far more than the chunk does. The firmware measured 20 chunks at 26.88 s
+     * closing each time against 1.66 s reusing — sixteen times. None of that arrives unless the
+     * platform stops discarding the connection too, which is what this is for.
+     *
+     * <p>Scoped to one upload rather than pooled globally on purpose: the pin belongs to one device,
+     * and a connection manager shared across devices is how a pin leaks from one to another. The
+     * device permit is held for the whole session, which is also correct — the firmware takes one
+     * uploader at a time, and the second permit stays free for status polls.
+     *
+     * <p>Falls back silently to a handshake per chunk against older firmware: keep-alive is the
+     * server's decision, and Apache's connection manager simply reconnects when it is refused.
+     */
+    public ChunkSession openChunkSession(String host, String fingerprint, String path, String token)
+            throws IOException {
+        requireReachableControllerAddress(host);
+        Semaphore lock = deviceLocks.get(host, h -> new Semaphore(MAX_CONCURRENT_PER_DEVICE));
+        boolean acquired;
+        try {
+            acquired = lock.tryAcquire(PERMIT_WAIT_SECONDS, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while opening an upload to " + host, e);
+        }
+        if (!acquired) {
+            throw new IOException("Timed out waiting for a free connection slot on " + host);
+        }
+        try {
+            return new ChunkSession(host, path, token,
+                    httpClient(new FingerprintCapturingTrustManager(fingerprint)), lock);
+        } catch (RuntimeException | IOException e) {
+            lock.release();
+            throw e;
+        }
+    }
+
+    /** One device, one connection, many chunks. Closing it releases the device permit. */
+    public final class ChunkSession implements Closeable {
+
+        private final String host;
+        private final String path;
+        private final String token;
+        private final CloseableHttpClient client;
+        private final Semaphore lock;
+        private boolean closed;
+
+        private ChunkSession(String host, String path, String token, CloseableHttpClient client,
+                             Semaphore lock) {
+            this.host = host;
+            this.path = path;
+            this.token = token;
+            this.client = client;
+            this.lock = lock;
+        }
+
+        public ControllerResponse post(byte[] chunk) throws IOException {
+            if (closed) {
+                throw new IOException("The upload connection to " + host + " is already closed");
+            }
+            if (chunk.length > maxChunkBytes(path)) {
+                throw new IOException("Chunk of " + chunk.length + " bytes exceeds what fits in the"
+                        + " controller's " + MAX_REQUEST_BYTES + "-byte request cap for " + path);
+            }
+            ClassicRequestBuilder builder = requestBuilder(host, "POST", path)
+                    .setEntity(chunk, ContentType.APPLICATION_OCTET_STREAM);
+            if (token != null) {
+                builder.setHeader("Authorization", "Bearer " + token);
+            }
+            return client.execute(builder.build(), response -> new ControllerResponse(
+                    response.getCode(), readBody(response.getEntity())));
+        }
+
+        @Override
+        public void close() throws IOException {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            try {
+                client.close();
+            } finally {
+                lock.release();
+            }
+        }
     }
 
     /** Largest chunk body that still leaves room for the request line, headers and the token. */

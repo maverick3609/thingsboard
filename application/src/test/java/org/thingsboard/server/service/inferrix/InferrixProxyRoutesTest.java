@@ -96,4 +96,20 @@ class InferrixProxyRoutesTest {
         assertTrue(InferrixProxyRoutes.isAllowed("get", "/api/v1/health"));
     }
 
+
+    @Test
+    void theRoutesAddedByFirmware0115AreReachable() {
+        // A point write and a reboot. Both are POST, so both already sit behind TENANT_ADMIN and
+        // device WRITE — the gate a firmware upload takes, which is the right one for a call that
+        // stops plant control.
+        assertTrue(InferrixProxyRoutes.isAllowed("POST", "/api/v1/points/10"));
+        assertTrue(InferrixProxyRoutes.isAllowed("POST", "/api/v1/system/reboot"));
+        // Reading a point stays a read; writing the collection is not a thing the device offers.
+        assertTrue(InferrixProxyRoutes.isAllowed("GET", "/api/v1/points/10"));
+        assertFalse(InferrixProxyRoutes.isAllowed("POST", "/api/v1/points"));
+        assertFalse(InferrixProxyRoutes.isAllowed("GET", "/api/v1/system/reboot"));
+        assertFalse(InferrixProxyRoutes.isAllowed("POST", "/api/v1/system"));
+        assertFalse(InferrixProxyRoutes.isAllowed("POST", "/api/v1/system/reboot/now"));
+    }
+
 }

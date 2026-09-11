@@ -52,6 +52,9 @@ public final class InferrixProxyRoutes {
             route("/api/v1/health", "GET"),
             route("/api/v1/points", "GET"),
             route("/api/v1/points/" + ID, "GET"),
+            // A point write goes through the same validation ladder as an MQTT "set" and reaches
+            // real plant, so it needs the TENANT_ADMIN that every non-GET here already takes.
+            route("/api/v1/points/" + ID, "POST"),
             route("/api/v1/diag/network", "GET"),
             route("/api/v1/diag/memory", "GET"),
             route("/api/v1/logic/status", "GET"),
@@ -81,6 +84,12 @@ public final class InferrixProxyRoutes {
             // The autotune outcome is read per slot: the device answers 400 on the bare path.
             route("/api/v1/logic/tune/" + ID, "GET"),
             route("/api/v1/logic/tune/abort", "POST"),
+
+            // Restarting the controller. Plant control stops for the reboot and a staged logic
+            // program or firmware image activates, so this is the most consequential thing on the
+            // proxy — it is here rather than behind its own endpoint only because the gate is
+            // already right: every non-GET route requires TENANT_ADMIN and device WRITE.
+            route("/api/v1/system/reboot", "POST"),
 
             // Diagnostics and attestation
             route("/api/v1/diag/ping", "POST"),

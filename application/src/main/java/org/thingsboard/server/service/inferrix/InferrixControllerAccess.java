@@ -126,6 +126,16 @@ public class InferrixControllerAccess {
                 credentials.token(), chunk);
     }
 
+    /**
+     * One connection held across every chunk of an upload, so the firmware's keep-alive on the
+     * upload routes is actually used rather than thrown away after each chunk.
+     */
+    InferrixControllerClient.ChunkSession openChunkSession(Credentials credentials, String path)
+            throws IOException {
+        return client.openChunkSession(credentials.host(), credentials.fingerprint(), path,
+                credentials.token());
+    }
+
     /** A JSON call under already-opened credentials, so an upload keeps one settled token. */
     ControllerResponse callWith(Credentials credentials, String method, String path, String body)
             throws IOException {

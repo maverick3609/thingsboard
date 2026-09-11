@@ -22,8 +22,8 @@ import { Store } from '@ngrx/store';
 import { AppState } from '@core/core.state';
 import { DialogComponent } from '@shared/components/dialog.component';
 import { InferrixControllerService } from '@core/http/inferrix-controller.service';
-import { bitsToFloat, ControllerConfigSection, ControllerSettingField, floatToBits }
-  from '@shared/models/inferrix-controller.models';
+import { bitsToFloat, ControllerConfigSection, controllerRecordError, ControllerSettingField,
+  floatToBits } from '@shared/models/inferrix-controller.models';
 
 export interface ControllerConfigRecordDialogData {
   deviceId: string;
@@ -91,7 +91,8 @@ export class ControllerConfigRecordDialogComponent
     this.controllerService.upsertConfigRecord(this.data.deviceId, this.section, this.payload())
       .subscribe({
         next: () => this.dialogRef.close(true),
-        error: error => this.errorMessage = error?.error?.message || error?.message || 'Save failed'
+        error: error => this.errorMessage = controllerRecordError(error,
+            error?.error?.message || error?.message || 'Save failed')
       });
   }
 

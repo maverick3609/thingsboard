@@ -260,13 +260,19 @@ public class InferrixUploadService {
             if (chunkSize <= 0) {
                 throw new IOException("No room for a chunk body within the controller's request cap");
             }
-            for (int offset = 0; offset < artifact.length; offset += chunkSize) {
-                int length = Math.min(chunkSize, artifact.length - offset);
-                byte[] chunk = new byte[length];
-                System.arraycopy(artifact, offset, chunk, 0, length);
-                requireOk(controllerAccess.callBinary(credentials, job.getKind().getPath(), chunk),
-                        "chunk at offset " + offset);
-                job.sentBytes.addAndGet(length);
+            // One connection for the whole stream. Firmware 0.1.15 keeps the upload routes alive
+            // and every other route closes, so this is where an OTA stops being handshake-bound:
+            // the firmware measured 16x on twenty chunks. Older firmware refuses keep-alive and the
+            // connection manager just reconnects, which is exactly the old behaviour.
+            try (InferrixControllerClient.ChunkSession session =
+                         controllerAccess.openChunkSession(credentials, job.getKind().getPath())) {
+                for (int offset = 0; offset < artifact.length; offset += chunkSize) {
+                    int length = Math.min(chunkSize, artifact.length - offset);
+                    byte[] chunk = new byte[length];
+                    System.arraycopy(artifact, offset, chunk, 0, length);
+                    requireOk(session.post(chunk), "chunk at offset " + offset);
+                    job.sentBytes.addAndGet(length);
+                }
             }
 
             // The digest is taken over what the platform actually holds, so apply verifies the whole

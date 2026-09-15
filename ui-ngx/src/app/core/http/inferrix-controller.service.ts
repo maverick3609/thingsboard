@@ -22,7 +22,8 @@ import { defaultHttpOptionsFromConfig, defaultHttpUploadOptions, RequestConfig }
 import { AdoptControllerRequest, ControllerConfigSection, ControllerUploadKind,
   ControllerUploadStatus, DiscoveredController } from '@shared/models/inferrix-controller.models';
 import { Device } from '@shared/models/device.models';
-import { LogicCompileResult, LogicProgram } from '@shared/models/inferrix-logic.models';
+import { floatToBits, LogicCompileResult, LogicProgram, PidTuneRequest,
+  PidTuneStatus } from '@shared/models/inferrix-logic.models';
 
 /**
  * HTTP client for /api/inferrix/controllers.
@@ -221,6 +222,31 @@ export class InferrixControllerService {
 
   public setConfigOwner(deviceId: string, owner: string): Observable<any> {
     return this.proxy(deviceId, 'PUT', '/api/v1/config/owner', {owner}, {ignoreErrors: true});
+  }
+
+  /**
+   * Starts the relay auto-tune on one PID slot.
+   *
+   * The device answers `{"state":"requested"}` — accepted, not armed: the scan task owns the VM and
+   * picks the request up at the next scan boundary, so the outcome is read back from the slot.
+   */
+  public startPidTune(deviceId: string, request: PidTuneRequest): Observable<{state: string}> {
+    return this.proxy(deviceId, 'POST', '/api/v1/logic/tune', {
+      slot: request.slot,
+      out_high: request.outHigh,
+      out_low: request.outLow,
+      hyst_bits: floatToBits(request.hysteresis),
+      timeout_ms: request.timeoutMs
+    }, {ignoreErrors: true});
+  }
+
+  public abortPidTune(deviceId: string, slot: number): Observable<{state: string}> {
+    return this.proxy(deviceId, 'POST', '/api/v1/logic/tune/abort', {slot}, {ignoreErrors: true});
+  }
+
+  /** Per slot: the device answers 400 on the bare path. */
+  public getPidTune(deviceId: string, slot: number): Observable<PidTuneStatus> {
+    return this.proxy(deviceId, 'GET', `/api/v1/logic/tune/${slot}`, null, {ignoreErrors: true});
   }
 
   /**

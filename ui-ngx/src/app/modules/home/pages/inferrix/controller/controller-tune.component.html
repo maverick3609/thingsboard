@@ -1,0 +1,122 @@
+<!--
+  Copyright © 2016-2026 The Inferrix Authors
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<div class="tb-form-panel stroked">
+  <div class="tb-form-panel-title" translate>inferrix.tune-title</div>
+  <div class="tb-hint" translate>inferrix.tune-hint</div>
+
+  <div class="tb-tune-warning">
+    <mat-icon>warning</mat-icon>
+    <span translate>inferrix.tune-warning</span>
+  </div>
+
+  <div class="tb-tune-row">
+    <mat-form-field class="tb-tune-field" subscriptSizing="dynamic" appearance="outline">
+      <mat-label>{{ 'inferrix.tune-slot' | translate }}</mat-label>
+      <input matInput type="number" min="0" max="15" [(ngModel)]="request.slot"
+             [disabled]="readonly || running" (change)="slotChanged()">
+    </mat-form-field>
+
+    <mat-form-field class="tb-tune-field" subscriptSizing="dynamic" appearance="outline">
+      <mat-label>{{ 'inferrix.tune-out-high' | translate }}</mat-label>
+      <input matInput type="number" min="0" max="100" [(ngModel)]="request.outHigh"
+             [disabled]="readonly || running">
+      <span matTextSuffix>%</span>
+    </mat-form-field>
+
+    <mat-form-field class="tb-tune-field" subscriptSizing="dynamic" appearance="outline">
+      <mat-label>{{ 'inferrix.tune-out-low' | translate }}</mat-label>
+      <input matInput type="number" min="0" max="100" [(ngModel)]="request.outLow"
+             [disabled]="readonly || running">
+      <span matTextSuffix>%</span>
+    </mat-form-field>
+
+    <mat-form-field class="tb-tune-hyst" subscriptSizing="dynamic" appearance="outline">
+      <mat-label>{{ 'inferrix.tune-hysteresis' | translate }}</mat-label>
+      <input matInput type="number" [(ngModel)]="request.hysteresis"
+             [disabled]="readonly || running">
+      <mat-hint translate>inferrix.tune-hysteresis-hint</mat-hint>
+    </mat-form-field>
+
+    <mat-form-field class="tb-tune-field" subscriptSizing="dynamic" appearance="outline">
+      <mat-label>{{ 'inferrix.tune-timeout' | translate }}</mat-label>
+      <input matInput type="number" min="1000" [(ngModel)]="request.timeoutMs"
+             [disabled]="readonly || running">
+      <span matTextSuffix>{{ 'inferrix.logic-ms' | translate }}</span>
+    </mat-form-field>
+  </div>
+
+  <div class="tb-tune-actions">
+    @if (!running) {
+      <button mat-raised-button color="primary" [disabled]="busy || readonly || !valid"
+              (click)="start()">
+        <mat-icon>tune</mat-icon>{{ 'inferrix.tune-start' | translate }}
+      </button>
+    } @else {
+      <button mat-stroked-button color="warn" [disabled]="busy || readonly || !slotValid"
+              (click)="abort()">
+        <mat-icon>stop</mat-icon>{{ 'inferrix.tune-abort' | translate }}
+      </button>
+    }
+    <button mat-stroked-button [disabled]="busy || !slotValid" (click)="read()">
+      <mat-icon>refresh</mat-icon>{{ 'inferrix.tune-refresh' | translate }}
+    </button>
+    @if (busy || running) {
+      <mat-spinner diameter="24"></mat-spinner>
+    }
+    @if (status) {
+      <span class="tb-tune-state">{{ 'inferrix.tune-state-' + status.state | translate }}</span>
+    }
+  </div>
+
+  @if (!valid) {
+    <div class="tb-hint" translate>inferrix.tune-incomplete</div>
+  }
+
+  @if (error) {
+    <div class="tb-logic-error">{{ error }}</div>
+  }
+
+  @if (gains) {
+    <div class="tb-tune-result">
+      <div class="tb-tune-measured">
+        {{ 'inferrix.tune-measured' | translate: {ku: status.ku | number: '1.0-3',
+             tu: status.tu_s | number: '1.0-3', amp: status.amp | number: '1.0-3'} }}
+      </div>
+
+      <table class="tb-tune-gains">
+        <tr>
+          <th></th><th>Kp</th><th>Ki</th><th>Kd</th>
+        </tr>
+        <tr>
+          <td translate>inferrix.tune-rule-tl</td>
+          <td>{{ gains.kp | number: '1.0-4' }}</td>
+          <td>{{ gains.ki | number: '1.0-4' }}</td>
+          <td>{{ gains.kd | number: '1.0-4' }}</td>
+        </tr>
+        @if (classic) {
+          <tr>
+            <td translate>inferrix.tune-rule-zn</td>
+            <td>{{ classic.kp | number: '1.0-4' }}</td>
+            <td>{{ classic.ki | number: '1.0-4' }}</td>
+            <td>{{ classic.kd | number: '1.0-4' }}</td>
+          </tr>
+        }
+      </table>
+
+      <div class="tb-hint" translate>inferrix.tune-apply-hint</div>
+    </div>
+  }
+</div>

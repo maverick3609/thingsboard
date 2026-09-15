@@ -294,7 +294,8 @@ export const CONTROLLER_RECORD_ERRORS: {[name: string]: string} = {
   not_writable: 'That point is not marked writable.',
   read_only: 'That point maps to a Modbus object that cannot be written.',
   wbox_full: 'The controller is still working through queued writes; try again shortly.',
-  malformed: 'The controller could not read that request.'
+  malformed: 'The controller could not read that request.',
+  bad_request: 'The controller rejected the request.'
 };
 
 /** The device's own words for a refused record, naming the field when the firmware gives one. */

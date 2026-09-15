@@ -198,3 +198,63 @@ export const newStatement = (kind: LogicStatementKind): LogicStatement => {
         setpoint: newExpression('LITERAL'), processValue: newExpression('TAG')};
   }
 };
+
+// --- PID relay auto-tune -----------------------------------------------------------------------
+
+export type PidTuneState = 'idle' | 'running' | 'done' | 'failed_timeout'
+  | 'failed_no_oscillation' | 'aborted';
+
+/** The request in the units an operator thinks in; the wire form is built in the service. */
+export interface PidTuneRequest {
+  slot: number;
+  outHigh: number;
+  outLow: number;
+  hysteresis: number;
+  timeoutMs: number;
+}
+
+export interface PidTuneStatus {
+  slot: number;
+  state: PidTuneState;
+  ku?: number;
+  tu_s?: number;
+  amp?: number;
+  kp?: number;
+  ki?: number;
+  kd?: number;
+}
+
+export interface PidGains {
+  kp: number;
+  ki: number;
+  kd: number;
+}
+
+/** Neither of these is a finished tune, so both keep the poller alive. */
+export const pidTunePending = (state: PidTuneState): boolean =>
+  state === 'idle' || state === 'running';
+
+/**
+ * The hysteresis crosses as a raw IEEE-754 `u32` bit pattern rather than a decimal, the same
+ * convention the device uses for `deadband_bits` — its JSON parser has no `strtod`. 1.0 is
+ * 1065353216. Both views share one buffer, so the platform's own byte order is used on each side
+ * of the assignment and never enters the value.
+ */
+export const floatToBits = (value: number): number => {
+  const buffer = new ArrayBuffer(4);
+  new Float32Array(buffer)[0] = value;
+  return new Uint32Array(buffer)[0];
+};
+
+/**
+ * Ziegler-Nichols classic, from the raw `Ku`/`Tu` the device reports alongside its own suggestion.
+ *
+ * The controller suggests Tyreus-Luyben, which is the right default for the lag-dominant thermal
+ * loops these boards mostly run — ZN classic targets about 25% overshoot. It is offered because the
+ * measurement is the expensive part: swapping rules afterwards costs nothing, re-tuning costs
+ * another few cycles of swinging the plant.
+ */
+export const zieglerNichols = (ku: number, tu: number): PidGains => {
+  const kp = 0.6 * ku;
+  return {kp, ki: kp / (0.5 * tu), kd: kp * (0.125 * tu)};
+};

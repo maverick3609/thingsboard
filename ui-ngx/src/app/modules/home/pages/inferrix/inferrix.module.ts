@@ -34,6 +34,7 @@ import { ControllerSoftwareComponent } from '@home/pages/inferrix/controller/con
 import { ControllerLogicComponent } from '@home/pages/inferrix/controller/controller-logic.component';
 import { ControllerStatementsComponent } from '@home/pages/inferrix/controller/controller-statements.component';
 import { ControllerExpressionComponent } from '@home/pages/inferrix/controller/controller-expression.component';
+import { ControllerTuneComponent } from '@home/pages/inferrix/controller/controller-tune.component';
 
 @NgModule({
   declarations: [
@@ -49,7 +50,8 @@ import { ControllerExpressionComponent } from '@home/pages/inferrix/controller/c
     ControllerSoftwareComponent,
     ControllerLogicComponent,
     ControllerStatementsComponent,
-    ControllerExpressionComponent
+    ControllerExpressionComponent,
+    ControllerTuneComponent
   ],
   imports: [
     CommonModule,

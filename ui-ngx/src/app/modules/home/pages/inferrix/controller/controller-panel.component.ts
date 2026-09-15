@@ -16,6 +16,7 @@
 
 import { Directive, Input, OnDestroy } from '@angular/core';
 import { Subject } from 'rxjs';
+import { controllerRecordError } from '@shared/models/inferrix-controller.models';
 
 /**
  * Shared behaviour for the panels on a controller's details tabs.
@@ -57,8 +58,17 @@ export abstract class ControllerPanelComponent implements OnDestroy {
   /** Called once, the first time this panel's tab is opened. */
   protected abstract load(): void;
 
-  /** The device's own error text where it sent one, so a 400 says which field it rejected. */
+  /**
+   * The device's own error text where it sent one, so a 400 says which field it rejected.
+   *
+   * Two different speakers answer these calls. The platform refuses in ThingsBoard's shape, with a
+   * `message`; the controller refuses in its own, a bare `{"error":"name"}` with no message at all,
+   * which used to come out here as "Request failed" and threw away the only useful word in it.
+   */
   protected messageOf(error: any): string {
-    return error?.error?.message || error?.message || 'Request failed';
+    return error?.error?.message
+      || controllerRecordError(error, null)
+      || error?.message
+      || 'Request failed';
   }
 }

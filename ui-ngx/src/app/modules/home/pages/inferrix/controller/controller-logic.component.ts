@@ -15,10 +15,12 @@
 ///
 
 import { Component } from '@angular/core';
+import { TranslateService } from '@ngx-translate/core';
 import { Observable, Subscription, timer } from 'rxjs';
 import { switchMap, takeWhile } from 'rxjs/operators';
 import { InferrixControllerService } from '@core/http/inferrix-controller.service';
-import { ControllerUploadStatus } from '@shared/models/inferrix-controller.models';
+import { CONTROLLER_CONFIG_SECTIONS, ControllerUploadStatus, isRealPoint,
+  POINT_SOURCES } from '@shared/models/inferrix-controller.models';
 import { LOGIC_BINDINGS, LOGIC_SYSTEM_REGISTERS, LogicBinding, LogicCompileResult, LogicProgram,
   LogicTag } from '@shared/models/inferrix-logic.models';
 import { ControllerPanelComponent } from '@home/pages/inferrix/controller/controller-panel.component';
@@ -56,8 +58,11 @@ export class ControllerLogicComponent extends ControllerPanelComponent {
     statements: []
   };
 
-  /** The controller's configured points, so an ICC binding is a choice rather than a typed id. */
-  points: {id: number; type: string; name?: string}[] = [];
+  /**
+   * The points in the controller's active configuration, so an ICC binding is a choice rather than a
+   * typed id. `real` says whether the point holds a float, which decides the tag type it needs.
+   */
+  points: {id: number; source: number; type: string; name?: string; real: boolean; bit: boolean}[] = [];
 
   result: LogicCompileResult = null;
   error: string = null;
@@ -67,18 +72,26 @@ export class ControllerLogicComponent extends ControllerPanelComponent {
 
   private poll: Subscription;
 
-  constructor(private controllerService: InferrixControllerService) {
+  constructor(private controllerService: InferrixControllerService,
+              private translate: TranslateService) {
     super();
   }
 
   protected load(): void {
     this.loadingPoints = true;
     // One read, and only when the tab is opened: the firmware serves two clients at a time and
-    // every request costs a TLS handshake.
-    this.controllerService.readPoints(this.deviceId).subscribe({
-      next: result => {
-        this.points = (result.records || []).map(point => ({
-          id: point.id, type: point.type, name: point.name
+    // every request costs a TLS handshake. The active config's point records rather than the live
+    // points list, because only the records carry the scaling and data format a tag type depends on.
+    const pointSection = CONTROLLER_CONFIG_SECTIONS.find(section => section.key === 'points');
+    this.controllerService.readConfigSection(this.deviceId, pointSection, false).subscribe({
+      next: records => {
+        this.points = (records || []).map(point => ({
+          id: point.point_id,
+          source: point.source,
+          type: POINT_SOURCES.find(source => source.value === point.source)?.label,
+          name: point.name,
+          real: isRealPoint(point),
+          bit: point.data_format === 6
         }));
         this.loadingPoints = false;
       },
@@ -109,6 +122,17 @@ export class ControllerLogicComponent extends ControllerPanelComponent {
     } else if (tag.address === undefined) {
       tag.address = spec.fromPoints ? (this.points[0]?.id ?? 0) : 0;
     }
+    this.steerType(tag);
+  }
+
+  /** Gives a tag bound to a point the type that point's value needs; see {@link needsReal}. */
+  steerType(tag: LogicTag): void {
+    const needsReal = this.needsReal(tag);
+    if (needsReal) {
+      tag.dataType = 'REAL';
+    } else if (needsReal === false && tag.dataType === 'REAL') {
+      tag.dataType = this.boundPoint(tag).bit ? 'BOOL' : 'INT';
+    }
   }
 
   verify(): void {
@@ -127,6 +151,18 @@ export class ControllerLogicComponent extends ControllerPanelComponent {
    * program winning on a tie.
    */
   private run(write: boolean): void {
+    const mismatch = this.program.tags.find(tag => {
+      const needsReal = this.needsReal(tag);
+      return needsReal !== null && needsReal !== (tag.dataType === 'REAL');
+    });
+    if (mismatch) {
+      this.error = this.translate.instant(
+        this.needsReal(mismatch) ? 'inferrix.logic-needs-real' : 'inferrix.logic-needs-whole',
+        {tag: mismatch.name, point: mismatch.address});
+      this.result = null;
+      this.job = null;
+      return;
+    }
     this.busy = true;
     this.error = null;
     this.result = null;
@@ -174,6 +210,27 @@ export class ControllerLogicComponent extends ControllerPanelComponent {
       next: status => this.job = status,
       error: error => this.error = this.messageOf(error)
     });
+  }
+
+  /**
+   * Whether a tag bound to a point must be REAL, or null when its type is free.
+   *
+   * The controller hands a bound tag the point's raw 32 bits, typed only by the tag: an INT tag on a
+   * scaled point reads float bits as an integer, and a REAL tag on an unscaled one reads an integer as
+   * float bits. Neither the platform's verifier nor the controller's catches it (firmware notes §26).
+   * The one exception is a program driving a local AO through its point, where firmware 0.1.16
+   * converts whatever type it is given.
+   */
+  private needsReal(tag: LogicTag): boolean {
+    const point = this.boundPoint(tag);
+    if (!point || (tag.cls === 'OUTPUT' && point.source === 3)) {
+      return null;
+    }
+    return point.real;
+  }
+
+  private boundPoint(tag: LogicTag) {
+    return tag.binding === 'ICC_POINT' ? this.points.find(point => point.id === tag.address) : undefined;
   }
 
   private uniqueName(): string {

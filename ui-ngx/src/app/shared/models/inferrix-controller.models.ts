@@ -294,6 +294,18 @@ export const POINT_SOURCES = [
   {value: 7, label: 'Peer controller'}
 ];
 
+/** The on-board DI, DO, AI and AO sources: no float format, and DI/DO take no scaling (firmware 0.1.16). */
+export const LOCAL_POINT_SOURCES = [0, 1, 2, 3];
+export const FLOAT_DATA_FORMATS = [4, 5];
+export const NO_SCALING = 65535;
+
+/**
+ * Whether a config point carries a float: scaled, or read as one. The firmware's own `point_is_real`,
+ * and what decides how its value's bits are read — by MQTT, by REST and by a logic tag bound to it.
+ */
+export const isRealPoint = (point: {scaling_idx?: number; data_format?: number}): boolean =>
+  Number(point.scaling_idx) !== NO_SCALING || FLOAT_DATA_FORMATS.includes(Number(point.data_format));
+
 /** §5.2 data formats. */
 export const DATA_FORMATS = [
   {value: 0, label: 'U16'},
@@ -323,7 +335,9 @@ export const ICC_VERIFY_ERRORS: {[name: string]: string} = {
   ICC_BAD_SCALING: 'A point references a scaling that does not exist.',
   ICC_BUS_OVERSUBSCRIBED: 'The queries on one bus ask for more traffic than its baud rate allows.',
   ICC_BAD_POLICY: 'A publish policy is invalid — check the trigger bits against interval_s.',
-  ICC_BAD_PEER: 'A peer-source point references a peer_id that is not in the peer table.'
+  ICC_BAD_PEER: 'A peer-source point references a peer_id that is not in the peer table.',
+  ICC_BAD_LOCAL_POINT: 'A local I/O point is invalid: DI and DO points take no scaling, no local point takes a '
+    + 'float format, and an AO scaling needs a non-zero multiplier.'
 };
 
 /**
@@ -346,7 +360,9 @@ export const CONTROLLER_RECORD_ERRORS: {[name: string]: string} = {
   queue_full: 'The controller\'s Modbus write queue is full; try again shortly.',
   busy: 'The controller is already running a probe; try again shortly.',
   malformed: 'The controller could not read that request.',
-  bad_request: 'The controller rejected the request.'
+  bad_request: 'The controller rejected the request.',
+  out_of_range: 'That value is outside what the output can produce (0 to 4095 counts, after its scaling).',
+  bad_scaling: 'The point\'s scaling has a zero multiplier or divisor, so no value can be converted for it.'
 };
 
 /** The device's own words for a refused record, naming the field when the firmware gives one. */

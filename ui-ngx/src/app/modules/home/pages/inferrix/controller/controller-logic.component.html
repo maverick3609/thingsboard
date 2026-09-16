@@ -61,7 +61,8 @@
           @if (bindingSpec(tag.binding)?.fromPoints) {
             <mat-form-field class="tb-logic-choice" subscriptSizing="dynamic" appearance="outline">
               <mat-label>{{ 'inferrix.logic-point' | translate }}</mat-label>
-              <mat-select [(value)]="tag.address" [disabled]="readonly">
+              <mat-select [value]="tag.address" [disabled]="readonly"
+                          (valueChange)="tag.address = $event; steerType(tag)">
                 @for (point of points; track point.id) {
                   <mat-option [value]="point.id">
                     {{ point.id }} · {{ point.name || point.type }}

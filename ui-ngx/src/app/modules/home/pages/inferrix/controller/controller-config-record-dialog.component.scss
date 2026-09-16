@@ -29,3 +29,10 @@
     width: 650px;
   }
 }
+
+/* The warning beside a writable output: coloured the way the platform colours its own form warnings,
+   and kept from shrinking, or a hint long enough to wrap squeezes the icon to nothing. */
+.tb-form-hint .mat-icon {
+  flex-shrink: 0;
+  color: #FAA405;
+}

@@ -45,7 +45,7 @@
           </div>
           <mat-form-field *ngIf="field.type === 'select'" class="flex-1" appearance="outline" subscriptSizing="dynamic">
             <mat-select [formControlName]="field.key">
-              <mat-option *ngFor="let option of field.options" [value]="option.value">
+              <mat-option *ngFor="let option of optionsFor(field)" [value]="option.value">
                 {{ option.label }}
               </mat-option>
             </mat-select>
@@ -61,6 +61,10 @@
               warning
             </mat-icon>
           </mat-form-field>
+        </div>
+        <div *ngIf="field.key === 'flags' && writableOutputWarning" class="tb-form-hint tb-primary-fill flex items-center gap-2">
+          <mat-icon>warning</mat-icon>
+          <span>{{ writableOutputWarning | translate }}</span>
         </div>
       </ng-container>
     </fieldset>

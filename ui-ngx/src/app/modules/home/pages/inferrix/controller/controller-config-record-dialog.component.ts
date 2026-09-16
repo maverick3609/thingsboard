@@ -23,7 +23,7 @@ import { AppState } from '@core/core.state';
 import { DialogComponent } from '@shared/components/dialog.component';
 import { InferrixControllerService } from '@core/http/inferrix-controller.service';
 import { bitsToFloat, ControllerConfigSection, controllerRecordError, ControllerSettingField,
-  floatToBits } from '@shared/models/inferrix-controller.models';
+  FLOAT_DATA_FORMATS, floatToBits, LOCAL_POINT_SOURCES, NO_SCALING } from '@shared/models/inferrix-controller.models';
 
 export interface ControllerConfigRecordDialogData {
   deviceId: string;
@@ -69,6 +69,40 @@ export class ControllerConfigRecordDialogComponent
     if (!this.isAdd) {
       this.recordForm.get(this.section.idField)?.disable();
     }
+    if (this.isPointSection) {
+      const source = this.recordForm.get('source');
+      this.applySourceRules(source.value);
+      source.valueChanges.subscribe(value => this.applySourceRules(value));
+    }
+  }
+
+  get isPointSection(): boolean {
+    return this.section.key === 'points';
+  }
+
+  /** A local point is offered no float format: the controller refuses one at apply (firmware 0.1.16). */
+  optionsFor(field: ControllerSettingField): {value: any; label: string}[] {
+    return field.key === 'data_format' && this.isLocalSource()
+      ? field.options.filter(option => !FLOAT_DATA_FORMATS.includes(option.value))
+      : field.options;
+  }
+
+  /**
+   * The warning for opening a local output to remote writes, or null. A program can drive the same
+   * output, and the two then fight over it.
+   */
+  get writableOutputWarning(): string {
+    if (!this.isPointSection || ((this.recordForm.get('flags').value | 0) & 1) === 0) {
+      return null;
+    }
+    switch (this.recordForm.get('source').value) {
+      case 1:
+        return 'inferrix.writable-do-warning';
+      case 3:
+        return 'inferrix.writable-ao-warning';
+      default:
+        return null;
+    }
   }
 
   /** Checkbox state for one named bit of a bitmask field. */
@@ -109,6 +143,29 @@ export class ControllerConfigRecordDialogComponent
       record[field.key] = field.float32Bits ? floatToBits(Number(current)) : current;
     });
     return record;
+  }
+
+  private isLocalSource(): boolean {
+    return this.isPointSection && LOCAL_POINT_SOURCES.includes(this.recordForm.get('source').value);
+  }
+
+  /**
+   * What the controller refuses for a local source at apply (ICC_BAD_LOCAL_POINT): a scaling on a
+   * DI or DO, and a float format on any of them. Refused here instead, so the operator finds out
+   * while editing the record rather than when the whole draft is rejected.
+   */
+  private applySourceRules(source: number): void {
+    const scaling = this.recordForm.get('scaling_idx');
+    if (source === 0 || source === 1) {
+      scaling.setValue(NO_SCALING);
+      scaling.disable();
+    } else {
+      scaling.enable();
+    }
+    const format = this.recordForm.get('data_format');
+    if (this.isLocalSource() && FLOAT_DATA_FORMATS.includes(format.value)) {
+      format.setValue(null);
+    }
   }
 
   private initialValue(field: ControllerSettingField, record: any): any {

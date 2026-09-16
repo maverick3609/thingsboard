@@ -15,18 +15,23 @@
 ///
 
 import { Component } from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
 import { Subscription, timer } from 'rxjs';
 import { switchMap, takeUntil } from 'rxjs/operators';
 import { ControllerPanelComponent } from '@home/pages/inferrix/controller/controller-panel.component';
 import { InferrixControllerService, PagedRecords } from '@core/http/inferrix-controller.service';
-import { ControllerPoint, pointQualityColor } from '@shared/models/inferrix-controller.models';
+import { ControllerPoint, pointQualityColor, WRITABLE_POINT_TYPES } from '@shared/models/inferrix-controller.models';
+import {
+  ControllerPointWriteDialogComponent,
+  ControllerPointWriteDialogData
+} from '@home/pages/inferrix/controller/controller-point-write-dialog.component';
 
 /**
- * Live point values from the controller's active program.
+ * Live point values from the controller's active program, and a write for the output classes.
  *
- * Read-only: the firmware has no REST point write, only an MQTT `set` command, so a value cannot be
- * forced from here. The point set itself comes from the compiled ICC and is changed in the config
- * plane, not on this screen.
+ * The point set itself comes from the compiled ICC and is changed in the config plane, not on this
+ * screen. Whether a given output is writable is the ICC's call too, so the write is offered for
+ * every output and the device's own refusal is what the operator sees.
  */
 @Component({
   selector: 'tb-controller-points',
@@ -42,12 +47,13 @@ export class ControllerPointsComponent extends ControllerPanelComponent {
   error: string;
   autoRefresh = false;
 
-  readonly displayedColumns = ['id', 'n', 'type', 'address', 'v', 'q', 'age'];
+  readonly displayedColumns = ['id', 'n', 'type', 'address', 'v', 'q', 'age', 'actions'];
   readonly qualityColor = pointQualityColor;
 
   private refreshSubscription: Subscription;
 
-  constructor(private controllerService: InferrixControllerService) {
+  constructor(private controllerService: InferrixControllerService,
+              private dialog: MatDialog) {
     super();
   }
 
@@ -93,6 +99,23 @@ export class ControllerPointsComponent extends ControllerPanelComponent {
       error: error => {
         this.error = this.messageOf(error);
         this.loading = false;
+      }
+    });
+  }
+
+  canWrite(point: ControllerPoint): boolean {
+    return !this.readonly && WRITABLE_POINT_TYPES.includes(point.type);
+  }
+
+  write(point: ControllerPoint): void {
+    this.dialog.open<ControllerPointWriteDialogComponent, ControllerPointWriteDialogData, boolean>(
+      ControllerPointWriteDialogComponent, {
+        disableClose: true,
+        panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
+        data: {deviceId: this.deviceId, point}
+      }).afterClosed().subscribe(written => {
+      if (written) {
+        this.reload();
       }
     });
   }

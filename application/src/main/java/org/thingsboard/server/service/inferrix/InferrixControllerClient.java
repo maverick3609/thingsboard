@@ -173,6 +173,42 @@ public class InferrixControllerClient {
         return token;
     }
 
+    /**
+     * Moves ownership to a new password. The device route is unauthenticated — the old password is
+     * the credential — and it revokes the active token, so the caller has to log in again at once.
+     *
+     * @return the device's status: 200 changed, 400 policy, 401 old password wrong, 429 throttled
+     */
+    public int changePassword(String host, String fingerprint, String oldPassword, String newPassword)
+            throws IOException {
+        return call(host, fingerprint, "POST", "/api/v1/auth/password", null,
+                JacksonUtil.newObjectNode().put("old", oldPassword).put("new", newPassword).toString())
+                .statusCode();
+    }
+
+    /**
+     * Asks the controller to sign a nonce, and returns the answer together with the certificate of
+     * the very session that carried it.
+     *
+     * <p>The certificate comes from the handshake and only once it has passed the pin — never from
+     * anything the device says — so a signature that verifies against it was made by the key the
+     * platform pinned at adoption.
+     */
+    public AttestExchange attest(String host, String fingerprint, String token, String nonceHex)
+            throws IOException {
+        if (fingerprint == null) {
+            throw new IOException("An attestation is only meaningful against a pinned certificate");
+        }
+        FingerprintCapturingTrustManager trust = new FingerprintCapturingTrustManager(fingerprint);
+        ClassicHttpRequest request = requestBuilder(host, "POST", "/api/v1/attest")
+                .setEntity(JacksonUtil.newObjectNode().put("nonce", nonceHex).toString(),
+                        ContentType.APPLICATION_JSON)
+                .setHeader("Authorization", "Bearer " + token)
+                .build();
+        ControllerResponse response = send(host, trust, request);
+        return new AttestExchange(response, trust.getCertificate());
+    }
+
     public void putMqttConfig(String host, String fingerprint, String token, JsonNode config) throws IOException {
         requireOk(call(host, fingerprint, "PUT", "/api/v1/mqtt", token, config.toString()),
                 "PUT /api/v1/mqtt");
@@ -481,6 +517,9 @@ public class InferrixControllerClient {
         private final String expectedFingerprint;
         @Getter
         private volatile String fingerprint;
+        /** The served leaf certificate, set only once it has passed the pin. */
+        @Getter
+        private volatile X509Certificate certificate;
 
         FingerprintCapturingTrustManager(String expectedFingerprint) {
             this.expectedFingerprint = expectedFingerprint;
@@ -502,12 +541,17 @@ public class InferrixControllerClient {
                 throw new CertificateException("The controller's certificate fingerprint changed:"
                         + " expected " + expectedFingerprint + " but got " + served);
             }
+            this.certificate = chain[0];
         }
 
         @Override
         public X509Certificate[] getAcceptedIssuers() {
             return new X509Certificate[0];
         }
+    }
+
+    /** An attestation answer and the pinned certificate of the session it arrived on. */
+    public record AttestExchange(ControllerResponse response, X509Certificate certificate) {
     }
 
     /** Identity plus the fingerprint actually served, so the caller pins what it really talked to. */

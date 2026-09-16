@@ -17,7 +17,8 @@
 -->
 @if (entity) {
   <mat-tab label="{{ 'inferrix.tab-points' | translate }}" #pointsTab="matTab">
-    <tb-controller-points [active]="pointsTab.isActive" [deviceId]="entity.id.id"></tb-controller-points>
+    <tb-controller-points [active]="pointsTab.isActive" [deviceId]="entity.id.id"
+                          [readonly]="readonly"></tb-controller-points>
   </mat-tab>
   <mat-tab label="{{ 'inferrix.tab-settings' | translate }}" #settingsTab="matTab">
     <tb-controller-settings [active]="settingsTab.isActive" [deviceId]="entity.id.id"

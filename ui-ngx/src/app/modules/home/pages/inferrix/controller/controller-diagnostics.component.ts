@@ -19,6 +19,7 @@ import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms
 import { concat, of } from 'rxjs';
 import { catchError, toArray } from 'rxjs/operators';
 import { InferrixControllerService } from '@core/http/inferrix-controller.service';
+import { ControllerAttestation } from '@shared/models/inferrix-controller.models';
 import { ControllerPanelComponent } from '@home/pages/inferrix/controller/controller-panel.component';
 
 /**
@@ -55,6 +56,10 @@ export class ControllerDiagnosticsComponent extends ControllerPanelComponent {
   mqttTestError: string;
 
   restartRunning = false;
+
+  attestation: ControllerAttestation;
+  attestRunning = false;
+  attestError: string;
 
   /** `state` values of GET /api/v1/logic/status. */
   readonly logicStates: {[state: number]: string} = {
@@ -160,6 +165,26 @@ export class ControllerDiagnosticsComponent extends ControllerPanelComponent {
       error: error => {
         this.error = this.messageOf(error);
         this.restartRunning = false;
+      }
+    });
+  }
+
+  /**
+   * Asks the controller to sign for its adopted UID with the key behind its pinned certificate. The
+   * pin alone cannot tell apart controllers still sharing the development certificate.
+   */
+  attest(): void {
+    this.attestRunning = true;
+    this.attestError = null;
+    this.attestation = null;
+    this.controllerService.attestController(this.deviceId, {ignoreErrors: true}).subscribe({
+      next: result => {
+        this.attestation = result;
+        this.attestRunning = false;
+      },
+      error: error => {
+        this.attestError = this.messageOf(error);
+        this.attestRunning = false;
       }
     });
   }

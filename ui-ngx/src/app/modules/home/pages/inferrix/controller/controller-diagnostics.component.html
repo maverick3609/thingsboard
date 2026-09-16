@@ -111,6 +111,34 @@
   </div>
 
   <div class="tb-form-panel stroked">
+    <div class="tb-form-panel-title" translate>inferrix.attestation</div>
+    <div class="tb-form-panel-hint" translate>inferrix.attestation-hint</div>
+    <div class="flex flex-row items-center">
+      <button mat-stroked-button [disabled]="readonly || attestRunning" (click)="attest()">
+        {{ 'inferrix.attest' | translate }}
+      </button>
+    </div>
+    <div class="tb-error-message" *ngIf="attestError">{{ attestError }}</div>
+    <ng-container *ngIf="attestation">
+      <div class="tb-form-row space-between">
+        <div translate>inferrix.attestation-result</div>
+        <div [class.tb-bad]="!attestation.verified">
+          {{ (attestation.verified ? 'inferrix.attestation-verified' : 'inferrix.attestation-not-verified') | translate }}
+        </div>
+      </div>
+      <div class="tb-error-message" *ngIf="attestation.reason">{{ attestation.reason }}</div>
+      <div class="tb-form-row space-between">
+        <div translate>inferrix.uid</div>
+        <div>{{ attestation.uid }}</div>
+      </div>
+      <div class="tb-form-row space-between">
+        <div translate>inferrix.cert-fingerprint</div>
+        <div class="tb-diag-fingerprint">{{ attestation.certFingerprint }}</div>
+      </div>
+    </ng-container>
+  </div>
+
+  <div class="tb-form-panel stroked">
     <div class="tb-form-panel-title" translate>inferrix.diag-reachability</div>
     <form [formGroup]="pingForm" (ngSubmit)="ping()">
       <fieldset [disabled]="readonly || pingRunning">

@@ -16,12 +16,12 @@
 
 import { Component } from '@angular/core';
 import { TranslateService } from '@ngx-translate/core';
-import { Subscription, timer } from 'rxjs';
-import { switchMap, takeWhile } from 'rxjs/operators';
+import { concat, of, Subscription, timer } from 'rxjs';
+import { catchError, filter, switchMap, takeUntil, takeWhile, tap, toArray } from 'rxjs/operators';
 import { DialogService } from '@core/services/dialog.service';
 import { InferrixControllerService } from '@core/http/inferrix-controller.service';
-import { CONTROLLER_UPLOAD_LIMITS, ControllerUploadKind, ControllerUploadStatus }
-  from '@shared/models/inferrix-controller.models';
+import { CONTROLLER_UPLOAD_LIMITS, ControllerUploadKind, ControllerUploadStatus, firmwareVersionOf,
+  sameFirmwareRelease } from '@shared/models/inferrix-controller.models';
 import { ControllerPanelComponent } from '@home/pages/inferrix/controller/controller-panel.component';
 
 /**
@@ -32,8 +32,9 @@ import { ControllerPanelComponent } from '@home/pages/inferrix/controller/contro
  * then polls a job. Closing the page does not stop it — the job outlives the screen, which is why
  * the state is re-read on load rather than only tracked in memory.
  *
- * Both kinds activate on **reboot**, decided by the controller. Firmware additionally has to
- * self-confirm its test boot, so a version that will not run reverts on its own.
+ * Both kinds activate on **reboot**, which is why the restart lives here too. Firmware additionally
+ * has to self-confirm its test boot, so a version that will not run reverts on its own — and the
+ * only way to tell is to compare what the controller runs afterwards with what was uploaded.
  */
 @Component({
   selector: 'tb-controller-software',
@@ -51,11 +52,19 @@ export class ControllerSoftwareComponent extends ControllerPanelComponent {
   ];
 
   deviceStatus: {[kind: string]: any} = {};
+  /** GET /api/v1/info — the running firmware version. */
+  running: any;
   selected: {[kind: string]: File} = {};
   job: {[kind: string]: ControllerUploadStatus} = {};
   errors: {[kind: string]: string} = {};
 
   loading = false;
+
+  restarting = false;
+  restartError: string;
+  restartOutcome: string;
+
+  readonly versionOf = firmwareVersionOf;
 
   private polls: {[kind: string]: Subscription} = {};
 
@@ -89,13 +98,51 @@ export class ControllerSoftwareComponent extends ControllerPanelComponent {
     this.loading = true;
     // One at a time; the device serves two clients and one of those slots may already belong to a
     // running upload.
-    this.controllerService.proxy<any>(this.deviceId, 'GET', this.kinds[0].statusPath, null,
-      {ignoreErrors: true}).subscribe({
-      next: status => {
-        this.deviceStatus.FIRMWARE = status;
-        this.loadLogicStatus();
+    concat(this.get('/api/v1/info'), this.get(this.kinds[0].statusPath), this.get(this.kinds[1].statusPath))
+      .pipe(toArray(), takeUntil(this.destroy$))
+      .subscribe(([info, firmware, logic]) => {
+        this.running = info;
+        this.deviceStatus.FIRMWARE = firmware;
+        this.deviceStatus.LOGIC = logic;
+        this.loading = false;
+      });
+  }
+
+  get uploading(): boolean {
+    return Object.values(this.job).some(status => status?.state === 'RUNNING');
+  }
+
+  /**
+   * Restarts the controller so a staged image or program activates, waits for it to answer again,
+   * and says whether an image uploaded from this page is the one now running.
+   */
+  restart(): void {
+    this.dialogService.confirm(
+      this.translate.instant('inferrix.restart-controller-title'),
+      this.translate.instant('inferrix.restart-controller-text'),
+      this.translate.instant('action.cancel'),
+      this.translate.instant('inferrix.restart-controller')
+    ).pipe(
+      filter(confirmed => confirmed),
+      tap(() => {
+        this.restarting = true;
+        this.restartError = null;
+        this.restartOutcome = null;
+      }),
+      switchMap(() => this.controllerService.rebootController(this.deviceId)),
+      switchMap(() => this.controllerService.awaitController(this.deviceId)),
+      takeUntil(this.destroy$)
+    ).subscribe({
+      next: info => {
+        this.restarting = false;
+        this.restartOutcome = this.outcomeOf(info);
+        this.reload();
       },
-      error: () => this.loadLogicStatus()
+      error: error => {
+        this.restarting = false;
+        this.restartError = error?.name === 'TimeoutError'
+          ? this.translate.instant('inferrix.restart-timeout') : this.messageOf(error);
+      }
     });
   }
 
@@ -179,15 +226,20 @@ export class ControllerSoftwareComponent extends ControllerPanelComponent {
     });
   }
 
-  private loadLogicStatus(): void {
-    this.controllerService.proxy<any>(this.deviceId, 'GET', this.kinds[1].statusPath, null,
-      {ignoreErrors: true}).subscribe({
-      next: status => {
-        this.deviceStatus.LOGIC = status;
-        this.loading = false;
-      },
-      error: () => this.loading = false
-    });
+  private outcomeOf(info: any): string {
+    const version = firmwareVersionOf(info?.fw) ?? '—';
+    const firmware = this.job.FIRMWARE;
+    if (firmware?.state !== 'DONE' || !firmware.imageVersion) {
+      return this.translate.instant('inferrix.restart-done', {version});
+    }
+    return this.translate.instant(sameFirmwareRelease(version, firmware.imageVersion)
+      ? 'inferrix.restart-image-active' : 'inferrix.restart-image-not-active',
+      {version, image: firmware.imageVersion});
+  }
+
+  private get(path: string) {
+    return this.controllerService.proxy<any>(this.deviceId, 'GET', path, null, {ignoreErrors: true})
+      .pipe(catchError(() => of(null)));
   }
 
 }

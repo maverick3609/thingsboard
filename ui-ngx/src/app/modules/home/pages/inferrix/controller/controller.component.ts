@@ -24,7 +24,7 @@ import { EntityComponent } from '@home/components/entity/entity.component';
 import { EntityTableConfig } from '@home/models/entity/entities-table-config.models';
 import { EntityType } from '@shared/models/entity-type.models';
 import { InferrixControllerService } from '@core/http/inferrix-controller.service';
-import { ControllerHealth, ControllerInfo } from '@shared/models/inferrix-controller.models';
+import { ControllerHealth, ControllerInfo, firmwareVersionOf } from '@shared/models/inferrix-controller.models';
 
 /**
  * The Details tab of an adopted controller.
@@ -43,6 +43,7 @@ import { ControllerHealth, ControllerInfo } from '@shared/models/inferrix-contro
 export class ControllerComponent extends EntityComponent<ControllerInfo> {
 
   entityType = EntityType;
+  readonly versionOf = firmwareVersionOf;
 
   health: ControllerHealth;
   info: {[key: string]: any};

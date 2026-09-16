@@ -32,14 +32,19 @@ import org.thingsboard.server.service.inferrix.ilb.IlbVerifier;
 
 import jakarta.annotation.PreDestroy;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.IntPredicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -118,10 +123,16 @@ public class InferrixUploadService {
         executor.shutdownNow();
     }
 
-    /** What is being written, and the limits that go with it. */
+    /** MCUboot's {@code struct image_header} and trailer magics, from bootutil/image.h. */
+    private static final int IMAGE_MAGIC = 0x96f3b83d;
+    private static final int IMAGE_HEADER_BYTES = 32;
+    private static final int IMAGE_F_RAM_LOAD = 0x20;
+    private static final int IMAGE_TLV_INFO_MAGIC = 0x6907;
+
     /** 1024 points at the device's page sizes leaves headroom; see readPointIds. */
     private static final int MAX_POINT_PAGES = 256;
 
+    /** What is being written, and the limits that go with it. */
     public enum Kind {
 
         FIRMWARE("/api/v1/firmware", 1024 * 1024),
@@ -177,6 +188,11 @@ public class InferrixUploadService {
         private volatile String message;
         /** From the device's apply response: "reboot" for both kinds today. */
         private volatile String activation;
+        /**
+         * A firmware image's own version, so whoever reboots the controller can tell whether it is
+         * the one that came back — {@code GET /api/v1/info} is the only proof an update activated.
+         */
+        private volatile String imageVersion;
 
         UploadJob(TenantId tenantId, DeviceId deviceId, Kind kind, int totalBytes) {
             this.tenantId = tenantId;
@@ -209,6 +225,9 @@ public class InferrixUploadService {
                     + kind.name().toLowerCase() + " upload");
         }
         UploadJob job = new UploadJob(tenantId, deviceId, kind, artifact.length);
+        if (kind == Kind.FIRMWARE) {
+            job.imageVersion = readFirmwareImage(artifact).version();
+        }
         // computeIfAbsent, not a check-then-put: two operators pressing upload at the same moment
         // would otherwise both pass the check and the second begin would erase the first's slot.
         String running = activeByDevice.computeIfAbsent(deviceId, id -> job.getId());
@@ -251,6 +270,8 @@ public class InferrixUploadService {
 
             if (job.getKind() == Kind.LOGIC) {
                 verifyLogicOrThrow(credentials, artifact);
+            } else {
+                requireOutranksRunningFirmware(credentials, readFirmwareImage(artifact));
             }
 
             requireOk(controllerAccess.callWith(credentials, "POST", job.getKind().beginPath(),
@@ -290,6 +311,92 @@ public class InferrixUploadService {
             fail(job, e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
         } finally {
             activeByDevice.remove(job.getDeviceId(), job.getId());
+        }
+    }
+
+    /**
+     * Refuses an image that would be written, armed and then never run.
+     *
+     * <p>MCUboot boots the slot with the strictly higher version and compares major, minor and
+     * revision only, so an image that does not outrank the running one is accepted by every step on
+     * the device, keeps losing at boot, and is erased by auto-revert — a success that is not one
+     * (the firmware's docs/OTA.md). {@code begin} also erases the target slot, so this has to be
+     * decided before it.
+     */
+    private void requireOutranksRunningFirmware(InferrixControllerAccess.Credentials credentials,
+                                                FirmwareImage image) throws IOException {
+        ControllerResponse info = controllerAccess.callWith(credentials, "GET", "/api/v1/info", null);
+        requireOk(info, "read of the running firmware version");
+        String running = textField(info.body(), "fw");
+        if (!image.outranks(running)) {
+            throw new IOException("This image is version " + image.version() + ", which does not outrank the"
+                    + " running " + running + " in major.minor.revision (the build number is ignored), so the"
+                    + " controller would keep booting its current firmware");
+        }
+    }
+
+    /**
+     * The version of a signed MCUboot image, or why the file is not one this controller can boot.
+     *
+     * <p>Checked here because nothing downstream catches these in time: {@code begin} erases the
+     * target slot first, and {@code apply} compares a SHA-256 the platform computed over the same
+     * bytes, so any file at all would be streamed, "verified" and armed. The layout is MCUboot's
+     * {@code struct image_header}, little-endian, as read by the firmware's docs/OTA.md.
+     */
+    static FirmwareImage readFirmwareImage(byte[] file) {
+        if (file.length < IMAGE_HEADER_BYTES) {
+            throw new IllegalArgumentException("This file is too small to be a firmware image");
+        }
+        ByteBuffer header = ByteBuffer.wrap(file).order(ByteOrder.LITTLE_ENDIAN);
+        if (header.getInt(0) != IMAGE_MAGIC) {
+            throw new IllegalArgumentException("This file has no MCUboot header; upload zephyr.signed.bin,"
+                    + " not zephyr.bin");
+        }
+        long loadAddress = Integer.toUnsignedLong(header.getInt(4));
+        int headerSize = Short.toUnsignedInt(header.getShort(8));
+        int protectedTlvSize = Short.toUnsignedInt(header.getShort(10));
+        long imageSize = Integer.toUnsignedLong(header.getInt(12));
+        int flags = header.getInt(16);
+        // The unprotected TLV area, which carries the signature, follows the image and any protected
+        // TLVs; an image with nothing there was never signed.
+        long trailerAt = headerSize + imageSize + protectedTlvSize;
+        if (headerSize < IMAGE_HEADER_BYTES || trailerAt + 4 > file.length) {
+            throw new IllegalArgumentException("This firmware image is truncated: its header describes more"
+                    + " than the file holds");
+        }
+        if (Short.toUnsignedInt(header.getShort((int) trailerAt)) != IMAGE_TLV_INFO_MAGIC) {
+            throw new IllegalArgumentException("This firmware image is not signed");
+        }
+        if ((flags & IMAGE_F_RAM_LOAD) == 0 || loadAddress == 0) {
+            throw new IllegalArgumentException("This image was built without a RAM-load address, and MCUboot"
+                    + " erases such an image instead of booting it");
+        }
+        return new FirmwareImage(Byte.toUnsignedInt(header.get(20)), Byte.toUnsignedInt(header.get(21)),
+                Short.toUnsignedInt(header.getShort(22)), Integer.toUnsignedLong(header.getInt(24)));
+    }
+
+    record FirmwareImage(int major, int minor, int revision, long build) {
+
+        private static final Pattern VERSION = Pattern.compile("(\\d+)\\.(\\d+)\\.(\\d+)(\\+\\d+)?");
+
+        String version() {
+            return major + "." + minor + "." + revision + "+" + build;
+        }
+
+        /**
+         * Whether MCUboot would prefer this image to the one reporting {@code running}. A running
+         * version that cannot be read is not held against the image: that is a firmware too old to
+         * report one, which the version rule cannot be checked against at all.
+         */
+        boolean outranks(String running) {
+            Matcher matcher = running == null ? null : VERSION.matcher(running.trim());
+            if (matcher == null || !matcher.matches()) {
+                return true;
+            }
+            int[] current = {Integer.parseInt(matcher.group(1)), Integer.parseInt(matcher.group(2)),
+                    Integer.parseInt(matcher.group(3))};
+            int[] candidate = {major, minor, revision};
+            return Arrays.compare(candidate, current) > 0;
         }
     }
 

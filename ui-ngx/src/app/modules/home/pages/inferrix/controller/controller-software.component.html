@@ -26,8 +26,17 @@
       <div translate>inferrix.current-state</div>
       <div>{{ stateLabel(entry.kind) }}</div>
     </div>
+    <div class="tb-form-row space-between" *ngIf="entry.kind === 'FIRMWARE' && running">
+      <div translate>inferrix.running-version</div>
+      <div>{{ versionOf(running.fw) || '—' }}</div>
+    </div>
+    <!--
+      Not `!== undefined`: a template's `?.` yields null, so before the status loads that test was
+      true, the row rendered, and reading `.attempts` threw on every change detection — which took the
+      whole tab strip down with it.
+    -->
     <div class="tb-form-row space-between"
-         *ngIf="entry.kind === 'FIRMWARE' && deviceStatus.FIRMWARE?.attempts !== undefined">
+         *ngIf="entry.kind === 'FIRMWARE' && (deviceStatus.FIRMWARE?.attempts ?? null) !== null">
       <div translate>inferrix.boot-attempts</div>
       <div>{{ deviceStatus.FIRMWARE.attempts }}</div>
     </div>
@@ -44,7 +53,7 @@
         <span *ngIf="selected[entry.kind]"> · {{ selected[entry.kind].size }} B</span>
       </div>
       <button mat-raised-button color="primary"
-              [disabled]="readonly || !selected[entry.kind] || job[entry.kind]?.state === 'RUNNING'"
+              [disabled]="readonly || restarting || !selected[entry.kind] || job[entry.kind]?.state === 'RUNNING'"
               (click)="upload(entry.kind)">
         {{ 'inferrix.upload' | translate }}
       </button>
@@ -55,6 +64,9 @@
     <ng-container *ngIf="job[entry.kind] as status">
       <mat-progress-bar mode="determinate" [value]="progress(entry.kind)"
                         [color]="status.state === 'FAILED' ? 'warn' : 'primary'"></mat-progress-bar>
+      <div class="tb-form-panel-hint" *ngIf="status.imageVersion">
+        {{ 'inferrix.image-version' | translate: {version: status.imageVersion} }}
+      </div>
       <div class="tb-form-panel-hint" *ngIf="status.state === 'RUNNING'">
         {{ 'inferrix.upload-progress' | translate: {sent: status.sent, total: status.total,
            percent: progress(entry.kind)} }}
@@ -66,5 +78,21 @@
         {{ 'inferrix.upload-failed' | translate }} — {{ status.message }}
       </div>
     </ng-container>
+  </div>
+
+  <div class="tb-form-panel stroked">
+    <div class="tb-form-panel-title" translate>inferrix.restart-controller</div>
+    <div class="tb-form-panel-hint" translate>inferrix.restart-controller-hint</div>
+    <div class="flex flex-row items-center">
+      <button mat-raised-button color="warn" [disabled]="readonly || restarting || uploading" (click)="restart()">
+        {{ 'inferrix.restart-controller' | translate }}
+      </button>
+    </div>
+    <ng-container *ngIf="restarting">
+      <mat-progress-bar color="warn" mode="indeterminate"></mat-progress-bar>
+      <div class="tb-form-panel-hint" translate>inferrix.restart-waiting</div>
+    </ng-container>
+    <div *ngIf="restartOutcome">{{ restartOutcome }}</div>
+    <div class="tb-error-message" *ngIf="restartError">{{ restartError }}</div>
   </div>
 </div>

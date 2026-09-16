@@ -15,18 +15,22 @@
 ///
 
 import { Component } from '@angular/core';
-import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
-import { from, interval, Observable, of, Subscription } from 'rxjs';
-import { catchError, concatMap, finalize, takeUntil, tap } from 'rxjs/operators';
+import { AbstractControl, UntypedFormArray, UntypedFormBuilder, UntypedFormGroup, ValidationErrors,
+  Validators } from '@angular/forms';
+import { TranslateService } from '@ngx-translate/core';
+import { concat, from, interval, Observable, of, Subscription } from 'rxjs';
+import { catchError, concatMap, filter, finalize, switchMap, takeUntil, tap } from 'rxjs/operators';
+import { DialogService } from '@core/services/dialog.service';
 import { InferrixControllerService } from '@core/http/inferrix-controller.service';
-import { ControllerSettingField, ControllerSettingsForm } from '@shared/models/inferrix-controller.models';
+import { ControllerPeer, ControllerSettingField, ControllerSettingsForm } from '@shared/models/inferrix-controller.models';
 import { ControllerPanelComponent } from '@home/pages/inferrix/controller/controller-panel.component';
 
 /**
  * The controller's settings endpoints are all one shape — GET a flat JSON object, edit it, PUT it
  * back — so they are described by {@link CONTROLLER_SETTINGS_FORMS} rather than written out five
- * times. Only what genuinely is not that shape gets real code: the network confirm-or-revert window
- * below, and the peer table, which is a list rather than a form and is not built yet.
+ * times. Only what genuinely is not that shape gets real code: the network confirm-or-revert window,
+ * the peer address table, which is a list replaced whole, and the ownership password, which the
+ * platform changes rather than the proxy.
  */
 @Component({
   selector: 'tb-controller-settings',
@@ -58,13 +62,36 @@ export class ControllerSettingsComponent extends ControllerPanelComponent {
   confirmPending = false;
   private confirmTimer: Subscription;
 
+  peersForm: UntypedFormGroup;
+  pskSet = false;
+  peersLoading = false;
+  peersError: string;
+  peersSaved = false;
+
+  passwordForm: UntypedFormGroup;
+  passwordRunning = false;
+  passwordError: string;
+  passwordChanged = false;
+
   // The groups are built here, not on activation: the template binds [formGroup] as soon as the
   // component exists, and a tab that has not been opened yet would otherwise bind undefined.
   constructor(private fb: UntypedFormBuilder,
-              private controllerService: InferrixControllerService) {
+              private controllerService: InferrixControllerService,
+              private dialogService: DialogService,
+              private translate: TranslateService) {
     super();
     this.forms.forEach(form => this.formGroups[form.path] = this.fb.group(
       Object.fromEntries(form.fields.map(field => [field.key, [null, this.validatorsFor(field)]]))));
+    this.peersForm = this.fb.group({
+      psk: [null, [Validators.minLength(8), Validators.maxLength(64), Validators.pattern(DEVICE_SECRET)]],
+      peers: this.fb.array([])
+    });
+    this.passwordForm = this.fb.group({
+      password: [null, [Validators.required, Validators.minLength(8), Validators.maxLength(64),
+        Validators.pattern(DEVICE_SECRET)]],
+      confirm: [null, [Validators.required]]
+    }, {validators: (group: AbstractControl): ValidationErrors =>
+        group.get('password').value === group.get('confirm').value ? null : {mismatch: true}});
   }
 
   protected load(): void {
@@ -74,9 +101,14 @@ export class ControllerSettingsComponent extends ControllerPanelComponent {
       }
       this.loading[form.path] = true;
     });
+    if (this.readonly) {
+      this.peersForm.disable();
+      this.passwordForm.disable();
+    }
     // One at a time: the firmware serves two clients at once and makes the rest wait, so firing all
-    // five reads together only queues them somewhere less visible.
-    from(this.forms).pipe(concatMap(form => this.read(form)), takeUntil(this.destroy$)).subscribe();
+    // six reads together only queues them somewhere less visible.
+    concat(from(this.forms).pipe(concatMap(form => this.read(form))), this.readPeers())
+      .pipe(takeUntil(this.destroy$)).subscribe();
   }
 
   override ngOnDestroy(): void {
@@ -166,6 +198,112 @@ export class ControllerSettingsComponent extends ControllerPanelComponent {
     return body;
   }
 
+  get peerRows(): UntypedFormArray {
+    return this.peersForm.get('peers') as UntypedFormArray;
+  }
+
+  addPeer(peer?: ControllerPeer): void {
+    this.peerRows.push(this.fb.group({
+      uid: [peer?.uid ?? null, [Validators.required, Validators.pattern(/^[0-9a-f]{24}$/)]],
+      ip: [peer?.ip ?? null, [Validators.required, Validators.pattern(IPV4)]],
+      port: [peer?.port || null, [Validators.min(1), Validators.max(65535)]]
+    }));
+    this.peersForm.markAsDirty();
+  }
+
+  removePeer(index: number): void {
+    this.peerRows.removeAt(index);
+    this.peersForm.markAsDirty();
+  }
+
+  reloadPeers(): void {
+    this.readPeers().subscribe();
+  }
+
+  private readPeers(): Observable<any> {
+    this.peersLoading = true;
+    this.peersError = null;
+    return this.controllerService.proxy<{psk_set: boolean; peers: ControllerPeer[]}>(this.deviceId, 'GET',
+      PEERS_PATH, null, {ignoreErrors: true}).pipe(
+      tap(value => {
+        this.pskSet = !!value?.psk_set;
+        this.peerRows.clear();
+        (value?.peers ?? []).forEach(peer => this.addPeer(peer));
+        this.peersForm.get('psk').reset();
+        this.peersForm.markAsPristine();
+      }),
+      catchError(error => {
+        this.peersError = this.messageOf(error);
+        return of(null);
+      }),
+      finalize(() => this.peersLoading = false));
+  }
+
+  /**
+   * The device replaces the whole address table with what it is sent — a peer left out is dropped,
+   * not kept — so the body is always every row on screen. The PSK is sent only when one was typed;
+   * leaving it out keeps the stored secret.
+   */
+  savePeers(): void {
+    if (this.peersForm.invalid) {
+      this.peersForm.markAllAsTouched();
+      return;
+    }
+    const value = this.peersForm.getRawValue();
+    const body: {[key: string]: any} = {
+      peers: value.peers.map((peer: ControllerPeer) => peer.port ? peer : {uid: peer.uid, ip: peer.ip})
+    };
+    if (value.psk) {
+      body.psk = value.psk;
+    }
+    this.peersLoading = true;
+    this.peersError = null;
+    this.peersSaved = false;
+    this.controllerService.proxy(this.deviceId, 'PUT', PEERS_PATH, body, {ignoreErrors: true}).subscribe({
+      next: () => {
+        this.peersSaved = true;
+        this.reloadPeers();
+      },
+      error: error => {
+        this.peersError = this.messageOf(error);
+        this.peersLoading = false;
+      }
+    });
+  }
+
+  /**
+   * The platform makes this change, not the proxy: the device revokes its token when the password
+   * changes, so whoever changes it has to re-seal the new password and log in again in the same step.
+   */
+  changePassword(): void {
+    if (this.passwordForm.invalid) {
+      this.passwordForm.markAllAsTouched();
+      return;
+    }
+    this.dialogService.confirm(
+      this.translate.instant('inferrix.change-password-title'),
+      this.translate.instant('inferrix.change-password-text'),
+      this.translate.instant('action.cancel'),
+      this.translate.instant('inferrix.change-password')
+    ).pipe(
+      filter(confirmed => confirmed),
+      tap(() => {
+        this.passwordRunning = true;
+        this.passwordError = null;
+        this.passwordChanged = false;
+      }),
+      switchMap(() => this.controllerService.changeControllerPassword(this.deviceId,
+        this.passwordForm.get('password').value, {ignoreErrors: true}).pipe(
+        finalize(() => this.passwordRunning = false)))
+    ).subscribe({
+      next: () => {
+        this.passwordChanged = true;
+        this.passwordForm.reset();
+      },
+      error: error => this.passwordError = this.messageOf(error)
+    });
+  }
+
   private startConfirmWindow(windowSeconds: number): void {
     this.stopConfirmWindow();
     this.confirmPending = true;
@@ -207,6 +345,16 @@ export class ControllerSettingsComponent extends ControllerPanelComponent {
 }
 
 const NETWORK_PATH = '/api/v1/network';
+const PEERS_PATH = '/api/v1/peers';
+
+const IPV4 = /^((25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(25[0-5]|2[0-4]\d|1?\d?\d)$/;
+
+/**
+ * Printable ASCII without a quote or a backslash. The firmware reads a JSON string byte for byte up
+ * to the next quote and never unescapes it, so either character would be stored as something other
+ * than what was typed.
+ */
+const DEVICE_SECRET = /^[\x20-\x21\x23-\x5B\x5D-\x7E]*$/;
 
 /** Field limits mirror docs/INTEGRATION-API.md §3.3 in the controller repo. */
 export const CONTROLLER_SETTINGS_FORMS: ControllerSettingsForm[] = [

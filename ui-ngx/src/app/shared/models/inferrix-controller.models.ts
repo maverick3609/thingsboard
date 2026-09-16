@@ -125,6 +125,38 @@ export interface ControllerPoint {
   n: string;
 }
 
+/** The source classes `POST /api/v1/points/{id}` accepts; every other class is read-only. */
+export const WRITABLE_POINT_TYPES = ['do', 'ao', 'rtu'];
+
+/**
+ * The body of a point write.
+ *
+ * The device parses `v` as a bool or a 32-bit integer only; a fractional value has to travel as the
+ * raw float32 bit pattern in `v_bits`, the same convention as `deadband_bits`.
+ */
+export const pointWriteBody = (type: string, value: boolean | number): {[key: string]: any} =>
+  typeof value === 'boolean' || (Number.isInteger(value) && value >= -2147483648 && value <= 2147483647)
+    ? {type, v: value}
+    : {type, v_bits: floatToBits(value)};
+
+/**
+ * A reported firmware version, or null when the report carries none.
+ *
+ * Before firmware 0.1.15 the MQTT and discovery announces sent a hard-coded numeric `fw: 0` (notes
+ * §14) while `/api/v1/info` told the truth, so a stored `0` means "unknown", not "version 0".
+ */
+export const firmwareVersionOf = (fw: any): string =>
+  typeof fw === 'string' && fw.trim() ? fw : null;
+
+/**
+ * Whether two versions name the same release. MCUboot ranks images by major.minor.revision and
+ * ignores the build number, so this does too.
+ */
+export const sameFirmwareRelease = (a: string, b: string): boolean => {
+  const release = (version: string) => /^\d+\.\d+\.\d+/.exec(version ?? '')?.[0];
+  return !!release(a) && release(a) === release(b);
+};
+
 export const pointQualityColor = (quality: PointQuality): string => {
   switch (quality) {
     case 'good':
@@ -206,6 +238,23 @@ export interface ControllerUploadStatus {
   message?: string;
   /** From the device's apply response — "reboot" for both kinds today. */
   activation?: string;
+  /** Firmware only: the version in the image's MCUboot header, as `major.minor.revision+build`. */
+  imageVersion?: string;
+}
+
+/** POST /api/inferrix/controllers/{deviceId}/attest. */
+export interface ControllerAttestation {
+  verified: boolean;
+  uid: string;
+  certFingerprint: string;
+  reason?: string;
+}
+
+/** One entry of GET/PUT /api/v1/peers — the address half of the peer table. */
+export interface ControllerPeer {
+  uid: string;
+  ip: string;
+  port?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -294,6 +343,8 @@ export const CONTROLLER_RECORD_ERRORS: {[name: string]: string} = {
   not_writable: 'That point is not marked writable.',
   read_only: 'That point maps to a Modbus object that cannot be written.',
   wbox_full: 'The controller is still working through queued writes; try again shortly.',
+  queue_full: 'The controller\'s Modbus write queue is full; try again shortly.',
+  busy: 'The controller is already running a probe; try again shortly.',
   malformed: 'The controller could not read that request.',
   bad_request: 'The controller rejected the request.'
 };

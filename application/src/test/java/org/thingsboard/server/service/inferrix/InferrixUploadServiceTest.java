@@ -28,6 +28,8 @@ import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.service.inferrix.InferrixControllerClient.ControllerResponse;
 
 import java.io.ByteArrayOutputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -55,6 +57,7 @@ class InferrixUploadServiceTest {
 
     private InferrixUploadService service;
     private InferrixControllerAccess.Credentials credentials;
+    private InferrixControllerClient.ChunkSession session;
 
     /** Every chunk the fake device received, in order. */
     private final List<byte[]> chunks = new ArrayList<>();
@@ -71,11 +74,14 @@ class InferrixUploadServiceTest {
                     jsonCalls.add(invocation.getArgument(2) + " " + invocation.getArgument(3));
                     return response(200, "{\"state\":\"pending\",\"activation\":\"reboot\"}");
                 });
-        when(controllerAccess.callBinary(any(), anyString(), any()))
-                .thenAnswer(invocation -> {
-                    chunks.add(invocation.getArgument(2));
-                    return response(200, "{\"state\":\"downloading\"}");
-                });
+        // The chunk loop streams over one held connection (firmware 0.1.15 keep-alive), so the fake
+        // device is the session, not callBinary.
+        session = mock(InferrixControllerClient.ChunkSession.class);
+        when(controllerAccess.openChunkSession(any(), anyString())).thenReturn(session);
+        when(session.post(any())).thenAnswer(invocation -> {
+            chunks.add(invocation.getArgument(0));
+            return response(200, "{\"state\":\"downloading\"}");
+        });
     }
 
     @AfterEach
@@ -85,10 +91,12 @@ class InferrixUploadServiceTest {
 
     @Test
     void anImageIsChunkedInOrderAndAppliedWithItsOwnDigest() throws Exception {
-        byte[] artifact = artifact(5000);
+        // A firmware image rather than a logic program: the chunk loop is the same for both, and a
+        // logic program would first have to pass the ILB verifier, which has tests of its own.
+        byte[] artifact = firmwareImage(0, 1, 16, 0);
 
         InferrixUploadService.UploadJob job = service.start(TENANT, DEVICE,
-                InferrixUploadService.Kind.LOGIC, artifact);
+                InferrixUploadService.Kind.FIRMWARE, artifact);
         awaitFinished(job);
 
         assertThat(job.getState()).isEqualTo(InferrixUploadService.State.DONE);
@@ -101,11 +109,12 @@ class InferrixUploadServiceTest {
         chunks.forEach(received::writeBytes);
         assertThat(received.toByteArray()).isEqualTo(artifact);
 
-        int limit = InferrixControllerClient.maxChunkBytes("/api/v1/logic");
+        int limit = InferrixControllerClient.maxChunkBytes("/api/v1/firmware");
         assertThat(chunks).allSatisfy(chunk -> assertThat(chunk.length).isBetween(1, limit));
         assertThat(jsonCalls).containsExactly(
-                "/api/v1/logic/begin {\"size\":5000}",
-                "/api/v1/logic/apply {\"sha256\":\"" + InferrixUploadService.sha256(artifact) + "\"}");
+                "/api/v1/info null",
+                "/api/v1/firmware/begin {\"size\":" + artifact.length + "}",
+                "/api/v1/firmware/apply {\"sha256\":\"" + InferrixUploadService.sha256(artifact) + "\"}");
     }
 
     @Test
@@ -128,18 +137,18 @@ class InferrixUploadServiceTest {
     @Test
     void aSecondUploadToTheSameControllerIsRefusedWhileTheFirstRuns() throws Exception {
         CountDownLatch release = new CountDownLatch(1);
-        when(controllerAccess.callBinary(any(), anyString(), any())).thenAnswer(invocation -> {
+        when(session.post(any())).thenAnswer(invocation -> {
             release.await(5, TimeUnit.SECONDS);
             return response(200, "{}");
         });
 
         InferrixUploadService.UploadJob first = service.start(TENANT, DEVICE,
-                InferrixUploadService.Kind.LOGIC, artifact(4000));
+                InferrixUploadService.Kind.FIRMWARE, firmwareImage(0, 1, 16, 0));
         try {
             // The device takes one uploader; a second begin would erase the slot the first is
             // writing into.
             assertThatThrownBy(() -> service.start(TENANT, DEVICE,
-                    InferrixUploadService.Kind.LOGIC, artifact(4000)))
+                    InferrixUploadService.Kind.FIRMWARE, firmwareImage(0, 1, 16, 0)))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("already running");
         } finally {
@@ -150,10 +159,10 @@ class InferrixUploadServiceTest {
 
     @Test
     void theSameControllerCanBeUploadedAgainOnceTheFirstRunFinishes() throws Exception {
-        awaitFinished(service.start(TENANT, DEVICE, InferrixUploadService.Kind.LOGIC, artifact(2000)));
+        awaitFinished(service.start(TENANT, DEVICE, InferrixUploadService.Kind.FIRMWARE, firmwareImage(0, 1, 16, 0)));
 
         InferrixUploadService.UploadJob second = service.start(TENANT, DEVICE,
-                InferrixUploadService.Kind.LOGIC, artifact(2000));
+                InferrixUploadService.Kind.FIRMWARE, firmwareImage(0, 1, 16, 0));
         awaitFinished(second);
         assertThat(second.getState()).isEqualTo(InferrixUploadService.State.DONE);
     }
@@ -163,16 +172,16 @@ class InferrixUploadServiceTest {
         // Built before the when(...): a mock created inside another stubbing call leaves Mockito
         // with an unfinished stub.
         ControllerResponse rejected = response(400, "{\"error\":\"chunk_rejected\"}");
-        when(controllerAccess.callBinary(any(), anyString(), any())).thenReturn(rejected);
+        when(session.post(any())).thenReturn(rejected);
 
         InferrixUploadService.UploadJob job = service.start(TENANT, DEVICE,
-                InferrixUploadService.Kind.LOGIC, artifact(3000));
+                InferrixUploadService.Kind.FIRMWARE, firmwareImage(0, 1, 16, 0));
         awaitFinished(job);
 
         assertThat(job.getState()).isEqualTo(InferrixUploadService.State.FAILED);
         assertThat(job.getMessage()).contains("chunk_rejected");
         // Nothing was applied, so nothing can activate.
-        assertThat(jsonCalls).noneMatch(call -> call.startsWith("/api/v1/logic/apply"));
+        assertThat(jsonCalls).noneMatch(call -> call.startsWith("/api/v1/firmware/apply"));
     }
 
     @Test
@@ -180,10 +189,10 @@ class InferrixUploadServiceTest {
         // Built before the when(...): a mock created inside another stubbing call leaves Mockito
         // with an unfinished stub.
         ControllerResponse gatewayError = response(500, "<html>gateway error</html>");
-        when(controllerAccess.callBinary(any(), anyString(), any())).thenReturn(gatewayError);
+        when(session.post(any())).thenReturn(gatewayError);
 
         InferrixUploadService.UploadJob job = service.start(TENANT, DEVICE,
-                InferrixUploadService.Kind.LOGIC, artifact(3000));
+                InferrixUploadService.Kind.FIRMWARE, firmwareImage(0, 1, 16, 0));
         awaitFinished(job);
 
         assertThat(job.getState()).isEqualTo(InferrixUploadService.State.FAILED);
@@ -193,13 +202,13 @@ class InferrixUploadServiceTest {
     @Test
     void aRunningJobIsFindableByItsControllerAndReleasedWhenItEnds() throws Exception {
         CountDownLatch release = new CountDownLatch(1);
-        when(controllerAccess.callBinary(any(), anyString(), any())).thenAnswer(invocation -> {
+        when(session.post(any())).thenAnswer(invocation -> {
             release.await(5, TimeUnit.SECONDS);
             return response(200, "{}");
         });
 
         InferrixUploadService.UploadJob job = service.start(TENANT, DEVICE,
-                InferrixUploadService.Kind.FIRMWARE, artifact(4000));
+                InferrixUploadService.Kind.FIRMWARE, firmwareImage(0, 1, 16, 0));
         try {
             // A reloaded page has only the device id to go on, so this is the whole route back to a
             // job in flight.
@@ -238,12 +247,126 @@ class InferrixUploadServiceTest {
                 .thenThrow(new IllegalStateException("This device has not been adopted"));
 
         InferrixUploadService.UploadJob job = service.start(TENANT, DEVICE,
-                InferrixUploadService.Kind.FIRMWARE, artifact(2000));
+                InferrixUploadService.Kind.FIRMWARE, firmwareImage(0, 1, 16, 0));
         awaitFinished(job);
 
         assertThat(job.getState()).isEqualTo(InferrixUploadService.State.FAILED);
         assertThat(job.getMessage()).contains("not been adopted");
         assertThat(chunks).isEmpty();
+    }
+
+    @Test
+    void aFileWithoutAnMcubootHeaderIsRefusedBeforeAnythingIsSent() {
+        // zephyr.bin instead of zephyr.signed.bin is the likely mistake, and the device cannot catch
+        // it: begin erases the slot and apply checks a digest the platform computed itself.
+        assertThatThrownBy(() -> service.start(TENANT, DEVICE, InferrixUploadService.Kind.FIRMWARE, artifact(2000)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("zephyr.signed.bin");
+        assertThat(jsonCalls).isEmpty();
+        assertThat(chunks).isEmpty();
+    }
+
+    @Test
+    void anUnsignedImageIsRefused() {
+        byte[] image = firmwareImage(0, 1, 16, 0);
+        ByteBuffer.wrap(image).order(ByteOrder.LITTLE_ENDIAN).putShort(IMAGE_HEADER + IMAGE_BODY, (short) 0);
+
+        assertThatThrownBy(() -> service.start(TENANT, DEVICE, InferrixUploadService.Kind.FIRMWARE, image))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not signed");
+    }
+
+    @Test
+    void anImageWithoutARamLoadAddressIsRefused() {
+        // OTA.md: MCUboot erases such an image rather than booting it.
+        byte[] image = firmwareImage(0, 1, 16, 0);
+        ByteBuffer.wrap(image).order(ByteOrder.LITTLE_ENDIAN).putInt(16, 0);
+
+        assertThatThrownBy(() -> service.start(TENANT, DEVICE, InferrixUploadService.Kind.FIRMWARE, image))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("RAM-load");
+    }
+
+    @Test
+    void aTruncatedImageIsRefused() {
+        byte[] image = java.util.Arrays.copyOf(firmwareImage(0, 1, 16, 0), IMAGE_HEADER + 100);
+
+        assertThatThrownBy(() -> service.start(TENANT, DEVICE, InferrixUploadService.Kind.FIRMWARE, image))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("truncated");
+    }
+
+    @Test
+    void anImageThatDoesNotOutrankTheRunningFirmwareFailsBeforeTheSlotIsErased() throws Exception {
+        runningFirmware("0.1.15+0");
+
+        InferrixUploadService.UploadJob job = service.start(TENANT, DEVICE,
+                InferrixUploadService.Kind.FIRMWARE, firmwareImage(0, 1, 15, 7));
+        awaitFinished(job);
+
+        assertThat(job.getState()).isEqualTo(InferrixUploadService.State.FAILED);
+        assertThat(job.getMessage()).contains("0.1.15+7").contains("does not outrank").contains("0.1.15+0");
+        assertThat(jsonCalls).noneMatch(call -> call.startsWith("/api/v1/firmware/begin"));
+        assertThat(chunks).isEmpty();
+    }
+
+    @Test
+    void aNewerImageIsWrittenWhole() throws Exception {
+        runningFirmware("0.1.15+0");
+        byte[] image = firmwareImage(0, 1, 16, 0);
+
+        InferrixUploadService.UploadJob job = service.start(TENANT, DEVICE, InferrixUploadService.Kind.FIRMWARE, image);
+        awaitFinished(job);
+
+        assertThat(job.getState()).isEqualTo(InferrixUploadService.State.DONE);
+        assertThat(job.getImageVersion()).isEqualTo("0.1.16+0");
+        ByteArrayOutputStream received = new ByteArrayOutputStream();
+        chunks.forEach(received::writeBytes);
+        assertThat(received.toByteArray()).isEqualTo(image);
+    }
+
+    @Test
+    void theVersionRuleIgnoresTheBuildNumberTheWayMcubootDoes() {
+        assertThat(new InferrixUploadService.FirmwareImage(0, 1, 15, 9).outranks("0.1.15+0")).isFalse();
+        assertThat(new InferrixUploadService.FirmwareImage(0, 1, 15, 0).outranks("0.1.16+0")).isFalse();
+        assertThat(new InferrixUploadService.FirmwareImage(0, 1, 16, 0).outranks("0.1.15+9")).isTrue();
+        assertThat(new InferrixUploadService.FirmwareImage(0, 2, 0, 0).outranks("0.1.99+0")).isTrue();
+        assertThat(new InferrixUploadService.FirmwareImage(1, 0, 0, 0).outranks("0.9.9")).isTrue();
+        // Firmware too old to report a version cannot be held against the image.
+        assertThat(new InferrixUploadService.FirmwareImage(0, 1, 15, 0).outranks("0")).isTrue();
+        assertThat(new InferrixUploadService.FirmwareImage(0, 1, 15, 0).outranks(null)).isTrue();
+    }
+
+    private void runningFirmware(String version) throws Exception {
+        ControllerResponse info = response(200, "{\"fw\":\"" + version + "\",\"profile\":1}");
+        when(controllerAccess.callWith(any(), eq("GET"), eq("/api/v1/info"), any())).thenReturn(info);
+    }
+
+    private static final int IMAGE_HEADER = 0x200;
+    private static final int IMAGE_BODY = 3000;
+
+    /**
+     * The shape `imgtool sign --pad-header --load-addr` produces: a padded header, the body, then
+     * the unprotected TLV area that carries the signature.
+     */
+    private static byte[] firmwareImage(int major, int minor, int revision, int build) {
+        byte[] image = new byte[IMAGE_HEADER + IMAGE_BODY + 8];
+        ByteBuffer buffer = ByteBuffer.wrap(image).order(ByteOrder.LITTLE_ENDIAN);
+        buffer.putInt(0, 0x96f3b83d);
+        buffer.putInt(4, 0x24000000);
+        buffer.putShort(8, (short) IMAGE_HEADER);
+        buffer.putInt(12, IMAGE_BODY);
+        buffer.putInt(16, 0x20);
+        buffer.put(20, (byte) major);
+        buffer.put(21, (byte) minor);
+        buffer.putShort(22, (short) revision);
+        buffer.putInt(24, build);
+        for (int i = 0; i < IMAGE_BODY; i++) {
+            image[IMAGE_HEADER + i] = (byte) (i * 13 + 5);
+        }
+        buffer.putShort(IMAGE_HEADER + IMAGE_BODY, (short) 0x6907);
+        buffer.putShort(IMAGE_HEADER + IMAGE_BODY + 2, (short) 8);
+        return image;
     }
 
     @Test

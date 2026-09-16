@@ -1,0 +1,61 @@
+<!--
+
+    Copyright © 2016-2026 The Inferrix Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<form class="tb-point-write-form" [formGroup]="writeForm" (ngSubmit)="write()">
+  <mat-toolbar color="primary">
+    <h2>{{ 'inferrix.point-write-title' | translate: {id: point.id, name: point.n} }}</h2>
+    <span class="flex-1"></span>
+    <button mat-icon-button
+            (click)="cancel()"
+            type="button">
+      <mat-icon class="material-icons">close</mat-icon>
+    </button>
+  </mat-toolbar>
+  <mat-progress-bar color="warn" mode="indeterminate" *ngIf="isLoading$ | async">
+  </mat-progress-bar>
+  <div style="height: 4px;" *ngIf="(isLoading$ | async) === false"></div>
+  <div mat-dialog-content>
+    <fieldset class="flex flex-col gap-4" [disabled]="isLoading$ | async">
+      <div class="tb-form-row space-between">
+        <div translate>inferrix.point-write-current</div>
+        <div>{{ point.v }} · {{ point.q }}</div>
+      </div>
+      <mat-slide-toggle *ngIf="isBoolean" formControlName="value">
+        {{ 'inferrix.point-write-on' | translate }}
+      </mat-slide-toggle>
+      <mat-form-field *ngIf="!isBoolean" class="mat-block" subscriptSizing="dynamic">
+        <mat-label>{{ 'inferrix.point-write-value' | translate }}</mat-label>
+        <input matInput type="number" formControlName="value" required/>
+      </mat-form-field>
+      <div class="tb-form-panel-hint">{{ 'inferrix.point-write-hint' | translate }}</div>
+      <div class="tb-error-message" *ngIf="errorMessage">{{ errorMessage }}</div>
+    </fieldset>
+  </div>
+  <div mat-dialog-actions class="flex flex-row items-center justify-end">
+    <button mat-button color="primary"
+            type="button"
+            [disabled]="(isLoading$ | async)"
+            (click)="cancel()" cdkFocusInitial>
+      {{ 'action.cancel' | translate }}
+    </button>
+    <button mat-raised-button color="primary"
+            type="submit"
+            [disabled]="(isLoading$ | async) || writeForm.invalid">
+      {{ 'inferrix.point-write' | translate }}
+    </button>
+  </div>
+</form>

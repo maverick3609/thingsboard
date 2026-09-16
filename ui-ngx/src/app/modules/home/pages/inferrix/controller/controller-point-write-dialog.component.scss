@@ -13,29 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/* Layout only, plus the one colour the platform has no class for: a bad reading inside an otherwise
-   normal row. #d12730 is the same red ThingsBoard's own device table uses for an inactive device. */
-.tb-bad {
-  color: #d12730;
-}
-
-.tb-diag-ping-fields {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0 16px;
-}
-
-.tb-diag-ping-target {
-  flex: 1 1 240px;
-  min-width: 240px;
-}
-
-.tb-diag-ping-small {
-  flex: 0 0 110px;
-}
-
-.tb-diag-fingerprint {
-  overflow-wrap: anywhere;
-  text-align: end;
+/* On the form, not :host — the host element is inline and ignores a width. Without one the dialog
+   grows to fit its hint on a single line. */
+:host {
+  .tb-point-write-form {
+    width: 480px;
+    max-width: 100%;
+  }
 }

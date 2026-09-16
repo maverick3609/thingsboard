@@ -481,13 +481,78 @@ public class InferrixPlcController extends BaseController {
         return "?" + query;
     }
 
+    @ApiOperation(value = "Verify a controller's attestation (attestController)",
+            notes = "Asks the controller to sign a fresh nonce and checks the signature against the "
+                    + "certificate pinned at adoption, bound to the silicon UID recorded then. The pin "
+                    + "shows the platform reaches the pinned key; this shows that key signs for that UID, "
+                    + "and reports a controller still on the shared development certificate, whose key is "
+                    + "not its own. Changes nothing on the device.")
+    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    @PostMapping("/{deviceId}/attest")
+    public InferrixControllerAccess.AttestationResult attestController(@PathVariable("deviceId") String strDeviceId)
+            throws ThingsboardException {
+        checkParameter("deviceId", strDeviceId);
+        DeviceId deviceId = new DeviceId(toUUID(strDeviceId));
+        Device device = checkDeviceId(deviceId, Operation.READ);
+        try {
+            return requireAccess().attest(device.getTenantId(), deviceId);
+        } catch (Exception e) {
+            throw handleException(e);
+        }
+    }
+
+    @ApiOperation(value = "Change a controller's ownership password (changeControllerPassword)",
+            notes = "Moves the controller to a new ownership password and keeps the platform able to "
+                    + "manage it. The device route is never proxied, because the change revokes the "
+                    + "token the platform holds: this endpoint changes it with the sealed current "
+                    + "password, stores the new one sealed, and logs in again. The new password must be "
+                    + "8 to 64 printable ASCII characters, without quotes or backslashes. Keep a copy: "
+                    + "re-adopting the controller needs it.")
+    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    @PostMapping("/{deviceId}/password")
+    public void changeControllerPassword(@PathVariable("deviceId") String strDeviceId,
+                                         @RequestBody ChangePasswordRequest request) throws ThingsboardException {
+        checkParameter("deviceId", strDeviceId);
+        DeviceId deviceId = new DeviceId(toUUID(strDeviceId));
+        Device device = checkDeviceId(deviceId, Operation.WRITE);
+        try {
+            requireAccess().changePassword(device.getTenantId(), deviceId,
+                    request == null ? null : request.newPassword());
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            // Policy, a stale stored password, throttling: each is the operator's to act on, and the
+            // message says how.
+            throw new ThingsboardException(e.getMessage(), ThingsboardErrorCode.BAD_REQUEST_PARAMS);
+        } catch (Exception e) {
+            throw handleException(e);
+        }
+    }
+
+    private InferrixControllerAccess requireAccess() throws ThingsboardException {
+        InferrixControllerAccess access = controllerAccess.getIfAvailable();
+        if (access == null) {
+            throw new ThingsboardException("Controller access is not available on this node",
+                    ThingsboardErrorCode.GENERAL);
+        }
+        return access;
+    }
+
     /** Progress of one firmware or logic upload. */
     public record UploadStatus(String jobId, String kind, String state, int sent, int total,
-                               String message, String activation) {
+                               String message, String activation, String imageVersion) {
 
         static UploadStatus of(InferrixUploadService.UploadJob job) {
             return new UploadStatus(job.getId(), job.getKind().name(), job.getState().name(),
-                    job.getSent(), job.getTotalBytes(), job.getMessage(), job.getActivation());
+                    job.getSent(), job.getTotalBytes(), job.getMessage(), job.getActivation(),
+                    job.getImageVersion());
+        }
+    }
+
+    /** Never logged and never returned: the platform seals it the moment the device accepts it. */
+    public record ChangePasswordRequest(String newPassword) {
+
+        @Override
+        public String toString() {
+            return "ChangePasswordRequest[newPassword=***]";
         }
     }
 

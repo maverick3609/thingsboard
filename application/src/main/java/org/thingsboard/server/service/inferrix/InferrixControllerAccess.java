@@ -15,9 +15,11 @@
  */
 package org.thingsboard.server.service.inferrix;
 
+import com.google.common.util.concurrent.SettableFuture;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.rule.engine.api.AttributesSaveRequest;
 import org.thingsboard.server.common.data.AttributeScope;
 import org.thingsboard.server.common.data.id.DeviceId;
@@ -35,6 +37,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -60,6 +64,17 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class InferrixControllerAccess {
+
+    /** The firmware's ownership password policy, §3.1: 8 to 64 characters. */
+    private static final int MIN_PASSWORD_LENGTH = 8;
+    private static final int MAX_PASSWORD_LENGTH = 64;
+    /**
+     * Printable ASCII, so the length the device counts is the length checked here, and never a quote
+     * or a backslash: the firmware copies a JSON string byte for byte up to the next quote without
+     * unescaping it, so either would be stored as something other than what the operator typed.
+     */
+    private static final Pattern PASSWORD_CHARACTERS = Pattern.compile("[\\x20-\\x7E&&[^\"\\\\]]+");
+    private static final long SECRET_STORE_TIMEOUT_SECONDS = 30;
 
     /** Serialises token refresh per device; see {@link #call}. */
     private final ConcurrentMap<DeviceId, Object> refreshLocks = new ConcurrentHashMap<>();
@@ -93,7 +108,9 @@ public class InferrixControllerAccess {
                 fresh = reloaded.token();
             } else {
                 log.info("[{}] Controller rejected the stored token; logging in again", deviceId);
-                fresh = client.login(credentials.host(), credentials.fingerprint(), credentials.password());
+                // The password is re-read too: a password change may have landed while this call
+                // waited, and retrying the old one would only feed the device's login throttle.
+                fresh = client.login(credentials.host(), credentials.fingerprint(), reloaded.password());
                 storeToken(tenantId, deviceId, fresh);
             }
         }
@@ -141,6 +158,89 @@ public class InferrixControllerAccess {
             throws IOException {
         return client.call(credentials.host(), credentials.fingerprint(), method, path,
                 credentials.token(), body);
+    }
+
+    /**
+     * Proves the key behind the pinned certificate signs for the silicon UID recorded at adoption.
+     *
+     * <p>The pin says the platform reaches the key it pinned, but every controller still on the shared
+     * development certificate holds that same key. This tells them apart: a controller with a key of
+     * its own signs a fresh nonce bound to its UID, and one without answers that it has none.
+     */
+    public AttestationResult attest(TenantId tenantId, DeviceId deviceId) throws Exception {
+        // Settles the token first, so a revoked one is refreshed by the normal path rather than
+        // failing the attestation for a reason that has nothing to do with the device's key.
+        Credentials credentials = openVerifiedCredentials(tenantId, deviceId, "/api/v1/health");
+        String uid = readAttributes(tenantId, deviceId, AttributeScope.SERVER_SCOPE,
+                List.of(InferrixAdoptionService.ATTR_UID)).get(InferrixAdoptionService.ATTR_UID);
+        if (uid == null) {
+            throw new IllegalStateException("No adopted UID is recorded for this controller");
+        }
+        String nonce = InferrixAttestation.newNonce();
+        InferrixControllerClient.AttestExchange exchange = client.attest(credentials.host(),
+                credentials.fingerprint(), credentials.token(), nonce);
+        int status = exchange.response().statusCode();
+        String problem;
+        if (status == 503) {
+            problem = "The controller is running on the shared development certificate, so it has no key"
+                    + " of its own to attest with";
+        } else if (status != 200) {
+            problem = "The controller answered HTTP " + status + " to the attestation request";
+        } else {
+            problem = InferrixAttestation.check(JacksonUtil.toJsonNode(exchange.response().body()),
+                    exchange.certificate(), nonce, uid);
+        }
+        return new AttestationResult(problem == null, uid, credentials.fingerprint(), problem);
+    }
+
+    /**
+     * Moves the controller to a new ownership password and keeps the platform able to manage it.
+     *
+     * <p>The device revokes its token on a password change, so the order matters: the new password
+     * is sealed and stored as soon as the device accepts it, and only then is a token minted and
+     * stored. A failure part-way through therefore leaves the platform holding the password that
+     * works. The per-device refresh lock is held throughout, so a call recovering from a 401 cannot
+     * log in with the old password in between.
+     */
+    public void changePassword(TenantId tenantId, DeviceId deviceId, String newPassword) throws Exception {
+        if (newPassword == null || newPassword.length() < MIN_PASSWORD_LENGTH
+                || newPassword.length() > MAX_PASSWORD_LENGTH || !PASSWORD_CHARACTERS.matcher(newPassword).matches()) {
+            throw new IllegalArgumentException("The new password must be " + MIN_PASSWORD_LENGTH + " to "
+                    + MAX_PASSWORD_LENGTH + " printable ASCII characters, without quotes or backslashes");
+        }
+        synchronized (refreshLocks.computeIfAbsent(deviceId, id -> new Object())) {
+            Credentials credentials = load(tenantId, deviceId);
+            if (credentials.password() == null) {
+                throw new IllegalStateException("Cortex holds no ownership password for this controller, so it"
+                        + " cannot change one; re-adopt the controller with its current password first");
+            }
+            int status = client.changePassword(credentials.host(), credentials.fingerprint(),
+                    credentials.password(), newPassword);
+            switch (status) {
+                case 200 -> log.info("[{}] Controller ownership password changed", deviceId);
+                case 400 -> throw new IllegalArgumentException("The controller refused the new password");
+                case 401 -> throw new IllegalStateException("The controller no longer accepts the password Cortex"
+                        + " holds, so nothing was changed; re-adopt it with its current password");
+                case 429 -> throw new IllegalStateException("The controller is throttling password attempts;"
+                        + " wait a minute and try again");
+                default -> throw new IOException("The controller answered HTTP " + status
+                        + " to the password change");
+            }
+            try {
+                storeSealed(tenantId, deviceId, InferrixAdoptionService.ATTR_PASSWORD, newPassword);
+            } catch (Exception e) {
+                throw new IllegalStateException("The controller now uses the new password, but Cortex could not"
+                        + " store it; re-adopt the controller by address with the new password", e);
+            }
+            // The token went with the old password. Not fatal if this fails: the change itself has
+            // landed and is stored, and the next call recovers through the normal 401 refresh.
+            try {
+                storeSealed(tenantId, deviceId, InferrixAdoptionService.ATTR_TOKEN,
+                        client.login(credentials.host(), credentials.fingerprint(), newPassword));
+            } catch (Exception e) {
+                log.warn("[{}] Password changed and stored, but a fresh token could not be stored yet", deviceId, e);
+            }
+        }
     }
 
     Credentials load(TenantId tenantId, DeviceId deviceId) throws Exception {
@@ -194,7 +294,35 @@ public class InferrixControllerAccess {
                 .build());
     }
 
+    /** Seals and stores one secret, waiting for the write: the caller's next step depends on it. */
+    private void storeSealed(TenantId tenantId, DeviceId deviceId, String key, String secret) throws Exception {
+        SettableFuture<Void> stored = SettableFuture.create();
+        tsSubService.saveAttributes(AttributesSaveRequest.builder()
+                .tenantId(tenantId)
+                .entityId(deviceId)
+                .scope(AttributeScope.SERVER_SCOPE)
+                .entries(List.of(new BaseAttributeKvEntry(new StringDataEntry(key, secretCodec.encrypt(secret)),
+                        System.currentTimeMillis())))
+                .callback(new com.google.common.util.concurrent.FutureCallback<>() {
+                    @Override
+                    public void onSuccess(Void result) {
+                        stored.set(null);
+                    }
+
+                    @Override
+                    public void onFailure(Throwable t) {
+                        stored.setException(t);
+                    }
+                })
+                .build());
+        stored.get(SECRET_STORE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+    }
+
     record Credentials(String host, String fingerprint, String token, String password) {
+    }
+
+    /** What an attestation established; {@code reason} is set only when it did not verify. */
+    public record AttestationResult(boolean verified, String uid, String certFingerprint, String reason) {
     }
 
 }

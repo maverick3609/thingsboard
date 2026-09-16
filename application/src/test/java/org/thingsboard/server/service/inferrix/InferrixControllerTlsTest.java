@@ -42,6 +42,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
@@ -116,7 +117,23 @@ class InferrixControllerTlsTest {
         try (SSLSocket socket = upgrade(trust)) {
             socket.startHandshake();
             assertEquals(InferrixControllerClient.fingerprintOf(serverCertificate), trust.getFingerprint());
+            assertEquals(serverCertificate, trust.getCertificate());
         }
+    }
+
+    @Test
+    void aCertificateIsOnlyHandedOutOnceItHasPassedThePin() throws Exception {
+        // Attestation verifies against this certificate, so one that failed the pin must never be
+        // available to verify against — a signature by the wrong key could otherwise pass.
+        FingerprintCapturingTrustManager trust = new FingerprintCapturingTrustManager(
+                "0000000000000000000000000000000000000000000000000000000000000000");
+
+        assertThrows(SSLHandshakeException.class, () -> {
+            try (SSLSocket socket = upgrade(trust)) {
+                socket.startHandshake();
+            }
+        });
+        assertNull(trust.getCertificate());
     }
 
     @Test

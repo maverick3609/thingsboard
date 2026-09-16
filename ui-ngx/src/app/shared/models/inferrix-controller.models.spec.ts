@@ -14,7 +14,8 @@
 /// limitations under the License.
 ///
 
-import { bitsToFloat, CONTROLLER_CONFIG_SECTIONS, escapeCell, floatToBits } from './inferrix-controller.models';
+import { bitsToFloat, CONTROLLER_CONFIG_SECTIONS, escapeCell, firmwareVersionOf, floatToBits, pointWriteBody,
+  sameFirmwareRelease } from './inferrix-controller.models';
 
 describe('Inferrix controller config models', () => {
 
@@ -81,5 +82,37 @@ describe('Inferrix controller config models', () => {
       expect(escapeCell(0)).toBe('0');
     });
 
+  });
+
+  describe('point writes', () => {
+
+    it('sends bools and whole numbers as v', () => {
+      expect(pointWriteBody('do', true)).toEqual({type: 'do', v: true});
+      expect(pointWriteBody('rtu', 1500)).toEqual({type: 'rtu', v: 1500});
+      expect(pointWriteBody('ao', -2147483648)).toEqual({type: 'ao', v: -2147483648});
+    });
+
+    it('sends fractions, and whole numbers too wide for an int32, as float bits', () => {
+      // The device parses v as a bool or an int32 only; anything else there is a bad_field.
+      expect(pointWriteBody('ao', 0.15)).toEqual({type: 'ao', v_bits: 0x3E19999A});
+      expect(pointWriteBody('ao', 2147483648)).toEqual({type: 'ao', v_bits: floatToBits(2147483648)});
+    });
+  });
+
+  describe('firmware versions', () => {
+
+    it('treats the numeric 0 older announces sent as no version at all', () => {
+      expect(firmwareVersionOf(0)).toBeNull();
+      expect(firmwareVersionOf('')).toBeNull();
+      expect(firmwareVersionOf(undefined)).toBeNull();
+      expect(firmwareVersionOf('0.1.15+0')).toBe('0.1.15+0');
+    });
+
+    it('compares releases the way MCUboot ranks them, ignoring the build number', () => {
+      expect(sameFirmwareRelease('0.1.16+0', '0.1.16+7')).toBeTrue();
+      expect(sameFirmwareRelease('0.1.15+0', '0.1.16+0')).toBeFalse();
+      expect(sameFirmwareRelease('0.1.1+0', '0.1.16+0')).toBeFalse();
+      expect(sameFirmwareRelease('—', '—')).toBeFalse();
+    });
   });
 });

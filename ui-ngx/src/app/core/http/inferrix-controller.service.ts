@@ -16,11 +16,12 @@
 
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { defer, EMPTY, Observable } from 'rxjs';
-import { expand, map, reduce } from 'rxjs/operators';
+import { defer, EMPTY, Observable, of, timer } from 'rxjs';
+import { catchError, exhaustMap, expand, first, map, reduce, timeout } from 'rxjs/operators';
 import { defaultHttpOptionsFromConfig, defaultHttpUploadOptions, RequestConfig } from '@core/http/http-utils';
-import { AdoptControllerRequest, ControllerConfigSection, ControllerUploadKind,
-  ControllerUploadStatus, DiscoveredController } from '@shared/models/inferrix-controller.models';
+import { AdoptControllerRequest, ControllerAttestation, ControllerConfigSection, ControllerPoint,
+  ControllerUploadKind, ControllerUploadStatus, DiscoveredController,
+  pointWriteBody } from '@shared/models/inferrix-controller.models';
 import { Device } from '@shared/models/device.models';
 import { floatToBits, LogicCompileResult, LogicProgram, PidTuneRequest,
   PidTuneStatus } from '@shared/models/inferrix-logic.models';
@@ -250,6 +251,53 @@ export class InferrixControllerService {
   }
 
   /**
+   * Forces a value onto a writable point. Accepted means staged, not applied: a local output lands
+   * at the next scan boundary and a Modbus write when the poller reaches it.
+   */
+  public writePoint(deviceId: string, point: ControllerPoint, value: boolean | number): Observable<any> {
+    return this.proxy(deviceId, 'POST', `/api/v1/points/${point.id}`,
+      pointWriteBody(point.type, value), {ignoreErrors: true});
+  }
+
+  /** The device answers first and resets 500 ms later, so a 200 means the restart is armed. */
+  public rebootController(deviceId: string): Observable<any> {
+    return this.proxy(deviceId, 'POST', '/api/v1/system/reboot', null, {ignoreErrors: true});
+  }
+
+  /**
+   * `/api/v1/info` from a controller that is on its way back up: polls until it answers, and errors
+   * if it has not within {@link REBOOT_WAIT_MS}.
+   */
+  public awaitController(deviceId: string): Observable<any> {
+    // exhaustMap: a probe of a controller that is still down can take longer than the interval, and
+    // the ticks that land meanwhile are dropped rather than queued behind it.
+    return timer(REBOOT_POLL_MS, REBOOT_POLL_MS).pipe(
+      exhaustMap(() => this.proxy<any>(deviceId, 'GET', '/api/v1/info', null,
+        {ignoreErrors: true, ignoreLoading: true}).pipe(catchError(() => of(null)))),
+      first(info => !!info),
+      timeout(REBOOT_WAIT_MS));
+  }
+
+  /**
+   * Challenges the controller to sign a fresh nonce and checks the signature against the
+   * certificate the platform pinned at adoption. Not a proxy call: only the platform holds that pin.
+   */
+  public attestController(deviceId: string, config?: RequestConfig): Observable<ControllerAttestation> {
+    return this.http.post<ControllerAttestation>(`/api/inferrix/controllers/${deviceId}/attest`, null,
+      defaultHttpOptionsFromConfig(config));
+  }
+
+  /**
+   * Rotates the controller's ownership password. Not a proxy call: the device revokes its token on
+   * a change, so the platform has to make the change and re-seal what it holds in one step.
+   */
+  public changeControllerPassword(deviceId: string, newPassword: string,
+                                  config?: RequestConfig): Observable<void> {
+    return this.http.post<void>(`/api/inferrix/controllers/${deviceId}/password`, {newPassword},
+      defaultHttpOptionsFromConfig(config));
+  }
+
+  /**
    * Forwards one request to the controller's own REST API.
    *
    * `path` is a device path such as `/api/v1/health`. Only device-configuration routes are
@@ -283,6 +331,14 @@ export interface PagedRecords {
 
 /** 1024 points at the buffer's worth per page leaves plenty of room; see readPaged. */
 const MAX_CONFIG_PAGES = 256;
+
+const REBOOT_POLL_MS = 5000;
+
+/**
+ * How long a restarting controller gets to answer again. A firmware test boot has to come up,
+ * confirm itself and bring the network up; a rolled-back one boots twice.
+ */
+const REBOOT_WAIT_MS = 3 * 60 * 1000;
 
 /**
  * The records out of one section page.

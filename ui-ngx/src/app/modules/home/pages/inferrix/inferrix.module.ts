@@ -35,6 +35,8 @@ import { ControllerLogicComponent } from '@home/pages/inferrix/controller/contro
 import { ControllerStatementsComponent } from '@home/pages/inferrix/controller/controller-statements.component';
 import { ControllerExpressionComponent } from '@home/pages/inferrix/controller/controller-expression.component';
 import { ControllerTuneComponent } from '@home/pages/inferrix/controller/controller-tune.component';
+import { ControllerPointWriteDialogComponent }
+  from '@home/pages/inferrix/controller/controller-point-write-dialog.component';
 
 @NgModule({
   declarations: [
@@ -51,7 +53,8 @@ import { ControllerTuneComponent } from '@home/pages/inferrix/controller/control
     ControllerLogicComponent,
     ControllerStatementsComponent,
     ControllerExpressionComponent,
-    ControllerTuneComponent
+    ControllerTuneComponent,
+    ControllerPointWriteDialogComponent
   ],
   imports: [
     CommonModule,

@@ -84,7 +84,7 @@
       </div>
       <div class="tb-form-row space-between">
         <div translate>inferrix.firmware</div>
-        <div>{{ entity?.fw || info?.fw || '—' }}</div>
+        <div>{{ versionOf(entity?.fw) || versionOf(info?.fw) || '—' }}</div>
       </div>
       <div class="tb-form-row space-between">
         <div translate>inferrix.icc-version</div>

@@ -96,4 +96,94 @@
       </div>
     </form>
   </div>
+
+  <div class="tb-form-panel stroked">
+    <div class="flex flex-row items-center">
+      <div class="tb-form-panel-title flex-1" translate>inferrix.settings-peers</div>
+      <button mat-icon-button type="button" [disabled]="peersLoading" (click)="reloadPeers()"
+              matTooltip="{{ 'action.refresh' | translate }}" matTooltipPosition="above">
+        <mat-icon>refresh</mat-icon>
+      </button>
+    </div>
+    <div class="tb-form-panel-hint" translate>inferrix.peers-hint</div>
+    <mat-progress-bar color="warn" mode="indeterminate" *ngIf="peersLoading"></mat-progress-bar>
+    <div class="tb-error-message" *ngIf="peersError">{{ peersError }}</div>
+    <form [formGroup]="peersForm">
+      <fieldset [disabled]="readonly || peersLoading">
+        <div class="tb-settings-fields">
+          <mat-form-field class="tb-settings-field" subscriptSizing="dynamic">
+            <mat-label>{{ 'inferrix.peer-psk' | translate }}</mat-label>
+            <input matInput type="password" formControlName="psk" maxlength="64" autocomplete="new-password"/>
+            <mat-hint>{{ (pskSet ? 'inferrix.peer-psk-set-hint' : 'inferrix.peer-psk-unset-hint') | translate }}</mat-hint>
+            <mat-error>{{ 'inferrix.peer-psk-invalid' | translate }}</mat-error>
+          </mat-form-field>
+        </div>
+        <div formArrayName="peers">
+          <div class="tb-settings-fields" *ngFor="let peer of peerRows.controls; let index = index"
+               [formGroupName]="index">
+            <mat-form-field class="tb-settings-field" subscriptSizing="dynamic">
+              <mat-label>{{ 'inferrix.peer-uid' | translate }}</mat-label>
+              <input matInput formControlName="uid" maxlength="24"/>
+              <mat-error>{{ 'inferrix.peer-uid-hint' | translate }}</mat-error>
+            </mat-form-field>
+            <mat-form-field class="tb-settings-field" subscriptSizing="dynamic">
+              <mat-label>{{ 'inferrix.network-ip' | translate }}</mat-label>
+              <input matInput formControlName="ip"/>
+              <mat-error>{{ 'inferrix.field-invalid' | translate }}</mat-error>
+            </mat-form-field>
+            <mat-form-field class="tb-settings-port" subscriptSizing="dynamic">
+              <mat-label>{{ 'inferrix.peer-port' | translate }}</mat-label>
+              <input matInput type="number" formControlName="port" placeholder="9701"/>
+              <mat-error>{{ 'inferrix.field-invalid' | translate }}</mat-error>
+            </mat-form-field>
+            <button mat-icon-button type="button" class="tb-settings-remove" [disabled]="readonly"
+                    (click)="removePeer(index)"
+                    matTooltip="{{ 'action.remove' | translate }}" matTooltipPosition="above">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+        </div>
+      </fieldset>
+      <div class="flex flex-row items-center justify-end gap-2">
+        <span class="tb-hint" *ngIf="peersSaved && peersForm.pristine">{{ 'inferrix.saved' | translate }}</span>
+        <button mat-stroked-button type="button" [disabled]="readonly || peersLoading || peerRows.length >= 4"
+                (click)="addPeer()">
+          {{ 'inferrix.add-peer' | translate }}
+        </button>
+        <button mat-raised-button color="primary" type="button" (click)="savePeers()"
+                [disabled]="readonly || peersLoading || peersForm.pristine || peersForm.invalid">
+          {{ 'action.save' | translate }}
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <div class="tb-form-panel stroked">
+    <div class="tb-form-panel-title" translate>inferrix.ownership-password</div>
+    <div class="tb-form-panel-hint" translate>inferrix.ownership-password-hint</div>
+    <div class="tb-error-message" *ngIf="passwordError">{{ passwordError }}</div>
+    <form [formGroup]="passwordForm">
+      <fieldset class="tb-settings-fields" [disabled]="readonly || passwordRunning">
+        <mat-form-field class="tb-settings-field" subscriptSizing="dynamic">
+          <mat-label>{{ 'inferrix.new-password' | translate }}</mat-label>
+          <input matInput type="password" formControlName="password" maxlength="64" autocomplete="new-password"/>
+          <mat-error>{{ 'inferrix.password-policy' | translate }}</mat-error>
+        </mat-form-field>
+        <mat-form-field class="tb-settings-field" subscriptSizing="dynamic">
+          <mat-label>{{ 'inferrix.confirm-password' | translate }}</mat-label>
+          <input matInput type="password" formControlName="confirm" maxlength="64" autocomplete="new-password"/>
+        </mat-form-field>
+      </fieldset>
+      <div class="flex flex-row items-center justify-end gap-2">
+        <span class="tb-error-message" *ngIf="passwordForm.hasError('mismatch') && passwordForm.get('confirm').dirty">
+          {{ 'inferrix.password-mismatch' | translate }}
+        </span>
+        <span class="tb-hint" *ngIf="passwordChanged">{{ 'inferrix.password-changed' | translate }}</span>
+        <button mat-raised-button color="primary" type="button" (click)="changePassword()"
+                [disabled]="readonly || passwordRunning || passwordForm.invalid">
+          {{ 'inferrix.change-password' | translate }}
+        </button>
+      </div>
+    </form>
+  </div>
 </div>

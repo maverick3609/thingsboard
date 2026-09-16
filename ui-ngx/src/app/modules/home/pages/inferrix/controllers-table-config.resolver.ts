@@ -41,6 +41,7 @@ import {
   CONTROLLER_ATTRIBUTE_KEYS,
   ControllerInfo,
   escapeCell,
+  firmwareVersionOf,
   INFERRIX_CONTROLLER_PROFILE
 } from '@shared/models/inferrix-controller.models';
 import { ControllerComponent } from '@home/pages/inferrix/controller/controller.component';
@@ -121,7 +122,7 @@ export class ControllersTableConfigResolver {
       new EntityTableColumn<ControllerInfo>('model', 'inferrix.model', '15%',
         controller => escapeCell(controller.model), () => ({}), false),
       new EntityTableColumn<ControllerInfo>('fw', 'inferrix.firmware', '10%',
-        controller => escapeCell(controller.fw), () => ({}), false),
+        controller => escapeCell(firmwareVersionOf(controller.fw)), () => ({}), false),
       new EntityTableColumn<ControllerInfo>('icc', 'inferrix.config-version', '80px',
         controller => escapeCell(controller.icc), () => ({}), false),
       new EntityTableColumn<ControllerInfo>('active', 'device.state', '80px',

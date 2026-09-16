@@ -12,7 +12,7 @@ Builds `application/target/thingsboard-<ver>-boot.jar` and cuts it over on a rem
 The SSH **and** sudo password come from the operator at run time (ask, or read `$TB_DEPLOY_PASS`). It is passed to the bundled `expect` helpers **as an argument** and appears only transiently in process args — never in this skill, a temp file, git, or a remote file. macOS has no `sshpass`; the helpers (`ssh-run.exp`, `ssh-scp.exp`) drive password auth with the built-in `expect`.
 
 ## Prerequisites
-- Build toolchain (this machine): `JAVA_HOME=/Users/maverick/Library/Java/JavaVirtualMachines/azul-17.0.19/Contents/Home`; IntelliJ Maven `"/Applications/IntelliJ IDEA.app/Contents/plugins/maven/lib/maven3/bin/mvn"`; `PATH` prepend `/opt/homebrew/opt/node@22/bin` (frontend build needs Node 22).
+- Build toolchain (this machine): `JAVA_HOME=/Users/maverick/Library/Java/JavaVirtualMachines/azul-17.0.19/Contents/Home`; IntelliJ's bundled Maven, found by glob because IntelliJ 2026.2 renamed the plugin directory `maven` → `maven-plugin` and broke the hardcoded path; `PATH` prepend `/opt/homebrew/opt/node@22/bin` (frontend build needs Node 22).
 - `/usr/bin/expect` (ships with macOS); network reachability to `<host>:22`.
 
 ## When to use
@@ -38,7 +38,7 @@ D=.claude/skills/deploy-thingsboard
 ```bash
 export JAVA_HOME=/Users/maverick/Library/Java/JavaVirtualMachines/azul-17.0.19/Contents/Home
 export PATH="$JAVA_HOME/bin:/opt/homebrew/opt/node@22/bin:$PATH"
-MVN="/Applications/IntelliJ IDEA.app/Contents/plugins/maven/lib/maven3/bin/mvn"
+MVN=$(ls -d "/Applications/IntelliJ IDEA.app/Contents/plugins/"maven*/lib/maven3/bin/mvn | head -1)
 "$MVN" clean install -DskipTests            # full reactor incl. ui-ngx frontend; ~ tens of minutes
 JAR=$(ls application/target/thingsboard-*-boot.jar) ; N=$(basename "$JAR")
 ```

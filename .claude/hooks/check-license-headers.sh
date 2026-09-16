@@ -4,28 +4,39 @@
 # That goal runs only in a full reactor build, minutes in and typically only when someone is about
 # to deploy — and when it fails at the ui-ngx module, maven has not yet cleaned application/target,
 # so the PREVIOUS boot jar is still sitting there looking like a successful build. This has cost a
-# build cycle three times on this fork (7b95cf84f8, 94a1ecbe8e, 10e2c3a9df), every one of them a
-# .scss file.
+# build cycle four times on this fork (7b95cf84f8, 94a1ecbe8e, 10e2c3a9df, b557ff20c4).
 #
-# Two distinct failure modes, both checked:
-#   1. no header at all;
-#   2. the right header text in the WRONG comment style — .scss is JAVADOC_STYLE per the root pom's
-#      <mapping>, but a .ts habit produces ///, which is what bit 7b95cf84f8. Grepping for
-#      "Copyright" alone would pass that file, so the opener is checked too.
+# The check is exact because the plugin is. Measured on 2026-09-16 by running the real goal
+# (license-maven-plugin 3.0) over one-change copies of files it accepts:
+#   accepted  CRLF; trailing whitespace; blank lines before the header; either owner below;
+#   rejected  any other difference inside the header — an indent, a blank line added or missing, a
+#             missing space after the marker, a missing /// or -- first or last line, /* for /**,
+#             another comment style, another year — and a .ts or .sql header with no blank line
+#             after it (/// and -- have no closing marker; the blank line is how the end is found).
+# The check this replaced looked only for the opener on line 1 and a copyright line near the top,
+# and passed the four .html templates b557ff20c4 had to fix: indented two spaces instead of four.
+# check-license-headers.test.sh holds those copies and the verdict the plugin gave each one.
 #
-# Owner: the root pom sets <owner>The Inferrix Authors</owner> as the default and lists the
-# Thingsboard template under <validHeaders>, so both are accepted here.
+# The expected text is rendered from the plugin's own templates, so a year bump there cannot leave
+# this script behind. Owner: the root pom sets <owner>The Inferrix Authors</owner> and lists the
+# Thingsboard template under <validHeaders>, so both are accepted.
 #
 # Usage:
 #   check-license-headers.sh            check staged files (pre-commit); exit 1 if any fail
-#   check-license-headers.sh --fix      prepend the correct header, in the right style, then stage
+#   check-license-headers.sh --fix      rewrite the header of each failing staged file, then stage it
 #   check-license-headers.sh --all      check the whole worktree (pre-flight before a deploy build)
 
 set -uo pipefail
 
 MODE="${1:-staged}"
-YEAR_TO=2026
-OWNER="The Inferrix Authors"
+ROOT="$(git rev-parse --show-toplevel)" && cd "$ROOT" || exit 1
+INFERRIX="The Inferrix Authors"
+THINGSBOARD="The Thingsboard Authors"
+INCEPTION_YEAR="$(sed -n 's:.*<inceptionYear>\([0-9]*\)</inceptionYear>.*:\1:p' pom.xml | head -n 1)"
+if [[ -z "$INCEPTION_YEAR" ]]; then
+  printf '[license-header] no <inceptionYear> in %s/pom.xml, so the expected header is unknown\n' "$ROOT" >&2
+  exit 1
+fi
 
 # Only the extensions this fork actually authors. The maven plugin checks more; anything outside
 # this list still gets caught at build time, which is the existing (slow) safety net.
@@ -52,52 +63,109 @@ is_checked() {
   return 0
 }
 
-# Mirrors the root pom's <mapping> plus the plugin defaults; verified against the files in tree.
-opener_for() {
-  # printf '%s' throughout: a bare printf '--' is read as an end-of-options marker and errors.
-  case "$1" in
-    *.java|*.scss) printf '%s' '/**' ;;
-    *.ts)          printf '%s' '///' ;;
-    *.html)        printf '%s' '<!--' ;;
-    *.sql)         printf '%s' '--' ;;
-  esac
+# The template text for an owner, with the placeholders the plugin substitutes.
+template_body() {
+  if [[ "$1" == "$THINGSBOARD" ]]; then
+    cat license-header-template-thingsboard.txt
+  else
+    sed -e "s/\${project\.inceptionYear}/$INCEPTION_YEAR/g" -e "s/\${owner}/$1/g" license-header-template.txt
+  fi
 }
 
+# The header in the comment style the root pom's <mapping> and the plugin defaults give each type.
+# printf '%s' for the dashes: a bare printf '--' is read as an end-of-options marker and errors.
 header_for() {
-  local body="Copyright © 2016-${YEAR_TO} ${OWNER}
-
-Licensed under the Apache License, Version 2.0 (the \"License\");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an \"AS IS\" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License."
   case "$1" in
     *.java|*.scss)
-      printf '/**\n'; printf '%s\n' "$body" | sed 's|^| * |; s| *$||'; printf ' */\n' ;;
+      printf '/**\n'; template_body "$2" | sed 's|^| * |; s| *$||'; printf ' */\n' ;;
     *.ts)
-      printf '///\n'; printf '%s\n' "$body" | sed 's|^|/// |; s| *$||'; printf '///\n' ;;
+      printf '///\n'; template_body "$2" | sed 's|^|/// |; s| *$||'; printf '///\n' ;;
     *.html)
-      printf '<!--\n\n'; printf '%s\n' "$body" | sed 's|^|    |; s| *$||'; printf '\n-->\n' ;;
+      printf '<!--\n\n'; template_body "$2" | sed 's|^|    |; s| *$||'; printf '\n-->\n' ;;
     *.sql)
-      printf '%s\n' "$body" | sed 's|^|-- |; s| *$||' ;;
+      printf '%s\n' '--'; template_body "$2" | sed 's|^|-- |; s| *$||'; printf '%s\n' '--' ;;
   esac
 }
 
-# A file passes when it opens with the style its extension requires AND carries an accepted
-# copyright line near the top.
-has_valid_header() {
-  local f="$1" opener
-  opener="$(opener_for "$f")"
-  head -n 1 "$f" | grep -qF -- "$opener" || return 1
-  head -n 20 "$f" | grep -qE 'Copyright ©.*(The Inferrix Authors|The Thingsboard Authors)' || return 1
-  return 0
+# Rendered once per type and owner; bash 3.2 has no associative arrays, hence the variable names.
+for ext in java scss ts html sql; do
+  printf -v "EXPECTED_INFERRIX_$ext" '%s' "$(header_for "x.$ext" "$INFERRIX")"
+  printf -v "EXPECTED_THINGSBOARD_$ext" '%s' "$(header_for "x.$ext" "$THINGSBOARD")"
+done
+
+# Normalises what the plugin tolerates (CR, trailing whitespace, blank lines above), then compares
+# line for line; the "" forces a string comparison. Reads no further than the longest header needs.
+MATCH_AWK='
+function same(want,    w, n, k) {
+  n = split(want, w, "\n")
+  if (count < n) return 0
+  for (k = 1; k <= n; k++) if (got[k] "" != w[k] "") return 0
+  if (blank_after && !(count > n && got[n + 1] == "")) return 0
+  return 1
 }
+{
+  sub(/\r$/, ""); sub(/[ \t]+$/, "")
+  if (count == 0 && $0 == "") next
+  got[++count] = $0
+  if (count > 18) exit
+}
+END { exit !(same(ENVIRON["EXPECTED_A"]) || same(ENVIRON["EXPECTED_B"])) }'
+
+# $1 names the file, and its extension picks the comment style; $2 is what to read, if not $1.
+has_valid_header() {
+  local ext="${1##*.}" a b blank=0
+  a="EXPECTED_INFERRIX_$ext"; b="EXPECTED_THINGSBOARD_$ext"
+  case "$ext" in ts|sql) blank=1 ;; esac
+  EXPECTED_A="${!a}" EXPECTED_B="${!b}" awk -v blank_after="$blank" "$MATCH_AWK" "${2:-$1}"
+}
+
+# Prints a file without its licence comment and says, by exit status, whose licence it was: 0 none
+# or The Inferrix Authors', 10 The Thingsboard Authors', 11 someone else's — and then prints
+# nothing, because swapping a third party's notice for ours is not a formatting fix (Apache-2.0
+# section 4(c) requires keeping it).
+# The licence is the first comment block, when a Copyright line is in it. Anything else there, such
+# as a doc comment or a /// <reference> directive, is printed back. A // or -- block ends where the
+# licence text does, so a comment written straight under a malformed licence is kept too.
+STRIP_AWK='
+function blank(s) { return s ~ /^[ \t\r]*$/ }
+{ line[++n] = $0 }
+END {
+  i = 1
+  while (i <= n && blank(line[i])) i++
+  last = 0
+  if (i <= n && line[i] ~ /^[ \t]*(<!--|\/\*)/) {
+    closer = (line[i] ~ /^[ \t]*<!--/) ? "-->" : "\\*/"
+    for (j = i; j <= n; j++) if (line[j] ~ closer) { last = j; break }
+  } else if (i <= n && line[i] ~ /^[ \t]*(\/\/|--)/) {
+    slash = (line[i] ~ /^[ \t]*\/\//)
+    marker = slash ? "^[ \t]*//" : "^[ \t]*--"
+    bare = slash ? "^[ \t]*///?[ \t\r]*$" : "^[ \t]*--[ \t\r]*$"
+    for (j = i; j <= n && line[j] ~ marker; j++) {
+      last = j
+      if (line[j] ~ /limitations under the License/) {
+        if (j < n && line[j + 1] ~ bare) last = j + 1
+        break
+      }
+    }
+  }
+  licence = 0; status = 0
+  for (j = i; j <= last; j++) {
+    if (line[j] !~ /[Cc]opyright/) continue
+    licence = 1
+    who = tolower(line[j])
+    if (who ~ /the thingsboard authors/) status = 10
+    else if (who !~ /the inferrix authors/) exit 11
+  }
+  if (licence) {
+    i = last + 1
+    while (i <= n && blank(line[i])) i++
+  }
+  for (; i <= n; i++) print line[i]
+  exit status
+}'
+
+TMP="$(mktemp -d)" || exit 1
+trap 'rm -rf "$TMP"' EXIT
 
 # A read loop rather than mapfile: macOS ships bash 3.2 as /bin/bash and mapfile is bash 4+.
 if [[ "$MODE" == "--all" ]]; then
@@ -109,9 +177,15 @@ fi
 bad=""
 while IFS= read -r f; do
   [[ -n "$f" ]] || continue
-  [[ -f "$f" ]] || continue
   is_checked "$f" || continue
-  has_valid_header "$f" || bad="${bad}${f}"$'\n'
+  if [[ "$MODE" == "--all" ]]; then
+    [[ -f "$f" ]] || continue
+    has_valid_header "$f"
+  else
+    # The staged copy, not the worktree's: a header fixed on disk but never re-added would pass
+    # here and still be committed broken.
+    git cat-file blob ":$f" > "$TMP/blob" && has_valid_header "$f" "$TMP/blob"
+  fi || bad="${bad}${f}"$'\n'
 done <<< "$list"
 
 if [[ -z "$bad" ]]; then
@@ -119,22 +193,37 @@ if [[ -z "$bad" ]]; then
 fi
 
 if [[ "$MODE" == "--fix" ]]; then
+  failed=0
   while IFS= read -r f; do
     [[ -n "$f" ]] || continue
-    tmp=$(mktemp)
-    { header_for "$f"; printf '\n'; cat "$f"; } > "$tmp"
-    mv "$tmp" "$f"
-    git add "$f" 2>/dev/null || true
-    printf '[license-header] fixed %s\n' "$f"
+    awk "$STRIP_AWK" "$f" > "$TMP/body"
+    case $? in
+      0)  owner="$INFERRIX" ;;
+      10) owner="$THINGSBOARD" ;;
+      11) printf '[license-header] left %s alone: its first comment is a copyright notice that is not ours\n' "$f" >&2
+          failed=1; continue ;;
+      *)  printf '[license-header] could not read %s\n' "$f" >&2
+          failed=1; continue ;;
+    esac
+    { header_for "$f" "$owner"; printf '\n'; cat "$TMP/body"; } > "$TMP/fixed"
+    # Written through rather than moved over, which would give the file the temp file's mode.
+    cat "$TMP/fixed" > "$f"
+    git add -- "$f"
+    if has_valid_header "$f"; then
+      printf '[license-header] fixed %s\n' "$f"
+    else
+      printf '[license-header] rewrote %s and it still fails; the renderer here is wrong\n' "$f" >&2
+      failed=1
+    fi
   done <<< "$bad"
-  exit 0
+  exit "$failed"
 fi
 
-count=$(printf '%s' "$bad" | grep -c '' )
-printf '\n[license-header] %s file(s) would fail `mvn license:check`:\n\n' "$count" >&2
+count=$(printf '%s' "$bad" | grep -c '')
+printf '\n[license-header] %s file(s) would fail `mvn license:check`: the header is missing, or not in the exact form it accepts:\n\n' "$count" >&2
 while IFS= read -r f; do
   [[ -n "$f" ]] || continue
-  printf '  %s   (needs a %s header)\n' "$f" "$(opener_for "$f")" >&2
+  printf '  %s\n' "$f" >&2
 done <<< "$bad"
 printf '\nFix them with:\n  bash .claude/hooks/check-license-headers.sh --fix\n\n' >&2
 exit 1

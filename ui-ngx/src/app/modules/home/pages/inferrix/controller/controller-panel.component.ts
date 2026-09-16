@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 
-import { Directive, Input, OnDestroy } from '@angular/core';
+import { Directive, Input, OnChanges, OnDestroy } from '@angular/core';
 import { Subject } from 'rxjs';
 import { controllerRecordError } from '@shared/models/inferrix-controller.models';
 
@@ -24,31 +24,32 @@ import { controllerRecordError } from '@shared/models/inferrix-controller.models
  * The `active` input is ThingsBoard's own detail-tab convention (`tb-attribute-table`,
  * `tb-relation-table` and the rest all take it), and here it also protects the device: the firmware
  * serves two clients at a time, so a panel must not talk to it until its tab is actually opened.
- * The load happens once — everything on these panels has its own refresh control.
+ * The load happens once — everything on these panels has its own refresh control — and a panel serves
+ * one device for its whole life: the tabs rebuild it when the device changes.
  */
 @Directive()
-export abstract class ControllerPanelComponent implements OnDestroy {
+export abstract class ControllerPanelComponent implements OnChanges, OnDestroy {
 
   @Input() deviceId: string;
   @Input() readonly = false;
+  @Input() active = false;
 
-  @Input()
-  set active(active: boolean) {
-    this.activeValue = active;
-    if (active && !this.loaded) {
+  protected destroy$ = new Subject<void>();
+
+  private loaded = false;
+
+  /**
+   * Loads here rather than in an `active` setter, because inputs are set in template order and the
+   * templates bind `active` first. A panel created on a tab that is already open (the tune panel
+   * inside Logic, or any panel rebuilt for a new device) used to load before it knew the device, and
+   * before `readonly`. By the time this hook runs, every input is set.
+   */
+  ngOnChanges(): void {
+    if (this.active && this.deviceId && !this.loaded) {
       this.loaded = true;
       this.load();
     }
   }
-
-  get active(): boolean {
-    return this.activeValue;
-  }
-
-  protected destroy$ = new Subject<void>();
-
-  private activeValue = false;
-  private loaded = false;
 
   ngOnDestroy(): void {
     this.destroy$.next();

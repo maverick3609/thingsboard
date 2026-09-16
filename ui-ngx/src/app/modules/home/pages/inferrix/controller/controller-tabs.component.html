@@ -15,30 +15,49 @@
     limitations under the License.
 
 -->
+<!--
+  Each controller panel sits in a one-item loop tracked by the device id. The details drawer keeps this
+  component alive and only swaps the entity, so a panel reused across that swap would go on showing the
+  last controller's settings while its actions reached the new one. A new id rebuilds the panel; the
+  same controller saved again keeps it. Tracking by the id rather than the item also keeps Angular's
+  NG0956 "re-creation" dev warning quiet, since here the re-creation is the point.
+-->
 @if (entity) {
   <mat-tab label="{{ 'inferrix.tab-points' | translate }}" #pointsTab="matTab">
-    <tb-controller-points [active]="pointsTab.isActive" [deviceId]="entity.id.id"
-                          [readonly]="readonly"></tb-controller-points>
+    @for (controller of [entity]; track controller.id.id) {
+      <tb-controller-points [active]="pointsTab.isActive" [deviceId]="controller.id.id"
+                            [readonly]="readonly"></tb-controller-points>
+    }
   </mat-tab>
   <mat-tab label="{{ 'inferrix.tab-settings' | translate }}" #settingsTab="matTab">
-    <tb-controller-settings [active]="settingsTab.isActive" [deviceId]="entity.id.id"
-                            [readonly]="readonly"></tb-controller-settings>
+    @for (controller of [entity]; track controller.id.id) {
+      <tb-controller-settings [active]="settingsTab.isActive" [deviceId]="controller.id.id"
+                              [readonly]="readonly"></tb-controller-settings>
+    }
   </mat-tab>
   <mat-tab label="{{ 'inferrix.tab-config' | translate }}" #configTab="matTab">
-    <tb-controller-config [active]="configTab.isActive" [deviceId]="entity.id.id"
-                          [readonly]="readonly"></tb-controller-config>
+    @for (controller of [entity]; track controller.id.id) {
+      <tb-controller-config [active]="configTab.isActive" [deviceId]="controller.id.id"
+                            [readonly]="readonly"></tb-controller-config>
+    }
   </mat-tab>
   <mat-tab label="{{ 'inferrix.tab-logic' | translate }}" #logicTab="matTab">
-    <tb-controller-logic [active]="logicTab.isActive" [deviceId]="entity.id.id"
-                         [readonly]="readonly"></tb-controller-logic>
+    @for (controller of [entity]; track controller.id.id) {
+      <tb-controller-logic [active]="logicTab.isActive" [deviceId]="controller.id.id"
+                           [readonly]="readonly"></tb-controller-logic>
+    }
   </mat-tab>
   <mat-tab label="{{ 'inferrix.tab-software' | translate }}" #softwareTab="matTab">
-    <tb-controller-software [active]="softwareTab.isActive" [deviceId]="entity.id.id"
-                            [readonly]="readonly"></tb-controller-software>
+    @for (controller of [entity]; track controller.id.id) {
+      <tb-controller-software [active]="softwareTab.isActive" [deviceId]="controller.id.id"
+                              [readonly]="readonly"></tb-controller-software>
+    }
   </mat-tab>
   <mat-tab label="{{ 'inferrix.tab-diagnostics' | translate }}" #diagnosticsTab="matTab">
-    <tb-controller-diagnostics [active]="diagnosticsTab.isActive" [deviceId]="entity.id.id"
-                               [readonly]="readonly"></tb-controller-diagnostics>
+    @for (controller of [entity]; track controller.id.id) {
+      <tb-controller-diagnostics [active]="diagnosticsTab.isActive" [deviceId]="controller.id.id"
+                                 [readonly]="readonly"></tb-controller-diagnostics>
+    }
   </mat-tab>
   <mat-tab label="{{ 'attribute.attributes' | translate }}" #attributesTab="matTab">
     <tb-attribute-table [defaultAttributeScope]="attributeScopes.CLIENT_SCOPE"

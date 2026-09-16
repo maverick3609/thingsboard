@@ -25,6 +25,8 @@
 #   check-license-headers.sh            check staged files (pre-commit); exit 1 if any fail
 #   check-license-headers.sh --fix      rewrite the header of each failing staged file, then stage it
 #   check-license-headers.sh --all      check the whole worktree (pre-flight before a deploy build)
+#   check-license-headers.sh --header FILE
+#                                       print the header FILE's type needs (enforce-license-header.sh)
 
 set -uo pipefail
 
@@ -32,9 +34,9 @@ MODE="${1:-staged}"
 ROOT="$(git rev-parse --show-toplevel)" && cd "$ROOT" || exit 1
 INFERRIX="The Inferrix Authors"
 THINGSBOARD="The Thingsboard Authors"
-INCEPTION_YEAR="$(sed -n 's:.*<inceptionYear>\([0-9]*\)</inceptionYear>.*:\1:p' pom.xml | head -n 1)"
-if [[ -z "$INCEPTION_YEAR" ]]; then
-  printf '[license-header] no <inceptionYear> in %s/pom.xml, so the expected header is unknown\n' "$ROOT" >&2
+INCEPTION_YEAR="$(sed -n 's:.*<inceptionYear>\([0-9]*\)</inceptionYear>.*:\1:p' pom.xml 2>/dev/null | head -n 1)"
+if [[ -z "$INCEPTION_YEAR" || ! -f license-header-template.txt || ! -f license-header-template-thingsboard.txt ]]; then
+  printf '[license-header] %s lacks the licence templates or a pom <inceptionYear>, so the expected header is unknown\n' "$ROOT" >&2
   exit 1
 fi
 
@@ -86,6 +88,12 @@ header_for() {
       printf '%s\n' '--'; template_body "$2" | sed 's|^|-- |; s| *$||'; printf '%s\n' '--' ;;
   esac
 }
+
+# So enforce-license-header.sh stamps this rendering rather than keeping a copy of its own.
+if [[ "$MODE" == "--header" ]]; then
+  header_for "${2:?usage: check-license-headers.sh --header FILE}" "$INFERRIX"
+  exit
+fi
 
 # Rendered once per type and owner; bash 3.2 has no associative arrays, hence the variable names.
 for ext in java scss ts html sql; do

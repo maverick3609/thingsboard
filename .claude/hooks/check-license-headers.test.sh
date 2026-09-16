@@ -181,6 +181,16 @@ grep -q 'The Thingsboard Authors' "$T/fx/thingsboard_malformed.java" || fail "--
 fixture year java > "$T/fx/late.java" && git -C "$T" add fx/late.java && fixture ok java > "$T/fx/late.java"
 [[ "$(refused)" == $'foreign.java\nlate.java' ]] || fail "a header fixed on disk but not staged passed"
 
+# enforce-license-header.sh stamps the rendered header whatever year the clock says. The copy it
+# used to keep took the year from `date`, so a clock in 2027 made it stamp one the plugin refuses.
+mkdir -p "$T/bin" && printf '#!/bin/sh\necho 2027\n' > "$T/bin/date" && chmod +x "$T/bin/date"
+printf 'package fixture;\n' > "$T/fx/Stamped.java"
+printf '{"tool_input":{"file_path":"%s"}}' "$T/fx/Stamped.java" \
+  | PATH="$T/bin:$PATH" bash "$REPO/.claude/hooks/enforce-license-header.sh" 2>/dev/null
+git -C "$T" add fx/Stamped.java
+[[ "$(refused)" == $'foreign.java\nlate.java' ]] \
+  || fail "enforce-license-header.sh did not stamp a header license:check accepts"
+
 if (( failures )); then
   printf '%s check(s) failed\n' "$failures"
   exit 1

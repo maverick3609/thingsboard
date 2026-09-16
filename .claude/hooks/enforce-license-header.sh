@@ -14,6 +14,7 @@
 # Excludes:
 #   - target/, node_modules/ (build output)
 #   - files that already start with /** (header present)
+#   - files outside a repository with the licence templates (no license:check there to satisfy)
 #
 # Hook receives the tool call JSON on stdin; we extract tool_input.file_path.
 
@@ -33,29 +34,21 @@ if [[ "$first_line" == /\*\** ]]; then
   exit 0
 fi
 
-year=$(date +%Y)
-header="/**
- * Copyright © 2016-${year} The Inferrix Authors
- *
- * Licensed under the Apache License, Version 2.0 (the \"License\");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an \"AS IS\" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-"
+# Rendered by the pre-commit check from the templates in the file's own repository, so the two hooks
+# cannot disagree. The copy this hook kept took its end year from `date`: from 2027-01-01 it would
+# have stamped 2016-2027, which license:check refuses, because the range ends where the template
+# was last bumped, not at the current year.
+hooks_dir=$(cd "$(dirname "$0")" && pwd)
+header=$(cd "$(dirname "$file_path")" && bash "$hooks_dir/check-license-headers.sh" --header "$file_path" 2>/dev/null) || exit 0
+[[ -n "$header" ]] || exit 0
 
 tmp=$(mktemp)
 {
-  printf '%s\n' "$header"
+  printf '%s\n\n' "$header"
   cat "$file_path"
 } > "$tmp"
-mv "$tmp" "$file_path"
+# Written through rather than moved over, which would leave the file with mktemp's 0600 mode.
+cat "$tmp" > "$file_path"
+rm -f "$tmp"
 
 printf '[license-header] prepended Apache 2.0 header to %s\n' "$file_path" >&2

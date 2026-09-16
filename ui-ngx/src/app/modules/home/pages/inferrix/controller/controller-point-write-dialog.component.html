@@ -29,18 +29,22 @@
   </mat-progress-bar>
   <div style="height: 4px;" *ngIf="(isLoading$ | async) === false"></div>
   <div mat-dialog-content>
-    <fieldset class="flex flex-col gap-4" [disabled]="isLoading$ | async">
+    <fieldset class="tb-form-panel no-border no-padding" [disabled]="isLoading$ | async">
       <div class="tb-form-row space-between">
         <div translate>inferrix.point-write-current</div>
         <div>{{ point.v }} · {{ point.q }}</div>
       </div>
-      <mat-slide-toggle *ngIf="isBoolean" formControlName="value">
-        {{ 'inferrix.point-write-on' | translate }}
-      </mat-slide-toggle>
-      <mat-form-field *ngIf="!isBoolean" class="mat-block" subscriptSizing="dynamic">
-        <mat-label>{{ 'inferrix.point-write-value' | translate }}</mat-label>
-        <input matInput type="number" formControlName="value" required/>
-      </mat-form-field>
+      <div class="tb-form-row" *ngIf="isBoolean">
+        <mat-slide-toggle class="mat-slide" formControlName="value">
+          {{ 'inferrix.point-write-on' | translate }}
+        </mat-slide-toggle>
+      </div>
+      <div class="tb-form-row column-xs" *ngIf="!isBoolean">
+        <div class="fixed-title-width tb-required">{{ 'inferrix.point-write-value' | translate }}</div>
+        <mat-form-field class="flex-1" appearance="outline" subscriptSizing="dynamic">
+          <input matInput type="number" formControlName="value" required/>
+        </mat-form-field>
+      </div>
       <div class="tb-form-panel-hint">{{ 'inferrix.point-write-hint' | translate }}</div>
       <div class="tb-error-message" *ngIf="errorMessage">{{ errorMessage }}</div>
     </fieldset>

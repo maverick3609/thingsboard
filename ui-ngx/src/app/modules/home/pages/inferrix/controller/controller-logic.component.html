@@ -15,20 +15,20 @@
     limitations under the License.
 
 -->
-<div class="tb-form-panel no-border no-padding">
+<div class="mat-padding flex flex-col gap-4">
 
   <div class="tb-form-panel stroked">
     <div class="tb-form-panel-title" translate>inferrix.logic-tags</div>
-    <div class="tb-hint" translate>inferrix.logic-tags-hint</div>
+    <div class="tb-form-panel-hint" translate>inferrix.logic-tags-hint</div>
 
     @for (tag of program.tags; track $index) {
-      <div class="tb-logic-tag-row">
+      <div class="tb-form-row flex-wrap">
         <mat-form-field class="tb-logic-name" subscriptSizing="dynamic" appearance="outline">
           <mat-label>{{ 'inferrix.logic-tag-name' | translate }}</mat-label>
           <input matInput [(ngModel)]="tag.name" [disabled]="readonly">
         </mat-form-field>
 
-        <mat-form-field class="tb-logic-field" subscriptSizing="dynamic" appearance="outline">
+        <mat-form-field class="tb-logic-type" subscriptSizing="dynamic" appearance="outline">
           <mat-label>{{ 'inferrix.logic-tag-type' | translate }}</mat-label>
           <mat-select [(value)]="tag.dataType" [disabled]="readonly">
             <mat-option value="BOOL">{{ 'inferrix.logic-type-bool' | translate }}</mat-option>
@@ -38,7 +38,7 @@
           </mat-select>
         </mat-form-field>
 
-        <mat-form-field class="tb-logic-field" subscriptSizing="dynamic" appearance="outline">
+        <mat-form-field class="tb-logic-choice" subscriptSizing="dynamic" appearance="outline">
           <mat-label>{{ 'inferrix.logic-tag-role' | translate }}</mat-label>
           <mat-select [(value)]="tag.cls" [disabled]="readonly">
             <mat-option value="INPUT">{{ 'inferrix.logic-role-input' | translate }}</mat-option>
@@ -47,7 +47,7 @@
           </mat-select>
         </mat-form-field>
 
-        <mat-form-field class="tb-logic-field" subscriptSizing="dynamic" appearance="outline">
+        <mat-form-field class="tb-logic-choice" subscriptSizing="dynamic" appearance="outline">
           <mat-label>{{ 'inferrix.logic-tag-binding' | translate }}</mat-label>
           <mat-select [value]="tag.binding" [disabled]="readonly"
                       (valueChange)="tag.binding = $event; onBindingChange(tag)">
@@ -59,7 +59,7 @@
 
         @if (bindingSpec(tag.binding)?.needsAddress) {
           @if (bindingSpec(tag.binding)?.fromPoints) {
-            <mat-form-field class="tb-logic-address" subscriptSizing="dynamic" appearance="outline">
+            <mat-form-field class="tb-logic-choice" subscriptSizing="dynamic" appearance="outline">
               <mat-label>{{ 'inferrix.logic-point' | translate }}</mat-label>
               <mat-select [(value)]="tag.address" [disabled]="readonly">
                 @for (point of points; track point.id) {
@@ -69,11 +69,12 @@
                 }
               </mat-select>
               @if (!points.length && !loadingPoints) {
-                <mat-hint>{{ 'inferrix.logic-no-points' | translate }}</mat-hint>
+                <mat-icon matSuffix class="tb-error" matTooltipPosition="above" matTooltipClass="tb-error-tooltip"
+                          [matTooltip]="'inferrix.logic-no-points' | translate">warning</mat-icon>
               }
             </mat-form-field>
           } @else if (tag.binding === 'SYSTEM_REGISTER') {
-            <mat-form-field class="tb-logic-address" subscriptSizing="dynamic" appearance="outline">
+            <mat-form-field class="tb-logic-choice" subscriptSizing="dynamic" appearance="outline">
               <mat-label>{{ 'inferrix.logic-register' | translate }}</mat-label>
               <mat-select [(value)]="tag.address" [disabled]="readonly">
                 @for (register of registers; track register.id) {
@@ -82,7 +83,7 @@
               </mat-select>
             </mat-form-field>
           } @else {
-            <mat-form-field class="tb-logic-field" subscriptSizing="dynamic" appearance="outline">
+            <mat-form-field class="tb-logic-number" subscriptSizing="dynamic" appearance="outline">
               <mat-label>{{ 'inferrix.logic-channel' | translate }}</mat-label>
               <input matInput type="number" min="0" [(ngModel)]="tag.address"
                      [disabled]="readonly">
@@ -91,8 +92,8 @@
         }
 
         @if (!readonly) {
-          <button mat-icon-button color="warn" (click)="removeTag($index)"
-                  matTooltip="{{ 'action.delete' | translate }}">
+          <button mat-icon-button color="warn" class="ml-auto" (click)="removeTag($index)"
+                  matTooltip="{{ 'action.delete' | translate }}" matTooltipPosition="above">
             <mat-icon>delete</mat-icon>
           </button>
         }
@@ -100,44 +101,48 @@
     }
 
     @if (!program.tags.length) {
-      <div class="tb-logic-empty" translate>inferrix.logic-no-tags</div>
+      <div class="tb-form-panel-hint" translate>inferrix.logic-no-tags</div>
     }
 
     @if (!readonly) {
-      <button mat-stroked-button (click)="addTag()">
-        <mat-icon>add</mat-icon>{{ 'inferrix.logic-add-tag' | translate }}
-      </button>
+      <div>
+        <button mat-stroked-button (click)="addTag()">
+          <mat-icon>add</mat-icon>{{ 'inferrix.logic-add-tag' | translate }}
+        </button>
+      </div>
     }
   </div>
 
   <div class="tb-form-panel stroked">
     <div class="tb-form-panel-title" translate>inferrix.logic-steps</div>
-    <div class="tb-hint" translate>inferrix.logic-steps-hint</div>
+    <div class="tb-form-panel-hint" translate>inferrix.logic-steps-hint</div>
     <tb-controller-statements [statements]="program.statements" [tags]="program.tags"
                               [readonly]="readonly"></tb-controller-statements>
   </div>
 
   <div class="tb-form-panel stroked">
     <div class="tb-form-panel-title" translate>inferrix.logic-push</div>
-    <div class="tb-hint" translate>inferrix.logic-push-hint</div>
+    <div class="tb-form-panel-hint" translate>inferrix.logic-push-hint</div>
 
-    <div class="tb-logic-actions">
-      <mat-form-field class="tb-logic-field" subscriptSizing="dynamic" appearance="outline">
-        <mat-label>{{ 'inferrix.logic-scan-period' | translate }}</mat-label>
+    <div class="tb-form-row column-xs">
+      <div class="fixed-title-width">{{ 'inferrix.logic-scan-period' | translate }}</div>
+      <mat-form-field class="flex-1" subscriptSizing="dynamic" appearance="outline">
         <input matInput type="number" min="10" [(ngModel)]="program.scanPeriodMs"
                [disabled]="readonly">
         <span matTextSuffix>{{ 'inferrix.logic-ms' | translate }}</span>
       </mat-form-field>
+    </div>
 
+    <div class="flex flex-row flex-wrap items-center justify-end gap-2">
+      @if (busy) {
+        <mat-spinner diameter="24"></mat-spinner>
+      }
       <button mat-stroked-button [disabled]="busy" (click)="verify()">
         <mat-icon>fact_check</mat-icon>{{ 'inferrix.logic-verify' | translate }}
       </button>
       <button mat-raised-button color="primary" [disabled]="busy || readonly" (click)="push()">
         <mat-icon>upload</mat-icon>{{ 'inferrix.logic-push-action' | translate }}
       </button>
-      @if (busy) {
-        <mat-spinner diameter="24"></mat-spinner>
-      }
     </div>
 
     @if (error) {

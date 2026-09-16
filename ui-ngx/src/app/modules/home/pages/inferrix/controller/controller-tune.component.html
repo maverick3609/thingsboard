@@ -17,50 +17,71 @@
 -->
 <div class="tb-form-panel stroked">
   <div class="tb-form-panel-title" translate>inferrix.tune-title</div>
-  <div class="tb-hint" translate>inferrix.tune-hint</div>
+  <div class="tb-form-panel-hint" translate>inferrix.tune-hint</div>
 
   <div class="tb-tune-warning">
     <mat-icon>warning</mat-icon>
     <span translate>inferrix.tune-warning</span>
   </div>
 
-  <div class="tb-tune-row">
-    <mat-form-field class="tb-tune-field" subscriptSizing="dynamic" appearance="outline">
-      <mat-label>{{ 'inferrix.tune-slot' | translate }}</mat-label>
+  <div class="tb-form-row column-xs">
+    <div class="fixed-title-width">{{ 'inferrix.tune-slot' | translate }}</div>
+    <mat-form-field class="flex-1" subscriptSizing="dynamic" appearance="outline">
       <input matInput type="number" min="0" max="15" [(ngModel)]="request.slot"
              [disabled]="readonly || running" (change)="slotChanged()">
     </mat-form-field>
+  </div>
 
-    <mat-form-field class="tb-tune-field" subscriptSizing="dynamic" appearance="outline">
-      <mat-label>{{ 'inferrix.tune-out-high' | translate }}</mat-label>
+  <div class="tb-form-row column-xs">
+    <div class="fixed-title-width">{{ 'inferrix.tune-out-high' | translate }}</div>
+    <mat-form-field class="flex-1" subscriptSizing="dynamic" appearance="outline">
       <input matInput type="number" min="0" max="100" [(ngModel)]="request.outHigh"
              [disabled]="readonly || running">
       <span matTextSuffix>%</span>
     </mat-form-field>
+  </div>
 
-    <mat-form-field class="tb-tune-field" subscriptSizing="dynamic" appearance="outline">
-      <mat-label>{{ 'inferrix.tune-out-low' | translate }}</mat-label>
+  <div class="tb-form-row column-xs">
+    <div class="fixed-title-width">{{ 'inferrix.tune-out-low' | translate }}</div>
+    <mat-form-field class="flex-1" subscriptSizing="dynamic" appearance="outline">
       <input matInput type="number" min="0" max="100" [(ngModel)]="request.outLow"
              [disabled]="readonly || running">
       <span matTextSuffix>%</span>
     </mat-form-field>
+  </div>
 
-    <mat-form-field class="tb-tune-hyst" subscriptSizing="dynamic" appearance="outline">
-      <mat-label>{{ 'inferrix.tune-hysteresis' | translate }}</mat-label>
+  <div class="tb-form-row column-xs">
+    <div class="fixed-title-width"
+         tb-hint-tooltip-icon="{{ 'inferrix.tune-hysteresis-hint' | translate }}">{{ 'inferrix.tune-hysteresis' | translate }}</div>
+    <mat-form-field class="flex-1" subscriptSizing="dynamic" appearance="outline">
       <input matInput type="number" [(ngModel)]="request.hysteresis"
              [disabled]="readonly || running">
-      <mat-hint translate>inferrix.tune-hysteresis-hint</mat-hint>
     </mat-form-field>
+  </div>
 
-    <mat-form-field class="tb-tune-field" subscriptSizing="dynamic" appearance="outline">
-      <mat-label>{{ 'inferrix.tune-timeout' | translate }}</mat-label>
+  <div class="tb-form-row column-xs">
+    <div class="fixed-title-width">{{ 'inferrix.tune-timeout' | translate }}</div>
+    <mat-form-field class="flex-1" subscriptSizing="dynamic" appearance="outline">
       <input matInput type="number" min="1000" [(ngModel)]="request.timeoutMs"
              [disabled]="readonly || running">
       <span matTextSuffix>{{ 'inferrix.logic-ms' | translate }}</span>
     </mat-form-field>
   </div>
 
-  <div class="tb-tune-actions">
+  @if (!valid) {
+    <div class="tb-form-panel-hint" translate>inferrix.tune-incomplete</div>
+  }
+
+  <div class="flex flex-row flex-wrap items-center justify-end gap-2">
+    @if (status) {
+      <span class="tb-tune-state">{{ 'inferrix.tune-state-' + status.state | translate }}</span>
+    }
+    @if (busy || running) {
+      <mat-spinner diameter="24"></mat-spinner>
+    }
+    <button mat-stroked-button [disabled]="busy || !slotValid" (click)="read()">
+      <mat-icon>refresh</mat-icon>{{ 'inferrix.tune-refresh' | translate }}
+    </button>
     @if (!running) {
       <button mat-raised-button color="primary" [disabled]="busy || readonly || !valid"
               (click)="start()">
@@ -72,27 +93,14 @@
         <mat-icon>stop</mat-icon>{{ 'inferrix.tune-abort' | translate }}
       </button>
     }
-    <button mat-stroked-button [disabled]="busy || !slotValid" (click)="read()">
-      <mat-icon>refresh</mat-icon>{{ 'inferrix.tune-refresh' | translate }}
-    </button>
-    @if (busy || running) {
-      <mat-spinner diameter="24"></mat-spinner>
-    }
-    @if (status) {
-      <span class="tb-tune-state">{{ 'inferrix.tune-state-' + status.state | translate }}</span>
-    }
   </div>
 
-  @if (!valid) {
-    <div class="tb-hint" translate>inferrix.tune-incomplete</div>
-  }
-
   @if (error) {
-    <div class="tb-logic-error">{{ error }}</div>
+    <div class="tb-error-message">{{ error }}</div>
   }
 
   @if (gains) {
-    <div class="tb-tune-result">
+    <div>
       <div class="tb-tune-measured">
         {{ 'inferrix.tune-measured' | translate: {ku: status.ku | number: '1.0-3',
              tu: status.tu_s | number: '1.0-3', amp: status.amp | number: '1.0-3'} }}
@@ -118,7 +126,7 @@
         }
       </table>
 
-      <div class="tb-hint" translate>inferrix.tune-apply-hint</div>
+      <div class="tb-form-panel-hint" translate>inferrix.tune-apply-hint</div>
     </div>
   }
 </div>

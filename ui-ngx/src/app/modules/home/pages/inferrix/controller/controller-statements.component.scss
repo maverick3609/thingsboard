@@ -14,21 +14,39 @@
  * limitations under the License.
  */
 
-.tb-logic-step {
+/* Steps are spaced by the host rather than each carrying a margin, so the last one does not push
+   the add buttons away. */
+:host {
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
   gap: 8px;
-  padding: 8px 10px;
-  margin-bottom: 8px;
+}
+
+/* Drawn like the platform's own form row, so a step reads as one row of the form. */
+.tb-logic-step {
+  position: relative;
+  padding: 7px 7px 7px 16px;
   border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 4px;
+  border-radius: 6px;
+}
+
+/* Pinned beside the first row only, so every later row gets the step's full width instead of
+   wrapping around a column of buttons that is empty below the first line. */
+.tb-logic-step-actions {
+  position: absolute;
+  top: 11px;
+  right: 7px;
+  display: flex;
+}
+
+.tb-logic-step-actions + .tb-logic-step-body > .tb-logic-row:first-child {
+  padding-right: 104px;
 }
 
 .tb-logic-step-body {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  flex: 1;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -36,7 +54,7 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 
 .tb-logic-keyword {
@@ -55,16 +73,15 @@
   border-left: 2px solid rgba(0, 0, 0, 0.12);
 }
 
+/* Sized to the longest option each field offers, so no choice is cut off. */
 .tb-logic-target {
   width: 150px;
 }
 
-.tb-logic-small {
-  width: 96px;
+.tb-logic-mode {
+  width: 140px;
 }
 
-.tb-logic-empty {
-  opacity: 0.6;
-  font-style: italic;
-  padding: 4px 0;
+.tb-logic-small {
+  width: 96px;
 }

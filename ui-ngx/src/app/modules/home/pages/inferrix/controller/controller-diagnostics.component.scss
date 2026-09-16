@@ -19,22 +19,6 @@
   color: #d12730;
 }
 
-.tb-diag-ping-fields {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0 16px;
-}
-
-.tb-diag-ping-target {
-  flex: 1 1 240px;
-  min-width: 240px;
-}
-
-.tb-diag-ping-small {
-  flex: 0 0 110px;
-}
-
 .tb-diag-fingerprint {
   overflow-wrap: anywhere;
   text-align: end;

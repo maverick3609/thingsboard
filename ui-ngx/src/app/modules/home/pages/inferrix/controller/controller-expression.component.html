@@ -17,7 +17,7 @@
 -->
 @if (expression) {
   @if (availableKinds.length > 1) {
-    <mat-form-field class="tb-logic-kind" subscriptSizing="dynamic" appearance="outline">
+    <mat-form-field class="tb-inline-field tb-logic-kind" subscriptSizing="dynamic" appearance="outline">
       <mat-select [value]="expression.kind" [disabled]="readonly"
                   (valueChange)="changeKind($event)">
         @for (kind of availableKinds; track kind.value) {
@@ -29,7 +29,7 @@
 
   @switch (expression.kind) {
     @case ('TAG') {
-      <mat-form-field class="tb-logic-value" subscriptSizing="dynamic" appearance="outline">
+      <mat-form-field class="tb-inline-field tb-logic-value" subscriptSizing="dynamic" appearance="outline">
         <mat-select [(value)]="expression.tag" [disabled]="readonly"
                     placeholder="{{ 'inferrix.logic-pick-tag' | translate }}">
           @for (tag of tags; track tag.name) {
@@ -40,7 +40,7 @@
     }
 
     @case ('LITERAL') {
-      <mat-form-field class="tb-logic-type" subscriptSizing="dynamic" appearance="outline">
+      <mat-form-field class="tb-inline-field tb-logic-type" subscriptSizing="dynamic" appearance="outline">
         <mat-select [(value)]="expression.dataType" [disabled]="readonly">
           <mat-option value="BOOL">{{ 'inferrix.logic-type-bool' | translate }}</mat-option>
           <mat-option value="INT">{{ 'inferrix.logic-type-int' | translate }}</mat-option>
@@ -53,7 +53,7 @@
           {{ (expression.flag ? 'inferrix.logic-on' : 'inferrix.logic-off') | translate }}
         </mat-slide-toggle>
       } @else {
-        <mat-form-field class="tb-logic-value" subscriptSizing="dynamic" appearance="outline">
+        <mat-form-field class="tb-inline-field tb-logic-value" subscriptSizing="dynamic" appearance="outline">
           <input matInput type="number" [(ngModel)]="expression.number" [disabled]="readonly">
           @if (expression.dataType === 'TIME') {
             <span matTextSuffix>{{ 'inferrix.logic-ms' | translate }}</span>
@@ -66,7 +66,7 @@
       <span class="tb-logic-nested">
         <tb-controller-expression [expression]="expression.args[0]" [tags]="tags"
                                   [readonly]="readonly"></tb-controller-expression>
-        <mat-form-field class="tb-logic-op" subscriptSizing="dynamic" appearance="outline">
+        <mat-form-field class="tb-inline-field tb-logic-op" subscriptSizing="dynamic" appearance="outline">
           <mat-select [(value)]="expression.op" [disabled]="readonly">
             @for (op of binaryOps; track op.value) {
               <mat-option [value]="op.value">{{ op.label }}</mat-option>
@@ -80,7 +80,7 @@
 
     @case ('UNARY') {
       <span class="tb-logic-nested">
-        <mat-form-field class="tb-logic-op" subscriptSizing="dynamic" appearance="outline">
+        <mat-form-field class="tb-inline-field tb-logic-unary" subscriptSizing="dynamic" appearance="outline">
           <mat-select [(value)]="expression.op" [disabled]="readonly">
             @for (op of unaryOps; track op) {
               <mat-option [value]="op">{{ 'inferrix.logic-op-' + op.toLowerCase() | translate }}</mat-option>
@@ -94,7 +94,7 @@
 
     @case ('CALL') {
       <span class="tb-logic-nested">
-        <mat-form-field class="tb-logic-op" subscriptSizing="dynamic" appearance="outline">
+        <mat-form-field class="tb-inline-field tb-logic-fn" subscriptSizing="dynamic" appearance="outline">
           <mat-select [value]="expression.fn" [disabled]="readonly"
                       (valueChange)="changeFunction($event)">
             @for (fn of functions; track fn.value) {
@@ -103,7 +103,7 @@
           </mat-select>
         </mat-form-field>
         @if (needsSlot(expression.fn)) {
-          <mat-form-field class="tb-logic-op" subscriptSizing="dynamic" appearance="outline">
+          <mat-form-field class="tb-inline-field tb-logic-op" subscriptSizing="dynamic" appearance="outline">
             <mat-label>{{ 'inferrix.logic-slot' | translate }}</mat-label>
             <input matInput type="number" min="0" [(ngModel)]="expression.slot"
                    [disabled]="readonly">

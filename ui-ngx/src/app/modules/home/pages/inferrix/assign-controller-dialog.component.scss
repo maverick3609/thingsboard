@@ -15,8 +15,11 @@
  */
 @import "../../../../../scss/constants";
 
+/* A dialog's host is `display: contents` until told otherwise, and then ignores its width. */
 :host {
+  display: block;
+
   @media #{$mat-gt-xs} {
-    min-width: 420px;
+    width: 420px;
   }
 }

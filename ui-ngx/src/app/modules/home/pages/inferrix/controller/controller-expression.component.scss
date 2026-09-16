@@ -18,15 +18,24 @@
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 8px;
 }
 
+/* Sized to the longest option each field offers, so no choice is cut off. */
 .tb-logic-kind {
-  width: 116px;
+  width: 190px;
 }
 
 .tb-logic-op {
   width: 92px;
+}
+
+.tb-logic-unary {
+  width: 170px;
+}
+
+.tb-logic-fn {
+  width: 124px;
 }
 
 .tb-logic-value {
@@ -34,7 +43,7 @@
 }
 
 .tb-logic-type {
-  width: 104px;
+  width: 150px;
 }
 
 /* A nested value is boxed so the shape of a compound expression is visible at a glance; without it
@@ -43,8 +52,8 @@
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 4px;
-  padding: 2px 6px;
+  gap: 8px;
+  padding: 4px 8px;
   border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 4px;
+  border-radius: 6px;
 }

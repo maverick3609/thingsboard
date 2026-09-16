@@ -14,31 +14,24 @@
  * limitations under the License.
  */
 
-.tb-logic-tag-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 6px 0;
-}
+/* Sized to the longest option each field offers, so no choice is cut off. Qualified by the row
+   because the platform's form row sets its own width on every field inside it. */
+.tb-form-row {
+  .tb-logic-name {
+    width: 160px;
+  }
 
-.tb-logic-name {
-  width: 160px;
-}
+  .tb-logic-type {
+    width: 150px;
+  }
 
-.tb-logic-field {
-  width: 140px;
-}
+  .tb-logic-choice {
+    width: 210px;
+  }
 
-.tb-logic-address {
-  width: 200px;
-}
-
-.tb-logic-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  .tb-logic-number {
+    width: 100px;
+  }
 }
 
 .tb-logic-result {

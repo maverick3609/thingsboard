@@ -13,30 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-.tb-tune-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: flex-start;
-}
-
-.tb-tune-field {
-  width: 120px;
-}
-
-/* Wider than the rest because it carries a hint that would otherwise wrap to three lines. */
-.tb-tune-hyst {
-  width: 200px;
-}
-
-.tb-tune-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  margin-top: 8px;
-}
-
 .tb-tune-state {
   font-weight: 500;
 }
@@ -46,7 +22,6 @@
   display: flex;
   gap: 8px;
   align-items: center;
-  margin: 4px 0 8px;
   color: #d12730;
 
   mat-icon {
@@ -54,10 +29,6 @@
     width: 20px;
     height: 20px;
   }
-}
-
-.tb-tune-result {
-  margin-top: 12px;
 }
 
 .tb-tune-measured {

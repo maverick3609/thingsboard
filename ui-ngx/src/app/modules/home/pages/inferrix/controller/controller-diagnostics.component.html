@@ -91,8 +91,8 @@
       <div>{{ firmware.state }}</div>
     </div>
     <div class="flex flex-row items-center justify-between gap-4">
-      <div class="tb-hint">{{ 'inferrix.restart-logic-hint' | translate }}</div>
-      <button mat-stroked-button [disabled]="readonly || restartRunning" (click)="restartLogic()">
+      <div class="tb-form-panel-hint">{{ 'inferrix.restart-logic-hint' | translate }}</div>
+      <button mat-stroked-button class="shrink-0" [disabled]="readonly || restartRunning" (click)="restartLogic()">
         {{ 'inferrix.restart-logic' | translate }}
       </button>
     </div>
@@ -140,30 +140,54 @@
 
   <div class="tb-form-panel stroked">
     <div class="tb-form-panel-title" translate>inferrix.diag-reachability</div>
-    <form [formGroup]="pingForm" (ngSubmit)="ping()">
-      <fieldset [disabled]="readonly || pingRunning">
-        <div class="tb-diag-ping-fields">
-          <mat-form-field class="tb-diag-ping-target" subscriptSizing="dynamic">
-            <mat-label>{{ 'inferrix.ping-target' | translate }}</mat-label>
+    <div class="tb-form-panel-hint">{{ 'inferrix.ping-tcp-note' | translate }}</div>
+    <form class="tb-form-panel no-border no-padding" [formGroup]="pingForm" (ngSubmit)="ping()">
+      <fieldset class="tb-form-panel no-border no-padding" [disabled]="readonly || pingRunning">
+        <div class="tb-form-row column-xs">
+          <div class="fixed-title-width tb-required"
+               tb-hint-tooltip-icon="{{ 'inferrix.ping-target-hint' | translate }}">{{ 'inferrix.ping-target' | translate }}</div>
+          <mat-form-field class="flex-1" appearance="outline" subscriptSizing="dynamic">
             <input matInput formControlName="target"/>
-            <mat-hint>{{ 'inferrix.ping-target-hint' | translate }}</mat-hint>
+            <mat-icon matSuffix class="tb-error" matTooltipPosition="above" matTooltipClass="tb-error-tooltip"
+                      [matTooltip]="'inferrix.ping-target-hint' | translate"
+                      *ngIf="pingForm.get('target').invalid && pingForm.get('target').touched">
+              warning
+            </mat-icon>
           </mat-form-field>
-          <mat-form-field class="tb-diag-ping-small">
-            <mat-label>{{ 'inferrix.ping-count' | translate }}</mat-label>
+        </div>
+        <div class="tb-form-row column-xs">
+          <div class="fixed-title-width">{{ 'inferrix.ping-count' | translate }}</div>
+          <mat-form-field class="flex-1" appearance="outline" subscriptSizing="dynamic">
             <input matInput type="number" formControlName="count"/>
+            <mat-icon matSuffix class="tb-error" matTooltipPosition="above" matTooltipClass="tb-error-tooltip"
+                      [matTooltip]="'inferrix.field-invalid' | translate"
+                      *ngIf="pingForm.get('count').invalid && pingForm.get('count').touched">
+              warning
+            </mat-icon>
           </mat-form-field>
-          <mat-form-field class="tb-diag-ping-small">
-            <mat-label>{{ 'inferrix.ping-port' | translate }}</mat-label>
+        </div>
+        <div class="tb-form-row column-xs">
+          <div class="fixed-title-width">{{ 'inferrix.ping-port' | translate }}</div>
+          <mat-form-field class="flex-1" appearance="outline" subscriptSizing="dynamic">
             <input matInput type="number" formControlName="port"/>
+            <mat-icon matSuffix class="tb-error" matTooltipPosition="above" matTooltipClass="tb-error-tooltip"
+                      [matTooltip]="'inferrix.field-invalid' | translate"
+                      *ngIf="pingForm.get('port').invalid && pingForm.get('port').touched">
+              warning
+            </mat-icon>
           </mat-form-field>
-          <button mat-raised-button color="primary" type="submit"
-                  [disabled]="readonly || pingRunning || pingForm.invalid">
-            {{ 'inferrix.ping' | translate }}
-          </button>
         </div>
       </fieldset>
+      <div class="flex flex-row flex-wrap items-center justify-end gap-2">
+        <button mat-stroked-button type="button" [disabled]="readonly || mqttTestRunning" (click)="testMqtt()">
+          {{ 'inferrix.test-broker' | translate }}
+        </button>
+        <button mat-raised-button color="primary" type="submit"
+                [disabled]="readonly || pingRunning || pingForm.invalid">
+          {{ 'inferrix.ping' | translate }}
+        </button>
+      </div>
     </form>
-    <div class="tb-form-panel-hint">{{ 'inferrix.ping-tcp-note' | translate }}</div>
     <div class="tb-error-message" *ngIf="pingError">{{ pingError }}</div>
     <ng-container *ngIf="pingResult">
       <div class="tb-form-row space-between">
@@ -181,11 +205,6 @@
       </div>
     </ng-container>
 
-    <div class="flex flex-row items-center">
-      <button mat-stroked-button [disabled]="readonly || mqttTestRunning" (click)="testMqtt()">
-        {{ 'inferrix.test-broker' | translate }}
-      </button>
-    </div>
     <div class="tb-error-message" *ngIf="mqttTestError">{{ mqttTestError }}</div>
     <ng-container *ngIf="mqttTestResult">
       <div class="tb-form-row space-between" *ngFor="let entry of mqttTestSteps()">

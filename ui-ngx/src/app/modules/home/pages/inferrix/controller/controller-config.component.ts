@@ -201,6 +201,11 @@ export class ControllerConfigComponent extends ControllerPanelComponent {
     });
   }
 
+  /** A column is headed by its field's own label, the one the record dialog shows for it. */
+  columnLabel(key: string): string {
+    return this.section.fields.find(field => field.key === key)?.label ?? key;
+  }
+
   /** Renders a raw record value the way its field spec says it means something. */
   display(record: any, key: string): string {
     const value = record[key];

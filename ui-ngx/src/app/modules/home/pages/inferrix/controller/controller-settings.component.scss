@@ -13,32 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/* Layout only: the settings forms are generated from a field spec, so the wrapping grid cannot be
-   expressed field by field in the template. Everything else uses the platform's own form styles. */
-.tb-settings-fields {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 16px;
+/* Column widths of the peer address table; the rest is the platform's own form styles. The address and
+   port fit their longest value (255.255.255.255, 65535 plus the number spinner) beside the error icon;
+   the UID takes the rest, but never less than its 24 digits. */
+.tb-peer-uid {
+  min-width: 230px;
 }
 
-.tb-settings-field {
-  flex: 1 1 240px;
-  min-width: 240px;
+.tb-peer-ip {
+  width: 170px;
 }
 
-.tb-settings-wide {
-  flex-basis: 100%;
+.tb-peer-port {
+  width: 115px;
 }
 
-.tb-settings-checkbox {
-  align-self: center;
-  padding-bottom: 22px;
+.tb-peer-actions {
+  width: 40px;
 }
 
-.tb-settings-port {
-  flex: 0 0 110px;
-}
+/* Too narrow for all of that, the table scrolls sideways; heading and rows keep the same minimum, so they
+   stay aligned. */
+.tb-peer-table {
+  overflow-x: auto;
 
-.tb-settings-remove {
-  align-self: center;
+  .tb-form-table-header, .tb-form-table-row {
+    min-width: min-content;
+  }
 }

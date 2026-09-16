@@ -15,14 +15,18 @@
  */
 @import "../../../../../scss/constants";
 
-/* Width comes from the dialog component itself, the way the device wizard and the credentials
-   dialog do it. Without it the dialog collapses to its content width and every hint wraps. */
+/* Width comes from the dialog component itself, at the device wizard's breakpoints. A width, not a
+   min-width: a floor lets the longest line of text stretch every field across the screen. The
+   display matters as much as the width: Material renders a dialog's host as `display: contents`,
+   which has no box, so a width on it alone does nothing. */
 :host {
+  display: block;
+
   @media #{$mat-sm} {
-    min-width: 470px;
+    width: 470px;
   }
 
   @media #{$mat-gt-sm} {
-    min-width: 650px;
+    width: 650px;
   }
 }

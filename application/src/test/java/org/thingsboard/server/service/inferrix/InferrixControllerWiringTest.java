@@ -44,6 +44,7 @@ class InferrixControllerWiringTest {
             .withBean(InferrixAdoptionService.class)
             .withBean(InferrixControllerAccess.class)
             .withBean(InferrixUploadService.class)
+            .withBean(InferrixProvisionService.class)
             .withConfiguration(org.springframework.boot.autoconfigure.AutoConfigurations.of())
             // @TbCoreComponent is a ConditionalOnExpression on service.type; without it these
             // beans are filtered out and the test would prove nothing.

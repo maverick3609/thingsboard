@@ -125,6 +125,7 @@ public class InferrixAdoptionService {
     private final TbDeviceService tbDeviceService;
     private final AdminSettingsService adminSettingsService;
     private final TelemetrySubscriptionService tsSubService;
+    private final InferrixProvisionService provisionService;
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -175,6 +176,17 @@ public class InferrixAdoptionService {
             discovery.forget(uid);
         }
         log.info("Adopted Inferrix controller {} at {} as device {}", uid, host, device.getId());
+
+        // A controller that has never been configured starts reporting its own inputs and outputs
+        // without anyone entering a record. In the background, and never at the adoption's expense:
+        // the controller is adopted either way, and the job re-checks everything before it writes.
+        if (info.body().path("icc").asLong(-1) == 0) {
+            try {
+                provisionService.start(tenantId, device.getId(), InferrixProvisionService.Mode.APPLY);
+            } catch (RuntimeException e) {
+                log.warn("[{}] Could not start provisioning the controller's local I/O", device.getId(), e);
+            }
+        }
         return device;
     }
 

@@ -20,7 +20,7 @@ import { defer, EMPTY, Observable, of, timer } from 'rxjs';
 import { catchError, exhaustMap, expand, first, map, reduce, timeout } from 'rxjs/operators';
 import { defaultHttpOptionsFromConfig, defaultHttpUploadOptions, RequestConfig } from '@core/http/http-utils';
 import { AdoptControllerRequest, ControllerAttestation, ControllerConfigSection, ControllerPoint,
-  ControllerUploadKind, ControllerUploadStatus, DiscoveredController,
+  ControllerProvisionStatus, ControllerUploadKind, ControllerUploadStatus, DiscoveredController,
   pointWriteBody } from '@shared/models/inferrix-controller.models';
 import { Device } from '@shared/models/device.models';
 import { floatToBits, LogicCompileResult, LogicProgram, PidTuneRequest,
@@ -114,6 +114,27 @@ export class InferrixControllerService {
   /** Jobs are held on the node that accepted the upload and expire thirty minutes after it ends. */
   public getUploadStatus(jobId: string, config?: RequestConfig): Observable<ControllerUploadStatus> {
     return this.http.get<ControllerUploadStatus>(`/api/inferrix/controllers/uploads/${jobId}`,
+      defaultHttpOptionsFromConfig(config));
+  }
+
+  /**
+   * Adds a point and a publish policy to the draft for each of the controller's own inputs and outputs
+   * that has none, and applies nothing. Not a proxy call: it is about fifty requests, one at a time,
+   * so the platform runs them and this returns a job to poll.
+   */
+  public provisionLocalIo(deviceId: string, config?: RequestConfig): Observable<ControllerProvisionStatus> {
+    return this.http.post<ControllerProvisionStatus>(`/api/inferrix/controllers/${deviceId}/provision`, null,
+      defaultHttpOptionsFromConfig(config));
+  }
+
+  /** The provisioning job running against this controller, or null — including the one adoption starts. */
+  public getActiveProvision(deviceId: string, config?: RequestConfig): Observable<ControllerProvisionStatus> {
+    return this.http.get<ControllerProvisionStatus>(`/api/inferrix/controllers/${deviceId}/provision`,
+      defaultHttpOptionsFromConfig(config));
+  }
+
+  public getProvisionStatus(jobId: string, config?: RequestConfig): Observable<ControllerProvisionStatus> {
+    return this.http.get<ControllerProvisionStatus>(`/api/inferrix/controllers/provisions/${jobId}`,
       defaultHttpOptionsFromConfig(config));
   }
 

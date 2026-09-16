@@ -47,6 +47,7 @@ import org.thingsboard.server.service.inferrix.InferrixControllerAccess;
 import org.thingsboard.server.service.inferrix.InferrixProxyRoutes;
 import org.thingsboard.server.service.inferrix.InferrixControllerSighting;
 import org.thingsboard.server.service.inferrix.InferrixDiscoveryService;
+import org.thingsboard.server.service.inferrix.InferrixProvisionService;
 import org.thingsboard.server.service.inferrix.InferrixUploadService;
 import org.thingsboard.server.service.security.model.SecurityUser;
 import org.thingsboard.server.service.security.permission.Operation;
@@ -87,6 +88,7 @@ public class InferrixPlcController extends BaseController {
     private final ObjectProvider<InferrixAdoptionService> adoptionService;
     private final ObjectProvider<InferrixControllerAccess> controllerAccess;
     private final ObjectProvider<InferrixUploadService> uploadService;
+    private final ObjectProvider<InferrixProvisionService> provisionService;
 
     @ApiOperation(value = "List discovered controllers (discovered)",
             notes = "Controllers that have announced themselves on the discovery port and have not "
@@ -440,6 +442,65 @@ public class InferrixPlcController extends BaseController {
         return UploadStatus.of(job);
     }
 
+    @ApiOperation(value = "Provision a controller's local I/O (provisionLocalIo)",
+            notes = "Adds a point and a publish policy to the controller's draft for each of its own digital "
+                    + "and analog inputs and outputs that has no point yet, and stops there: nothing changes "
+                    + "on the controller until the draft is applied. Analog points are unscaled and report "
+                    + "raw counts; outputs are not writable. Runs in the background, one REST call at a time, "
+                    + "and returns a job to poll.")
+    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    @PostMapping("/{deviceId}/provision")
+    public ProvisionStatus provisionLocalIo(@PathVariable("deviceId") String strDeviceId)
+            throws ThingsboardException {
+        checkParameter("deviceId", strDeviceId);
+        DeviceId deviceId = new DeviceId(toUUID(strDeviceId));
+        Device device = checkDeviceId(deviceId, Operation.WRITE);
+        try {
+            return ProvisionStatus.of(requireProvisioning().start(device.getTenantId(), deviceId,
+                    InferrixProvisionService.Mode.DRAFT));
+        } catch (IllegalStateException e) {
+            throw new ThingsboardException(e.getMessage(), ThingsboardErrorCode.BAD_REQUEST_PARAMS);
+        }
+    }
+
+    @ApiOperation(value = "The local I/O provisioning running against a controller (activeProvision)",
+            notes = "The provisioning job currently running against this controller, or nothing — including "
+                    + "the one adoption starts for a controller that has never been configured.")
+    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    @GetMapping("/{deviceId}/provision")
+    public ProvisionStatus getActiveProvision(@PathVariable("deviceId") String strDeviceId)
+            throws ThingsboardException {
+        checkParameter("deviceId", strDeviceId);
+        DeviceId deviceId = new DeviceId(toUUID(strDeviceId));
+        Device device = checkDeviceId(deviceId, Operation.READ);
+        InferrixProvisionService.ProvisionJob job = requireProvisioning().getActiveJob(deviceId, device.getTenantId());
+        return job == null ? null : ProvisionStatus.of(job);
+    }
+
+    @ApiOperation(value = "Poll a local I/O provisioning job (provisionStatus)",
+            notes = "Progress of a provisioning job started on this node. Jobs are held in memory for thirty "
+                    + "minutes and are only visible to the tenant that owns the controller.")
+    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    @GetMapping("/provisions/{jobId}")
+    public ProvisionStatus getProvision(@PathVariable("jobId") String jobId) throws ThingsboardException {
+        SecurityUser user = getCurrentUser();
+        InferrixProvisionService.ProvisionJob job = requireProvisioning().getJob(jobId, user.getTenantId());
+        if (job == null) {
+            // Same answer for "no such job" and "not yours", as for uploads.
+            throw new ThingsboardException("No such provisioning job", ThingsboardErrorCode.ITEM_NOT_FOUND);
+        }
+        return ProvisionStatus.of(job);
+    }
+
+    private InferrixProvisionService requireProvisioning() throws ThingsboardException {
+        InferrixProvisionService provisioning = provisionService.getIfAvailable();
+        if (provisioning == null) {
+            throw new ThingsboardException("Controller provisioning is not available on this node",
+                    ThingsboardErrorCode.GENERAL);
+        }
+        return provisioning;
+    }
+
     private InferrixUploadService.Kind parseKind(String kind) throws ThingsboardException {
         try {
             return InferrixUploadService.Kind.valueOf(kind.toUpperCase());
@@ -544,6 +605,16 @@ public class InferrixPlcController extends BaseController {
             return new UploadStatus(job.getId(), job.getKind().name(), job.getState().name(),
                     job.getSent(), job.getTotalBytes(), job.getMessage(), job.getActivation(),
                     job.getImageVersion());
+        }
+    }
+
+    /** Progress of one local I/O provisioning job. */
+    public record ProvisionStatus(String jobId, String mode, String state, int added, int total,
+                                  String message, Long iccVersion, String activation) {
+
+        static ProvisionStatus of(InferrixProvisionService.ProvisionJob job) {
+            return new ProvisionStatus(job.getId(), job.getMode().name(), job.getState().name(),
+                    job.getAdded(), job.getTotal(), job.getMessage(), job.getIccVersion(), job.getActivation());
         }
     }
 

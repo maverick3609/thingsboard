@@ -14,8 +14,10 @@
 /// limitations under the License.
 ///
 
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
+import { Subscription, timer } from 'rxjs';
+import { switchMap, takeWhile } from 'rxjs/operators';
 import { TranslateService } from '@ngx-translate/core';
 import { DialogService } from '@core/services/dialog.service';
 import { InferrixControllerService } from '@core/http/inferrix-controller.service';
@@ -23,6 +25,7 @@ import {
   bitsToFloat,
   CONTROLLER_CONFIG_SECTIONS,
   ControllerConfigSection,
+  ControllerProvisionStatus,
   ControllerSettingField,
   DATA_FORMATS,
   ICC_VERIFY_ERRORS,
@@ -48,7 +51,7 @@ import { ControllerPanelComponent } from '@home/pages/inferrix/controller/contro
   styleUrls: ['./controller-config.component.scss'],
   standalone: false
 })
-export class ControllerConfigComponent extends ControllerPanelComponent {
+export class ControllerConfigComponent extends ControllerPanelComponent implements OnDestroy {
 
   readonly sections = CONTROLLER_CONFIG_SECTIONS;
 
@@ -62,9 +65,12 @@ export class ControllerConfigComponent extends ControllerPanelComponent {
   loading = false;
   error: string;
   applyResult: string;
+  /** The local I/O provisioning job this tab started or found running, until the operator leaves. */
+  provision: ControllerProvisionStatus;
 
   /** Identifies the newest read, so a slow one for a section the operator left cannot land. */
   private readToken = 0;
+  private provisionPoll: Subscription;
 
   constructor(private controllerService: InferrixControllerService,
               private dialog: MatDialog,
@@ -79,10 +85,36 @@ export class ControllerConfigComponent extends ControllerPanelComponent {
       error: () => this.owner = null
     });
     this.selectSection(this.section);
+    if (!this.readonly) {
+      // Adoption provisions a controller that has never been configured, so the operator may well
+      // arrive here while that is still writing to the draft.
+      this.controllerService.getActiveProvision(this.deviceId, {ignoreErrors: true}).subscribe({
+        next: status => {
+          if (status) {
+            this.watchProvision(status);
+          }
+        },
+        error: () => this.provision = null
+      });
+    }
   }
 
   get editable(): boolean {
     return !this.readonly && this.showDraft && this.owner === 'local';
+  }
+
+  /** Applying or discarding while a job still writes would take half its records live, or lose them. */
+  get provisioning(): boolean {
+    return this.provision?.state === 'RUNNING';
+  }
+
+  provisionLocalIo(): void {
+    this.error = null;
+    this.applyResult = null;
+    this.controllerService.provisionLocalIo(this.deviceId, {ignoreErrors: true}).subscribe({
+      next: status => this.watchProvision(status),
+      error: error => this.error = this.messageOf(error)
+    });
   }
 
   selectSection(section: ControllerConfigSection): void {
@@ -201,6 +233,11 @@ export class ControllerConfigComponent extends ControllerPanelComponent {
     });
   }
 
+  ngOnDestroy(): void {
+    this.provisionPoll?.unsubscribe();
+    super.ngOnDestroy();
+  }
+
   /** A column is headed by its field's own label, the one the record dialog shows for it. */
   columnLabel(key: string): string {
     return this.section.fields.find(field => field.key === key)?.label ?? key;
@@ -241,6 +278,34 @@ export class ControllerConfigComponent extends ControllerPanelComponent {
     return set.length ? set.join(', ') : this.translate.instant('inferrix.flags-none');
   }
 
+  private watchProvision(status: ControllerProvisionStatus): void {
+    this.provision = status;
+    this.provisionPoll?.unsubscribe();
+    if (status.state !== 'RUNNING') {
+      this.reload();
+      return;
+    }
+    this.provisionPoll = timer(PROVISION_POLL_MS, PROVISION_POLL_MS).pipe(
+      switchMap(() => this.controllerService.getProvisionStatus(status.jobId,
+        {ignoreErrors: true, ignoreLoading: true})),
+      takeWhile(current => current?.state === 'RUNNING', true)
+    ).subscribe({
+      next: current => {
+        this.provision = current;
+        if (current?.state === 'DONE' && current.added) {
+          // What changed is the points, and they are what the operator has to review.
+          this.selectSection(this.sections.find(section => section.key === 'points'));
+        } else if (current?.state !== 'RUNNING') {
+          this.reload();
+        }
+      },
+      error: error => {
+        this.provision = null;
+        this.error = this.messageOf(error);
+      }
+    });
+  }
+
   private openRecord(record: any): void {
     this.dialog.open(ControllerConfigRecordDialogComponent, {
       disableClose: true,
@@ -269,3 +334,6 @@ export class ControllerConfigComponent extends ControllerPanelComponent {
   }
 
 }
+
+/** A provisioning job is a few dozen requests to a microcontroller, so there is no hurry. */
+const PROVISION_POLL_MS = 2000;

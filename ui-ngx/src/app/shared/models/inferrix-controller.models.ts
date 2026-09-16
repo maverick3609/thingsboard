@@ -242,6 +242,22 @@ export interface ControllerUploadStatus {
   imageVersion?: string;
 }
 
+/**
+ * Progress of the job that gives a controller's own inputs and outputs their points and publish
+ * policies. `DRAFT` fills the draft for review; `APPLY` is adoption's, for a controller that has never
+ * been configured, and applies the result. `message` is the platform's reason for a skip or failure.
+ */
+export interface ControllerProvisionStatus {
+  jobId: string;
+  mode: 'DRAFT' | 'APPLY';
+  state: 'RUNNING' | 'DONE' | 'SKIPPED' | 'FAILED';
+  added: number;
+  total: number;
+  message?: string;
+  iccVersion?: number;
+  activation?: string;
+}
+
 /** POST /api/inferrix/controllers/{deviceId}/attest. */
 export interface ControllerAttestation {
   verified: boolean;

@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 
-import { Component } from '@angular/core';
+import { ChangeDetectorRef, Component } from '@angular/core';
 import { AbstractControl, UntypedFormArray, UntypedFormBuilder, UntypedFormGroup, ValidationErrors,
   Validators } from '@angular/forms';
 import { TranslateService } from '@ngx-translate/core';
@@ -78,7 +78,8 @@ export class ControllerSettingsComponent extends ControllerPanelComponent {
   constructor(private fb: UntypedFormBuilder,
               private controllerService: InferrixControllerService,
               private dialogService: DialogService,
-              private translate: TranslateService) {
+              private translate: TranslateService,
+              private cd: ChangeDetectorRef) {
     super();
     this.forms.forEach(form => this.formGroups[form.path] = this.fb.group(
       Object.fromEntries(form.fields.map(field => [field.key, [null, this.validatorsFor(field)]]))));
@@ -310,6 +311,8 @@ export class ControllerSettingsComponent extends ControllerPanelComponent {
     this.confirmSecondsLeft = windowSeconds;
     this.confirmTimer = interval(1000).subscribe(() => {
       this.confirmSecondsLeft--;
+      // The details page is OnPush, and nothing else redraws it while the countdown runs.
+      this.cd.markForCheck();
       if (this.confirmSecondsLeft <= 0) {
         // The window closed. Whether the device reverted or the confirm landed is not knowable from
         // here, so re-read rather than guess.

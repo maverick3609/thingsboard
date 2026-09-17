@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 
-import { Component, OnDestroy } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { Subscription, timer } from 'rxjs';
 import { switchMap, takeWhile } from 'rxjs/operators';
@@ -75,7 +75,8 @@ export class ControllerConfigComponent extends ControllerPanelComponent implemen
   constructor(private controllerService: InferrixControllerService,
               private dialog: MatDialog,
               private dialogService: DialogService,
-              private translate: TranslateService) {
+              private translate: TranslateService,
+              private cd: ChangeDetectorRef) {
     super();
   }
 
@@ -292,6 +293,8 @@ export class ControllerConfigComponent extends ControllerPanelComponent implemen
     ).subscribe({
       next: current => {
         this.provision = current;
+        // The details page is OnPush and a poll that skips the loading bar does not mark it.
+        this.cd.markForCheck();
         if (current?.state === 'DONE' && current.added) {
           // What changed is the points, and they are what the operator has to review.
           this.selectSection(this.sections.find(section => section.key === 'points'));
@@ -302,6 +305,7 @@ export class ControllerConfigComponent extends ControllerPanelComponent implemen
       error: error => {
         this.provision = null;
         this.error = this.messageOf(error);
+        this.cd.markForCheck();
       }
     });
   }

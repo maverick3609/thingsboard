@@ -881,7 +881,14 @@
                     <configuration>
                         <licenseSets>
                             <licenseSet>
-                                <header>${main.dir}/license-header.txt</header>
+                                <!-- Inferrix-authored files carry the Inferrix owner, so that is
+                                     what `license:format` stamps on a new one; upstream's own
+                                     header stays accepted for the ~20k files that came with the
+                                     fork. Both are upstream's two-line SPDX form since 4.3.1.5. -->
+                                <header>${main.dir}/license-header-inferrix.txt</header>
+                                <validHeaders>
+                                    <validHeader>${main.dir}/license-header.txt</validHeader>
+                                </validHeaders>
                                 <excludes>
                                     <exclude>**/.env</exclude>
                                     <exclude>**/*.env</exclude>
@@ -926,6 +933,11 @@
                                     <exclude>**/resources/lwm2m/models/**</exclude>
                                     <exclude>src/main/data/resources/**</exclude>
                                     <exclude>.claude/**</exclude>
+                                    <!-- Local scratch from agent tooling, alongside .claude. Never
+                                         committed, and .playwright-mcp is why a deploy build had to
+                                         move a directory aside before it would pass. -->
+                                    <exclude>.superpowers/**</exclude>
+                                    <exclude>.playwright-mcp/**</exclude>
                                     <exclude>**/lombok.config</exclude>
                                     <exclude>**/eslint.config.mjs</exclude>
                                     <exclude>**/config.monitoring</exclude>
@@ -933,6 +945,11 @@
                                     <exclude>**/data/certs/**</exclude>
                                     <exclude>**/*.otf</exclude>
                                     <exclude>**/*.txt</exclude>
+                                    <!-- docs/jars is an extracted ThingsBoard PE jar kept for
+                                         reference. Its files carry PE's own notices, which are not
+                                         ours to rewrite; they passed before only because this fork
+                                         accepted the pre-SPDX Thingsboard header. -->
+                                    <exclude>docs/jars/**</exclude>
                                     <!-- Reporting R2a: PE-ported Thymeleaf templates, CSS, SVG and embedded
                                          fonts staged as classpath resources (application/src/main/resources/
                                          {html,svg,fonts}). Binary/asset files carry no source header. -->

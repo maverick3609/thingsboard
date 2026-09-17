@@ -1,19 +1,5 @@
-///
-/// Copyright © 2016-2026 The Inferrix Authors
-///
-/// Licensed under the Apache License, Version 2.0 (the "License");
-/// you may not use this file except in compliance with the License.
-/// You may obtain a copy of the License at
-///
-///     http://www.apache.org/licenses/LICENSE-2.0
-///
-/// Unless required by applicable law or agreed to in writing, software
-/// distributed under the License is distributed on an "AS IS" BASIS,
-/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-/// See the License for the specific language governing permissions and
-/// limitations under the License.
-///
-
+// SPDX-FileCopyrightText: Copyright The Inferrix Authors
+// SPDX-License-Identifier: Apache-2.0
 // Generic "Export widget data" data source (PE port, BUG 2). Turns a widget's already-subscribed data into a
 // {columns, rows} table for widget-data-export.ts, WITHOUT touching the Timeseries/Entities/Alarms table
 // widget components (they hold richer, private row/column state — sort/paging/search UI state, per-key cell

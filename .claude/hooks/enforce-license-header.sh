@@ -13,7 +13,7 @@
 #
 # Excludes:
 #   - target/, node_modules/ (build output)
-#   - files that already start with /** (header present)
+#   - files that already start with the SPDX header
 #   - files outside a repository with the licence templates (no license:check there to satisfy)
 #
 # Hook receives the tool call JSON on stdin; we extract tool_input.file_path.
@@ -30,21 +30,20 @@ file_path=$(printf '%s' "$input" | jq -r '.tool_input.file_path // ""')
 [[ ! -f "$file_path" ]] && exit 0
 
 first_line=$(head -n 1 "$file_path")
-if [[ "$first_line" == /\*\** ]]; then
+if [[ "$first_line" == "// SPDX-FileCopyrightText:"* || "$first_line" == /\*\** ]]; then
   exit 0
 fi
 
 # Rendered by the pre-commit check from the templates in the file's own repository, so the two hooks
-# cannot disagree. The copy this hook kept took its end year from `date`: from 2027-01-01 it would
-# have stamped 2016-2027, which license:check refuses, because the range ends where the template
-# was last bumped, not at the current year.
+# cannot disagree. Since 4.3.1.5 that rendering is upstream's two-line SPDX header, which carries no
+# year at all; the copy this hook once kept stamped a year from `date` that license:check refused.
 hooks_dir=$(cd "$(dirname "$0")" && pwd)
 header=$(cd "$(dirname "$file_path")" && bash "$hooks_dir/check-license-headers.sh" --header "$file_path" 2>/dev/null) || exit 0
 [[ -n "$header" ]] || exit 0
 
 tmp=$(mktemp)
 {
-  printf '%s\n\n' "$header"
+  printf '%s\n' "$header"
   cat "$file_path"
 } > "$tmp"
 # Written through rather than moved over, which would leave the file with mktemp's 0600 mode.

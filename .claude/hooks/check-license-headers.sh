@@ -6,20 +6,23 @@
 # so the PREVIOUS boot jar is still sitting there looking like a successful build. This has cost a
 # build cycle four times on this fork (7b95cf84f8, 94a1ecbe8e, 10e2c3a9df, b557ff20c4).
 #
-# The check is exact because the plugin is. Measured on 2026-09-16 by running the real goal
-# (license-maven-plugin 3.0) over one-change copies of files it accepts:
-#   accepted  CRLF; trailing whitespace; blank lines before the header; either owner below;
+# The check is exact because the plugin is. Measured on 2026-09-18 by running the real goal
+# (license-maven-plugin 5.1.2, upstream's two-line SPDX header) over one-change copies of files it
+# accepts:
+#   accepted  CRLF; trailing whitespace; blank lines before the header; either owner below; no
+#             blank line under a // or <!-- --> header, which is how upstream leaves them;
 #   rejected  any other difference inside the header — an indent, a blank line added or missing, a
-#             missing space after the marker, a missing /// or -- first or last line, /* for /**,
-#             another comment style, another year — and a .ts or .sql header with no blank line
-#             after it (/// and -- have no closing marker; the blank line is how the end is found).
+#             missing space after the marker, one line instead of two, the two lines swapped, a
+#             changed identifier, another comment style, the pre-SPDX long-form header — and a .sql
+#             header with no blank line after it (-- has no closing marker on the file, so the blank
+#             line is how the end is found).
 # The check this replaced looked only for the opener on line 1 and a copyright line near the top,
 # and passed the four .html templates b557ff20c4 had to fix: indented two spaces instead of four.
 # check-license-headers.test.sh holds those copies and the verdict the plugin gave each one.
 #
-# The expected text is rendered from the plugin's own templates, so a year bump there cannot leave
-# this script behind. Owner: the root pom sets <owner>The Inferrix Authors</owner> and lists the
-# Thingsboard template under <validHeaders>, so both are accepted.
+# The expected text is rendered from the plugin's own templates, so a change there cannot leave this
+# script behind. Owner: the root pom points <header> at license-header-inferrix.txt and lists
+# upstream's license-header.txt under <validHeaders>, so both are accepted.
 #
 # Usage:
 #   check-license-headers.sh            check staged files (pre-commit); exit 1 if any fail
@@ -34,9 +37,8 @@ MODE="${1:-staged}"
 ROOT="$(git rev-parse --show-toplevel)" && cd "$ROOT" || exit 1
 INFERRIX="The Inferrix Authors"
 THINGSBOARD="The Thingsboard Authors"
-INCEPTION_YEAR="$(sed -n 's:.*<inceptionYear>\([0-9]*\)</inceptionYear>.*:\1:p' pom.xml 2>/dev/null | head -n 1)"
-if [[ -z "$INCEPTION_YEAR" || ! -f license-header-template.txt || ! -f license-header-template-thingsboard.txt ]]; then
-  printf '[license-header] %s lacks the licence templates or a pom <inceptionYear>, so the expected header is unknown\n' "$ROOT" >&2
+if [[ ! -f license-header-inferrix.txt || ! -f license-header.txt ]]; then
+  printf '[license-header] %s lacks the licence templates, so the expected header is unknown\n' "$ROOT" >&2
   exit 1
 fi
 
@@ -65,12 +67,13 @@ is_checked() {
   return 0
 }
 
-# The template text for an owner, with the placeholders the plugin substitutes.
+# The template text for an owner. Both are the two SPDX lines upstream adopted in 4.3.1.5; the
+# owner is the only difference, so there is nothing to substitute.
 template_body() {
   if [[ "$1" == "$THINGSBOARD" ]]; then
-    cat license-header-template-thingsboard.txt
+    cat license-header.txt
   else
-    sed -e "s/\${project\.inceptionYear}/$INCEPTION_YEAR/g" -e "s/\${owner}/$1/g" license-header-template.txt
+    cat license-header-inferrix.txt
   fi
 }
 
@@ -78,10 +81,8 @@ template_body() {
 # printf '%s' for the dashes: a bare printf '--' is read as an end-of-options marker and errors.
 header_for() {
   case "$1" in
-    *.java|*.scss)
-      printf '/**\n'; template_body "$2" | sed 's|^| * |; s| *$||'; printf ' */\n' ;;
-    *.ts)
-      printf '///\n'; template_body "$2" | sed 's|^|/// |; s| *$||'; printf '///\n' ;;
+    *.java|*.scss|*.ts|*.js)
+      template_body "$2" | sed 's|^|// |; s| *$||' ;;
     *.html)
       printf '<!--\n\n'; template_body "$2" | sed 's|^|    |; s| *$||'; printf '\n-->\n' ;;
     *.sql)
@@ -123,7 +124,7 @@ END { exit !(same(ENVIRON["EXPECTED_A"]) || same(ENVIRON["EXPECTED_B"])) }'
 has_valid_header() {
   local ext="${1##*.}" a b blank=0
   a="EXPECTED_INFERRIX_$ext"; b="EXPECTED_THINGSBOARD_$ext"
-  case "$ext" in ts|sql) blank=1 ;; esac
+  case "$ext" in sql) blank=1 ;; esac
   EXPECTED_A="${!a}" EXPECTED_B="${!b}" awk -v blank_after="$blank" "$MATCH_AWK" "${2:-$1}"
 }
 
@@ -149,11 +150,11 @@ END {
     marker = slash ? "^[ \t]*//" : "^[ \t]*--"
     bare = slash ? "^[ \t]*///?[ \t\r]*$" : "^[ \t]*--[ \t\r]*$"
     for (j = i; j <= n && line[j] ~ marker; j++) {
+      # A // or -- block has no closing marker, so it ends where the licence stops talking: the
+      # next commented line that is neither bare nor licence text is someone\047s own comment. The
+      # two SPDX lines are taken in either order, which a header that swapped them still needs.
+      if (line[j] !~ bare && line[j] !~ /SPDX-|[Cc]opyright|[Ll]icen[cs]e|WARRANTIES|apache\.org/) break
       last = j
-      if (line[j] ~ /limitations under the License/) {
-        if (j < n && line[j + 1] ~ bare) last = j + 1
-        break
-      }
     }
   }
   licence = 0; status = 0
@@ -213,7 +214,9 @@ if [[ "$MODE" == "--fix" ]]; then
       *)  printf '[license-header] could not read %s\n' "$f" >&2
           failed=1; continue ;;
     esac
-    { header_for "$f" "$owner"; printf '\n'; cat "$TMP/body"; } > "$TMP/fixed"
+    { header_for "$f" "$owner"
+      case "$f" in *.sql) printf '\n' ;; esac
+      cat "$TMP/body"; } > "$TMP/fixed"
     # Written through rather than moved over, which would give the file the temp file's mode.
     cat "$TMP/fixed" > "$f"
     git add -- "$f"

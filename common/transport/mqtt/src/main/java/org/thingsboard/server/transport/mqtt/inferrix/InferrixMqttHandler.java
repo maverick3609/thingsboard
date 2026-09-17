@@ -30,8 +30,11 @@ import org.thingsboard.server.transport.mqtt.session.DeviceSessionCtx;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Deque;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.regex.Pattern;
 
 /**
  * Bridges the Inferrix soft-PLC controller's MQTT surface onto the ThingsBoard transport.
@@ -79,6 +82,7 @@ public class InferrixMqttHandler {
     private static final String QUALITY_GOOD = "good";
     private static final String QUALITY_COMM_FAIL = "comm_fail";
     private static final String QUALITY_NEVER = "never";
+    private static final String QUALITY_SUFFIX = "_q";
 
     /**
      * Cap on RPC request ids awaiting a device result.
@@ -107,6 +111,22 @@ public class InferrixMqttHandler {
      */
     private static final long DOWNLINK_MIN_INTERVAL_MS = 1000L;
 
+    /**
+     * A point name the platform will store as a series key. The name is device-supplied, and
+     * ThingsBoard refuses a whole telemetry save when one key fails its XSS check, so one odd name
+     * would cost every other point in the batch. Plain names only: anything else keeps {@code p<id>}.
+     * Commas are out because ThingsBoard lists keys comma-separated in its subscriptions, and a name
+     * ending in {@code _q} is refused in {@link #seriesKey} because it would land on another point's
+     * quality series.
+     */
+    private static final Pattern SERIES_NAME = Pattern.compile("[A-Za-z0-9_./()-][A-Za-z0-9 _./()-]{0,63}");
+
+    /**
+     * Series keys one session may claim. The firmware holds at most 1024 points, so a real
+     * configuration never gets near this, renames included; a device inventing names does.
+     */
+    private static final int MAX_SERIES_KEYS = 2048;
+
     @Getter
     private final String root;
     private final String prefix;
@@ -118,9 +138,11 @@ public class InferrixMqttHandler {
     /** 24-hex silicon uid, learned from the first topic or payload that carries it. */
     private volatile String uid;
 
-    // Both only ever touched from the channel's event loop, so a plain read-modify-write is safe.
+    // Only ever touched from the channel's event loop, so a plain read-modify-write is safe.
     private long lastTimeSyncReplyMs;
     private long lastRegistrationAckMs;
+    /** Which point id writes each series key in this session, so two points never share one. */
+    private final Map<String, Integer> keyOwners = new HashMap<>();
 
     public InferrixMqttHandler(DeviceSessionCtx ctx, TransportService transportService, String root) {
         this.ctx = ctx;
@@ -276,10 +298,12 @@ public class InferrixMqttHandler {
     /**
      * {@code {"ts":..,"tq":..,"points":[{"id":1,"type":"di","v":false,"q":"good","age_ms":77,"n":"DI1"}]}}
      *
-     * <p>Series are keyed {@code p<id>} rather than by the point's name: the id survives a rename in
-     * the config plane, the name does not, and stranding history on a rename is not recoverable
-     * whereas adding a display name later is. Quality is only written when it is not {@code good},
-     * and a point whose quality says no value exists contributes the quality alone.
+     * <p>Series are keyed by the point's name ({@code n}), so an operator reads {@code DI1} or
+     * {@code AHU_Supply_T} rather than an id that means nothing outside the controller's config.
+     * The cost is that renaming a point starts a new series. A point with no usable name, or whose
+     * name another point already writes to, is keyed {@code p<id>} instead. Quality is only written
+     * when it is not {@code good}, as {@code <key>_q}, and a point whose quality says no value
+     * exists contributes the quality alone.
      *
      * <p>ponytail: one timestamp for the whole batch, taken from the envelope. Per-point acquisition
      * time ({@code ts - age_ms}) is sub-second on a 100 ms scan and not worth fragmenting the proto
@@ -301,7 +325,12 @@ public class InferrixMqttHandler {
             if (id == null || !id.isJsonPrimitive() || !id.getAsJsonPrimitive().isNumber()) {
                 continue;
             }
-            String key = "p" + id.getAsInt();
+            String key = seriesKey(id.getAsInt(), optString(point, "n"));
+            if (key == null) {
+                log.debug("[{}] Point {} has no series key it can write without merging into another point's",
+                        ctx.getSessionId(), id);
+                continue;
+            }
             String quality = optString(point, "q");
             if (quality == null) {
                 quality = QUALITY_GOOD;
@@ -312,10 +341,40 @@ public class InferrixMqttHandler {
                 values.add(key, value);
             }
             if (!QUALITY_GOOD.equals(quality)) {
-                values.addProperty(key + "_q", quality);
+                values.addProperty(key + QUALITY_SUFFIX, quality);
             }
         }
         return values.size() == 0 ? null : withTs(values, optLong(jo, "ts"));
+    }
+
+    /**
+     * The point's name when it is plain and no other point in this session writes it, else
+     * {@code p<id>}, else null when even that is taken (a point named after another's id).
+     *
+     * <p>ponytail: a key stays with the first point that used it for the whole session, so when two
+     * points swap names without a reconnect, one of them writes to {@code p<id>} until the next
+     * one. Releasing a key when its point is seen under a new name would fix that.
+     */
+    private String seriesKey(int id, String name) {
+        String fallback = "p" + id;
+        String trimmed = name == null ? "" : name.trim();
+        String preferred = SERIES_NAME.matcher(trimmed).matches() && !trimmed.endsWith(QUALITY_SUFFIX)
+                ? trimmed : fallback;
+        for (String key : List.of(preferred, fallback)) {
+            Integer owner = keyOwners.get(key);
+            if (owner == null) {
+                if (keyOwners.size() >= MAX_SERIES_KEYS) {
+                    // Stop remembering, but keep the data flowing under the one key that is the id's.
+                    return fallback;
+                }
+                keyOwners.put(key, id);
+                return key;
+            }
+            if (owner == id) {
+                return key;
+            }
+        }
+        return null;
     }
 
     /**

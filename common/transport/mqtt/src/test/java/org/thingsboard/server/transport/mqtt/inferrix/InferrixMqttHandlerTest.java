@@ -42,6 +42,7 @@ import org.thingsboard.server.transport.mqtt.session.DeviceSessionCtx;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -53,6 +54,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -98,7 +100,7 @@ class InferrixMqttHandlerTest {
     }
 
     @Test
-    void telemetryIsKeyedByPointIdAndCarriesQualityOnlyWhenDegraded() {
+    void telemetryIsKeyedByPointNameAndCarriesQualityOnlyWhenDegraded() {
         publish(ROOT + "/telemetry/" + UID, """
                 {"ts":1699999999000,"tq":"synced","points":[
                   {"id":1,"type":"di","v":false,"q":"good","age_ms":77,"n":"DI1"},
@@ -114,19 +116,70 @@ class InferrixMqttHandlerTest {
         assertEquals(1699999999000L, list.getTs());
 
         Map<String, TransportProtos.KeyValueProto> kv = index(list);
-        assertEquals(false, kv.get("p1").getBoolV());
-        assertEquals(23.5, kv.get("p13").getDoubleV());
+        assertEquals(false, kv.get("DI1").getBoolV());
+        assertEquals(23.5, kv.get("AI1").getDoubleV());
         // stale keeps the reading and says so
-        assertEquals(100L, kv.get("p20").getLongV());
-        assertEquals("stale", kv.get("p20_q").getStringV());
+        assertEquals(100L, kv.get("FlowRate").getLongV());
+        assertEquals("stale", kv.get("FlowRate_q").getStringV());
         // the device says these two values mean nothing, so only the quality is stored
-        assertNull(kv.get("p21"));
-        assertEquals("comm_fail", kv.get("p21_q").getStringV());
-        assertNull(kv.get("p22"));
-        assertEquals("never", kv.get("p22_q").getStringV());
+        assertNull(kv.get("Pump"));
+        assertEquals("comm_fail", kv.get("Pump_q").getStringV());
+        assertNull(kv.get("Valve"));
+        assertEquals("never", kv.get("Valve_q").getStringV());
         // good points cost exactly one series each
-        assertNull(kv.get("p1_q"));
-        assertNull(kv.get("p13_q"));
+        assertNull(kv.get("DI1_q"));
+        assertNull(kv.get("AI1_q"));
+        assertEquals(6, kv.size());
+    }
+
+    @Test
+    void aPointWithoutAPlainNameIsKeyedByItsId() {
+        publish(ROOT + "/telemetry/" + UID, """
+                {"ts":1699999999000,"points":[
+                  {"id":2,"type":"di","v":true,"q":"good","age_ms":1},
+                  {"id":3,"type":"di","v":true,"q":"good","age_ms":1,"n":"   "},
+                  {"id":4,"type":"ai","v":1,"q":"good","age_ms":1,"n":"<svg onload=a>"},
+                  {"id":5,"type":"ai","v":2,"q":"good","age_ms":1,"n":"a,b"},
+                  {"id":6,"type":"ai","v":3,"q":"good","age_ms":1,"n":"{{x}}"},
+                  {"id":7,"type":"ai","v":4,"q":"good","age_ms":1,"n":"%s"},
+                  {"id":8,"type":"ao","v":5,"q":"good","age_ms":1,"n":" AO2_V (0-10) "},
+                  {"id":9,"type":"ai","v":6,"q":"good","age_ms":1,"n":"Pump_q"}
+                ]}""");
+
+        Map<String, TransportProtos.KeyValueProto> kv = index(captureTelemetry().getTsKvList(0));
+        // "Pump_q" would be the quality series of a point named "Pump"
+        assertEquals(List.of("AO2_V (0-10)", "p2", "p3", "p4", "p5", "p6", "p7", "p9"),
+                kv.keySet().stream().sorted().toList());
+    }
+
+    @Test
+    void twoPointsWithOneNameNeverShareASeries() {
+        publish(ROOT + "/telemetry/" + UID, """
+                {"ts":1699999999000,"points":[
+                  {"id":3,"type":"ai","v":20.5,"q":"good","age_ms":1,"n":"Temp"},
+                  {"id":4,"type":"ai","v":99.5,"q":"stale","age_ms":1,"n":"Temp"}
+                ]}""");
+        publish(ROOT + "/telemetry/" + UID, """
+                {"ts":1699999999100,"points":[
+                  {"id":4,"type":"ai","v":98.5,"q":"good","age_ms":1,"n":"Temp"},
+                  {"id":9,"type":"ai","v":1,"q":"good","age_ms":1,"n":"p4"}
+                ]}""");
+
+        ArgumentCaptor<TransportProtos.PostTelemetryMsg> captor =
+                ArgumentCaptor.forClass(TransportProtos.PostTelemetryMsg.class);
+        verify(transportService, times(2)).process(any(), captor.capture(), any(TbMsgMetaData.class), eq(callback));
+        Map<String, TransportProtos.KeyValueProto> first = index(captor.getAllValues().get(0).getTsKvList(0));
+        assertEquals(20.5, first.get("Temp").getDoubleV());
+        assertEquals(99.5, first.get("p4").getDoubleV());
+        assertEquals("stale", first.get("p4_q").getStringV());
+        assertNull(first.get("Temp_q"));
+        // the name stays with the point that had it first, in every later batch too
+        Map<String, TransportProtos.KeyValueProto> second = index(captor.getAllValues().get(1).getTsKvList(0));
+        assertEquals(98.5, second.get("p4").getDoubleV());
+        assertNull(second.get("Temp"));
+        // a point named after another point's id gets its own id instead
+        assertEquals(1L, second.get("p9").getLongV());
+        assertEquals(2, second.size());
     }
 
     @Test
@@ -261,7 +314,7 @@ class InferrixMqttHandlerTest {
 
         Map<String, TransportProtos.KeyValueProto> kv = index(captureTelemetry().getTsKvList(0));
         assertEquals(1, kv.size());
-        assertEquals(23.5, kv.get("p13").getDoubleV());
+        assertEquals(23.5, kv.get("AI1").getDoubleV());
     }
 
     @Test

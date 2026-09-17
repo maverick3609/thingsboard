@@ -69,8 +69,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  * proxy timeout in front of the platform. The upload is handed to a worker and polled instead.
  *
  * <p>Jobs live in memory: a platform restart mid-upload leaves the device with a half-written
- * staging slot, which is safe — the slot is not activated until {@code apply} verifies the whole
- * image by SHA-256, and the next {@code begin} erases it.
+ * staging slot. Nothing activates it, because {@code apply} verifies the whole image by SHA-256. A
+ * firmware one would also steer the device's next {@code begin} to the wrong slot, so the next
+ * firmware upload clears it first (see discardUnfinishedFirmwareUpload).
  */
 @Service
 @TbCoreComponent
@@ -107,7 +108,7 @@ public class InferrixUploadService {
 
     /**
      * One upload per device. The firmware is explicit that it accepts a single uploader, and a
-     * second {@code begin} would erase the slot the first is still writing into.
+     * second {@code begin} restarts the device's upload in the middle of the first.
      */
     private final ConcurrentMap<DeviceId, String> activeByDevice = new ConcurrentHashMap<>();
 
@@ -229,7 +230,7 @@ public class InferrixUploadService {
             job.imageVersion = readFirmwareImage(artifact).version();
         }
         // computeIfAbsent, not a check-then-put: two operators pressing upload at the same moment
-        // would otherwise both pass the check and the second begin would erase the first's slot.
+        // would otherwise both pass the check and the second begin would restart the first's upload.
         String running = activeByDevice.computeIfAbsent(deviceId, id -> job.getId());
         if (!running.equals(job.getId())) {
             throw new IllegalStateException("An upload to this controller is already running");
@@ -272,6 +273,7 @@ public class InferrixUploadService {
                 verifyLogicOrThrow(credentials, artifact);
             } else {
                 requireOutranksRunningFirmware(credentials, readFirmwareImage(artifact));
+                discardUnfinishedFirmwareUpload(credentials, job.getDeviceId());
             }
 
             requireOk(controllerAccess.callWith(credentials, "POST", job.getKind().beginPath(),
@@ -320,8 +322,7 @@ public class InferrixUploadService {
      * <p>MCUboot boots the slot with the strictly higher version and compares major, minor and
      * revision only, so an image that does not outrank the running one is accepted by every step on
      * the device, keeps losing at boot, and is erased by auto-revert — a success that is not one
-     * (the firmware's docs/OTA.md). {@code begin} also erases the target slot, so this has to be
-     * decided before it.
+     * (the firmware's docs/OTA.md). Decided before anything on the device is touched.
      */
     private void requireOutranksRunningFirmware(InferrixControllerAccess.Credentials credentials,
                                                 FirmwareImage image) throws IOException {
@@ -336,10 +337,42 @@ public class InferrixUploadService {
     }
 
     /**
+     * Makes the controller drop a firmware upload that stopped before apply, before this one begins.
+     *
+     * <p>The device's {@code begin} erases nothing, whatever its docs/OTA.md says (firmware up to
+     * 0.1.17). It writes into the slot without a valid image header, or into the older of two. An
+     * upload that stopped midway has already written its newer header, so the next {@code begin}
+     * picks the slot of the image the controller is running. That write cannot verify, and the
+     * rejection erases the only bootable image, which nobody finds out until the controller
+     * restarts. An apply the device must refuse makes it erase the unfinished slot instead. It
+     * answers {@code verify_failed} whatever it did, so the state is read back afterwards.
+     */
+    private void discardUnfinishedFirmwareUpload(InferrixControllerAccess.Credentials credentials,
+                                                 DeviceId deviceId) throws IOException {
+        if (!firmwareUploadOpen(credentials)) {
+            return;
+        }
+        log.warn("[{}] Discarding an unfinished firmware upload on the controller", deviceId);
+        controllerAccess.callWith(credentials, "POST", Kind.FIRMWARE.applyPath(),
+                "{\"sha256\":\"" + "0".repeat(64) + "\"}");
+        if (firmwareUploadOpen(credentials)) {
+            throw new IOException("The controller still holds an unfinished firmware upload. Restart the"
+                    + " controller before uploading again, because a new upload now could erase the"
+                    + " firmware it runs");
+        }
+    }
+
+    private boolean firmwareUploadOpen(InferrixControllerAccess.Credentials credentials) throws IOException {
+        ControllerResponse status = controllerAccess.callWith(credentials, "GET", Kind.FIRMWARE.statusPath(), null);
+        requireOk(status, "read of the firmware upload state");
+        return "downloading".equals(textField(status.body(), "state"));
+    }
+
+    /**
      * The version of a signed MCUboot image, or why the file is not one this controller can boot.
      *
-     * <p>Checked here because nothing downstream catches these in time: {@code begin} erases the
-     * target slot first, and {@code apply} compares a SHA-256 the platform computed over the same
+     * <p>Checked here because nothing downstream catches these in time: the stream overwrites the
+     * target slot, and {@code apply} compares a SHA-256 the platform computed over the same
      * bytes, so any file at all would be streamed, "verified" and armed. The layout is MCUboot's
      * {@code struct image_header}, little-endian, as read by the firmware's docs/OTA.md.
      */

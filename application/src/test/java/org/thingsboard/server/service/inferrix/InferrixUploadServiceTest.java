@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -113,8 +114,54 @@ class InferrixUploadServiceTest {
         assertThat(chunks).allSatisfy(chunk -> assertThat(chunk.length).isBetween(1, limit));
         assertThat(jsonCalls).containsExactly(
                 "/api/v1/info null",
+                "/api/v1/firmware/status null",
                 "/api/v1/firmware/begin {\"size\":" + artifact.length + "}",
                 "/api/v1/firmware/apply {\"sha256\":\"" + InferrixUploadService.sha256(artifact) + "\"}");
+    }
+
+    @Test
+    void anUploadLeftUnfinishedOnTheControllerIsDiscardedBeforeBegin() throws Exception {
+        // begin erases nothing and picks its slot by image header, so a half-written newer header
+        // would aim this upload at the slot of the firmware the controller is running.
+        firmwareUploadStates("downloading", "idle");
+        byte[] image = firmwareImage(0, 1, 16, 0);
+
+        InferrixUploadService.UploadJob job = service.start(TENANT, DEVICE, InferrixUploadService.Kind.FIRMWARE, image);
+        awaitFinished(job);
+
+        assertThat(job.getState()).isEqualTo(InferrixUploadService.State.DONE);
+        assertThat(jsonCalls).containsExactly(
+                "/api/v1/info null",
+                "/api/v1/firmware/status null",
+                "/api/v1/firmware/apply {\"sha256\":\"" + "0".repeat(64) + "\"}",
+                "/api/v1/firmware/status null",
+                "/api/v1/firmware/begin {\"size\":" + image.length + "}",
+                "/api/v1/firmware/apply {\"sha256\":\"" + InferrixUploadService.sha256(image) + "\"}");
+    }
+
+    @Test
+    void anUnfinishedUploadTheControllerKeepsStopsTheJobBeforeBegin() throws Exception {
+        firmwareUploadStates("downloading");
+
+        InferrixUploadService.UploadJob job = service.start(TENANT, DEVICE,
+                InferrixUploadService.Kind.FIRMWARE, firmwareImage(0, 1, 16, 0));
+        awaitFinished(job);
+
+        assertThat(job.getState()).isEqualTo(InferrixUploadService.State.FAILED);
+        assertThat(job.getMessage()).contains("Restart the controller");
+        assertThat(jsonCalls).noneMatch(call -> call.startsWith("/api/v1/firmware/begin"));
+        assertThat(chunks).isEmpty();
+    }
+
+    /** The upload state the controller reports on each status read, the last one repeating. */
+    private void firmwareUploadStates(String... states) throws Exception {
+        AtomicInteger reads = new AtomicInteger();
+        when(controllerAccess.callWith(any(), eq("GET"), eq("/api/v1/firmware/status"), any()))
+                .thenAnswer(invocation -> {
+                    jsonCalls.add(invocation.getArgument(2) + " " + invocation.getArgument(3));
+                    String state = states[Math.min(reads.getAndIncrement(), states.length - 1)];
+                    return response(200, "{\"state\":\"" + state + "\",\"attempts\":0,\"size\":0}");
+                });
     }
 
     @Test
@@ -145,8 +192,8 @@ class InferrixUploadServiceTest {
         InferrixUploadService.UploadJob first = service.start(TENANT, DEVICE,
                 InferrixUploadService.Kind.FIRMWARE, firmwareImage(0, 1, 16, 0));
         try {
-            // The device takes one uploader; a second begin would erase the slot the first is
-            // writing into.
+            // The device takes one uploader; a second begin would restart the upload the first is
+            // writing.
             assertThatThrownBy(() -> service.start(TENANT, DEVICE,
                     InferrixUploadService.Kind.FIRMWARE, firmwareImage(0, 1, 16, 0)))
                     .isInstanceOf(IllegalStateException.class)
@@ -258,7 +305,7 @@ class InferrixUploadServiceTest {
     @Test
     void aFileWithoutAnMcubootHeaderIsRefusedBeforeAnythingIsSent() {
         // zephyr.bin instead of zephyr.signed.bin is the likely mistake, and the device cannot catch
-        // it: begin erases the slot and apply checks a digest the platform computed itself.
+        // it: the stream overwrites the slot and apply checks a digest the platform computed itself.
         assertThatThrownBy(() -> service.start(TENANT, DEVICE, InferrixUploadService.Kind.FIRMWARE, artifact(2000)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("zephyr.signed.bin");
@@ -297,7 +344,7 @@ class InferrixUploadServiceTest {
     }
 
     @Test
-    void anImageThatDoesNotOutrankTheRunningFirmwareFailsBeforeTheSlotIsErased() throws Exception {
+    void anImageThatDoesNotOutrankTheRunningFirmwareFailsBeforeBegin() throws Exception {
         runningFirmware("0.1.15+0");
 
         InferrixUploadService.UploadJob job = service.start(TENANT, DEVICE,

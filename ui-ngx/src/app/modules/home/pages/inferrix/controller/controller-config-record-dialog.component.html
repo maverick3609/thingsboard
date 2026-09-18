@@ -41,9 +41,14 @@
           </mat-form-field>
           <mat-form-field *ngIf="field.type === 'text' || field.type === 'number'"
                           class="flex-1" appearance="outline" subscriptSizing="dynamic">
-            <input matInput [formControlName]="field.key"
-                   [type]="field.type === 'number' ? 'number' : 'text'"
-                   [maxlength]="field.maxLength"/>
+            <!-- Two inputs, not one with [type] bound: Angular picks NumberValueAccessor off the
+                 static `type="number"` attribute, and a bound [type] never matches it. With the
+                 binding the control held the digits as a STRING, and the device answered every
+                 record write `400 {"error":"bad_field"}` because its JSON parser wants a number. -->
+            <input matInput *ngIf="field.type === 'number'" type="number"
+                   [formControlName]="field.key"/>
+            <input matInput *ngIf="field.type === 'text'" type="text"
+                   [formControlName]="field.key" [maxlength]="field.maxLength"/>
             <mat-icon matSuffix class="tb-error" matTooltipPosition="above" matTooltipClass="tb-error-tooltip"
                       [matTooltip]="'inferrix.field-invalid' | translate"
                       *ngIf="recordForm.get(field.key).invalid && recordForm.get(field.key).touched">

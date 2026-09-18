@@ -56,9 +56,16 @@
             </mat-form-field>
             <mat-form-field *ngIf="field.type === 'text' || field.type === 'number' || field.type === 'password'"
                             class="flex-1" appearance="outline" subscriptSizing="dynamic">
-              <input matInput [formControlName]="field.key"
-                     [type]="field.type === 'number' ? 'number' : field.type === 'password' ? 'password' : 'text'"
-                     [maxlength]="field.maxLength"/>
+              <!-- A static type="number", never a bound [type]: Angular matches NumberValueAccessor
+                   on the attribute, so a bound one leaves the control holding a STRING and the
+                   device refuses the save with 400 bad_field. Same trap as the config record
+                   dialog. -->
+              <input matInput *ngIf="field.type === 'number'" type="number"
+                     [formControlName]="field.key"/>
+              <input matInput *ngIf="field.type === 'password'" type="password"
+                     [formControlName]="field.key" [maxlength]="field.maxLength"/>
+              <input matInput *ngIf="field.type === 'text'" type="text"
+                     [formControlName]="field.key" [maxlength]="field.maxLength"/>
               <mat-icon matSuffix class="tb-error" matTooltipPosition="above" matTooltipClass="tb-error-tooltip"
                         [matTooltip]="'inferrix.field-invalid' | translate"
                         *ngIf="formGroups[form.path].get(field.key).invalid && formGroups[form.path].get(field.key).touched">

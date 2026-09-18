@@ -23,6 +23,7 @@ import {
 @Component({
   selector: 'tb-controller-points',
   templateUrl: './controller-points.component.html',
+  styleUrls: ['./controller-table.scss'],
   standalone: false
 })
 export class ControllerPointsComponent extends ControllerPanelComponent {

@@ -21,7 +21,11 @@
       </button>
     </div>
     <div class="flex flex-row items-center gap-2">
-      <mat-button-toggle-group [value]="showDraft" (change)="toggleDraft($event.value)">
+      <!-- What draft and active mean is a tooltip, not two permanent lines of prose: on a laptop
+           frame those lines cost a record row each. -->
+      <mat-button-toggle-group [value]="showDraft" (change)="toggleDraft($event.value)"
+                               matTooltip="{{ (showDraft ? 'inferrix.draft-note' : 'inferrix.active-note') | translate }}"
+                               matTooltipPosition="above">
         <mat-button-toggle [value]="true">{{ 'inferrix.draft' | translate }}</mat-button-toggle>
         <mat-button-toggle [value]="false">{{ 'inferrix.active' | translate }}</mat-button-toggle>
       </mat-button-toggle-group>
@@ -37,8 +41,6 @@
         {{ 'inferrix.apply' | translate }}
       </button>
     </div>
-    <div class="tb-form-panel-hint" *ngIf="showDraft" translate>inferrix.draft-note</div>
-    <div class="tb-form-panel-hint" *ngIf="!showDraft" translate>inferrix.active-note</div>
     <mat-progress-bar color="warn" mode="indeterminate" *ngIf="loading"></mat-progress-bar>
     <div class="tb-error-message" *ngIf="error">{{ error }}</div>
     <div class="tb-form-panel-hint" *ngIf="applyResult">{{ applyResult }}</div>
@@ -55,7 +57,7 @@
     </ng-container>
   </div>
 
-  <div class="tb-entity-table tb-config-records flex flex-1 flex-col">
+  <div class="tb-entity-table tb-controller-table tb-config-records flex flex-1 flex-col">
     <div class="tb-entity-table-content tb-outlined-border flex flex-1 flex-col">
       <mat-toolbar class="mat-mdc-table-toolbar">
         <div class="mat-toolbar-tools gap-4">
@@ -90,11 +92,11 @@
           <ng-container matColumnDef="actions" stickyEnd>
             <th mat-header-cell *matHeaderCellDef></th>
             <td mat-cell *matCellDef="let record" class="tb-config-actions">
-              <button mat-icon-button [disabled]="!editable" (click)="editRecord(record)"
+              <button mat-icon-button class="tb-mat-32" [disabled]="!editable" (click)="editRecord(record)"
                       matTooltip="{{ 'action.edit' | translate }}" matTooltipPosition="above">
                 <mat-icon>edit</mat-icon>
               </button>
-              <button mat-icon-button [disabled]="!editable" (click)="deleteRecord(record)"
+              <button mat-icon-button class="tb-mat-32" [disabled]="!editable" (click)="deleteRecord(record)"
                       matTooltip="{{ 'action.delete' | translate }}" matTooltipPosition="above">
                 <mat-icon>delete</mat-icon>
               </button>

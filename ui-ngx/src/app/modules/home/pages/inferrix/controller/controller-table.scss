@@ -1,0 +1,39 @@
+// SPDX-FileCopyrightText: Copyright The Inferrix Authors
+// SPDX-License-Identifier: Apache-2.0
+
+/* Density for the two controller tables (config records, live points).
+ *
+ * A tab frame is ~690px tall on a 900px laptop and ~870px at 1080p, and the panel above the table
+ * eats 300 of them. At the platform's 52px row a page of 10 records cannot be on screen at either
+ * size. 44px rows and a 44px header buy back 92px — the whole page fits at 1080p, and what is left
+ * over at 900px is one short scroll of the panel, never a scrollbar inside the table.
+ *
+ * The row actions have to come down with the rows: a 48px icon button would hold the row open on
+ * its own. TB's tb-mat-32 is that button, 32px. */
+.tb-controller-table {
+  table {
+    width: 100%;
+  }
+
+  /* The paginator sticks to the bottom of the tab frame. On a short window the panel is taller than
+     the frame, and a paginator that scrolls out of sight is a paginator the operator does not know
+     is there — the page controls have to stay reachable wherever the panel is scrolled to. */
+  mat-paginator {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    background: #fff;
+  }
+
+  .mat-mdc-header-row {
+    height: 44px;
+  }
+
+  .mat-mdc-row {
+    height: 44px;
+  }
+
+  .mat-mdc-cell {
+    height: 43px;
+  }
+}

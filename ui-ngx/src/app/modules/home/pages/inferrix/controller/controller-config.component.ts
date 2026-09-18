@@ -35,7 +35,7 @@ import { ControllerPanelComponent } from '@home/pages/inferrix/controller/contro
 @Component({
   selector: 'tb-controller-config',
   templateUrl: './controller-config.component.html',
-  styleUrls: ['./controller-config.component.scss'],
+  styleUrls: ['./controller-config.component.scss', './controller-table.scss'],
   standalone: false
 })
 export class ControllerConfigComponent extends ControllerPanelComponent implements OnDestroy {

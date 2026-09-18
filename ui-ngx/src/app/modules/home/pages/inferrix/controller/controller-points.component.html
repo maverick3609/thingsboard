@@ -4,7 +4,7 @@
     SPDX-License-Identifier: Apache-2.0
 
 -->
-<div class="mat-padding tb-entity-table flex flex-1 flex-col">
+<div class="mat-padding tb-entity-table tb-controller-table flex flex-1 flex-col">
   <div class="tb-entity-table-content tb-outlined-border flex flex-1 flex-col">
     <mat-toolbar class="mat-mdc-table-toolbar">
       <div class="mat-toolbar-tools">
@@ -63,7 +63,7 @@
         <ng-container matColumnDef="actions">
           <th mat-header-cell *matHeaderCellDef></th>
           <td mat-cell *matCellDef="let point">
-            <button mat-icon-button *ngIf="canWrite(point)" (click)="write(point)"
+            <button mat-icon-button class="tb-mat-32" *ngIf="canWrite(point)" (click)="write(point)"
                     matTooltip="{{ 'inferrix.point-write' | translate }}" matTooltipPosition="above">
               <mat-icon>edit</mat-icon>
             </button>

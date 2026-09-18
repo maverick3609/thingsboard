@@ -34,10 +34,11 @@ if you need to know which line of which upstream file carries a feature, read th
 7. [Reporting](#7-reporting)
 8. [Widget Data Export](#8-widget-data-export)
 9. [Branding and navigation](#9-branding-and-navigation)
-10. [Configuration reference](#10-configuration-reference)
-11. [REST API reference](#11-rest-api-reference)
-12. [Troubleshooting](#12-troubleshooting)
-13. [Maintaining the fork](#13-maintaining-the-fork)
+10. [IO Controllers](#10-io-controllers)
+11. [Configuration reference](#11-configuration-reference)
+12. [REST API reference](#12-rest-api-reference)
+13. [Troubleshooting](#13-troubleshooting)
+14. [Maintaining the fork](#14-maintaining-the-fork)
 
 ---
 
@@ -63,6 +64,7 @@ if you need to know which line of which upstream file carries a feature, read th
 | [Scheduler](#6-scheduler) | PE-style scheduled events: recurring attribute updates, RPC, firmware/software updates, report generation | Tenant admin, customer user | Yes |
 | [Reporting](#7-reporting) | PE-style report templates, a drag-and-drop designer, PDF/CSV rendering, scheduled email delivery | Tenant admin | **No** — renderer is opt-in |
 | [Widget Data Export](#8-widget-data-export) | CSV / XLS / XLSX export button on dashboard widgets | Anyone who can view a dashboard | Yes, for table-type widgets |
+| [IO Controllers](#10-io-controllers) | Inferrix soft-PLC controllers as ordinary devices: discovery, adoption, live configuration, logic programs, firmware upload | Tenant admin (full), customer user (read) | Yes — but nothing appears until a controller is adopted |
 | [Branding](#9-branding-and-navigation) | Inferrix logos, colours, titles, mail text baked into the default build | Everyone | Yes |
 | [Navigation](#9-branding-and-navigation) | Slimmed tenant sidebar; Edge Management and OTA removed; Utilities and Administration groups | Tenant admin | Yes |
 
@@ -72,7 +74,7 @@ Scheduler, Reporting, Roles and White Labeling are **replications of ThingsBoard
 features**, rebuilt on the Community Edition codebase from analysis of the PE distribution. Where a PE
 concept has no CE equivalent (entity groups, for example), the feature is reshaped rather than dropped,
 and every such deviation is called out in the relevant section below. Two are deliberately *stricter*
-than PE — the [anonymous public-dashboard viewer](#46-the-anonymous-public-dashboard-viewer) and the
+than PE — the [anonymous public-dashboard viewer](#47-the-anonymous-public-dashboard-viewer) and the
 [report sub-report recursion bounds](#78-limits-and-safety-rails) — and one is deliberately *narrower*
 ([roles apply to customer users only](#41-who-a-role-applies-to)).
 
@@ -159,7 +161,7 @@ export INFERRIX_LICENSE_KEY="..."
 ```
 
 `thingsboard.yml` reads it via `license.key: "${INFERRIX_LICENSE_KEY:}"`. Four more tunables live in the
-same `license:` block — see the [configuration reference](#101-license-control).
+same `license:` block — see the [configuration reference](#111-license-control).
 
 ### 3.2 First boot
 
@@ -397,7 +399,33 @@ mail. The activation **link** is available — that is the intended way to hand 
 The capability is **explicit**: it needs a role that names `User` Write. A customer user with no role
 sees the page exactly as read-only as before, so shipping this widened nobody's access by default.
 
-### 4.6 The anonymous public-dashboard viewer
+### 4.6 Letting a customer user create and delete
+
+Stock ThingsBoard gives a customer user no `Create` and no `Delete` on assets or devices at all, and a
+role can only ever restrict what the authority already allows. A role granting `Asset: Create`
+therefore had nothing to hand back: the *Add asset* button stayed hidden however the role was written.
+
+A role that **names the operation explicitly** now opens it:
+
+| Resource | Opened by an explicit grant | Baseline for any customer user |
+|---|---|---|
+| Asset | `Create`, `Delete` | `Read`, `Write`, attributes, telemetry |
+| Device | `Create`, `Delete` | `Read`, `Write`, credentials read, RPC, claim, attributes, telemetry |
+
+"Explicitly" is the load-bearing word. A customer user with **no** role keeps legacy access, which the
+ordinary check reads as full authority — so the grant is tested against roles the user actually holds,
+and shipping this widened nobody's access by default. `Manage credentials` stays closed for this scope.
+
+Ownership is pinned on the server: whatever the request body says, an entity a customer user saves
+carries their own customer id. On a create that is what makes the save reachable at all; on an update
+it closes a pre-existing gap where a customer user could POST one of their own assets back under a
+sibling customer's id and hand it away.
+
+> [!WARNING]
+> Deleting a device destroys its credentials and telemetry, not just the record, and a device deleted
+> this way cannot reconnect. Grant `Device: Delete` to a customer role only deliberately.
+
+### 4.7 The anonymous public-dashboard viewer
 
 Publishing a dashboard makes it readable by anyone holding the link. That viewer authenticates with
 nothing but the public id and arrives as a **customer user of the public customer** — synthetic, with no
@@ -426,6 +454,7 @@ The credentials read is the one worth dwelling on: the access token does not exp
 opened a public dashboard could publish data as that device indefinitely, from anywhere, long after the
 link was withdrawn.
 
+> [!WARNING]
 > **Stricter than PE, on purpose.** PE's public entity-group permissions include `RPC_CALL`, so a PE
 > public dashboard can carry working control widgets. We drop it: anyone holding a dashboard link could
 > otherwise actuate the devices on it. The consequence is that a **control widget on a public dashboard
@@ -433,7 +462,7 @@ link was withdrawn.
 > needs to actuate, that is the line to revisit (`PUBLIC_USER_PERMISSIONS` in
 > `DefaultUserPermissionsService`), not a per-widget workaround.
 
-### 4.7 How it is enforced
+### 4.8 How it is enforced
 
 - Roles are AND-ed in after the normal authority check, in `DefaultAccessControlService`. A role can
   only ever **restrict** what the authority already allows, never extend it.
@@ -449,7 +478,7 @@ link was withdrawn.
   customer user never sees Disable/Enable Account or Resend activation (tenant-only endpoints), and sees
   Display activation link only with the customer-administrator grant.
 
-### 4.8 Operational notes
+### 4.9 Operational notes
 
 - **Permissions are never in the JWT.** They are cached per user and re-read each request, so a role
   edit applies on the **next request** — no logout needed. The menu follows on the next page load.
@@ -550,6 +579,7 @@ Every send in the platform routes through a single choke point, so a saved templ
 bundled defaults. Bodies are Freemarker with the platform's usual model variables, edited in a rich-text
 editor.
 
+> [!WARNING]
 > **Security.** Bodies are operator-supplied Freemarker. The engine is configured with
 > `TemplateClassResolver.ALLOWS_NOTHING_RESOLVER`, which is what stops
 > `<#assign x="freemarker.template.utility.Execute"?new()>` in a saved template from being remote code
@@ -619,6 +649,7 @@ it, right-click for its context menu.
 
 `TIMER` events are floored at `SCHEDULER_MIN_INTERVAL_IN_SEC` (default 60).
 
+> [!WARNING]
 > **`endsOn` is mandatory and recurring events die silently on that date.** The list carries a **Status**
 > column — Active / Disabled / Expired — precisely so an expired event does not read as healthy. If a
 > schedule "just stopped working", check Status first.
@@ -813,6 +844,7 @@ with its own configuration form.
 The node submits a job and acknowledges the message; the finished report is pushed back into the chain
 as an output message.
 
+> [!WARNING]
 > **`useConfigFromMessage = true` lets an incoming message choose any user and any notification target
 > within the tenant.** That is PE-parity behaviour and it is the rule-chain author's decision to enable
 > it. Treat it as you would any other node that takes its configuration from message data.
@@ -969,6 +1001,7 @@ enforces that.)
 `tenant@inferrix.com`, `customer@inferrix.com` (and `customerA/B/C@`); the default "Mail From" is
 `Inferrix Cortex <sysadmin@localhost.localdomain>`; the JWT issuer defaults to `inferrix.com`.
 
+> [!WARNING]
 > **Existing installs are not migrated.** These are install-time defaults written once into
 > `admin_settings` and the `tb_user` table. An install that predates them keeps its
 > `@thingsboard.org` accounts and its old mail-from/issuer values until you change them via the UI or
@@ -1016,17 +1049,321 @@ Sys admin and customer user menus are unchanged apart from the removals noted ab
 | White labeling | `/white-labeling` | Sys admin, tenant admin, customer user |
 | Roles | `/roles` | Tenant admin |
 | Users | `/users` | Tenant admin, customer user |
+| IO Controllers | `/io-controllers` | Tenant admin, customer user |
+| Discovered controllers | `/io-controllers/discovered` | Sys admin, tenant admin |
+
+## 10. IO Controllers
+
+Inferrix soft-PLC controllers — Zephyr/STM32H750 boards running Modbus RTU, Wirepas and local
+DI/DO/AI/AO — brought into Cortex as ordinary ThingsBoard devices. Telemetry arrives over the
+platform's **own** MQTT transport (no second broker, no bridge process); configuration goes the other
+way, through a backend REST proxy that reaches the controller's IP directly over the LAN or VPN.
+
+**Where:** Entities → **IO Controllers** (`/io-controllers`) for the adopted fleet, and
+**Discovered controllers** (`/io-controllers/discovered`) for boards that have announced themselves
+but belong to nobody yet.
+
+### 10.1 What a controller is to the platform
+
+An adopted controller is a `DEVICE` on the auto-created **`Inferrix Controller`** device profile.
+Nothing about it is special-cased: attributes, telemetry, alarms, audit log, rule chains, dashboards
+and the licence device cap all apply exactly as they do to any other device, and its *Active* flag is
+the platform's own connectivity flag, not something the board reports.
+
+**The feature adds no database table.** Discovery sightings, upload jobs and provisioning jobs live in
+a per-node in-memory cache and are lost on restart — sightings repopulate within about five minutes,
+tenant assignments have to be redone. Everything durable is a device, a device attribute, or the
+controller's own flash.
+
+### 10.2 Before you adopt anything
+
+Three things must be in place, and adoption fails loudly without the first two.
+
+**1. A credentials key.** Adoption seals the controller's ownership password and bearer token with
+AES-256-GCM before writing them to device attributes; with no key it refuses to run rather than
+storing them in plaintext.
+
+```sh
+export INFERRIX_CONTROLLER_CREDENTIALS_KEY="$(openssl rand -base64 32)"
+```
+
+> [!WARNING]
+> The key lives outside the database it protects, in `thingsboard.conf`. **Losing it or changing it
+> orphans every adopted controller**: the sealed password and token become undecryptable, and a board
+> whose ownership password is not known to the platform has to be re-claimed with the password itself
+> — which cannot be read back off the device, only reset by a factory format.
+
+**2. Broker settings.** A sys-admin JSON block under **Administration → Settings → General** named
+`inferrixController`. This is what the platform writes into each adopted controller's `settings_mqtt`,
+so it must name the broker address the *controller* can reach, which is rarely `localhost`.
+
+| Field | Default | Becomes |
+|---|---|---|
+| `host` | *(none — adoption fails without it)* | `host` |
+| `port` | `8883` | `port` |
+| `tls` | `true` | `tls_on` |
+| `topicRoot` | `com/inferrix` | `base_topic` |
+| `caCert` | *(omitted when blank)* | `ca_cert` |
+
+The username, password and client id are not settings — the platform derives them per device: username
+is the silicon UID, client id is `infx-{uid}`, and the password is 23 random bytes, base64url-encoded,
+because the firmware truncates `settings_mqtt.password` at 31 characters.
+
+**3. The discovery listener, if you want greenfield discovery.** Off by default. See
+[§11.6](#116-io-controllers).
+
+### 10.3 Discovery and adoption
+
+A controller that has never been adopted has no platform credentials, so it cannot appear over MQTT.
+It announces itself instead over plain TCP, by default to `gateway:9700`, and the platform records
+each announce as a **sighting**: uid, the address the connection actually came from, the identity JSON
+it sent, first/last seen, and a count. Sightings are capped at 512 and expire 30 minutes after the
+last announce.
+
+> [!WARNING]
+> **The announce is unauthenticated.** Anything in it — uid, model, name, location — is attacker-
+> controllable by anyone who can open a TCP connection to the listener, and every value is rendered
+> back into a sys admin's browser. The UI escapes each one before display; any new column showing a
+> device-reported value must do the same. Keep the discovery port on a trusted network segment, and
+> leave it off entirely where controllers are commissioned by address instead.
+
+Sightings are **global**, because an unadopted controller belongs to nobody yet:
+
+| Role | Sees | May |
+|---|---|---|
+| Sys admin | every sighting | assign a sighting to one tenant |
+| Tenant admin | only sightings assigned to them | adopt |
+
+The two steps cannot be collapsed: ThingsBoard forbids a sys admin from creating a tenant's device, so
+"adopt on behalf of a tenant" does not exist. Assignments share the sightings cache and are therefore
+also lost on restart.
+
+**Adoption** (by uid, or by address for a controller that never announced) runs in one call: connect
+over TLS, pin the device certificate on first use, set or supply the ownership password, log in, create
+the device with generated MQTT credentials, and write the broker settings back to the board so it
+connects. Leave the password field blank and the platform generates and seals one — that is the normal
+path. An **already-claimed** controller needs its existing ownership password, which is stored on the
+device as a PBKDF2 hash and cannot be recovered from it.
+
+What adoption leaves behind, per device:
+
+| Scope | Keys | Why |
+|---|---|---|
+| Server | `controllerUid`, `controllerIp`, `controllerCertFingerprint`, `controllerPasswordSealed`, `controllerTokenSealed` | The controller must never be able to read or overwrite the platform's record of how to reach and authenticate to it. |
+| Client | `uid`, `ip`, `model`, `fw`, `icc`, `mac`, `location`, `name` | Everything the device asserts about itself, refreshed on every discovery publish. The live `ip` is preferred over the adoption-time one, so a DHCP move heals itself. |
+
+> [!WARNING]
+> Read a controller's attributes **by explicit key list**, never with a null scope and no keys. Server
+> scope holds the sealed password and token, and a bare read ships them to the browser.
+
+### 10.4 Telemetry
+
+Opting a device profile in is one field: **`inferrixTopicRoot`** on the MQTT transport configuration,
+blank by default, which leaves upstream behaviour untouched. `Inferrix Controller` profiles get it
+automatically. A root containing `+` or `#` disables the scheme for that profile rather than
+subscribing to wildcards.
+
+Under that root the handler owns `telemetry/{uid}`, `health/{uid}`, `discovery/{uid}`,
+`timesync/{uid}/req` and `command/{uid}/result` inbound, and publishes `timesync/{uid}`,
+`discovery/{uid}/ack` and `command/{uid}` (RPC) outbound. Everything else under the root is refused.
+
+**Series are keyed by the point's name**, the `n` field the firmware sends with each point. The name
+is used only if it is at most 64 characters of `A-Z a-z 0-9 _ . / ( ) -` (not leading with a space),
+does not end in `_q`, and no other point has already claimed it this session; otherwise the series
+falls back to `p{point_id}`.
+
+The character allowlist is not cosmetic: ThingsBoard rejects the **entire** telemetry save if one key
+fails its XSS check, so a single odd name would drop every other point in the batch.
+
+> [!WARNING]
+> Renaming a point starts a **new series**. The old one keeps its history and stops receiving values.
+> This trade-off was chosen deliberately over stable-but-opaque `p1`…`p25` keys; rename points before
+> building dashboards on them, not after.
+
+Quality travels with the value: a point whose quality is `comm_fail` or `never` writes **no** value at
+all (so a stale reading is never mistaken for a live one), and any non-`good` quality also writes a
+companion `{key}_q` series naming it.
+
+Health messages are flattened into `scan_max_ms`-style keys and stored as telemetry alongside.
+
+### 10.5 The controller page
+
+`/io-controllers/{id}` is a standard entity details page, so Attributes, Latest telemetry, Alarms and
+Audit logs come free. The Inferrix tabs sit in front of them:
+
+| Tab | What it does |
+|---|---|
+| Details | Entity form, the identity block read from attributes, and live health read from the device. |
+| Points | Live values from the **active** configuration; write a value to an output point (`do`, `ao`, Modbus RTU holding registers). |
+| Settings | Identity, network, MQTT, discovery and time forms; the peer table; the ownership password. |
+| Configuration | The draft/active configuration plane — [§10.6](#106-the-configuration-plane). |
+| Logic | Program editor, compile/verify/push, and PID auto-tune — [§10.8](#108-logic-programs). |
+| Software | Firmware and logic upload, restart-and-verify — [§10.9](#109-firmware-and-logic-upload). |
+| Diagnostics | Network and memory counters, logic status, MQTT and ping probes, attestation. |
+
+Every panel waits until its tab is opened before it talks to the device. That is a hard requirement,
+not an optimisation: **the firmware serves two clients at a time**, and the platform will block up to
+30 seconds on a per-device lock, so a page that fanned out its reads would hang itself.
+
+A discovered-but-unadopted controller cannot be configured at all — every device call needs the owner
+token, which only adoption obtains.
+
+### 10.6 The configuration plane
+
+The controller holds an **active** configuration (`icc` version) and a **draft**. All editing happens
+against the draft; **Apply** validates and promotes it, **Discard** throws it away. A failed apply
+names the offending record with the device's own `ICC_*` verdict.
+
+| Section | Holds | Key | Limit |
+|---|---|---|---|
+| Buses | Modbus RTU bus mode, baud, framing | `bus_id` | 2 |
+| Queries | Modbus polls: unit, function, start register, count, interval | `query_id` | 64 |
+| Points | Every point: name, source, data format, source reference, offset, scaling | `point_id` | 1024 |
+| Scalings | Multiplier / divisor / offset sets referenced by points | `idx` | 64 |
+| MQTT policies | Per-point publish trigger, QoS, interval, deadband | `point_id` | 1024 |
+| Peers | Peer controllers this one may read points from | `peer_id` | 4 |
+
+Point sources are `0` local DI, `1` local DO, `2` local AI, `3` local AO, `4` Modbus RTU, `5` Wirepas,
+`6` system register, `7` peer controller. A point name is capped at 15 characters *on the device* —
+shorter than the 64 the telemetry key allows.
+
+Two details regularly cost an afternoon:
+
+- **`deadband_bits` is a raw IEEE-754 single-precision bit pattern**, not a number. The UI converts;
+  anything driving the API directly must. (The firmware's own documentation prints a wrong worked
+  example for it.)
+- **Configuration ownership** is either `local` or `platform`. The platform will not edit a draft it
+  does not own; switch the owner first, from the same tab.
+
+### 10.7 Local I/O auto-provisioning
+
+A board's own DI/DO/AI/AO channels are inert until each one has a point and a publish policy. Two
+paths create them:
+
+- **At adoption**, automatically and applied, but only when the controller is genuinely blank: active
+  configuration version `icc` is 0, the owner is `local`, and all six draft sections are empty.
+- **On demand**, from the Configuration tab, which fills the **draft** and applies nothing. This is the
+  path for a board that already has a configuration.
+
+Defaults, which are meant to be edited afterwards rather than trusted:
+
+| Channel | Format | Trigger | Interval | QoS | Deadband |
+|---|---|---|---|---|---|
+| DI, DO | Bit | interval + on-change | 300 s | 1 | — |
+| AI | U16 | interval + on-change | 60 s | 0 | 40 counts |
+| AO | *(as configured)* | on-change | — | 0 | — |
+
+Point ids start at 1 (DI1 = 1) and skip to the next free id on a collision, so an existing
+configuration is never overwritten. Analog channels are provisioned **unscaled** — the hardware
+constants that would let the platform convert counts to engineering units are not published yet, so
+raw counts are what a fresh AI point reports until a scaling is added.
+
+> [!WARNING]
+> Never auto-provision a controller whose `icc` is not 0. That is why the adoption path checks three
+> conditions rather than one: applying a generated draft over a commissioned board would replace a
+> working configuration wholesale.
+
+Output points read back their real state — a DO's pin level, an AO's DAC register — once per scan,
+from firmware 0.1.17 onward. On older firmware a relay driven by a logic program's direct channel
+binding never shows in its point.
+
+### 10.8 Logic programs
+
+The platform compiles and verifies **ILB** (Inferrix Logic Bytecode) before a program ever reaches the
+device. Two front ends produce the same container: a block editor (tags and statements, type-checked)
+and a plain-text assembly form.
+
+> [!WARNING]
+> **Verification is the whole point.** A controller answers a program it rejected exactly as it answers
+> having never been given one — `GET /api/v1/logic/status` reports `state 0`, and the real reason goes
+> to a serial console the platform cannot read. Without a platform-side verifier an operator sees a
+> successful upload, "staged", and then nothing, forever.
+
+The verifier is a rule-for-rule port of the firmware's own, kept honest by a differential test against
+the real C implementation. Where the two disagree, the device is right and the platform is the bug.
+
+- **Compile** checks a program against the device's live profile and writes nothing.
+- **Build** compiles, verifies, and streams the container into the logic slot. A program that fails to
+  compile is never uploaded.
+- A compile failure is a *result*, not an error: the editor shows the message and the source line.
+
+Two gaps worth knowing. Neither verifier type-checks the operand stack, so storing an `INT` into a
+`BOOL` tag passes both and faults at run time. And type checking lives in the block compiler only — the
+assembly path is not guarded.
+
+**PID auto-tune** sits in the same tab: a relay test on one PID slot that reports the measured `Ku` and
+`Tu` plus Ziegler-Nichols suggested gains. It never rewrites the running loop; applying the numbers is
+a deliberate edit.
+
+### 10.9 Firmware and logic upload
+
+Uploads are **background jobs**, not requests. The firmware caps an inbound request at 2 KB including
+headers and closes the connection after each one, so a 500 KB image is several hundred chunks, each
+with its own TLS handshake — minutes of wall clock. The job survives the page being closed; reopening
+the tab re-finds it.
+
+| | Firmware | Logic |
+|---|---|---|
+| Size cap | 1 MiB | 128 KiB |
+| Verified by | SHA-256 over the bytes the platform received | the ILB verifier, before the first chunk |
+
+Jobs are node-local: 4 concurrent, 8 queued, 256 tracked, discarded 30 minutes after last access. One
+upload at a time per controller — starting a second discards the first's unfinished slot, because the
+device is a single-uploader and a fresh `begin` erases what was there.
+
+> [!WARNING]
+> The platform hashes what it holds, so `apply` always agrees with itself: a corrupt *source* file is
+> accepted and armed. The check proves the bytes survived browser → platform → device, nothing more.
+> And do not trust `GET /api/v1/info`'s `fw` to name the image actually running — a board can report a
+> version it is not booted on. Confirm an update by behaviour. After a **mid-stream** upload failure,
+> restart the controller before retrying; re-uploading straight over a half-written slot risks leaving
+> the board unbootable.
+
+**Restart and verify** is a single action on the Software tab: reboot, then poll the controller back up
+for three minutes before declaring the new version live.
+
+### 10.10 Reaching the device: the proxy
+
+Everything the UI does to a controller beyond adoption goes through one endpoint,
+`/{deviceId}/proxy/**`, which forwards a single request to the device's REST API with the platform's
+sealed bearer token and the pinned certificate. It is an **allowlist**, not a tunnel: routes not on the
+list are refused, the query string is capped at 256 characters of a restricted alphabet, and the path
+is taken from the servlet's decoded URI rather than reassembled.
+
+| Caller | May |
+|---|---|
+| Customer user, tenant admin with device Read | `GET` routes: info, health, points, diagnostics, logic and firmware status, settings reads |
+| Tenant admin with device Write | everything else: point writes, settings, the configuration plane, logic restart and tune, reboot |
+
+Two exclusions are deliberate and load-bearing:
+
+- **`/api/v1/auth/*` is never proxied.** A login or password change made through the proxy would
+  revoke the token the platform holds and lock Cortex out of the board. Password rotation has its own
+  endpoint, which re-seals as it goes.
+- **Binary firmware and logic appends are never proxied.** They belong to the chunked upload job above.
+
+The TLS pin is trust-on-first-use, taken at adoption; hostname verification is off because the
+firmware's certificate carries no SAN, which makes the pin — not the name — the thing that
+authenticates the board.
+
+**Attestation** (Diagnostics tab) asks the device to sign a fresh platform nonce, and checks it against
+the pinned certificate and the adopted UID. It proves less than it sounds: the TLS handshake already
+proved key possession. What it adds is the binding of that key to *this* silicon UID — and a 503,
+which means the controller is still on the shared development certificate.
+
+Device-bound secrets — the ownership password especially — are restricted to printable ASCII without
+`"` or `\`, because the firmware copies JSON strings byte for byte without unescaping them.
 
 ---
 
-## 10. Configuration reference
+## 11. Configuration reference
 
 Every Inferrix-added configuration key, its environment variable, and its default. Set environment
 variables in `/etc/thingsboard/conf/thingsboard.conf`; the YAML paths below refer to
 `/etc/thingsboard/conf/thingsboard.yml` — see [§2.2](#22-configuration-file-layout) for why the external
 file is the one that counts.
 
-### 10.1 License Control
+### 11.1 License Control
 
 | YAML path | Env var | Default | Meaning |
 |---|---|---|---|
@@ -1036,7 +1373,7 @@ file is the one that counts.
 | `license.clock_tolerance_ms` | `INFERRIX_LICENSE_CLOCK_TOLERANCE_MS` | `3600000` (1h) | How far the clock may move backwards before it counts as tampering. Absorbs an NTP correction. |
 | `license.max_high_water_advance_ms` | `INFERRIX_LICENSE_MAX_HIGH_WATER_ADVANCE_MS` | `86400000` (24h) | How far a single check may advance the clock-rollback high-water mark. See [§3.5](#35-recovering-from-exit-code-18). |
 
-### 10.2 Reporting
+### 11.2 Reporting
 
 | YAML path | Env var | Default | Meaning |
 |---|---|---|---|
@@ -1048,40 +1385,53 @@ file is the one that counts.
 | `reports.generation_timeout_ms` | `REPORTS_GENERATION_TIMEOUT_MS` | `120000` | Per-render timeout. |
 | `reports.test_report_pool_size` | `REPORTS_TEST_REPORT_POOL_SIZE` | `12` | Pool for preview/test renders. |
 
-### 10.3 Scheduler
+### 11.3 Scheduler
 
 | YAML path | Env var | Default | Meaning |
 |---|---|---|---|
 | `scheduler.min_interval` | `SCHEDULER_MIN_INTERVAL_IN_SEC` | `60` | Minimum interval for `TIMER` events, in seconds. |
 | `audit-log.logging-level.mask.scheduler_event` | `AUDIT_LOG_MASK_SCHEDULER_EVENT` | `W` | Audit-log mask for scheduler event CRUD. |
 
-### 10.4 White Labeling
+### 11.4 White Labeling
 
 | YAML path | Env var | Default | Meaning |
 |---|---|---|---|
 | `cache.specs.whiteLabeling.timeToLiveInMinutes` | `CACHE_SPECS_WHITE_LABELING_TTL` | `1440` | WL parameter cache TTL. |
 | `cache.specs.whiteLabeling.maxSize` | `CACHE_SPECS_WHITE_LABELING_MAX_SIZE` | `10000` | `0` disables the cache. |
 
-### 10.5 Branding
+### 11.5 Branding
 
 | YAML path | Env var | Default | Meaning |
 |---|---|---|---|
 | `security.jwt.tokenIssuer` | `JWT_TOKEN_ISSUER` | `inferrix.com` | JWT issuer, shown under Security → General. Changed from upstream's `thingsboard.io`. |
 
+### 11.6 IO Controllers
+
+| YAML path | Env var | Default | Meaning |
+|---|---|---|---|
+| `inferrix.controller.credentials_key` | `INFERRIX_CONTROLLER_CREDENTIALS_KEY` | *(empty)* | Base64 32-byte AES key that seals each controller's ownership password and bearer token before they are stored as device attributes. **Empty → adoption refuses to run.** Generate with `openssl rand -base64 32`. See [§10.2](#102-before-you-adopt-anything). |
+| `inferrix.controller.discovery.enabled` | `INFERRIX_DISCOVERY_ENABLED` | `false` | The unauthenticated plain-TCP announce listener. Off → `/io-controllers/discovered` is always empty and controllers must be adopted by address. |
+| `inferrix.controller.discovery.bind_address` | `INFERRIX_DISCOVERY_BIND_ADDRESS` | `0.0.0.0` | Listener bind address. |
+| `inferrix.controller.discovery.port` | `INFERRIX_DISCOVERY_PORT` | `9700` | Listener port; matches the firmware's default. |
+
+The broker the platform points adopted controllers at is **not** configuration — it is the
+`inferrixController` sys-admin settings block, because it is edited per install at runtime. See
+[§10.2](#102-before-you-adopt-anything).
+
 ---
 
-## 11. REST API reference
+## 12. REST API reference
 
 Inferrix-added endpoints. All are under `/api` and require a bearer token except where marked
 `noauth`. Stock ThingsBoard endpoints are unchanged and documented upstream.
 
-### 11.1 License
+### 12.1 License
 
 | Method | Path | Notes |
 |---|---|---|
 | `GET` | `/api/license/info` | Capacity, expiry. Customer name and instance ID **omitted** for non-sys-admin callers. |
 
-### 11.2 Roles
+### 12.2 Roles
 
 | Method | Path | Notes |
 |---|---|---|
@@ -1092,7 +1442,7 @@ Inferrix-added endpoints. All are under `/api` and require a bearer token except
 | `GET` | `/api/user/{userId}/roles` | |
 | `POST` | `/api/user/{userId}/roles` | Replaces the user's whole role set. Refused for non-customer users and for your own account. |
 
-### 11.3 White labeling
+### 12.3 White labeling
 
 | Method | Path | Notes |
 |---|---|---|
@@ -1114,7 +1464,7 @@ Inferrix-added endpoints. All are under `/api` and require a bearer token except
 | `GET` | `/api/whiteLabel/mailTemplates` | Sys admin. |
 | `POST` | `/api/whiteLabel/mailTemplates` | Sys admin. |
 
-### 11.4 Scheduler
+### 12.4 Scheduler
 
 | Method | Path | Notes |
 |---|---|---|
@@ -1128,7 +1478,7 @@ Inferrix-added endpoints. All are under `/api` and require a bearer token except
 | `GET` | `/api/schedulerEvents?startTime&endTime` | Calendar window. |
 | `GET` | `/api/schedulerEvents?schedulerEventIds=` | By id list. |
 
-### 11.5 Reporting
+### 12.5 Reporting
 
 | Method | Path | Notes |
 |---|---|---|
@@ -1149,13 +1499,38 @@ Inferrix-added endpoints. All are under `/api` and require a bearer token except
 | `POST` | `/api/report/{dashboardId}/download` | On-demand dashboard render → `application/pdf`, `image/png`, `image/jpeg`. |
 | `POST` | `/api/report/test` | On-demand dashboard render of an unsaved dashboard-report config. Distinct from `/api/v2/report/test` above. |
 
+### 12.6 IO Controllers
+
+All under `/api/inferrix/controllers`. None is covered by the RBAC read gate (an allowlist of upstream
+URL patterns); each checks its own permission.
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET` | `/discovered` | Unadopted sightings. Sys admin sees all; tenant admin needs device `Read` and sees only sightings assigned to them. |
+| `POST` | `/discovered/{uid}/assign?tenantId=` | Allocate a sighting to a tenant. **Sys admin only.** |
+| `POST` | `/adopt` | Claim, pin, register. Tenant admin + device `Create`. Body names `uid` **or** `host`. |
+| `ANY` | `/{deviceId}/proxy/**` | One request forwarded to the device. `GET` needs device `Read`; anything else is tenant-admin + device `Write`. Allowlisted routes only — see [§10.10](#1010-reaching-the-device-the-proxy). |
+| `POST` | `/{deviceId}/upload/{kind}` | Multipart (`file`) firmware or logic upload; returns a job. Tenant admin + device `Write`. |
+| `GET` | `/{deviceId}/upload` | The upload currently running against this controller, or null. |
+| `GET` | `/uploads/{jobId}` | Poll one upload. Unknown and foreign job ids answer alike. |
+| `POST` | `/{deviceId}/logic/compile` | `text/plain` assembly or `application/json` block program. Compiles and verifies against the device's live profile; writes nothing. Device `Read`. |
+| `POST` | `/{deviceId}/logic/build` | Compile, verify, then stream into the logic slot. Device `Write`. A failed compile is never uploaded. |
+| `POST` | `/{deviceId}/provision` | Draft a point and publish policy for every unprovisioned local DI/DO/AI/AO. Device `Write`. |
+| `GET` | `/{deviceId}/provision` | The provisioning job running for this controller, including the one adoption starts. |
+| `GET` | `/provisions/{jobId}` | Poll one provisioning job. |
+| `POST` | `/{deviceId}/attest` | Device signs a platform nonce; checked against the pinned certificate and the adopted UID. Device `Read`. |
+| `POST` | `/{deviceId}/password` | Rotate the ownership password and re-seal it. Tenant admin + device `Write`. Never proxied. |
+
+Reboot and PID auto-tune have no endpoints of their own — they are proxy routes
+(`POST /api/v1/system/reboot`, `POST /api/v1/logic/tune`).
+
 > The report *history/generation* endpoints live under **`/api/v2`**; the report *template* and
 > *dashboard-report* endpoints live under **`/api`**. `POST /api/report/test` and
 > `POST /api/v2/report/test` are two different endpoints.
 
 ---
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 | Symptom | Most likely cause |
 |---|---|
@@ -1165,7 +1540,7 @@ Inferrix-added endpoints. All are under `/api` and require a bearer token except
 | A customer user's dashboards show *"Problem loading widget configuration"* | Their role is missing `Widget type` → Read. See [§4.2](#42-authoring-a-role). |
 | A customer user sees no telemetry despite a `Read` grant | Operations match exactly; `Read` does not imply `Read telemetry`. |
 | Roles seem to have no effect at all | The `role` / `user_role` tables are missing — the schema overlay was not applied. Look for `RBAC tables are missing` in the log. Roles fail **open**. |
-| A control widget on a public dashboard does nothing | Intentional. Public viewers are refused `RPC_CALL`. See [§4.6](#46-the-anonymous-public-dashboard-viewer). |
+| A control widget on a public dashboard does nothing | Intentional. Public viewers are refused `RPC_CALL`. See [§4.6](#47-the-anonymous-public-dashboard-viewer). |
 | A deleted seeded role keeps coming back | Seeding re-creates the two default roles on each visit to the Roles page. Edit one to empty instead of deleting it. |
 | White-labeling change does not appear | Check the scope you edited (system / tenant / customer) and that the field is actually blank at the level below. An emptied field must be saved as blank so inheritance resumes. |
 | Branding missing on `/login` | The image field must hold a public link (`/api/images/public/{key}`). Re-pick it through the gallery picker. |
@@ -1179,13 +1554,23 @@ Inferrix-added endpoints. All are under `/api` and require a bearer token except
 | Dashboard in a report is captured half-loaded | Raise `REPORTS_RENDERER_DASHBOARD_SETTLE_MS`. |
 | Widget export button missing | The widget is not `timeseries`/`latest`/`alarm`, or the dashboard is in edit mode. Turn it on per widget under Advanced → Card buttons. |
 | Exported values differ from what the widget displays | Export writes raw subscribed values, not cell-content function output. |
+| Adoption fails with "no broker host is configured" | The `inferrixController` sys-admin settings block is missing or has no `host`. See [§10.2](#102-before-you-adopt-anything). |
+| Adoption refuses to run at all | `INFERRIX_CONTROLLER_CREDENTIALS_KEY` is not set. The platform will not store a controller secret in plaintext. |
+| Discovered list is always empty | The discovery listener is off (`INFERRIX_DISCOVERY_ENABLED`), or the sightings expired — they live in memory, 30 minutes, and are lost on restart. |
+| A tenant admin cannot see a controller a sys admin can | The sighting has not been assigned to that tenant. Assignments are also lost on restart. |
+| Controller telemetry keys look like `p1`, `p7` | The point has no name, the name is not plain ASCII, it ends in `_q`, or another point already claimed it. See [§10.4](#104-telemetry). |
+| A renamed point stopped updating its old chart | Renaming starts a new series by design. |
+| A point shows no value but the controller is online | Quality is `comm_fail` or `never`; the value is deliberately withheld. Look at the `{key}_q` series. |
+| Only the Details tab is shown on a controller page | A tab template threw. One failing tab takes every tab down. |
+| Logic program uploads fine and then nothing happens | The controller rejected it at boot. It reports `state 0` for both "rejected" and "never given a program" — compile through the platform, which verifies first. |
+| Firmware version did not change after an update | `GET /api/v1/info`'s `fw` cannot be trusted to name the running image. Confirm by behaviour. |
 | Frontend build fails | Node 18 is not supported; use Node 22. |
 
 ---
 
-## 13. Maintaining the fork
+## 14. Maintaining the fork
 
-### 13.1 Where Inferrix code lives
+### 14.1 Where Inferrix code lives
 
 Two kinds of change:
 
@@ -1196,18 +1581,20 @@ merge and are not tracked in the ledger:
 common/data/.../{scheduler,report,dashboardreport,license,role}/**
 dao/.../{scheduler,report,wl,license,role}/**
 dao/src/main/resources/sql/schema-inferrix.sql
-application/.../service/{scheduler,report}/**
+application/.../service/{scheduler,report,inferrix}/**
+application/.../controller/InferrixPlcController.java
+common/transport/mqtt/.../transport/mqtt/inferrix/**
 application/.../controller/{SchedulerEvent,Report,ReportTemplate,DashboardReport,License,Role,WhiteLabeling}Controller.java
 rule-engine/rule-engine-components/.../rule/engine/report/**
-ui-ngx/src/app/modules/home/pages/{scheduler,report,white-labeling,role}/**
-ui-ngx/src/app/core/http/{scheduler-event,report,license,white-labeling}.service.ts
-ui-ngx/src/app/shared/models/{scheduler-event,report,report-configuration,white-labeling,license}.models.ts
+ui-ngx/src/app/modules/home/pages/{scheduler,report,white-labeling,role,inferrix}/**
+ui-ngx/src/app/core/http/{scheduler-event,report,license,white-labeling,inferrix-controller}.service.ts
+ui-ngx/src/app/shared/models/{scheduler-event,report,report-configuration,white-labeling,license,inferrix-controller,inferrix-logic}.models.ts
 ```
 
 **Modifications to upstream files.** Every one of these is recorded in `INFERRIX-PATCHES.md` with what
-was changed, why, and how to recover it. There are roughly 150 such rows across nine features.
+was changed, why, and how to recover it. There are roughly 160 such rows across ten features.
 
-### 13.2 Upstream merges
+### 14.2 Upstream merges
 
 Upstream periodically **rebuilds** `release-4.3`'s history, so a sync is a re-merge against an old merge
 base rather than a fast-forward. Expect roughly 68 conflicts, including spurious rename/rename
@@ -1239,17 +1626,49 @@ The highest-risk files, in order:
 Version bumps follow one rule: bump only if upstream ships a database upgrade at a version we already
 occupy. A shared version label on its own is not a conflict.
 
-### 13.3 Adding new database objects
+### 14.3 Adding new database objects
 
 Append idempotent DDL to `dao/src/main/resources/sql/schema-inferrix.sql`. Nothing else changes: no
 upstream schema file, no new seam, no new ledger row. See [§2.1](#21-the-database-schema-overlay).
 
-### 13.4 Conventions
+### 14.4 Conventions
 
-- New Inferrix-authored frontend files carry a `The Inferrix Authors` licence header, not
-  `The Thingsboard Authors`. There is no build-time enforcement of this on the frontend; it is
-  convention.
+- New Inferrix-authored files carry a `The Inferrix Authors` licence header, not
+  `The Thingsboard Authors`. The form is **build-enforced**: `license:check` in the Maven reactor
+  compares each header line for line against the plugin's own SPDX templates, so an indent or a year
+  range that looks right can still fail the build. A pre-commit hook checks the staged copy against
+  the same templates, and `--fix` stamps the exact header the plugin accepts.
 - In Angular templates, use the `translate` **pipe**, not the `translate` attribute. As an attribute on
   Material components (`mat-option`, `mat-checkbox`) it silently ships the raw i18n key.
 - Reuse ThingsBoard's own services directly. The Inferrix modules depend on all upstream modules;
   parallel implementations of something the platform already provides are the wrong shape here.
+
+### 14.5 Keeping this document current
+
+`INFERRIX.md` is the source. `docs/guide/inferrix-guide.html` is its published rendering, produced by
+`docs/guide/render-guide.py` — deterministic, offline, and the only thing that should ever write that
+HTML. Do not edit the rendering; regenerate it.
+
+```bash
+python3 docs/guide/render-guide.py            # rewrite the HTML from the markdown
+python3 docs/guide/render-guide.py --check    # fail if the committed HTML is stale
+```
+
+Two git hooks keep the pair honest. `.git/hooks` is not tracked, so install them once per clone:
+
+```bash
+bash docs/guide/install-hooks.sh
+```
+
+- **pre-commit** re-renders the guide whenever `INFERRIX.md` is staged, and stages the result, so the
+  markdown and the HTML land in the same commit and cannot disagree. It refuses the commit if the
+  markdown links to a section that no longer exists — renumbered sections are the one way this
+  document rots. (It also runs the licence-header check described in
+  [§14.4](#144-conventions), when that script is present — it lives in the gitignored `.claude/`, so a
+  fresh clone has the guide hooks but not that one, and the installer says so.)
+- **post-commit** records any `feat` or `fix` commit that changed code this guide describes without
+  touching `INFERRIX.md`, as an unticked line in `docs/guide/DOC-DEBT.md`.
+
+Neither hook writes prose, amends a commit, or commits anything. What a feature *does* is a sentence a
+person has to write; the debt list is the reminder that one is owed. Publishing the rendered guide as
+an Artifact is likewise a deliberate step — a hook cannot do it.

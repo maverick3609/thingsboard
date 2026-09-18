@@ -1,0 +1,2916 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Inferrix Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<title>Inferrix Cortex Feature Guide</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<style>
+:root{
+  --paper:#fbfbfd; --surface:#ffffff; --sunken:#f3f3f8;
+  --ink:#14151f; --body:#2c2e3d; --muted:#6a6d82;
+  --rule:#e2e3ec; --rule-soft:#eeeef4;
+  --brand:#2b388f; --brand-soft:#eaecf7; --brand-ink:#2b388f;
+  --signal:#ec1c24; --signal-soft:#fdeced; --signal-ink:#b3151b;
+  --code-bg:#f2f2f8; --code-ink:#33355a;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#0e0f16; --surface:#161825; --sunken:#1c1e2c;
+    --ink:#eceef7; --body:#c4c7d8; --muted:#8b8fa6;
+    --rule:#282b3d; --rule-soft:#20222f;
+    --brand:#93a0ec; --brand-soft:#1b2040; --brand-ink:#a8b3f2;
+    --signal:#ff6b70; --signal-soft:#33161a; --signal-ink:#ff8a8e;
+    --code-bg:#1b1d2b; --code-ink:#b9bdd8;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0e0f16; --surface:#161825; --sunken:#1c1e2c;
+  --ink:#eceef7; --body:#c4c7d8; --muted:#8b8fa6;
+  --rule:#282b3d; --rule-soft:#20222f;
+  --brand:#93a0ec; --brand-soft:#1b2040; --brand-ink:#a8b3f2;
+  --signal:#ff6b70; --signal-soft:#33161a; --signal-ink:#ff8a8e;
+  --code-bg:#1b1d2b; --code-ink:#b9bdd8;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--paper); color:var(--body);
+  font-family:"Source Serif 4","Iowan Old Style",Georgia,serif;
+  font-size:17px; line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+.sans{font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+
+/* ── masthead ─────────────────────────────────────────── */
+header.mast{
+  border-bottom:1px solid var(--rule);
+  background:var(--surface);
+  padding:clamp(2rem,5vw,3.25rem) clamp(1.25rem,5vw,3rem) clamp(1.75rem,4vw,2.5rem);
+}
+.mast-in{max-width:1180px;margin:0 auto;display:flex;flex-wrap:wrap;gap:1.5rem 3rem;align-items:flex-end;justify-content:space-between}
+.mast h1{
+  font-family:"IBM Plex Sans",sans-serif; font-weight:600;
+  font-size:clamp(1.9rem,4vw,2.9rem); line-height:1.08; letter-spacing:-.022em;
+  color:var(--ink); margin:0; text-wrap:balance;
+}
+.mast .lede{
+  margin:.75rem 0 0; max-width:60ch; color:var(--muted); font-size:1.02rem; line-height:1.55;
+}
+.mark{
+  display:inline-flex;align-items:center;gap:.55rem;margin-bottom:1rem;
+  font-family:"IBM Plex Sans",sans-serif;font-size:.7rem;font-weight:600;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--brand-ink);
+}
+.mark i{width:.55rem;height:.55rem;background:var(--signal);border-radius:1px;display:block;transform:rotate(45deg)}
+.facts{
+  font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:.76rem;line-height:1.9;color:var(--muted);
+  display:grid;grid-template-columns:auto auto;gap:0 1.1rem;
+}
+.facts b{color:var(--ink);font-weight:500}
+
+/* ── shell ────────────────────────────────────────────── */
+.shell{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:15.5rem minmax(0,1fr);gap:clamp(2rem,4vw,3.5rem);padding:0 clamp(1.25rem,5vw,3rem) 6rem}
+@media(max-width:900px){.shell{grid-template-columns:minmax(0,1fr)}}
+
+nav.rail{position:sticky;top:0;align-self:start;max-height:100vh;overflow-y:auto;padding:2.5rem 0 3rem}
+@media(max-width:900px){nav.rail{position:static;max-height:none;padding-bottom:1rem;border-bottom:1px solid var(--rule)}}
+nav.rail h2{
+  font-family:"IBM Plex Sans",sans-serif;font-size:.66rem;font-weight:600;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--muted);margin:0 0 1rem;
+}
+nav.rail ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.1rem}
+nav.rail a{
+  display:grid;grid-template-columns:1.9rem 1fr;align-items:baseline;
+  font-family:"IBM Plex Sans",sans-serif;font-size:.845rem;line-height:1.35;
+  text-decoration:none;color:var(--body);padding:.4rem .55rem;border-radius:3px;
+  border-left:2px solid transparent;
+}
+nav.rail a:hover{background:var(--sunken);color:var(--ink)}
+nav.rail a .n{font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums}
+nav.rail a:hover .n{color:var(--brand-ink)}
+
+/* ── article ──────────────────────────────────────────── */
+article{padding-top:2.5rem;min-width:0}
+article > p, article > ul, article > ol, article > aside{max-width:68ch}
+article p{margin:0 0 1.1rem}
+article > h2{
+  font-family:"IBM Plex Sans",sans-serif;font-weight:600;color:var(--ink);
+  font-size:clamp(1.45rem,2.6vw,1.95rem);line-height:1.15;letter-spacing:-.018em;
+  margin:4.25rem 0 1.5rem;padding-top:2.25rem;border-top:1px solid var(--rule);
+  display:grid;grid-template-columns:auto 1fr;gap:.85rem;align-items:baseline;text-wrap:balance;
+}
+article > h2:first-child{margin-top:0;padding-top:0;border-top:0}
+.sec-num{
+  font-family:"IBM Plex Mono",monospace;font-size:.78rem;font-weight:500;
+  color:var(--brand-ink);background:var(--brand-soft);
+  padding:.28rem .5rem;border-radius:3px;font-variant-numeric:tabular-nums;
+  transform:translateY(-.15em);
+}
+article h3{
+  font-family:"IBM Plex Sans",sans-serif;font-weight:600;color:var(--ink);
+  font-size:1.13rem;line-height:1.3;letter-spacing:-.008em;margin:2.75rem 0 .9rem;text-wrap:balance;
+}
+article h4{
+  font-family:"IBM Plex Sans",sans-serif;font-weight:600;color:var(--ink);
+  font-size:.97rem;margin:2rem 0 .7rem;
+}
+article ul,article ol{margin:0 0 1.2rem;padding-left:1.25rem}
+article li{margin-bottom:.45rem}
+article li::marker{color:var(--muted)}
+strong{color:var(--ink);font-weight:600}
+em{color:var(--ink)}
+a{color:var(--brand-ink);text-decoration:none;border-bottom:1px solid color-mix(in srgb,var(--brand) 35%,transparent)}
+a:hover{border-bottom-color:var(--brand)}
+:focus-visible{outline:2px solid var(--brand);outline-offset:3px;border-radius:2px}
+
+code{
+  font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:.845em;background:var(--code-bg);color:var(--code-ink);
+  padding:.13em .38em;border-radius:3px;
+}
+pre{
+  background:var(--code-bg);border:1px solid var(--rule-soft);border-radius:5px;
+  padding:1rem 1.15rem;overflow-x:auto;margin:0 0 1.4rem;max-width:68ch;
+}
+pre code{background:none;padding:0;font-size:.8rem;line-height:1.7;color:var(--code-ink)}
+
+/* ── tables ───────────────────────────────────────────── */
+.tw{overflow-x:auto;margin:0 0 1.75rem;border:1px solid var(--rule);border-radius:5px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-family:"IBM Plex Sans",sans-serif;font-size:.855rem;line-height:1.5}
+th{
+  text-align:left;font-weight:600;color:var(--muted);background:var(--sunken);
+  font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
+  padding:.7rem .9rem;border-bottom:1px solid var(--rule);white-space:nowrap;
+}
+td{padding:.72rem .9rem;border-bottom:1px solid var(--rule-soft);vertical-align:top;color:var(--body)}
+tbody tr:last-child td{border-bottom:0}
+td:first-child{color:var(--ink);font-weight:500}
+td code{font-size:.8em}
+th:empty{padding:0}
+
+/* ── callouts ─────────────────────────────────────────── */
+aside.callout{
+  border-left:2px solid var(--brand);background:var(--brand-soft);
+  padding:.95rem 1.15rem;margin:0 0 1.5rem;border-radius:0 4px 4px 0;
+}
+aside.callout p{margin:0 0 .6rem;font-size:.95rem}
+aside.callout p:last-child{margin-bottom:0}
+aside.callout code{background:color-mix(in srgb,var(--ink) 7%,transparent)}
+aside.danger{border-left-color:var(--signal);background:var(--signal-soft)}
+aside.danger strong{color:var(--signal-ink)}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<header class="mast">
+  <div class="mast-in">
+    <div>
+      <div class="mark"><i></i>Inferrix Cortex</div>
+      <h1>Feature Guide</h1>
+      <p class="lede">Every feature Inferrix has added on top of upstream ThingsBoard &mdash; what it does,
+      how to configure it, how it behaves, and where it deliberately differs from ThingsBoard Professional Edition.</p>
+    </div>
+    <div class="facts">
+      <span>version</span><b>4.3.1.5</b>
+      <span>branch</span><b>inferrix-release-4.3</b>
+      <span>base</span><b>ThingsBoard CE 4.3.x</b>
+      <span>features</span><b>9</b>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="rail">
+    <h2>Contents</h2>
+    <ol>
+<li><a href="#1-overview"><span class="n">1</span><span class="t">Overview</span></a></li>
+<li><a href="#2-before-you-deploy"><span class="n">2</span><span class="t">Before you deploy</span></a></li>
+<li><a href="#3-license-control"><span class="n">3</span><span class="t">License Control</span></a></li>
+<li><a href="#4-roles-and-permissions"><span class="n">4</span><span class="t">Roles and Permissions</span></a></li>
+<li><a href="#5-white-labeling"><span class="n">5</span><span class="t">White Labeling</span></a></li>
+<li><a href="#6-scheduler"><span class="n">6</span><span class="t">Scheduler</span></a></li>
+<li><a href="#7-reporting"><span class="n">7</span><span class="t">Reporting</span></a></li>
+<li><a href="#8-widget-data-export"><span class="n">8</span><span class="t">Widget Data Export</span></a></li>
+<li><a href="#9-branding-and-navigation"><span class="n">9</span><span class="t">Branding and navigation</span></a></li>
+<li><a href="#10-io-controllers"><span class="n">10</span><span class="t">IO Controllers</span></a></li>
+<li><a href="#11-configuration-reference"><span class="n">11</span><span class="t">Configuration reference</span></a></li>
+<li><a href="#12-rest-api-reference"><span class="n">12</span><span class="t">REST API reference</span></a></li>
+<li><a href="#13-troubleshooting"><span class="n">13</span><span class="t">Troubleshooting</span></a></li>
+<li><a href="#14-maintaining-the-fork"><span class="n">14</span><span class="t">Maintaining the fork</span></a></li>
+</ol>
+  </nav>
+  <article>
+<p>Inferrix Cortex is a fork of the open-source ThingsBoard IoT platform. This document describes every
+feature Inferrix has added on top of upstream ThingsBoard: what it does, how to configure it, how it
+behaves, and where it deliberately differs from ThingsBoard Professional Edition (PE), which several of
+these features replicate.</p>
+<p><strong>Audience.</strong> Operators deploying and configuring the platform, and developers extending it.</p>
+<p><strong>Scope.</strong> Features Inferrix built. Everything else — devices, assets, dashboards, rule chains, alarms,
+edge, telemetry — is stock ThingsBoard and is documented at
+<a href="https://thingsboard.io/docs/">thingsboard.io/docs</a>.</p>
+<p><strong>Companion document.</strong> <code>INFERRIX-PATCHES.md</code> is the <em>merge-survival ledger</em>: every upstream file an
+Inferrix feature modified, why, and how to recover the change after <code>git merge upstream/release-4.3</code>.
+It is for people maintaining the fork, not for people configuring it. This file never duplicates it —
+if you need to know which line of which upstream file carries a feature, read the ledger.</p>
+<aside class="callout">
+<p><strong>Branch note.</strong> This file documents <code>inferrix-release-4.3</code>. The <code>master</code> branch carries an unrelated,
+older <code>INFERRIX.md</code> (commit <code>f2e6ce9aa9</code>) describing the superseded "Inferrix Synapse" <code>src/inferrix/</code>
+branding overlay. The two branches are divergent; these are not versions of the same document and must
+not be merged or reconciled as if they were.</p>
+</aside>
+<h2 id="1-overview"><span class="sec-num">1</span><span>Overview</span></h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Product</td>
+<td>Inferrix Cortex</td>
+</tr>
+<tr>
+<td>Base</td>
+<td>ThingsBoard CE <code>4.3.x</code> (Apache 2.0)</td>
+</tr>
+<tr>
+<td>Current version</td>
+<td><code>4.3.1.5</code></td>
+</tr>
+<tr>
+<td>Integration branch</td>
+<td><code>inferrix-release-4.3</code></td>
+</tr>
+<tr>
+<td>Upstream baseline</td>
+<td><code>upstream/release-4.3</code></td>
+</tr>
+<tr>
+<td>Backend</td>
+<td>Java 17 / Spring Boot 3.5, Maven multi-module</td>
+</tr>
+<tr>
+<td>Frontend</td>
+<td>Angular 20 (<code>ui-ngx/</code>), Yarn</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="the-features">The features</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>What it adds</th>
+<th>Who sees it</th>
+<th>Enabled by default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#3-license-control">License Control</a></td>
+<td>Offline signed licence: device/asset caps + expiry, bound to one install</td>
+<td>Sys admin, tenant admin (capacity card)</td>
+<td><strong>Yes</strong> — platform will not boot without a key</td>
+</tr>
+<tr>
+<td><a href="#4-roles-and-permissions">Roles and Permissions</a></td>
+<td>PE-style RBAC: named roles of <code>resource → [operations]</code>, assigned to customer users</td>
+<td>Tenant admin authors; customer users are restricted</td>
+<td>Yes, but <strong>opt-in per user</strong> — a user with no role is unaffected</td>
+</tr>
+<tr>
+<td><a href="#5-white-labeling">White Labeling</a></td>
+<td>Runtime branding: logo, colours, titles, favicon, custom CSS, login page, mail templates, legal pages</td>
+<td>Sys admin, tenant admin, customer user</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><a href="#6-scheduler">Scheduler</a></td>
+<td>PE-style scheduled events: recurring attribute updates, RPC, firmware/software updates, report generation</td>
+<td>Tenant admin, customer user</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><a href="#7-reporting">Reporting</a></td>
+<td>PE-style report templates, a drag-and-drop designer, PDF/CSV rendering, scheduled email delivery</td>
+<td>Tenant admin</td>
+<td><strong>No</strong> — renderer is opt-in</td>
+</tr>
+<tr>
+<td><a href="#8-widget-data-export">Widget Data Export</a></td>
+<td>CSV / XLS / XLSX export button on dashboard widgets</td>
+<td>Anyone who can view a dashboard</td>
+<td>Yes, for table-type widgets</td>
+</tr>
+<tr>
+<td><a href="#10-io-controllers">IO Controllers</a></td>
+<td>Inferrix soft-PLC controllers as ordinary devices: discovery, adoption, live configuration, logic programs, firmware upload</td>
+<td>Tenant admin (full), customer user (read)</td>
+<td>Yes — but nothing appears until a controller is adopted</td>
+</tr>
+<tr>
+<td><a href="#9-branding-and-navigation">Branding</a></td>
+<td>Inferrix logos, colours, titles, mail text baked into the default build</td>
+<td>Everyone</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><a href="#9-branding-and-navigation">Navigation</a></td>
+<td>Slimmed tenant sidebar; Edge Management and OTA removed; Utilities and Administration groups</td>
+<td>Tenant admin</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="pe-replication">"PE replication"</h3>
+<p>Scheduler, Reporting, Roles and White Labeling are <strong>replications of ThingsBoard Professional Edition
+features</strong>, rebuilt on the Community Edition codebase from analysis of the PE distribution. Where a PE
+concept has no CE equivalent (entity groups, for example), the feature is reshaped rather than dropped,
+and every such deviation is called out in the relevant section below. Two are deliberately <em>stricter</em>
+than PE — the <a href="#47-the-anonymous-public-dashboard-viewer">anonymous public-dashboard viewer</a> and the
+<a href="#78-limits-and-safety-rails">report sub-report recursion bounds</a> — and one is deliberately <em>narrower</em>
+(<a href="#41-who-a-role-applies-to">roles apply to customer users only</a>).</p>
+<h2 id="2-before-you-deploy"><span class="sec-num">2</span><span>Before you deploy</span></h2>
+<h3 id="21-the-database-schema-overlay">2.1 The database schema overlay</h3>
+<p>All Inferrix tables live in <strong>one file</strong>: <code>dao/src/main/resources/sql/schema-inferrix.sql</code>. It is applied
+automatically on every fresh install and on every upgrade, and it is idempotent (<code>CREATE ... IF NOT
+EXISTS</code>, guarded <code>ALTER</code>), so re-running it is safe.</p>
+<p>It currently creates:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Feature</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>scheduler_event</code> (+ <code>idx_scheduler_event_originator_id</code>)</td>
+<td>Scheduler</td>
+</tr>
+<tr>
+<td><code>report_template</code>, <code>report</code> (+ two indexes)</td>
+<td>Reporting</td>
+</tr>
+<tr>
+<td><code>inferrix_license_state</code></td>
+<td>License Control</td>
+</tr>
+<tr>
+<td><code>role</code>, <code>user_role</code> (+ <code>idx_user_role_role_id</code>)</td>
+<td>Roles and Permissions</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>This matters operationally.</strong> Swapping the boot jar on a running server does <em>not</em> apply the overlay —
+the install/upgrade tool does. If you hot-swap a jar without running the upgrade, features whose tables
+are missing degrade rather than crash:</p>
+<ul>
+<li><strong>Roles</strong> log <code>RBAC tables are missing - roles are not enforced until the database upgrade is run.</code>
+  once, then fall back to legacy access for every customer user. This fail-open is deliberate: a missed
+  migration must not lock a whole tenant out.</li>
+<li><strong>Scheduler</strong> and <strong>Reporting</strong> fail their queries loudly.</li>
+</ul>
+<p>ThingsBoard's Liquibase is <strong>not</strong> used on this fork. This overlay plus the platform's own
+install/upgrade application is the only migration path. To add new Inferrix DDL, append idempotent
+statements to that one file — nothing else changes.</p>
+<h3 id="22-configuration-file-layout">2.2 Configuration file layout</h3>
+<p>Two files, and the distinction is load-bearing:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>File</th>
+<th>Holds</th>
+<th>Survives a jar swap</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/etc/thingsboard/conf/thingsboard.conf</code></td>
+<td>shell <code>export VAR=value</code> lines — environment variables</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>/etc/thingsboard/conf/thingsboard.yml</code></td>
+<td>the platform's YAML configuration</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table></div>
+<p>The <code>thingsboard.yml</code> <strong>inside the jar</strong> is a default template. The external file at
+<code>/etc/thingsboard/conf/thingsboard.yml</code> is what a real deployment reads, and it overrides the packaged
+one. A configuration block that exists only inside the jar will not take effect on a server that has an
+external <code>thingsboard.yml</code> — this is the single most common cause of "I set it and nothing happened".</p>
+<p><strong>Licensing in particular cannot be configured by swapping a jar.</strong> The <code>license:</code> block must be present
+in the external <code>thingsboard.yml</code>, and <code>INFERRIX_LICENSE_KEY</code> must be exported from <code>thingsboard.conf</code>.</p>
+<h3 id="23-building">2.3 Building</h3>
+<pre><code class="language-bash"># Backend (full reactor)
+mvn clean install -DskipTests
+
+# Frontend only — requires Node 22
+export PATH=&quot;/opt/homebrew/opt/node@22/bin:$PATH&quot;
+cd ui-ngx &amp;&amp; yarn install &amp;&amp; yarn build:prod
+</code></pre>
+<p>The default frontend build is already Inferrix-branded — see
+<a href="#9-branding-and-navigation">Branding</a>. No special build configuration is needed.</p>
+<h2 id="3-license-control"><span class="sec-num">3</span><span>License Control</span></h2>
+<p>Offline, install-wide licence enforcement. A signed key caps the number of devices and assets a
+deployment may create and expires on a schedule. There is no per-tenant licensing and no phone-home.</p>
+<h3 id="31-the-key">3.1 The key</h3>
+<p>Inferrix issues each deployment an Ed25519-signed licence key: a customer name, an expiry date, and a
+device/asset cap, bound to that one deployment's instance UUID so a key cannot be copied to a second
+install. The key is a single opaque string.</p>
+<p>It goes in <code>thingsboard.conf</code> as an environment variable:</p>
+<pre><code class="language-sh">export INFERRIX_LICENSE_KEY=&quot;...&quot;
+</code></pre>
+<p><code>thingsboard.yml</code> reads it via <code>license.key: "${INFERRIX_LICENSE_KEY:}"</code>. Four more tunables live in the
+same <code>license:</code> block — see the <a href="#111-license-control">configuration reference</a>.</p>
+<h3 id="32-first-boot">3.2 First boot</h3>
+<p>On its first boot the platform generates a random instance UUID and stores it in a single-row table
+(<code>inferrix_license_state</code>). That UUID is the deployment's permanent licensing identity.</p>
+<p>If <code>INFERRIX_LICENSE_KEY</code> is not set, the platform logs that instance UUID and exits with code 13.
+Send the UUID to Inferrix, receive a key issued specifically for it, set <code>INFERRIX_LICENSE_KEY</code>, and
+restart. From then on the key is re-verified at boot and on a timer (<code>license.check_interval_ms</code>,
+default one hour) for as long as the process runs.</p>
+<h3 id="33-what-each-role-sees">3.3 What each role sees</h3>
+<p><code>GET /api/license/info</code> backs a card on the <code>/home</code> fallback grid, visible to SYS_ADMIN and TENANT_ADMIN
+alike. Both roles see the capacity numbers — devices and assets used against the cap, plus days
+remaining — because that is the point of the card: a tenant admin needs to see capacity pressure coming.</p>
+<p>The licensing <strong>customer name</strong> and the <strong>instance ID</strong> are SYS_ADMIN-only. The API omits both fields
+(rather than blanking them client-side) for every other caller, so a TENANT_ADMIN never receives them.
+On a shared multi-tenant install those two values would identify the paying customer and the deployment
+itself to every tenant on it.</p>
+<h3 id="34-exit-codes">3.4 Exit codes</h3>
+<p>A licence problem is fatal: the platform logs the reason and terminates. Each failure mode has its own
+exit code so the cause is visible from a process supervisor without reading logs.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>13</td>
+<td>No licence key is configured</td>
+</tr>
+<tr>
+<td>14</td>
+<td>The licence key is malformed (not a valid key at all)</td>
+</tr>
+<tr>
+<td>15</td>
+<td>The signature does not verify (payload altered, or not a genuine Inferrix key)</td>
+</tr>
+<tr>
+<td>16</td>
+<td>The key was issued for a different deployment's instance UUID</td>
+</tr>
+<tr>
+<td>17</td>
+<td>The licence has expired</td>
+</tr>
+<tr>
+<td>18</td>
+<td>The system clock moved backwards past the recorded high-water mark, beyond tolerance</td>
+</tr>
+</tbody>
+</table></div>
+<p>Reaching a device/asset cap does <strong>not</strong> exit the process — it only blocks further creates. Existing
+devices and assets keep operating normally. Only the six conditions above terminate the platform.</p>
+<p>The systemd unit template sets <code>RestartPreventExitStatus=13 14 15 16 17 18</code>, so a licence exit stops the
+service instead of restarting it. <strong>Docker Compose has no exit-code predicate</strong> for its <code>restart:</code>
+directive, so under <code>restart: always</code> a licence exit will loop the container every restart delay. If a
+container is exiting on a licence code, stop it (<code>docker compose stop</code>) rather than waiting on it, and
+fix the licence before starting it again.</p>
+<h3 id="35-recovering-from-exit-code-18">3.5 Recovering from exit code 18</h3>
+<p>Exit 18 does not always mean <em>this</em> node's clock is wrong.</p>
+<p><code>checkClock</code> compares the current clock against <code>high_water_ts</code>, a mark in <code>inferrix_license_state</code> that
+only ever moves forward. The usual cause is a <strong>different</strong> node whose clock once ran ahead of real
+time: it still passed <code>checkExpiry</code> (its fast clock had not reached the licence's expiry) and
+<code>checkClock</code> (nothing had recorded a higher mark yet), so it persisted its own future timestamp as the
+new high-water mark. Because the mark cannot move backward, every node afterwards — including the
+offending one, once corrected — reads a real "now" behind that stale future mark.</p>
+<p><strong>Confirm before touching anything.</strong> The exit-18 log line prints both values it compared:</p>
+<pre><code>System clock moved backwards past the recorded high-water mark: clock reads &lt;now&gt; but the recorded high-water mark is &lt;highWater&gt;
+</code></pre>
+<p>Convert both to readable times and check them against a clock you trust (NTP, another host).</p>
+<ul>
+<li>If <strong><code>highWater</code></strong> is the one in the future — this is the scenario above. Proceed to the recovery.</li>
+<li>If <strong><code>now</code></strong> is the one that looks wrong — the check is doing its job. Fix <em>this</em> node's clock and let
+  it re-verify normally. <strong>Do not run the recovery</strong>; it would recreate the same stuck mark for whoever
+  checks in next.</li>
+</ul>
+<p><strong>Blast radius.</strong> <code>license.max_high_water_advance_ms</code> (default 24h) caps how far one check can push the
+mark ahead, not how many checks can push it.</p>
+<ul>
+<li>A <strong>transient</strong> bad reading (a one-off NTP jump that self-corrects, or a node that stops checking in)
+  costs at most one clamp period of lockout, then the install heals itself.</li>
+<li>A <strong>persistent</strong> skew (dead RTC battery, wrong timezone) walks the mark forward by one clamp period
+  per check until it reaches that node's own reading, then tracks it exactly. The lockout lasts as long
+  as that node keeps running and checking in. The real fix is correcting or stopping the offending
+  node's clock; the recovery below buys time but a still-running bad node will push the mark straight
+  back up.</li>
+</ul>
+<p>A WARN in the log (<code>DefaultLicenseService</code>, "high-water mark clamped") fires every time a check gets
+clamped, so this is visible well before the lockout lands.</p>
+<p><strong>Recovery</strong>, only once the clocks involved are confirmed good:</p>
+<pre><code class="language-sql">-- Only after confirming no clock is actually wound back. Sets the mark to the current true time.
+UPDATE inferrix_license_state SET high_water_ts = &lt;current epoch millis&gt; WHERE singleton = TRUE;
+</code></pre>
+<p>This is a deliberate override of an anti-tamper control, applied directly against the database and
+bypassing the platform entirely. Run it only once the clocks are known good — used on a node whose clock
+is genuinely wound back, it is exactly the tampering this mechanism exists to catch, defeated silently
+by an operator's own hand.</p>
+<h3 id="36-no-internet-access-required">3.6 No internet access required</h3>
+<p>Verification is entirely offline. The public key used to verify signatures is compiled into the
+platform, and the only persisted state is the single <code>inferrix_license_state</code> row. The platform never
+calls out to Inferrix or anywhere else to check a licence.</p>
+<h3 id="37-install-and-upgrade-are-unlicensed">3.7 Install and upgrade are unlicensed</h3>
+<p>The installer and the upgrade tool run under Spring's <code>install</code> profile, which selects a separate no-op
+licence bean that never checks a key and never exits. Enforcement activates only once the platform
+starts in its normal (non-install) profile. A fresh install or a version upgrade therefore always
+completes regardless of whether a key is configured yet — the key is needed to start serving traffic
+afterward, not to migrate.</p>
+<h3 id="38-issuing-keys">3.8 Issuing keys</h3>
+<p>Keys are produced by a separate tool, not by this repository:
+<code>/Users/maverick/Office/Product/inferrix-license-keygen/</code>.</p>
+<p>The generator's private signing key lives <strong>only in the password manager</strong> — it is not checked into
+either repository. Both repositories share a test-only "golden vector" fixture (a throwaway keypair used
+purely to pin the key format in tests); that fixture's private key is confined to the generator repo's
+copy and is deliberately absent from this repo's copy.</p>
+<h2 id="4-roles-and-permissions"><span class="sec-num">4</span><span>Roles and Permissions</span></h2>
+<p>PE-style role-based access control, ported as <em>generic roles assigned directly to users</em>. A role is a
+set of <code>resource → [operations]</code> grants; a user may hold several and gets the union.</p>
+<p><strong>Where:</strong> Administration → Roles (<code>/roles</code>, tenant admin only) to author; Administration → Users
+(<code>/users</code>) to assign.</p>
+<h3 id="41-who-a-role-applies-to">4.1 Who a role applies to</h3>
+<p><strong>Customer users only.</strong> A tenant administrator has full rights over their own tenant and cannot be
+restricted by a role — assigning one is refused (<code>403 Roles may only be assigned to customer users!</code>),
+and the <em>Manage roles</em> action is disabled on non-customer rows. A sys admin is never restricted either.</p>
+<p>A customer user with <strong>no</strong> role keeps the plain authority-based access ThingsBoard has always given
+them, so the feature is opt-in per user and needs no migration or backfill.</p>
+<aside class="callout">
+<p><strong>PE differs here.</strong> PE routes tenant admins through the same role machinery and merely seeds them a
+generic <code>ALL: [ALL]</code> role, so PE <em>can</em> restrict a tenant admin. This fork deliberately cannot. The
+out-of-the-box behaviour is identical; the capability is narrower.</p>
+</aside>
+<h3 id="42-authoring-a-role">4.2 Authoring a role</h3>
+<p><strong>Administration → Roles → Add role.</strong> Each row grants a set of operations on one resource; <code>All</code> is a
+wildcard on either side.</p>
+<p>The available operations are: <code>ALL</code>, <code>CREATE</code>, <code>READ</code>, <code>WRITE</code>, <code>DELETE</code>, <code>ASSIGN_TO_CUSTOMER</code>,
+<code>UNASSIGN_FROM_CUSTOMER</code>, <code>RPC_CALL</code>, <code>READ_CREDENTIALS</code>, <code>WRITE_CREDENTIALS</code>, <code>READ_ATTRIBUTES</code>,
+<code>WRITE_ATTRIBUTES</code>, <code>READ_TELEMETRY</code>, <code>WRITE_TELEMETRY</code>, <code>CLAIM_DEVICES</code>, <code>ASSIGN_TO_TENANT</code>,
+<code>READ_CALCULATED_FIELD</code>, <code>WRITE_CALCULATED_FIELD</code>.</p>
+<p>Three things regularly surprise people:</p>
+<ul>
+<li><strong>Operations match exactly.</strong> <code>Read</code> does <strong>not</strong> imply <code>Read telemetry</code>, <code>Read attributes</code> or
+  <code>Read credentials</code>. A role that must serve a dashboard needs those listed explicitly.</li>
+<li><strong>Dashboards need <code>Widget type</code> Read.</strong> Every dashboard — including the built-in Home page — resolves
+  each of its widgets through <code>GET /api/widgetType?fqn=</code>, which is permission-checked. Without the grant
+  the page renders as a column of <em>"Problem loading widget configuration. Probably associated widget
+  type was removed."</em> That is ThingsBoard's generic message; nothing in it says "permission". Browsing
+  the widget library additionally needs <code>Widgets bundle</code> Read.</li>
+<li><strong>A user needs nothing extra to be themselves.</strong> Reading your own user record, editing your own
+  profile, and — for a customer user — reading your own customer record are never role-gated. Every
+  session bootstraps with <code>GET /api/user/{self}</code>, <code>checkCustomerId</code> fronts every customer-scoped list,
+  and editing your own name or language is something the platform gives every user, so gating any of
+  them would lock the account down rather than restrict it. The exemption stops there: <strong>deleting</strong> your
+  own account is never exempt, and the write exemption is your <em>user record</em> only — a customer user
+  still has no write on their own Customer.</li>
+</ul>
+<h3 id="43-assigning">4.3 Assigning</h3>
+<p><strong>Administration → Users</strong> lists every user in the tenant for a tenant admin (read-only — creating and
+deleting a user stays on the page that owns its authority, the tenant's or the customer's own users
+page). The <em>Manage roles</em> action replaces a user's whole set; an empty selection removes all roles and
+restores default access.</p>
+<p>The same page shown to a <em>customer</em> user lists only their own customer's users, and is read-only unless
+they hold the customer-administrator grant described below.</p>
+<p>Nobody may change their <strong>own</strong> roles, in the UI or over the API — clearing them would restore
+unrestricted access to the person doing the clearing.</p>
+<h3 id="44-the-two-seeded-roles">4.4 The two seeded roles</h3>
+<p>The first time a tenant opens <strong>Administration → Roles</strong>, two roles are created if absent (PE parity
+with <code>findOrCreateCustomerAdminRole</code> / <code>findOrCreateCustomerUserRole</code>):</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Grants</th>
+<th>For</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Customer Administrator</code></td>
+<td><code>All: [All]</code></td>
+<td>a customer user who manages their own customer's users</td>
+</tr>
+<tr>
+<td><code>Customer User</code></td>
+<td><code>All: [Read, Read credentials, Read attributes, Read telemetry, RPC call]</code></td>
+<td>plain read-only access</td>
+</tr>
+</tbody>
+</table></div>
+<p>They are ordinary roles — edit them, or ignore them and author your own. Note they are <strong>re-created on
+the next visit to the Roles page if deleted</strong>, so removing one is not permanent; edit it to empty
+instead. Seeding is idempotent and never touches a role that already exists under that name.</p>
+<p>The seeded <code>Customer User</code> role does grant <code>Read credentials</code> and <code>RPC call</code> — PE's read-only set
+includes both. That is a deliberate contrast with the anonymous viewer below, who is refused both: a
+named customer user is someone the tenant chose to create and can revoke, while a public dashboard link
+is held by whoever happens to have the URL.</p>
+<p>PE seeds five roles per tenant; we seed these two. The other three do not port:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>PE role</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Tenant Administrator</code></td>
+<td>PE reaches full tenant access by <em>seeding</em> an <code>ALL: [ALL]</code> role. Here a tenant admin has full rights inherently, so the role would grant nothing already untrue.</td>
+</tr>
+<tr>
+<td><code>Tenant User</code></td>
+<td>Its whole purpose is to restrict a tenant admin to read-only. Roles restrict customer users only here, so no tenant admin could ever hold it.</td>
+</tr>
+<tr>
+<td><code>Public User</code></td>
+<td>Ported, but <strong>not as a role</strong> — see below. CE does have public users, but they are synthetic (no database row), so there is nothing to assign a role to.</td>
+</tr>
+</tbody>
+</table></div>
+<p>The cost of leaving the tenant pair out is a <strong>read-only junior tenant administrator</strong>: someone who can
+see everything in the tenant but change nothing. That role is not expressible here, and will not be
+while roles stay customer-scoped. Reversing it means dropping three guards — the authority checks at the
+top of <code>DefaultUserPermissionsService.getMergedPermissions</code> and in <code>UserPermissionsUtil.granted</code>, and
+the "customer users only" check in <code>RoleController.updateUserRoles</code> — after which an explicitly assigned
+role would restrict a tenant admin too. Nobody's access would change until a role is actually assigned,
+since a role-less user keeps full authority-based access either way.</p>
+<h3 id="45-the-customer-administrator">4.5 The customer administrator</h3>
+<p>Give a customer user a role granting <code>User</code> <strong>Write</strong> — the seeded <em>Customer Administrator</em> does, via
+its <code>All: [All]</code> — and they may manage the other users of <strong>their own customer</strong>:</p>
+<ul>
+<li><strong>Administration → Users</strong> becomes read-write for them, and lists only their own customer's users.</li>
+<li>Create, edit and delete a colleague, and copy an activation link so the colleague can set a password.</li>
+<li>Add and Delete additionally require <code>User</code> <strong>Create</strong> / <strong>Delete</strong>; <code>All: [All]</code> covers both.</li>
+</ul>
+<p>Scope is pinned on the server, never taken from the request body: a new user's tenant, customer and
+authority all come from the caller. An attempt to create a <code>TENANT_ADMIN</code>, or a user inside another
+customer, is silently downgraded to a customer user of the caller's own customer rather than refused.</p>
+<p>Still refused for a customer administrator, and the buttons are hidden accordingly: impersonation
+(<em>Login as user</em>), assigning roles (a tenant admin only), disabling an account, and resending activation
+mail. The activation <strong>link</strong> is available — that is the intended way to hand off a new account.</p>
+<p>The capability is <strong>explicit</strong>: it needs a role that names <code>User</code> Write. A customer user with no role
+sees the page exactly as read-only as before, so shipping this widened nobody's access by default.</p>
+<h3 id="46-letting-a-customer-user-create-and-delete">4.6 Letting a customer user create and delete</h3>
+<p>Stock ThingsBoard gives a customer user no <code>Create</code> and no <code>Delete</code> on assets or devices at all, and a
+role can only ever restrict what the authority already allows. A role granting <code>Asset: Create</code>
+therefore had nothing to hand back: the <em>Add asset</em> button stayed hidden however the role was written.</p>
+<p>A role that <strong>names the operation explicitly</strong> now opens it:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Resource</th>
+<th>Opened by an explicit grant</th>
+<th>Baseline for any customer user</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Asset</td>
+<td><code>Create</code>, <code>Delete</code></td>
+<td><code>Read</code>, <code>Write</code>, attributes, telemetry</td>
+</tr>
+<tr>
+<td>Device</td>
+<td><code>Create</code>, <code>Delete</code></td>
+<td><code>Read</code>, <code>Write</code>, credentials read, RPC, claim, attributes, telemetry</td>
+</tr>
+</tbody>
+</table></div>
+<p>"Explicitly" is the load-bearing word. A customer user with <strong>no</strong> role keeps legacy access, which the
+ordinary check reads as full authority — so the grant is tested against roles the user actually holds,
+and shipping this widened nobody's access by default. <code>Manage credentials</code> stays closed for this scope.</p>
+<p>Ownership is pinned on the server: whatever the request body says, an entity a customer user saves
+carries their own customer id. On a create that is what makes the save reachable at all; on an update
+it closes a pre-existing gap where a customer user could POST one of their own assets back under a
+sibling customer's id and hand it away.</p>
+<aside class="callout danger">
+<p>Deleting a device destroys its credentials and telemetry, not just the record, and a device deleted
+this way cannot reconnect. Grant <code>Device: Delete</code> to a customer role only deliberately.</p>
+</aside>
+<h3 id="47-the-anonymous-public-dashboard-viewer">4.7 The anonymous public-dashboard viewer</h3>
+<p>Publishing a dashboard makes it readable by anyone holding the link. That viewer authenticates with
+nothing but the public id and arrives as a <strong>customer user of the public customer</strong> — synthetic, with no
+database row, so no role can be assigned to it. Its permissions are therefore fixed in code
+(<code>DefaultUserPermissionsService.PUBLIC_USER_PERMISSIONS</code>) rather than seeded as a role, which is the one
+place this fork <em>has</em> to diverge from PE's shape while matching its effect.</p>
+<p>The set is PE's two public roles unioned, minus RPC — <code>{ALL: [READ, READ_ATTRIBUTES, READ_TELEMETRY]}</code>.
+Unioned because we have no entity groups to carry the second half. <code>CustomerUserPermissions</code> still
+confines the viewer to the public customer's own entities, which is what group membership did in PE.</p>
+<p>Stock ThingsBoard grants a public viewer far more than reading. Measured against a published dashboard,
+before and after:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>An anonymous link holder could…</th>
+<th>before</th>
+<th>now</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>read the device's <strong>access token</strong> (<code>/credentials</code>)</td>
+<td>200</td>
+<td><strong>403</strong></td>
+</tr>
+<tr>
+<td>write shared attributes</td>
+<td>200</td>
+<td><strong>403</strong></td>
+</tr>
+<tr>
+<td>write timeseries</td>
+<td>200</td>
+<td><strong>403</strong></td>
+</tr>
+<tr>
+<td>rename or otherwise modify the device</td>
+<td>200</td>
+<td><strong>403</strong></td>
+</tr>
+<tr>
+<td>send RPC to the device (actuate it)</td>
+<td>200</td>
+<td><strong>403</strong></td>
+</tr>
+<tr>
+<td>read the dashboard, device, attributes, telemetry, alarms</td>
+<td>200</td>
+<td>200</td>
+</tr>
+<tr>
+<td>delete the device, list tenant devices</td>
+<td>403</td>
+<td>403</td>
+</tr>
+</tbody>
+</table></div>
+<p>The credentials read is the one worth dwelling on: the access token does not expire, so anyone who
+opened a public dashboard could publish data as that device indefinitely, from anywhere, long after the
+link was withdrawn.</p>
+<aside class="callout danger">
+<p><strong>Stricter than PE, on purpose.</strong> PE's public entity-group permissions include <code>RPC_CALL</code>, so a PE
+public dashboard can carry working control widgets. We drop it: anyone holding a dashboard link could
+otherwise actuate the devices on it. The consequence is that a <strong>control widget on a public dashboard
+is inert</strong> — it renders, and the command is refused with 403. If a public dashboard ever legitimately
+needs to actuate, that is the line to revisit (<code>PUBLIC_USER_PERMISSIONS</code> in
+<code>DefaultUserPermissionsService</code>), not a per-widget workaround.</p>
+</aside>
+<h3 id="48-how-it-is-enforced">4.8 How it is enforced</h3>
+<ul>
+<li>Roles are AND-ed in after the normal authority check, in <code>DefaultAccessControlService</code>. A role can
+  only ever <strong>restrict</strong> what the authority already allows, never extend it.</li>
+<li>Collection endpoints that read entity data without a per-entity check are covered by a read gate keyed
+  on the URL pattern (115 endpoints). It logs <code>RBAC read gate active on 115 endpoints</code> at boot, and logs
+  an error naming any pattern that no longer resolves, so an upstream rename cannot silently open a
+  hole.</li>
+<li><code>/api/entitiesQuery/*</code> and the WebSocket v2 commands are gated on the entity type the query resolves
+  to.</li>
+<li>The UI hides menu entries, Add/Delete buttons and details-panel actions the role denies. That is
+  <strong>cosmetic</strong> — the server is the enforcer. A few entity-specific buttons (Unassign from customer,
+  Manage credentials) are still drawn; the server refuses them. The <strong>Users</strong> page is fully covered: a
+  customer user never sees Disable/Enable Account or Resend activation (tenant-only endpoints), and sees
+  Display activation link only with the customer-administrator grant.</li>
+</ul>
+<h3 id="49-operational-notes">4.9 Operational notes</h3>
+<ul>
+<li><strong>Permissions are never in the JWT.</strong> They are cached per user and re-read each request, so a role
+  edit applies on the <strong>next request</strong> — no logout needed. The menu follows on the next page load.</li>
+<li><strong>Cache eviction is cluster-wide.</strong> A role change broadcasts one message to every tb-core node
+  carrying the affected user ids, so a revocation cannot linger on another node. This matters because
+  <code>cache.type</code> defaults to node-local caffeine.</li>
+<li><strong>The <code>role</code> and <code>user_role</code> tables must exist.</strong> They ship in the Inferrix schema overlay
+  (§<a href="#21-the-database-schema-overlay">2.1</a>). If the jar is swapped without applying it, the platform
+  logs <code>RBAC tables are missing - roles are not enforced until the database upgrade is run.</code> once and
+  falls back to legacy access for every customer user rather than failing their requests — a deliberate
+  fail-open, chosen so a missed migration cannot lock a whole tenant out. Apply the overlay.</li>
+</ul>
+<h2 id="5-white-labeling"><span class="sec-num">5</span><span>White Labeling</span></h2>
+<p>Runtime branding, configured through the UI rather than baked into a build. Where the
+<a href="#9-branding-and-navigation">default build branding</a> is compiled in, white labeling is data — it lives
+in the <code>white_labeling</code> table, is cached, and takes effect without a redeploy.</p>
+<p><strong>Where:</strong> its own top-level sidebar entry, <strong>White labeling</strong> (<code>/white-labeling</code>). For a tenant admin
+it sits inside the <strong>Administration</strong> group; sys admins and customer users see it top-level.</p>
+<h3 id="51-the-three-scopes">5.1 The three scopes</h3>
+<p>Settings inherit down a chain. Each level fills in only what the level below left blank:</p>
+<pre><code>System (sys admin)  →  Tenant (tenant admin)  →  Customer (customer user / tenant admin on a customer)
+</code></pre>
+<p>A field left empty at the customer level inherits the tenant's; a field left empty at the tenant level
+inherits the system's. This is why an <strong>emptied</strong> field is stored as <code>null</code>, not <code>""</code> — a blank string
+would count as a deliberate override and block inheritance. Both form components run every text field
+through <code>blankToNull()</code> on save for exactly this reason.</p>
+<p>A tenant admin can edit a specific customer's branding; the page keeps that scope across tab switches.</p>
+<h3 id="52-the-tabs">5.2 The tabs</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Tab</th>
+<th>Route</th>
+<th>Who</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>General</td>
+<td><code>/white-labeling/general</code></td>
+<td>sys admin, tenant admin, customer user</td>
+</tr>
+<tr>
+<td>Login</td>
+<td><code>/white-labeling/login</code></td>
+<td>sys admin, tenant admin, customer user</td>
+</tr>
+<tr>
+<td>Mail templates</td>
+<td><code>/white-labeling/mail-templates</code></td>
+<td><strong>sys admin only</strong></td>
+</tr>
+<tr>
+<td>Privacy policy</td>
+<td><code>/white-labeling/privacy-policy</code></td>
+<td>sys admin, tenant admin</td>
+</tr>
+<tr>
+<td>Terms of use</td>
+<td><code>/white-labeling/terms-of-use</code></td>
+<td>sys admin, tenant admin</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>/settings/whiteLabeling</code> still resolves for old bookmarks and redirects to <code>/white-labeling</code>.</p>
+<h3 id="53-general-tab">5.3 General tab</h3>
+<p>Applies to the authenticated application: sidebar, dashboards, browser tab.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>logoImageUrl</code></td>
+<td>Sidebar logo, dashboard logo. Picked from the image gallery.</td>
+</tr>
+<tr>
+<td><code>logoImageHeight</code></td>
+<td>Rendered logo height in px.</td>
+</tr>
+<tr>
+<td><code>appTitle</code></td>
+<td>Browser tab title, replacing the built-in one.</td>
+</tr>
+<tr>
+<td><code>faviconUrl</code></td>
+<td>Browser tab icon.</td>
+</tr>
+<tr>
+<td><code>paletteSettings</code></td>
+<td>Primary and accent Material palettes; each may extend a stock palette or define its own colours. Edited via the palette dialog.</td>
+</tr>
+<tr>
+<td><code>showNameVersion</code></td>
+<td>Renders <code>{platformName} v.{platformVersion}</code> at the bottom of the left nav.</td>
+</tr>
+<tr>
+<td><code>platformName</code>, <code>platformVersion</code></td>
+<td>The text that toggle renders. <code>platformName</code> is required when the toggle is on.</td>
+</tr>
+<tr>
+<td><code>enableHelpLinks</code>, <code>helpLinkBaseUrl</code>, <code>uiHelpBaseUrl</code></td>
+<td>Whether in-app help links render, and where they point.</td>
+</tr>
+<tr>
+<td><code>hideConnectivityDialog</code></td>
+<td>Suppresses the device "check connectivity" dialog.</td>
+</tr>
+<tr>
+<td>Advanced CSS</td>
+<td>Free-form CSS injected into the app, edited in its own dialog.</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Images are stored as public links.</strong> White-labeling image fields hold
+<code>/api/images/public/{key}</code>, not the gated <code>tb-image;</code> reference the rest of the platform uses. Picking an
+image through the gallery picker makes it public and stores its public link. This is required so
+branding renders on <code>/login</code>, before any authentication exists.</p>
+<h3 id="54-login-tab">5.4 Login tab</h3>
+<p>Applies to the unauthenticated <code>/login</code> page, which loads its own parameters before any token exists via
+<code>GET /api/noauth/whiteLabel/loginWhiteLabelParams</code>.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>logoImageUrl</code>, <code>logoImageHeight</code></td>
+<td>Login card logo. Custom logos keep their aspect ratio inside the fixed 280px slot.</td>
+</tr>
+<tr>
+<td><code>pageBackgroundColor</code></td>
+<td>Page background behind the card.</td>
+</tr>
+<tr>
+<td><code>loginCardColor</code></td>
+<td>The card itself.</td>
+</tr>
+<tr>
+<td><code>darkForeground</code></td>
+<td>Whether text on the page renders light-on-dark or dark-on-light.</td>
+</tr>
+<tr>
+<td><code>appTitle</code>, <code>faviconUrl</code></td>
+<td>Tab title/icon on the login page.</td>
+</tr>
+<tr>
+<td><code>showNameVersion</code>, <code>platformName</code>, <code>platformVersion</code></td>
+<td>Renders <code>{platformName} v.{platformVersion}</code>.</td>
+</tr>
+<tr>
+<td><code>namePosition</code></td>
+<td>Where that text sits — under the logo, or at the bottom of the card.</td>
+</tr>
+<tr>
+<td><code>paletteSettings</code></td>
+<td>Palettes applied pre-auth.</td>
+</tr>
+<tr>
+<td><code>baseUrl</code></td>
+<td>The base URL used in generated links.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="55-mail-templates-sys-admin">5.5 Mail templates (sys admin)</h3>
+<p>Overrides the subject and body of the platform's ten outgoing emails:</p>
+<p><code>test</code>, <code>activation</code>, <code>account.activated</code>, <code>account.lockout</code>, <code>reset.password</code>, <code>password.was.reset</code>,
+<code>2fa.verification.code</code>, <code>state.enabled</code>, <code>state.warning</code>, <code>state.disabled</code>.</p>
+<p>Every send in the platform routes through a single choke point, so a saved template wins over the
+bundled defaults. Bodies are Freemarker with the platform's usual model variables, edited in a rich-text
+editor.</p>
+<aside class="callout danger">
+<p><strong>Security.</strong> Bodies are operator-supplied Freemarker. The engine is configured with
+<code>TemplateClassResolver.ALLOWS_NOTHING_RESOLVER</code>, which is what stops
+<code>&lt;#assign x="freemarker.template.utility.Execute"?new()&gt;</code> in a saved template from being remote code
+execution. This is a requirement, not a hardening nicety — if you are reviewing a merge that touched
+<code>DefaultMailService</code>, confirm that line survived.</p>
+</aside>
+<p>The bundled default templates are already Inferrix-branded (see
+<a href="#9-branding-and-navigation">Branding</a>) and no longer load remote images or name the upstream product.</p>
+<h3 id="56-privacy-policy-and-terms-of-use">5.6 Privacy policy and terms of use</h3>
+<p>Free-form content served to both authenticated and anonymous callers
+(<code>GET /api/noauth/whiteLabel/privacyPolicy</code>, <code>.../termsOfUse</code>). Sys admin and tenant admin can edit.</p>
+<h3 id="57-preview-reset-and-caching">5.7 Preview, reset, and caching</h3>
+<ul>
+<li><strong>Preview</strong> — <code>POST /api/whiteLabel/previewWhiteLabelParams</code> merges a candidate set against the
+  inherited chain without saving, so you can see the result before committing.</li>
+<li><strong>Reset</strong> — <code>DELETE /api/whiteLabel/currentWhiteLabelParams</code> (or <code>.../currentLoginWhiteLabelParams</code>)
+  clears this level's overrides and falls back to the inherited values.</li>
+<li><strong>Caching</strong> — parameters are cached under the <code>whiteLabeling</code> cache. Tune with
+  <code>CACHE_SPECS_WHITE_LABELING_TTL</code> (default 1440 minutes) and <code>CACHE_SPECS_WHITE_LABELING_MAX_SIZE</code>
+  (default 10000). Saves evict transactionally, so a change is visible immediately.</li>
+</ul>
+<h3 id="58-permissions">5.8 Permissions</h3>
+<p><code>WHITE_LABELING</code> is a first-class permission resource: sys admin and tenant admin have full control;
+customer users may read and write their own. Under <a href="#4-roles-and-permissions">Roles</a>, a role can grant
+or withhold it like any other resource.</p>
+<h2 id="6-scheduler"><span class="sec-num">6</span><span>Scheduler</span></h2>
+<p>PE-style scheduled events. An event has a name, a type, a schedule, an originator entity, and a
+type-specific configuration. When it fires, the platform pushes a message into the tenant's rule engine
+(or, for reports, submits a render job directly).</p>
+<p><strong>Where:</strong> <strong>Features → Scheduler</strong> (<code>/features/scheduler</code>). Visible to tenant admins and customer
+users; customer users may create, read, update and delete their own events.</p>
+<p>The page is a combined <strong>list + calendar</strong>: switch views, drag an event on the calendar to reschedule
+it, right-click for its context menu.</p>
+<h3 id="61-event-types">6.1 Event types</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Type</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>updateAttributes</code></td>
+<td>Writes attributes to the originator. Fires as <code>POST_ATTRIBUTES_REQUEST</code>.</td>
+</tr>
+<tr>
+<td><code>sendRpcRequest</code></td>
+<td>Sends an RPC to the originator device. Fires as <code>RPC_CALL_FROM_SERVER_TO_DEVICE</code>.</td>
+</tr>
+<tr>
+<td><code>updateFirmware</code></td>
+<td>Assigns an OTA firmware package.</td>
+</tr>
+<tr>
+<td><code>updateSoftware</code></td>
+<td>Assigns an OTA software package.</td>
+</tr>
+<tr>
+<td><code>generateReport</code></td>
+<td>Submits a report render job. See <a href="#7-reporting">Reporting</a>. Tenant admin only — the type is removed from the picker for customer users.</td>
+</tr>
+<tr>
+<td><code>generateDashboardReport</code></td>
+<td>Renders a dashboard directly to PDF/PNG/JPEG.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="62-scheduling">6.2 Scheduling</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>timezone</code></td>
+<td>IANA zone the schedule is interpreted in.</td>
+</tr>
+<tr>
+<td><code>startTime</code></td>
+<td>First fire.</td>
+</tr>
+<tr>
+<td><code>repeat.type</code></td>
+<td><code>DAILY</code>, <code>EVERY_N_DAYS</code>, <code>WEEKLY</code>, <code>EVERY_N_WEEKS</code>, <code>MONTHLY</code>, <code>YEARLY</code>, <code>TIMER</code>.</td>
+</tr>
+<tr>
+<td><code>repeat.endsOn</code></td>
+<td><strong>Mandatory</strong> for any recurring event.</td>
+</tr>
+<tr>
+<td><code>repeat.repeatOn</code></td>
+<td><code>WEEKLY</code> — days of week, <code>0</code> = Sunday.</td>
+</tr>
+<tr>
+<td><code>repeat.days</code> / <code>repeat.weeks</code></td>
+<td><code>EVERY_N_DAYS</code> / <code>EVERY_N_WEEKS</code> interval.</td>
+</tr>
+<tr>
+<td><code>repeat.repeatInterval</code> + <code>repeat.timeUnit</code></td>
+<td><code>TIMER</code> — every N <code>SECONDS</code>/<code>MINUTES</code>/<code>HOURS</code>.</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>TIMER</code> events are floored at <code>SCHEDULER_MIN_INTERVAL_IN_SEC</code> (default 60).</p>
+<aside class="callout danger">
+<p><strong><code>endsOn</code> is mandatory and recurring events die silently on that date.</strong> The list carries a <strong>Status</strong>
+column — Active / Disabled / Expired — precisely so an expired event does not read as healthy. If a
+schedule "just stopped working", check Status first.</p>
+</aside>
+<h3 id="63-originator">6.3 Originator</h3>
+<p>The originator is the entity the message is addressed to, and it is stored as a top-level field on the
+event, not inside its configuration. The per-type configuration form picks it (a device for RPC, for
+example) and the dialog lifts it out before saving.</p>
+<p>Custom or raw event types with no originator picker default to the event's own id as originator.</p>
+<aside class="callout">
+<p><strong>Known limitation.</strong> The rule engine's <code>TenantIdLoader</code> throws <em>"Unexpected entity type"</em> if a rule
+node attempts tenant resolution on a <code>SCHEDULER_EVENT</code> originator. Set an explicit originator
+(device or asset) on events whose downstream rule chains need tenant resolution. The per-type
+originator picker makes this the normal path for <code>updateAttributes</code> / RPC / OTA; only custom events
+are affected.</p>
+</aside>
+<h3 id="64-no-rule-chain-of-your-own-is-needed">6.4 No rule chain of your own is needed</h3>
+<p>This is PE's design and now ours: the scheduler writes a <strong>stock message type</strong> that the default root
+rule chain already routes.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Event type</th>
+<th>Message type pushed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>updateAttributes</code></td>
+<td><code>POST_ATTRIBUTES_REQUEST</code></td>
+</tr>
+<tr>
+<td><code>sendRpcRequest</code></td>
+<td><code>RPC_CALL_FROM_SERVER_TO_DEVICE</code></td>
+</tr>
+<tr>
+<td>anything else</td>
+<td>the event type verbatim (PE behaviour)</td>
+</tr>
+</tbody>
+</table></div>
+<p>An explicit <code>configuration.msgType</code> always wins. The mapping is applied in the engine, not only in the
+UI, so events stored before this behaviour existed are repaired without a migration.</p>
+<aside class="callout">
+<p>This was a real defect: events saved with <code>msgType: null</code> fell through to the raw event type
+(<code>"updateAttributes"</code>), which is not a message type at all. The Message Type Switch dropped them down
+its <code>Other</code> branch into a Log node, and the event silently did nothing.</p>
+</aside>
+<h3 id="65-message-metadata">6.5 Message metadata</h3>
+<p>If the configuration carries a <code>metadata</code> map, it is used verbatim. Otherwise the engine supplies
+<code>customerId</code>, <code>eventName</code>, and <code>additionalInfo</code>. <code>sendRpcRequest</code> additionally gets <code>originServiceId</code>,
+and an <code>expirationTime</code> derived from <code>timeout</code> when one is set.</p>
+<h3 id="66-clustering">6.6 Clustering</h3>
+<p>Scheduler events propagate between tb-core nodes over the queue: a create/update/delete publishes a
+<code>SchedulerServiceMsgProto</code> on the <code>tb-core</code> topic, and every node re-arms its in-memory timers. This is
+why <strong>scheduler events must be changed through the API, never with SQL</strong> — a direct database write does
+not re-arm the live event.</p>
+<h3 id="67-permissions-and-audit">6.7 Permissions and audit</h3>
+<ul>
+<li><code>SCHEDULER_EVENT</code> is a permission resource. Tenant admins get full CRUD; customer users get CRUD on
+  their own events.</li>
+<li>Scheduler CRUD is audit-logged. Tune with <code>AUDIT_LOG_MASK_SCHEDULER_EVENT</code> (default <code>W</code> — writes).</li>
+<li>Scheduler events are <strong>not</strong> edge-syncable.</li>
+</ul>
+<h2 id="7-reporting"><span class="sec-num">7</span><span>Reporting</span></h2>
+<p>PE-style reporting: author a report template in a drag-and-drop designer, render it to PDF or CSV, and
+deliver it on a schedule by email. Dashboards are captured by an in-process headless Chromium.</p>
+<p><strong>Where:</strong> <strong>Reporting</strong> (<code>/reporting</code>), tenant admin only, with three tabs:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Tab</th>
+<th>Route</th>
+<th>What</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Templates</td>
+<td><code>/reporting/templates</code></td>
+<td>Author, edit, import/export and generate report templates</td>
+</tr>
+<tr>
+<td>Scheduling</td>
+<td><code>/reporting/scheduling</code></td>
+<td>The <code>generateReport</code> scheduler events, in report terms</td>
+</tr>
+<tr>
+<td>Reports</td>
+<td><code>/reporting/reports</code></td>
+<td>Generated report history; download or delete</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="71-the-renderer-is-opt-in">7.1 The renderer is opt-in</h3>
+<p><strong>Nothing in this feature renders until the renderer is turned on.</strong> Every render bean is
+<code>@ConditionalOnProperty(reports.renderer.enabled)</code>, and the platform boots cleanly with it off — which
+is the default, because rendering needs a headless Chromium that not every environment has.</p>
+<pre><code class="language-sh">export REPORTS_RENDERER_ENABLED=true
+export REPORTS_RENDERER_BASE_URL=&quot;https://your-server&quot;   # must be reachable BY the headless browser
+</code></pre>
+<p>With the renderer off:</p>
+<ul>
+<li>The Templates page and the designer still work; <strong>Preview returns a placeholder</strong> rather than a PDF.</li>
+<li><code>generateReport</code> scheduler events hit a WARN branch and produce nothing.</li>
+<li>The <code>generate report</code> rule node fails the job at intake — no orphan render task is enqueued.</li>
+<li>On-demand download endpoints refuse the request.</li>
+</ul>
+<p><code>REPORTS_RENDERER_BASE_URL</code> must be the URL the <em>headless browser inside the server process</em> can reach,
+which is not always the URL your users type. It defaults to <code>http://localhost:8080</code>.</p>
+<p><code>REPORTS_RENDERER_BROWSER_PATH</code> may point at a system Chromium; left empty, Playwright's own managed
+browser is used.</p>
+<h3 id="72-report-templates">7.2 Report templates</h3>
+<p>A template is a name, a description, a file-name pattern, a default date format, and an ordered list of
+<strong>components</strong>. Its format is either <code>PDF</code> or <code>CSV</code>.</p>
+<p><strong>PDF templates</strong> additionally carry page settings — page size (<code>A4</code>, <code>A3</code>, <code>A5</code>, <code>LETTER</code>, <code>LEGAL</code>,
+<code>TABLOID</code>), orientation (<code>PORTRAIT</code> / <code>LANDSCAPE</code>), margins, and a page background — plus a running
+<strong>header</strong> and <strong>footer</strong>, each of which can have a distinct first-page variant.</p>
+<p>A new PDF template opens with its header and footer already enabled, a file-name pattern of
+<code>report-%d{yyyy-MM-dd_HH:mm:ss}</code>, a date pattern of <code>yyyy-MM-dd HH:mm:ss</code>, and a white page background.</p>
+<h3 id="73-components">7.3 Components</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Renders</th>
+<th>PDF</th>
+<th>CSV</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>HEADING</code></td>
+<td>A heading line, with font, colour and alignment</td>
+<td>yes</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>RICH_TEXT</code></td>
+<td>Formatted HTML</td>
+<td>yes</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>DIVIDER</code></td>
+<td>A horizontal rule</td>
+<td>yes</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>PAGE_BREAK</code></td>
+<td>A forced page break</td>
+<td>yes</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>IMAGE</code></td>
+<td>A gallery image, or an image resolved from an entity key</td>
+<td>yes</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>ENTITY_TABLE</code></td>
+<td>A table of entities and their attributes/telemetry</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>ALARM_TABLE</code></td>
+<td>A table of alarms</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>TIME_SERIES_TABLE</code></td>
+<td>A timeseries table</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>SUB_REPORT</code></td>
+<td>Another report template, embedded</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>DASHBOARD</code></td>
+<td>A dashboard, captured by headless Chromium and embedded as an image</td>
+<td>yes</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<p>Every layout-bearing component supports margins, paddings, background, border width, border radius and
+alignment.</p>
+<h3 id="74-the-designer">7.4 The designer</h3>
+<p>Full-page, three panes, at <code>/reporting/templates/:reportTemplateId</code> (or <code>/new</code>):</p>
+<ul>
+<li><strong>Palette</strong> (left) — 23 items: the 10 component types plus 13 ready-made presets (logos, title blocks,
+  common table shapes). Drag onto the canvas.</li>
+<li><strong>Canvas</strong> (centre) — the report body, with the header and footer as their own drop zones above and
+  below it. Reorder by dragging. A header or footer can be collapsed or disabled without losing its
+  contents.</li>
+<li><strong>Configuration panel</strong> (right) — the selected component's settings, or, with nothing selected, the
+  <strong>Common settings</strong> (name, file-name pattern, default date format, description) and <strong>Page settings</strong>
+  cards.</li>
+</ul>
+<p><strong>Toolbar:</strong> Settings, Aliases, Filters, fullscreen, Decline, Save. Decline and Save activate only once
+something has actually changed.</p>
+<p><strong>Preview</strong> toggles the canvas for a rendered PDF of the current, unsaved configuration. It renders as
+<em>you</em>, the logged-in tenant admin — which is why a preview can look right while the scheduled version
+of the same report arrives empty. See <a href="#79-why-a-scheduled-report-arrives-empty">§7.9</a>.</p>
+<p><strong>Dynamic fields.</strong> Headings and rich text can embed <code>${…}</code> expressions inserted from a menu.</p>
+<p><strong>Import / export.</strong> A template round-trips as JSON. Editing preserves fields the designer does not
+itself expose — a template authored elsewhere is not silently rewritten by opening it.</p>
+<p><strong>Entity aliases and filters</strong> are authored in the toolbar dialog and behave as they do on dashboards;
+table components bind their data sources to them.</p>
+<aside class="callout">
+<p><strong>Not available:</strong> version control for report templates. ThingsBoard CE has no version-control
+support for the <code>REPORT_TEMPLATE</code> entity type, so the designer has no Versions button.</p>
+</aside>
+<h3 id="75-scheduling-a-report">7.5 Scheduling a report</h3>
+<p>A scheduled report <strong>is a scheduler event of type <code>generateReport</code></strong>. The Reporting → Scheduling tab is
+a filtered, report-shaped view of the same events you would see under Features → Scheduler.</p>
+<p>Its configuration:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>reportTemplateId</code></td>
+<td>The template to render.</td>
+</tr>
+<tr>
+<td><code>userId</code></td>
+<td><strong>The identity the report is rendered as</strong> — <em>not</em> the recipient. See <a href="#79-why-a-scheduled-report-arrives-empty">§7.9</a>.</td>
+</tr>
+<tr>
+<td><code>timezone</code></td>
+<td>Zone used for the report's time window and name pattern.</td>
+</tr>
+<tr>
+<td><code>targets</code></td>
+<td>Notification targets — <strong>this is who receives it</strong>. Required.</td>
+</tr>
+<tr>
+<td><code>notificationTemplateId</code></td>
+<td>Optional. Left empty, an inline WEB + EMAIL template is used.</td>
+</tr>
+</tbody>
+</table></div>
+<p>The generated report is stored, then delivered as an email attachment through the platform's
+notification system.</p>
+<h3 id="76-on-demand-generation">7.6 On-demand generation</h3>
+<ul>
+<li><strong>Templates page → Generate</strong> renders immediately, as the calling tenant admin.</li>
+<li><code>POST /api/v2/report/test</code> renders a candidate configuration without saving it — what the designer's
+  Preview uses.</li>
+<li><code>POST /api/report/{dashboardId}/download</code> renders a dashboard directly to PDF, PNG or JPEG.</li>
+</ul>
+<h3 id="77-the-generate-report-rule-node">7.7 The <code>generate report</code> rule node</h3>
+<p>An action node named <strong>generate report</strong> (<code>ComponentType.ACTION</code>), available in the rule-chain editor
+with its own configuration form.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>useConfigFromMessage = false</code> (default)</td>
+<td>Uses the static <code>ReportConfig</code> configured on the node.</td>
+</tr>
+<tr>
+<td><code>useConfigFromMessage = true</code></td>
+<td>Parses the <code>ReportConfig</code> from the incoming message body.</td>
+</tr>
+</tbody>
+</table></div>
+<p>The node submits a job and acknowledges the message; the finished report is pushed back into the chain
+as an output message.</p>
+<aside class="callout danger">
+<p><strong><code>useConfigFromMessage = true</code> lets an incoming message choose any user and any notification target
+within the tenant.</strong> That is PE-parity behaviour and it is the rule-chain author's decision to enable
+it. Treat it as you would any other node that takes its configuration from message data.</p>
+</aside>
+<h3 id="78-limits-and-safety-rails">7.8 Limits and safety rails</h3>
+<p>Several of these are Inferrix hardening that PE does not have:</p>
+<ul>
+<li><strong>Sub-report recursion is bounded</strong> — maximum depth 10, and a shared cap of 1000 total sub-report
+  renders per report. PE bounds neither, so a self-referencing or cyclic template can be made to fan out
+  exponentially.</li>
+<li><strong>CSV formula injection is neutralised</strong> — leading <code>=</code>, <code>+</code>, <code>-</code>, <code>@</code>, including full-width and
+  leading-whitespace variants. PE does not do this.</li>
+<li><strong>Images resolve from bundled assets and the tenant's own image store only.</strong> Arbitrary <code>http</code>,
+  <code>https</code>, <code>file</code> or <code>ftp</code> image URIs return an error image rather than being fetched, closing an SSRF
+  and local-file-read path.</li>
+<li><strong>The dashboard capture URL is always the trusted server URL.</strong> A per-component <code>baseUrl</code> override is
+  ignored, so template JSON cannot redirect the minted access token to an attacker's host.</li>
+<li><strong>User-supplied text is not evaluated as a template.</strong> Headings and rich text go through a data-only
+  <code>${var}</code> substitution, not an expression engine.</li>
+<li><strong>Fonts and colours are allowlisted / normalised</strong>, closing CSS injection through a font-family or
+  colour field.</li>
+<li>Unsupported component/feature combinations render an <strong>error box</strong> in place of that component rather
+  than failing the whole report.</li>
+<li><code>REPORTS_GENERATION_TIMEOUT_MS</code> (default 120s) bounds a single render;
+  <code>REPORTS_RENDERER_MAX_CONCURRENT</code> (default 2) bounds how many run at once.</li>
+</ul>
+<p>The PDF stack is Thymeleaf + Flying Saucer + <strong>OpenPDF</strong> (LGPL). iText/AGPL is deliberately absent —
+<code>mvn dependency:tree</code> should show <code>com.github.librepdf:openpdf</code> and zero <code>com.itextpdf</code>.</p>
+<h3 id="79-why-a-scheduled-report-arrives-empty">7.9 Why a scheduled report arrives empty</h3>
+<p>This is the single most common reporting support question, so it gets its own heading.</p>
+<p><strong>A scheduled report is rendered by a headless browser logged in as the event's <code>userId</code>.</strong> The report
+therefore contains exactly what that user is permitted to see, and nothing more. A customer user whose
+customer owns none of the dashboard's devices produces a report with all the dashboard chrome and
+<em>"No data to display on widget"</em> in every widget. Nothing fails and nothing is logged — the render
+succeeds, and the empty PDF is stored and emailed.</p>
+<p>Manual download and the designer's Preview default to the <strong>calling tenant admin</strong>, which is why the
+same template downloaded locally has data. Same template, same minute, different identity — that is the
+only variable.</p>
+<p><strong>Fix it as configuration, by intent:</strong></p>
+<ul>
+<li>Point the event's user at a <strong>tenant admin</strong> for a tenant-wide report, or</li>
+<li><strong>assign the entities to the customer</strong> for a customer-scoped report.</li>
+</ul>
+<p>Delivery is controlled by <em>Notification targets</em>, not by this user field — changing the user does not
+change who receives the mail.</p>
+<p>Apply the change through <code>POST /api/schedulerEvent</code>, <strong>never with SQL</strong>: the engine re-arms a live event
+from the API path only.</p>
+<aside class="callout">
+<p>The scheduler event form labels this field <strong>"Generate report as user"</strong> for exactly this reason. If
+you are looking at an older build that calls it <em>"Recipient user"</em>, that label is wrong — it was never
+the recipient.</p>
+</aside>
+<h3 id="710-delivery-checklist">7.10 Delivery checklist</h3>
+<p>When a scheduled report is not arriving, check these in order:</p>
+<ol>
+<li><strong><code>REPORTS_RENDERER_ENABLED=true</code> on the server.</strong> Default is false.</li>
+<li><strong>Event type.</strong> Both <code>generateReport</code> and <code>generateDashboardReport</code> work. With the renderer on,
+   <code>generateDashboardReport</code> renders directly and needs no rule chain — which also means the
+   <em>generate dashboard report</em> rule node does not receive scheduler-originated messages on a
+   renderer-on node.</li>
+<li><strong>The schedule has not expired.</strong> <code>endsOn</code> is mandatory; check the Status column.</li>
+<li><strong>Notification targets are non-empty.</strong> Required for <code>generateReport</code>. For <code>generateDashboardReport</code>
+   they are top-level <code>targets</code> / <code>notificationTemplateId</code> on the event configuration — an Inferrix
+   addition PE has neither of, so PE-era events carry none and generate but never send.</li>
+<li><strong>SMTP is configured.</strong> Otherwise delivery throws "No delivery methods", logged by
+   <code>ReportJobProcessor.onJobFinished</code>.</li>
+<li><strong>Render identity</strong> — see <a href="#79-why-a-scheduled-report-arrives-empty">§7.9</a>. This is the gate that
+   produces a successful-but-empty report.</li>
+</ol>
+<h2 id="8-widget-data-export"><span class="sec-num">8</span><span>Widget Data Export</span></h2>
+<p>An export button on dashboard widgets that downloads the widget's data as <strong>CSV</strong>, <strong>XLS</strong> or <strong>XLSX</strong>.</p>
+<p><strong>Where:</strong> the widget header, next to the fullscreen button, on hover. Hidden in dashboard edit mode.</p>
+<h3 id="81-which-widgets-have-it">8.1 Which widgets have it</h3>
+<p>Controlled per widget instance by <code>config.enableDataExport</code>. When that field is not set, the default is:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Widget type</th>
+<th>Export button</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>timeseries</code> (Timeseries table and friends)</td>
+<td><strong>on</strong></td>
+</tr>
+<tr>
+<td><code>latest</code> (Entities table and friends)</td>
+<td><strong>on</strong></td>
+</tr>
+<tr>
+<td><code>alarm</code> (Alarms table)</td>
+<td><strong>on</strong></td>
+</tr>
+<tr>
+<td>everything else</td>
+<td>off</td>
+</tr>
+</tbody>
+</table></div>
+<p>Override it per widget: <strong>widget settings → Advanced → Card buttons → Enable data export</strong>. The toggle
+sits next to the existing "Enable fullscreen" toggle and works on any widget type.</p>
+<aside class="callout">
+<p>This is PE's exact rule. Note that the default is keyed on <em>widget type</em>, not on the three specific
+table widgets — so a custom widget declared as <code>timeseries</code> also gets the button by default.</p>
+</aside>
+<h3 id="82-what-gets-exported">8.2 What gets exported</h3>
+<p><strong>The currently loaded page/window of the widget's subscription</strong> — bounded by that widget's own
+pagination and time window. It is not a fresh, unbounded re-query, so what you export is what the widget
+is showing.</p>
+<ul>
+<li><strong>Timeseries</strong> exports as a flattened long-format table: <code>Entity</code>, <code>Timestamp</code>, then one column per
+  data key, across <strong>all</strong> configured datasources together. This differs from the Timeseries table
+  widget's own per-source tabs, which are private to that component.</li>
+<li><strong>Latest</strong> exports the entity rows and their key columns.</li>
+<li><strong>Alarm</strong> exports the alarm rows and their key columns.</li>
+</ul>
+<p>Cell values are the <strong>raw subscribed values</strong>, not each widget's custom per-key cell-content function. A
+widget that renders <code>42</code> as <code>"42 °C"</code> via a cell function exports <code>42</code>.</p>
+<h3 id="83-safety">8.3 Safety</h3>
+<p>The writer neutralises spreadsheet formula injection (leading <code>=</code>, <code>+</code>, <code>-</code>, <code>@</code>) so an attacker-supplied
+device name or attribute value cannot execute when the file is opened in Excel or Sheets. This mirrors
+the server-side guard used by <a href="#78-limits-and-safety-rails">CSV reports</a>.</p>
+<h2 id="9-branding-and-navigation"><span class="sec-num">9</span><span>Branding and navigation</span></h2>
+<h3 id="91-default-build-branding">9.1 Default build branding</h3>
+<p>Inferrix branding is <strong>compiled into the default build</strong>. Every <code>yarn build:prod</code> output is
+Inferrix-branded; there is no special build configuration and no white-labeling runtime setup involved.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Primary colour</td>
+<td><code>#2b388f</code> (blue)</td>
+</tr>
+<tr>
+<td>Accent colour</td>
+<td><code>#ec1c24</code> (red)</td>
+</tr>
+<tr>
+<td>Secondary</td>
+<td><code>#4553a8</code></td>
+</tr>
+<tr>
+<td>Logos</td>
+<td>Inferrix mark and slogan logo, white variants for dark chrome</td>
+</tr>
+<tr>
+<td>Favicon</td>
+<td>Inferrix</td>
+</tr>
+<tr>
+<td>Browser title</td>
+<td><code>Inferrix Cortex</code></td>
+</tr>
+<tr>
+<td>Dashboard footer</td>
+<td><code>Powered by Inferrix Cortex v.x</code> → <code>inferrix.com</code></td>
+</tr>
+<tr>
+<td>Console banner</td>
+<td><code>Inferrix Cortex Version:</code></td>
+</tr>
+<tr>
+<td>TOTP issuer</td>
+<td><code>Inferrix Cortex</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>The sidebar logo is rendered at 52px in a 64px header, and the upstream "Star on GitHub" badge is gone.</p>
+<p><strong>Outgoing mail</strong> is rebranded end to end: all ten templates and all eight subjects name <em>Inferrix
+Cortex</em>, the sign-off is <em>The Inferrix Cortex Team</em>, and the three API-usage templates no longer load
+remote images from <code>media.thingsboard.io</code> — these were the only external asset loads in platform email.
+(The Apache licence headers in those template files keep their upstream attribution; the licence check
+enforces that.)</p>
+<p><strong>Fresh-install defaults</strong> use Inferrix domains: seeded accounts are <code>sysadmin@inferrix.com</code>,
+<code>tenant@inferrix.com</code>, <code>customer@inferrix.com</code> (and <code>customerA/B/C@</code>); the default "Mail From" is
+<code>Inferrix Cortex &lt;sysadmin@localhost.localdomain&gt;</code>; the JWT issuer defaults to <code>inferrix.com</code>.</p>
+<aside class="callout danger">
+<p><strong>Existing installs are not migrated.</strong> These are install-time defaults written once into
+<code>admin_settings</code> and the <code>tb_user</code> table. An install that predates them keeps its
+<code>@thingsboard.org</code> accounts and its old mail-from/issuer values until you change them via the UI or
+the API.</p>
+</aside>
+<p><strong>Home-page dashboards</strong> drop the upstream Version card, the CE-vs-PE Functions card with its
+"Switch to PE" link, and the Connect-mobile-app QR cards, with the surrounding widget geometry adjusted
+to fill the gap.</p>
+<p>To rebrand at runtime instead — per tenant, per customer, without a rebuild — use
+<a href="#5-white-labeling">White Labeling</a>.</p>
+<h3 id="92-tenant-sidebar">9.2 Tenant sidebar</h3>
+<p>The tenant administrator menu is deliberately slimmer than upstream's.</p>
+<p><strong>Removed entirely</strong> — menu entries <em>and</em> routes:</p>
+<ul>
+<li><strong>Edge Management</strong> (Edges, Rule chain templates)</li>
+<li><strong>OTA updates</strong>, including the legacy <code>/otaUpdates</code> URLs</li>
+</ul>
+<p>The backend edge and OTA REST APIs are untouched, and the tenant-admin sub-page
+<code>/customers/:customerId/edges</code> is deliberately kept. Home-page cards for removed sections disappear on
+their own. The customer-user Edge instances entry was removed with them, since its target route no
+longer exists.</p>
+<p><strong>Grouped:</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Contains</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Utilities</strong></td>
+<td>API usage, Mobile center (Mobile bundles, Mobile apps)</td>
+</tr>
+<tr>
+<td><strong>Administration</strong></td>
+<td>Settings (its 6 original tabs), White labeling, Roles, Users, Notification center (its 5 pages)</td>
+</tr>
+</tbody>
+</table></div>
+<p>Both are toggles — they expand in place rather than navigating. Neither auto-expands from the current
+URL, an accepted cosmetic tradeoff.</p>
+<p>Sys admin and customer user menus are unchanged apart from the removals noted above.</p>
+<h3 id="93-inferrix-menu-entries">9.3 Inferrix menu entries</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Entry</th>
+<th>Path</th>
+<th>Authority</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Scheduler</td>
+<td><code>/features/scheduler</code></td>
+<td>Tenant admin, customer user</td>
+</tr>
+<tr>
+<td>Reporting</td>
+<td><code>/reporting</code></td>
+<td>Tenant admin</td>
+</tr>
+<tr>
+<td>White labeling</td>
+<td><code>/white-labeling</code></td>
+<td>Sys admin, tenant admin, customer user</td>
+</tr>
+<tr>
+<td>Roles</td>
+<td><code>/roles</code></td>
+<td>Tenant admin</td>
+</tr>
+<tr>
+<td>Users</td>
+<td><code>/users</code></td>
+<td>Tenant admin, customer user</td>
+</tr>
+<tr>
+<td>IO Controllers</td>
+<td><code>/io-controllers</code></td>
+<td>Tenant admin, customer user</td>
+</tr>
+<tr>
+<td>Discovered controllers</td>
+<td><code>/io-controllers/discovered</code></td>
+<td>Sys admin, tenant admin</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="10-io-controllers"><span class="sec-num">10</span><span>IO Controllers</span></h2>
+<p>Inferrix soft-PLC controllers — Zephyr/STM32H750 boards running Modbus RTU, Wirepas and local
+DI/DO/AI/AO — brought into Cortex as ordinary ThingsBoard devices. Telemetry arrives over the
+platform's <strong>own</strong> MQTT transport (no second broker, no bridge process); configuration goes the other
+way, through a backend REST proxy that reaches the controller's IP directly over the LAN or VPN.</p>
+<p><strong>Where:</strong> Entities → <strong>IO Controllers</strong> (<code>/io-controllers</code>) for the adopted fleet, and
+<strong>Discovered controllers</strong> (<code>/io-controllers/discovered</code>) for boards that have announced themselves
+but belong to nobody yet.</p>
+<h3 id="101-what-a-controller-is-to-the-platform">10.1 What a controller is to the platform</h3>
+<p>An adopted controller is a <code>DEVICE</code> on the auto-created <strong><code>Inferrix Controller</code></strong> device profile.
+Nothing about it is special-cased: attributes, telemetry, alarms, audit log, rule chains, dashboards
+and the licence device cap all apply exactly as they do to any other device, and its <em>Active</em> flag is
+the platform's own connectivity flag, not something the board reports.</p>
+<p><strong>The feature adds no database table.</strong> Discovery sightings, upload jobs and provisioning jobs live in
+a per-node in-memory cache and are lost on restart — sightings repopulate within about five minutes,
+tenant assignments have to be redone. Everything durable is a device, a device attribute, or the
+controller's own flash.</p>
+<h3 id="102-before-you-adopt-anything">10.2 Before you adopt anything</h3>
+<p>Three things must be in place, and adoption fails loudly without the first two.</p>
+<p><strong>1. A credentials key.</strong> Adoption seals the controller's ownership password and bearer token with
+AES-256-GCM before writing them to device attributes; with no key it refuses to run rather than
+storing them in plaintext.</p>
+<pre><code class="language-sh">export INFERRIX_CONTROLLER_CREDENTIALS_KEY=&quot;$(openssl rand -base64 32)&quot;
+</code></pre>
+<aside class="callout danger">
+<p>The key lives outside the database it protects, in <code>thingsboard.conf</code>. <strong>Losing it or changing it
+orphans every adopted controller</strong>: the sealed password and token become undecryptable, and a board
+whose ownership password is not known to the platform has to be re-claimed with the password itself
+— which cannot be read back off the device, only reset by a factory format.</p>
+</aside>
+<p><strong>2. Broker settings.</strong> A sys-admin JSON block under <strong>Administration → Settings → General</strong> named
+<code>inferrixController</code>. This is what the platform writes into each adopted controller's <code>settings_mqtt</code>,
+so it must name the broker address the <em>controller</em> can reach, which is rarely <code>localhost</code>.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Default</th>
+<th>Becomes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>host</code></td>
+<td><em>(none — adoption fails without it)</em></td>
+<td><code>host</code></td>
+</tr>
+<tr>
+<td><code>port</code></td>
+<td><code>8883</code></td>
+<td><code>port</code></td>
+</tr>
+<tr>
+<td><code>tls</code></td>
+<td><code>true</code></td>
+<td><code>tls_on</code></td>
+</tr>
+<tr>
+<td><code>topicRoot</code></td>
+<td><code>com/inferrix</code></td>
+<td><code>base_topic</code></td>
+</tr>
+<tr>
+<td><code>caCert</code></td>
+<td><em>(omitted when blank)</em></td>
+<td><code>ca_cert</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>The username, password and client id are not settings — the platform derives them per device: username
+is the silicon UID, client id is <code>infx-{uid}</code>, and the password is 23 random bytes, base64url-encoded,
+because the firmware truncates <code>settings_mqtt.password</code> at 31 characters.</p>
+<p><strong>3. The discovery listener, if you want greenfield discovery.</strong> Off by default. See
+<a href="#116-io-controllers">§11.6</a>.</p>
+<h3 id="103-discovery-and-adoption">10.3 Discovery and adoption</h3>
+<p>A controller that has never been adopted has no platform credentials, so it cannot appear over MQTT.
+It announces itself instead over plain TCP, by default to <code>gateway:9700</code>, and the platform records
+each announce as a <strong>sighting</strong>: uid, the address the connection actually came from, the identity JSON
+it sent, first/last seen, and a count. Sightings are capped at 512 and expire 30 minutes after the
+last announce.</p>
+<aside class="callout danger">
+<p><strong>The announce is unauthenticated.</strong> Anything in it — uid, model, name, location — is attacker-
+controllable by anyone who can open a TCP connection to the listener, and every value is rendered
+back into a sys admin's browser. The UI escapes each one before display; any new column showing a
+device-reported value must do the same. Keep the discovery port on a trusted network segment, and
+leave it off entirely where controllers are commissioned by address instead.</p>
+</aside>
+<p>Sightings are <strong>global</strong>, because an unadopted controller belongs to nobody yet:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Sees</th>
+<th>May</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sys admin</td>
+<td>every sighting</td>
+<td>assign a sighting to one tenant</td>
+</tr>
+<tr>
+<td>Tenant admin</td>
+<td>only sightings assigned to them</td>
+<td>adopt</td>
+</tr>
+</tbody>
+</table></div>
+<p>The two steps cannot be collapsed: ThingsBoard forbids a sys admin from creating a tenant's device, so
+"adopt on behalf of a tenant" does not exist. Assignments share the sightings cache and are therefore
+also lost on restart.</p>
+<p><strong>Adoption</strong> (by uid, or by address for a controller that never announced) runs in one call: connect
+over TLS, pin the device certificate on first use, set or supply the ownership password, log in, create
+the device with generated MQTT credentials, and write the broker settings back to the board so it
+connects. Leave the password field blank and the platform generates and seals one — that is the normal
+path. An <strong>already-claimed</strong> controller needs its existing ownership password, which is stored on the
+device as a PBKDF2 hash and cannot be recovered from it.</p>
+<p>What adoption leaves behind, per device:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Scope</th>
+<th>Keys</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Server</td>
+<td><code>controllerUid</code>, <code>controllerIp</code>, <code>controllerCertFingerprint</code>, <code>controllerPasswordSealed</code>, <code>controllerTokenSealed</code></td>
+<td>The controller must never be able to read or overwrite the platform's record of how to reach and authenticate to it.</td>
+</tr>
+<tr>
+<td>Client</td>
+<td><code>uid</code>, <code>ip</code>, <code>model</code>, <code>fw</code>, <code>icc</code>, <code>mac</code>, <code>location</code>, <code>name</code></td>
+<td>Everything the device asserts about itself, refreshed on every discovery publish. The live <code>ip</code> is preferred over the adoption-time one, so a DHCP move heals itself.</td>
+</tr>
+</tbody>
+</table></div>
+<aside class="callout danger">
+<p>Read a controller's attributes <strong>by explicit key list</strong>, never with a null scope and no keys. Server
+scope holds the sealed password and token, and a bare read ships them to the browser.</p>
+</aside>
+<h3 id="104-telemetry">10.4 Telemetry</h3>
+<p>Opting a device profile in is one field: <strong><code>inferrixTopicRoot</code></strong> on the MQTT transport configuration,
+blank by default, which leaves upstream behaviour untouched. <code>Inferrix Controller</code> profiles get it
+automatically. A root containing <code>+</code> or <code>#</code> disables the scheme for that profile rather than
+subscribing to wildcards.</p>
+<p>Under that root the handler owns <code>telemetry/{uid}</code>, <code>health/{uid}</code>, <code>discovery/{uid}</code>,
+<code>timesync/{uid}/req</code> and <code>command/{uid}/result</code> inbound, and publishes <code>timesync/{uid}</code>,
+<code>discovery/{uid}/ack</code> and <code>command/{uid}</code> (RPC) outbound. Everything else under the root is refused.</p>
+<p><strong>Series are keyed by the point's name</strong>, the <code>n</code> field the firmware sends with each point. The name
+is used only if it is at most 64 characters of <code>A-Z a-z 0-9 _ . / ( ) -</code> (not leading with a space),
+does not end in <code>_q</code>, and no other point has already claimed it this session; otherwise the series
+falls back to <code>p{point_id}</code>.</p>
+<p>The character allowlist is not cosmetic: ThingsBoard rejects the <strong>entire</strong> telemetry save if one key
+fails its XSS check, so a single odd name would drop every other point in the batch.</p>
+<aside class="callout danger">
+<p>Renaming a point starts a <strong>new series</strong>. The old one keeps its history and stops receiving values.
+This trade-off was chosen deliberately over stable-but-opaque <code>p1</code>…<code>p25</code> keys; rename points before
+building dashboards on them, not after.</p>
+</aside>
+<p>Quality travels with the value: a point whose quality is <code>comm_fail</code> or <code>never</code> writes <strong>no</strong> value at
+all (so a stale reading is never mistaken for a live one), and any non-<code>good</code> quality also writes a
+companion <code>{key}_q</code> series naming it.</p>
+<p>Health messages are flattened into <code>scan_max_ms</code>-style keys and stored as telemetry alongside.</p>
+<h3 id="105-the-controller-page">10.5 The controller page</h3>
+<p><code>/io-controllers/{id}</code> is a standard entity details page, so Attributes, Latest telemetry, Alarms and
+Audit logs come free. The Inferrix tabs sit in front of them:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Tab</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Details</td>
+<td>Entity form, the identity block read from attributes, and live health read from the device.</td>
+</tr>
+<tr>
+<td>Points</td>
+<td>Live values from the <strong>active</strong> configuration; write a value to an output point (<code>do</code>, <code>ao</code>, Modbus RTU holding registers).</td>
+</tr>
+<tr>
+<td>Settings</td>
+<td>Identity, network, MQTT, discovery and time forms; the peer table; the ownership password.</td>
+</tr>
+<tr>
+<td>Configuration</td>
+<td>The draft/active configuration plane — <a href="#106-the-configuration-plane">§10.6</a>.</td>
+</tr>
+<tr>
+<td>Logic</td>
+<td>Program editor, compile/verify/push, and PID auto-tune — <a href="#108-logic-programs">§10.8</a>.</td>
+</tr>
+<tr>
+<td>Software</td>
+<td>Firmware and logic upload, restart-and-verify — <a href="#109-firmware-and-logic-upload">§10.9</a>.</td>
+</tr>
+<tr>
+<td>Diagnostics</td>
+<td>Network and memory counters, logic status, MQTT and ping probes, attestation.</td>
+</tr>
+</tbody>
+</table></div>
+<p>Every panel waits until its tab is opened before it talks to the device. That is a hard requirement,
+not an optimisation: <strong>the firmware serves two clients at a time</strong>, and the platform will block up to
+30 seconds on a per-device lock, so a page that fanned out its reads would hang itself.</p>
+<p>A discovered-but-unadopted controller cannot be configured at all — every device call needs the owner
+token, which only adoption obtains.</p>
+<h3 id="106-the-configuration-plane">10.6 The configuration plane</h3>
+<p>The controller holds an <strong>active</strong> configuration (<code>icc</code> version) and a <strong>draft</strong>. All editing happens
+against the draft; <strong>Apply</strong> validates and promotes it, <strong>Discard</strong> throws it away. A failed apply
+names the offending record with the device's own <code>ICC_*</code> verdict.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Section</th>
+<th>Holds</th>
+<th>Key</th>
+<th>Limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Buses</td>
+<td>Modbus RTU bus mode, baud, framing</td>
+<td><code>bus_id</code></td>
+<td>2</td>
+</tr>
+<tr>
+<td>Queries</td>
+<td>Modbus polls: unit, function, start register, count, interval</td>
+<td><code>query_id</code></td>
+<td>64</td>
+</tr>
+<tr>
+<td>Points</td>
+<td>Every point: name, source, data format, source reference, offset, scaling</td>
+<td><code>point_id</code></td>
+<td>1024</td>
+</tr>
+<tr>
+<td>Scalings</td>
+<td>Multiplier / divisor / offset sets referenced by points</td>
+<td><code>idx</code></td>
+<td>64</td>
+</tr>
+<tr>
+<td>MQTT policies</td>
+<td>Per-point publish trigger, QoS, interval, deadband</td>
+<td><code>point_id</code></td>
+<td>1024</td>
+</tr>
+<tr>
+<td>Peers</td>
+<td>Peer controllers this one may read points from</td>
+<td><code>peer_id</code></td>
+<td>4</td>
+</tr>
+</tbody>
+</table></div>
+<p>Point sources are <code>0</code> local DI, <code>1</code> local DO, <code>2</code> local AI, <code>3</code> local AO, <code>4</code> Modbus RTU, <code>5</code> Wirepas,
+<code>6</code> system register, <code>7</code> peer controller. A point name is capped at 15 characters <em>on the device</em> —
+shorter than the 64 the telemetry key allows.</p>
+<p>Two details regularly cost an afternoon:</p>
+<ul>
+<li><strong><code>deadband_bits</code> is a raw IEEE-754 single-precision bit pattern</strong>, not a number. The UI converts;
+  anything driving the API directly must. (The firmware's own documentation prints a wrong worked
+  example for it.)</li>
+<li><strong>Configuration ownership</strong> is either <code>local</code> or <code>platform</code>. The platform will not edit a draft it
+  does not own; switch the owner first, from the same tab.</li>
+</ul>
+<h3 id="107-local-io-auto-provisioning">10.7 Local I/O auto-provisioning</h3>
+<p>A board's own DI/DO/AI/AO channels are inert until each one has a point and a publish policy. Two
+paths create them:</p>
+<ul>
+<li><strong>At adoption</strong>, automatically and applied, but only when the controller is genuinely blank: active
+  configuration version <code>icc</code> is 0, the owner is <code>local</code>, and all six draft sections are empty.</li>
+<li><strong>On demand</strong>, from the Configuration tab, which fills the <strong>draft</strong> and applies nothing. This is the
+  path for a board that already has a configuration.</li>
+</ul>
+<p>Defaults, which are meant to be edited afterwards rather than trusted:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Channel</th>
+<th>Format</th>
+<th>Trigger</th>
+<th>Interval</th>
+<th>QoS</th>
+<th>Deadband</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DI, DO</td>
+<td>Bit</td>
+<td>interval + on-change</td>
+<td>300 s</td>
+<td>1</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AI</td>
+<td>U16</td>
+<td>interval + on-change</td>
+<td>60 s</td>
+<td>0</td>
+<td>40 counts</td>
+</tr>
+<tr>
+<td>AO</td>
+<td><em>(as configured)</em></td>
+<td>on-change</td>
+<td>—</td>
+<td>0</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<p>Point ids start at 1 (DI1 = 1) and skip to the next free id on a collision, so an existing
+configuration is never overwritten. Analog channels are provisioned <strong>unscaled</strong> — the hardware
+constants that would let the platform convert counts to engineering units are not published yet, so
+raw counts are what a fresh AI point reports until a scaling is added.</p>
+<aside class="callout danger">
+<p>Never auto-provision a controller whose <code>icc</code> is not 0. That is why the adoption path checks three
+conditions rather than one: applying a generated draft over a commissioned board would replace a
+working configuration wholesale.</p>
+</aside>
+<p>Output points read back their real state — a DO's pin level, an AO's DAC register — once per scan,
+from firmware 0.1.17 onward. On older firmware a relay driven by a logic program's direct channel
+binding never shows in its point.</p>
+<h3 id="108-logic-programs">10.8 Logic programs</h3>
+<p>The platform compiles and verifies <strong>ILB</strong> (Inferrix Logic Bytecode) before a program ever reaches the
+device. Two front ends produce the same container: a block editor (tags and statements, type-checked)
+and a plain-text assembly form.</p>
+<aside class="callout danger">
+<p><strong>Verification is the whole point.</strong> A controller answers a program it rejected exactly as it answers
+having never been given one — <code>GET /api/v1/logic/status</code> reports <code>state 0</code>, and the real reason goes
+to a serial console the platform cannot read. Without a platform-side verifier an operator sees a
+successful upload, "staged", and then nothing, forever.</p>
+</aside>
+<p>The verifier is a rule-for-rule port of the firmware's own, kept honest by a differential test against
+the real C implementation. Where the two disagree, the device is right and the platform is the bug.</p>
+<ul>
+<li><strong>Compile</strong> checks a program against the device's live profile and writes nothing.</li>
+<li><strong>Build</strong> compiles, verifies, and streams the container into the logic slot. A program that fails to
+  compile is never uploaded.</li>
+<li>A compile failure is a <em>result</em>, not an error: the editor shows the message and the source line.</li>
+</ul>
+<p>Two gaps worth knowing. Neither verifier type-checks the operand stack, so storing an <code>INT</code> into a
+<code>BOOL</code> tag passes both and faults at run time. And type checking lives in the block compiler only — the
+assembly path is not guarded.</p>
+<p><strong>PID auto-tune</strong> sits in the same tab: a relay test on one PID slot that reports the measured <code>Ku</code> and
+<code>Tu</code> plus Ziegler-Nichols suggested gains. It never rewrites the running loop; applying the numbers is
+a deliberate edit.</p>
+<h3 id="109-firmware-and-logic-upload">10.9 Firmware and logic upload</h3>
+<p>Uploads are <strong>background jobs</strong>, not requests. The firmware caps an inbound request at 2 KB including
+headers and closes the connection after each one, so a 500 KB image is several hundred chunks, each
+with its own TLS handshake — minutes of wall clock. The job survives the page being closed; reopening
+the tab re-finds it.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th></th>
+<th>Firmware</th>
+<th>Logic</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Size cap</td>
+<td>1 MiB</td>
+<td>128 KiB</td>
+</tr>
+<tr>
+<td>Verified by</td>
+<td>SHA-256 over the bytes the platform received</td>
+<td>the ILB verifier, before the first chunk</td>
+</tr>
+</tbody>
+</table></div>
+<p>Jobs are node-local: 4 concurrent, 8 queued, 256 tracked, discarded 30 minutes after last access. One
+upload at a time per controller — starting a second discards the first's unfinished slot, because the
+device is a single-uploader and a fresh <code>begin</code> erases what was there.</p>
+<aside class="callout danger">
+<p>The platform hashes what it holds, so <code>apply</code> always agrees with itself: a corrupt <em>source</em> file is
+accepted and armed. The check proves the bytes survived browser → platform → device, nothing more.
+And do not trust <code>GET /api/v1/info</code>'s <code>fw</code> to name the image actually running — a board can report a
+version it is not booted on. Confirm an update by behaviour. After a <strong>mid-stream</strong> upload failure,
+restart the controller before retrying; re-uploading straight over a half-written slot risks leaving
+the board unbootable.</p>
+</aside>
+<p><strong>Restart and verify</strong> is a single action on the Software tab: reboot, then poll the controller back up
+for three minutes before declaring the new version live.</p>
+<h3 id="1010-reaching-the-device-the-proxy">10.10 Reaching the device: the proxy</h3>
+<p>Everything the UI does to a controller beyond adoption goes through one endpoint,
+<code>/{deviceId}/proxy/**</code>, which forwards a single request to the device's REST API with the platform's
+sealed bearer token and the pinned certificate. It is an <strong>allowlist</strong>, not a tunnel: routes not on the
+list are refused, the query string is capped at 256 characters of a restricted alphabet, and the path
+is taken from the servlet's decoded URI rather than reassembled.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Caller</th>
+<th>May</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Customer user, tenant admin with device Read</td>
+<td><code>GET</code> routes: info, health, points, diagnostics, logic and firmware status, settings reads</td>
+</tr>
+<tr>
+<td>Tenant admin with device Write</td>
+<td>everything else: point writes, settings, the configuration plane, logic restart and tune, reboot</td>
+</tr>
+</tbody>
+</table></div>
+<p>Two exclusions are deliberate and load-bearing:</p>
+<ul>
+<li><strong><code>/api/v1/auth/*</code> is never proxied.</strong> A login or password change made through the proxy would
+  revoke the token the platform holds and lock Cortex out of the board. Password rotation has its own
+  endpoint, which re-seals as it goes.</li>
+<li><strong>Binary firmware and logic appends are never proxied.</strong> They belong to the chunked upload job above.</li>
+</ul>
+<p>The TLS pin is trust-on-first-use, taken at adoption; hostname verification is off because the
+firmware's certificate carries no SAN, which makes the pin — not the name — the thing that
+authenticates the board.</p>
+<p><strong>Attestation</strong> (Diagnostics tab) asks the device to sign a fresh platform nonce, and checks it against
+the pinned certificate and the adopted UID. It proves less than it sounds: the TLS handshake already
+proved key possession. What it adds is the binding of that key to <em>this</em> silicon UID — and a 503,
+which means the controller is still on the shared development certificate.</p>
+<p>Device-bound secrets — the ownership password especially — are restricted to printable ASCII without
+<code>"</code> or <code>\</code>, because the firmware copies JSON strings byte for byte without unescaping them.</p>
+<h2 id="11-configuration-reference"><span class="sec-num">11</span><span>Configuration reference</span></h2>
+<p>Every Inferrix-added configuration key, its environment variable, and its default. Set environment
+variables in <code>/etc/thingsboard/conf/thingsboard.conf</code>; the YAML paths below refer to
+<code>/etc/thingsboard/conf/thingsboard.yml</code> — see <a href="#22-configuration-file-layout">§2.2</a> for why the external
+file is the one that counts.</p>
+<h3 id="111-license-control">11.1 License Control</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>YAML path</th>
+<th>Env var</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>license.key</code></td>
+<td><code>INFERRIX_LICENSE_KEY</code></td>
+<td><em>(empty)</em></td>
+<td>The signed licence key. Empty → exit 13.</td>
+</tr>
+<tr>
+<td><code>license.enforcement.enabled</code></td>
+<td><code>INFERRIX_LICENSE_ENFORCEMENT_ENABLED</code></td>
+<td><code>true</code></td>
+<td>Master switch. Exists so the platform's own test suite can run without a key. <strong>Setting this false in a real deployment disables licence enforcement entirely and must never be done.</strong></td>
+</tr>
+<tr>
+<td><code>license.check_interval_ms</code></td>
+<td><code>INFERRIX_LICENSE_CHECK_INTERVAL_MS</code></td>
+<td><code>3600000</code> (1h)</td>
+<td>How often the key is re-verified at runtime.</td>
+</tr>
+<tr>
+<td><code>license.clock_tolerance_ms</code></td>
+<td><code>INFERRIX_LICENSE_CLOCK_TOLERANCE_MS</code></td>
+<td><code>3600000</code> (1h)</td>
+<td>How far the clock may move backwards before it counts as tampering. Absorbs an NTP correction.</td>
+</tr>
+<tr>
+<td><code>license.max_high_water_advance_ms</code></td>
+<td><code>INFERRIX_LICENSE_MAX_HIGH_WATER_ADVANCE_MS</code></td>
+<td><code>86400000</code> (24h)</td>
+<td>How far a single check may advance the clock-rollback high-water mark. See <a href="#35-recovering-from-exit-code-18">§3.5</a>.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="112-reporting">11.2 Reporting</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>YAML path</th>
+<th>Env var</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>reports.renderer.enabled</code></td>
+<td><code>REPORTS_RENDERER_ENABLED</code></td>
+<td><code>false</code></td>
+<td><strong>Master switch.</strong> Off → nothing renders.</td>
+</tr>
+<tr>
+<td><code>reports.renderer.base_url</code></td>
+<td><code>REPORTS_RENDERER_BASE_URL</code></td>
+<td><code>http://localhost:8080</code></td>
+<td>The UI URL reachable <strong>by the headless browser</strong>.</td>
+</tr>
+<tr>
+<td><code>reports.renderer.browser_path</code></td>
+<td><code>REPORTS_RENDERER_BROWSER_PATH</code></td>
+<td><em>(empty)</em></td>
+<td>Path to a system Chromium. Empty → Playwright-managed browser.</td>
+</tr>
+<tr>
+<td><code>reports.renderer.max_concurrent</code></td>
+<td><code>REPORTS_RENDERER_MAX_CONCURRENT</code></td>
+<td><code>2</code></td>
+<td>Concurrent renders.</td>
+</tr>
+<tr>
+<td><code>reports.renderer.dashboard_settle_ms</code></td>
+<td><code>REPORTS_RENDERER_DASHBOARD_SETTLE_MS</code></td>
+<td><code>5000</code></td>
+<td>After a dashboard reports itself settled, wait up to this long for network quiet before capturing. Covers widgets that fetch their own assets (custom widgets, map tiles) outside the readiness protocol. Best-effort: a continuously-polling dashboard never reaches idle and is captured when this elapses.</td>
+</tr>
+<tr>
+<td><code>reports.generation_timeout_ms</code></td>
+<td><code>REPORTS_GENERATION_TIMEOUT_MS</code></td>
+<td><code>120000</code></td>
+<td>Per-render timeout.</td>
+</tr>
+<tr>
+<td><code>reports.test_report_pool_size</code></td>
+<td><code>REPORTS_TEST_REPORT_POOL_SIZE</code></td>
+<td><code>12</code></td>
+<td>Pool for preview/test renders.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="113-scheduler">11.3 Scheduler</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>YAML path</th>
+<th>Env var</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>scheduler.min_interval</code></td>
+<td><code>SCHEDULER_MIN_INTERVAL_IN_SEC</code></td>
+<td><code>60</code></td>
+<td>Minimum interval for <code>TIMER</code> events, in seconds.</td>
+</tr>
+<tr>
+<td><code>audit-log.logging-level.mask.scheduler_event</code></td>
+<td><code>AUDIT_LOG_MASK_SCHEDULER_EVENT</code></td>
+<td><code>W</code></td>
+<td>Audit-log mask for scheduler event CRUD.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="114-white-labeling">11.4 White Labeling</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>YAML path</th>
+<th>Env var</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cache.specs.whiteLabeling.timeToLiveInMinutes</code></td>
+<td><code>CACHE_SPECS_WHITE_LABELING_TTL</code></td>
+<td><code>1440</code></td>
+<td>WL parameter cache TTL.</td>
+</tr>
+<tr>
+<td><code>cache.specs.whiteLabeling.maxSize</code></td>
+<td><code>CACHE_SPECS_WHITE_LABELING_MAX_SIZE</code></td>
+<td><code>10000</code></td>
+<td><code>0</code> disables the cache.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="115-branding">11.5 Branding</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>YAML path</th>
+<th>Env var</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>security.jwt.tokenIssuer</code></td>
+<td><code>JWT_TOKEN_ISSUER</code></td>
+<td><code>inferrix.com</code></td>
+<td>JWT issuer, shown under Security → General. Changed from upstream's <code>thingsboard.io</code>.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="116-io-controllers">11.6 IO Controllers</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>YAML path</th>
+<th>Env var</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>inferrix.controller.credentials_key</code></td>
+<td><code>INFERRIX_CONTROLLER_CREDENTIALS_KEY</code></td>
+<td><em>(empty)</em></td>
+<td>Base64 32-byte AES key that seals each controller's ownership password and bearer token before they are stored as device attributes. <strong>Empty → adoption refuses to run.</strong> Generate with <code>openssl rand -base64 32</code>. See <a href="#102-before-you-adopt-anything">§10.2</a>.</td>
+</tr>
+<tr>
+<td><code>inferrix.controller.discovery.enabled</code></td>
+<td><code>INFERRIX_DISCOVERY_ENABLED</code></td>
+<td><code>false</code></td>
+<td>The unauthenticated plain-TCP announce listener. Off → <code>/io-controllers/discovered</code> is always empty and controllers must be adopted by address.</td>
+</tr>
+<tr>
+<td><code>inferrix.controller.discovery.bind_address</code></td>
+<td><code>INFERRIX_DISCOVERY_BIND_ADDRESS</code></td>
+<td><code>0.0.0.0</code></td>
+<td>Listener bind address.</td>
+</tr>
+<tr>
+<td><code>inferrix.controller.discovery.port</code></td>
+<td><code>INFERRIX_DISCOVERY_PORT</code></td>
+<td><code>9700</code></td>
+<td>Listener port; matches the firmware's default.</td>
+</tr>
+</tbody>
+</table></div>
+<p>The broker the platform points adopted controllers at is <strong>not</strong> configuration — it is the
+<code>inferrixController</code> sys-admin settings block, because it is edited per install at runtime. See
+<a href="#102-before-you-adopt-anything">§10.2</a>.</p>
+<h2 id="12-rest-api-reference"><span class="sec-num">12</span><span>REST API reference</span></h2>
+<p>Inferrix-added endpoints. All are under <code>/api</code> and require a bearer token except where marked
+<code>noauth</code>. Stock ThingsBoard endpoints are unchanged and documented upstream.</p>
+<h3 id="121-license">12.1 License</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/license/info</code></td>
+<td>Capacity, expiry. Customer name and instance ID <strong>omitted</strong> for non-sys-admin callers.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="122-roles">12.2 Roles</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/role/{roleId}</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/role</code></td>
+<td>Create or update.</td>
+</tr>
+<tr>
+<td><code>DELETE</code></td>
+<td><code>/api/role/{roleId}</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/roles?pageSize&amp;page</code></td>
+<td>Seeds the two default roles on first call.</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/user/{userId}/roles</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/user/{userId}/roles</code></td>
+<td>Replaces the user's whole role set. Refused for non-customer users and for your own account.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="123-white-labeling">12.3 White labeling</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/whiteLabel/whiteLabelParams</code></td>
+<td>Merged, inherited parameters for the caller.</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/whiteLabel/currentWhiteLabelParams</code></td>
+<td>This level's own overrides only.</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/whiteLabel/whiteLabelParams</code></td>
+<td>Save.</td>
+</tr>
+<tr>
+<td><code>DELETE</code></td>
+<td><code>/api/whiteLabel/currentWhiteLabelParams</code></td>
+<td>Reset to inherited.</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/noauth/whiteLabel/loginWhiteLabelParams</code></td>
+<td><strong>noauth</strong> — what <code>/login</code> reads.</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/whiteLabel/currentLoginWhiteLabelParams</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/whiteLabel/loginWhiteLabelParams</code></td>
+<td>Save.</td>
+</tr>
+<tr>
+<td><code>DELETE</code></td>
+<td><code>/api/whiteLabel/currentLoginWhiteLabelParams</code></td>
+<td>Reset.</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/whiteLabel/previewWhiteLabelParams</code></td>
+<td>Merge without saving.</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/whiteLabel/isWhiteLabelingAllowed</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/whiteLabel/isCustomerWhiteLabelingAllowed</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/whiteLabel/privacyPolicy</code> · <code>/api/noauth/whiteLabel/privacyPolicy</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/whiteLabel/privacyPolicy</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/whiteLabel/termsOfUse</code> · <code>/api/noauth/whiteLabel/termsOfUse</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/whiteLabel/termsOfUse</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/whiteLabel/mailTemplates</code></td>
+<td>Sys admin.</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/whiteLabel/mailTemplates</code></td>
+<td>Sys admin.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="124-scheduler">12.4 Scheduler</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/schedulerEvent/{schedulerEventId}</code></td>
+<td>Full event including configuration.</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/schedulerEvent/info/{schedulerEventId}</code></td>
+<td>Projection without configuration.</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/schedulerEvent</code></td>
+<td>Create or update. <strong>The only supported way to change a live event</strong> — re-arms the engine.</td>
+</tr>
+<tr>
+<td><code>PUT</code></td>
+<td><code>/api/schedulerEvent/{schedulerEventId}/enabled/{enabledValue}</code></td>
+<td>Enable/disable.</td>
+</tr>
+<tr>
+<td><code>DELETE</code></td>
+<td><code>/api/schedulerEvent/{schedulerEventId}</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/schedulerEvents</code></td>
+<td>All for the caller's scope.</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/schedulerEvents?pageSize&amp;page</code></td>
+<td>Paged.</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/schedulerEvents?startTime&amp;endTime</code></td>
+<td>Calendar window.</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/schedulerEvents?schedulerEventIds=</code></td>
+<td>By id list.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="125-reporting">12.5 Reporting</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/reportTemplate/{reportTemplateId}</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/reportTemplate/info/{reportTemplateId}</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/reportTemplate</code></td>
+<td>Create or update.</td>
+</tr>
+<tr>
+<td><code>DELETE</code></td>
+<td><code>/api/reportTemplate/{reportTemplateId}</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/reportTemplateInfos/all?pageSize&amp;page</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/reportTemplates?reportTemplateIds=</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/v2/report</code></td>
+<td>Generate from a saved template.</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/v2/report/{reportId}</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/v2/report/{reportId}/download</code></td>
+<td>The rendered file.</td>
+</tr>
+<tr>
+<td><code>DELETE</code></td>
+<td><code>/api/v2/report/{reportId}</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/v2/reportInfos?pageSize&amp;page</code></td>
+<td>History. Accepts <code>reportTemplateId</code>, <code>userId</code>, <code>includeCustomers</code>.</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/v2/reportInfos/all?pageSize&amp;page</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/v2/report/test</code></td>
+<td>Render an unsaved template configuration. Renderer-gated; tenant admin; renders as the caller. This is what the designer's Preview calls.</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/v2/report/request</code></td>
+<td>Enqueue a render job. Renderer-gated.</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/report/{dashboardId}/download</code></td>
+<td>On-demand dashboard render → <code>application/pdf</code>, <code>image/png</code>, <code>image/jpeg</code>.</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/report/test</code></td>
+<td>On-demand dashboard render of an unsaved dashboard-report config. Distinct from <code>/api/v2/report/test</code> above.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="126-io-controllers">12.6 IO Controllers</h3>
+<p>All under <code>/api/inferrix/controllers</code>. None is covered by the RBAC read gate (an allowlist of upstream
+URL patterns); each checks its own permission.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET</code></td>
+<td><code>/discovered</code></td>
+<td>Unadopted sightings. Sys admin sees all; tenant admin needs device <code>Read</code> and sees only sightings assigned to them.</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/discovered/{uid}/assign?tenantId=</code></td>
+<td>Allocate a sighting to a tenant. <strong>Sys admin only.</strong></td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/adopt</code></td>
+<td>Claim, pin, register. Tenant admin + device <code>Create</code>. Body names <code>uid</code> <strong>or</strong> <code>host</code>.</td>
+</tr>
+<tr>
+<td><code>ANY</code></td>
+<td><code>/{deviceId}/proxy/**</code></td>
+<td>One request forwarded to the device. <code>GET</code> needs device <code>Read</code>; anything else is tenant-admin + device <code>Write</code>. Allowlisted routes only — see <a href="#1010-reaching-the-device-the-proxy">§10.10</a>.</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/{deviceId}/upload/{kind}</code></td>
+<td>Multipart (<code>file</code>) firmware or logic upload; returns a job. Tenant admin + device <code>Write</code>.</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/{deviceId}/upload</code></td>
+<td>The upload currently running against this controller, or null.</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/uploads/{jobId}</code></td>
+<td>Poll one upload. Unknown and foreign job ids answer alike.</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/{deviceId}/logic/compile</code></td>
+<td><code>text/plain</code> assembly or <code>application/json</code> block program. Compiles and verifies against the device's live profile; writes nothing. Device <code>Read</code>.</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/{deviceId}/logic/build</code></td>
+<td>Compile, verify, then stream into the logic slot. Device <code>Write</code>. A failed compile is never uploaded.</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/{deviceId}/provision</code></td>
+<td>Draft a point and publish policy for every unprovisioned local DI/DO/AI/AO. Device <code>Write</code>.</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/{deviceId}/provision</code></td>
+<td>The provisioning job running for this controller, including the one adoption starts.</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/provisions/{jobId}</code></td>
+<td>Poll one provisioning job.</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/{deviceId}/attest</code></td>
+<td>Device signs a platform nonce; checked against the pinned certificate and the adopted UID. Device <code>Read</code>.</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/{deviceId}/password</code></td>
+<td>Rotate the ownership password and re-seal it. Tenant admin + device <code>Write</code>. Never proxied.</td>
+</tr>
+</tbody>
+</table></div>
+<p>Reboot and PID auto-tune have no endpoints of their own — they are proxy routes
+(<code>POST /api/v1/system/reboot</code>, <code>POST /api/v1/logic/tune</code>).</p>
+<aside class="callout">
+<p>The report <em>history/generation</em> endpoints live under <strong><code>/api/v2</code></strong>; the report <em>template</em> and
+<em>dashboard-report</em> endpoints live under <strong><code>/api</code></strong>. <code>POST /api/report/test</code> and
+<code>POST /api/v2/report/test</code> are two different endpoints.</p>
+</aside>
+<h2 id="13-troubleshooting"><span class="sec-num">13</span><span>Troubleshooting</span></h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Most likely cause</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Platform exits immediately, code 13–18</td>
+<td>A licence problem. See <a href="#34-exit-codes">§3.4</a>. Under Docker Compose the container will restart-loop; stop it rather than waiting.</td>
+</tr>
+<tr>
+<td>Exit 18 but this node's clock is correct</td>
+<td>Another node's fast clock poisoned the high-water mark. See <a href="#35-recovering-from-exit-code-18">§3.5</a> — confirm which value is wrong before running the recovery SQL.</td>
+</tr>
+<tr>
+<td>Licence block set but nothing changed</td>
+<td>It was set in the jar's <code>thingsboard.yml</code>, not the external one. See <a href="#22-configuration-file-layout">§2.2</a>.</td>
+</tr>
+<tr>
+<td>A customer user's dashboards show <em>"Problem loading widget configuration"</em></td>
+<td>Their role is missing <code>Widget type</code> → Read. See <a href="#42-authoring-a-role">§4.2</a>.</td>
+</tr>
+<tr>
+<td>A customer user sees no telemetry despite a <code>Read</code> grant</td>
+<td>Operations match exactly; <code>Read</code> does not imply <code>Read telemetry</code>.</td>
+</tr>
+<tr>
+<td>Roles seem to have no effect at all</td>
+<td>The <code>role</code> / <code>user_role</code> tables are missing — the schema overlay was not applied. Look for <code>RBAC tables are missing</code> in the log. Roles fail <strong>open</strong>.</td>
+</tr>
+<tr>
+<td>A control widget on a public dashboard does nothing</td>
+<td>Intentional. Public viewers are refused <code>RPC_CALL</code>. See <a href="#47-the-anonymous-public-dashboard-viewer">§4.6</a>.</td>
+</tr>
+<tr>
+<td>A deleted seeded role keeps coming back</td>
+<td>Seeding re-creates the two default roles on each visit to the Roles page. Edit one to empty instead of deleting it.</td>
+</tr>
+<tr>
+<td>White-labeling change does not appear</td>
+<td>Check the scope you edited (system / tenant / customer) and that the field is actually blank at the level below. An emptied field must be saved as blank so inheritance resumes.</td>
+</tr>
+<tr>
+<td>Branding missing on <code>/login</code></td>
+<td>The image field must hold a public link (<code>/api/images/public/{key}</code>). Re-pick it through the gallery picker.</td>
+</tr>
+<tr>
+<td>Scheduler event never fires</td>
+<td>Check Status — a recurring event with a past <code>endsOn</code> reads as Expired.</td>
+</tr>
+<tr>
+<td>Scheduler event fires but nothing happens downstream</td>
+<td>Its <code>msgType</code> fell through to the raw event type and the Message Type Switch logged it. Re-save the event through the API.</td>
+</tr>
+<tr>
+<td>Scheduler change made in SQL has no effect</td>
+<td>The engine re-arms from <code>POST /api/schedulerEvent</code> only.</td>
+</tr>
+<tr>
+<td>Rule node gets <em>"Unexpected entity type"</em> for a scheduler event</td>
+<td>Set an explicit device/asset originator. See <a href="#63-originator">§6.3</a>.</td>
+</tr>
+<tr>
+<td>Report preview returns a placeholder</td>
+<td><code>REPORTS_RENDERER_ENABLED</code> is false.</td>
+</tr>
+<tr>
+<td>Report renders locally but the emailed one is empty</td>
+<td>Render identity. See <a href="#79-why-a-scheduled-report-arrives-empty">§7.9</a>.</td>
+</tr>
+<tr>
+<td>Scheduled report never arrives</td>
+<td>Walk <a href="#710-delivery-checklist">§7.10</a> in order.</td>
+</tr>
+<tr>
+<td>Dashboard in a report is captured half-loaded</td>
+<td>Raise <code>REPORTS_RENDERER_DASHBOARD_SETTLE_MS</code>.</td>
+</tr>
+<tr>
+<td>Widget export button missing</td>
+<td>The widget is not <code>timeseries</code>/<code>latest</code>/<code>alarm</code>, or the dashboard is in edit mode. Turn it on per widget under Advanced → Card buttons.</td>
+</tr>
+<tr>
+<td>Exported values differ from what the widget displays</td>
+<td>Export writes raw subscribed values, not cell-content function output.</td>
+</tr>
+<tr>
+<td>Adoption fails with "no broker host is configured"</td>
+<td>The <code>inferrixController</code> sys-admin settings block is missing or has no <code>host</code>. See <a href="#102-before-you-adopt-anything">§10.2</a>.</td>
+</tr>
+<tr>
+<td>Adoption refuses to run at all</td>
+<td><code>INFERRIX_CONTROLLER_CREDENTIALS_KEY</code> is not set. The platform will not store a controller secret in plaintext.</td>
+</tr>
+<tr>
+<td>Discovered list is always empty</td>
+<td>The discovery listener is off (<code>INFERRIX_DISCOVERY_ENABLED</code>), or the sightings expired — they live in memory, 30 minutes, and are lost on restart.</td>
+</tr>
+<tr>
+<td>A tenant admin cannot see a controller a sys admin can</td>
+<td>The sighting has not been assigned to that tenant. Assignments are also lost on restart.</td>
+</tr>
+<tr>
+<td>Controller telemetry keys look like <code>p1</code>, <code>p7</code></td>
+<td>The point has no name, the name is not plain ASCII, it ends in <code>_q</code>, or another point already claimed it. See <a href="#104-telemetry">§10.4</a>.</td>
+</tr>
+<tr>
+<td>A renamed point stopped updating its old chart</td>
+<td>Renaming starts a new series by design.</td>
+</tr>
+<tr>
+<td>A point shows no value but the controller is online</td>
+<td>Quality is <code>comm_fail</code> or <code>never</code>; the value is deliberately withheld. Look at the <code>{key}_q</code> series.</td>
+</tr>
+<tr>
+<td>Only the Details tab is shown on a controller page</td>
+<td>A tab template threw. One failing tab takes every tab down.</td>
+</tr>
+<tr>
+<td>Logic program uploads fine and then nothing happens</td>
+<td>The controller rejected it at boot. It reports <code>state 0</code> for both "rejected" and "never given a program" — compile through the platform, which verifies first.</td>
+</tr>
+<tr>
+<td>Firmware version did not change after an update</td>
+<td><code>GET /api/v1/info</code>'s <code>fw</code> cannot be trusted to name the running image. Confirm by behaviour.</td>
+</tr>
+<tr>
+<td>Frontend build fails</td>
+<td>Node 18 is not supported; use Node 22.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="14-maintaining-the-fork"><span class="sec-num">14</span><span>Maintaining the fork</span></h2>
+<h3 id="141-where-inferrix-code-lives">14.1 Where Inferrix code lives</h3>
+<p>Two kinds of change:</p>
+<p><strong>Additive, Inferrix-owned paths.</strong> New files under new directories. These never conflict on an upstream
+merge and are not tracked in the ledger:</p>
+<pre><code>common/data/.../{scheduler,report,dashboardreport,license,role}/**
+dao/.../{scheduler,report,wl,license,role}/**
+dao/src/main/resources/sql/schema-inferrix.sql
+application/.../service/{scheduler,report,inferrix}/**
+application/.../controller/InferrixPlcController.java
+common/transport/mqtt/.../transport/mqtt/inferrix/**
+application/.../controller/{SchedulerEvent,Report,ReportTemplate,DashboardReport,License,Role,WhiteLabeling}Controller.java
+rule-engine/rule-engine-components/.../rule/engine/report/**
+ui-ngx/src/app/modules/home/pages/{scheduler,report,white-labeling,role,inferrix}/**
+ui-ngx/src/app/core/http/{scheduler-event,report,license,white-labeling,inferrix-controller}.service.ts
+ui-ngx/src/app/shared/models/{scheduler-event,report,report-configuration,white-labeling,license,inferrix-controller,inferrix-logic}.models.ts
+</code></pre>
+<p><strong>Modifications to upstream files.</strong> Every one of these is recorded in <code>INFERRIX-PATCHES.md</code> with what
+was changed, why, and how to recover it. There are roughly 160 such rows across ten features.</p>
+<h3 id="142-upstream-merges">14.2 Upstream merges</h3>
+<p>Upstream periodically <strong>rebuilds</strong> <code>release-4.3</code>'s history, so a sync is a re-merge against an old merge
+base rather than a fast-forward. Expect roughly 68 conflicts, including spurious rename/rename
+conflicts.</p>
+<pre><code class="language-bash">git fetch upstream
+git merge upstream/release-4.3
+</code></pre>
+<p>Then walk <code>INFERRIX-PATCHES.md</code> row by row. Most Inferrix patches are <strong>not compiler-enforced</strong> — a
+dropped one compiles cleanly and fails silently at runtime, so the ledger's per-row recovery greps are
+the check, not the build.</p>
+<p>The highest-risk files, in order:</p>
+<ol>
+<li><strong><code>ui-ngx/src/app/core/services/menu.models.ts</code></strong> — carries White labeling, Scheduler, Reporting and
+   the menu restructure. Four features, many insertion points, and upstream edits these same maps every
+   release.</li>
+<li><strong><code>ui-ngx/src/assets/locale/locale.constant-en_US.json</code></strong> — a 10,000-line file upstream churns
+   constantly, in which Inferrix content is a handful of scattered blocks. Splice as raw text on
+   recovery; <strong>never</strong> run it through a JSON formatter.</li>
+<li><strong><code>application/.../service/mail/DefaultMailService.java</code></strong> — losing the Freemarker
+   <code>ALLOWS_NOTHING_RESOLVER</code> line leaves the feature working while reopening a remote-code-execution
+   path.</li>
+<li><strong><code>ui-ngx/src/app/modules/home/components/widget/widget-container.component.html</code></strong> — losing the
+   export block silently removes the button with everything else intact.</li>
+</ol>
+<p>Version bumps follow one rule: bump only if upstream ships a database upgrade at a version we already
+occupy. A shared version label on its own is not a conflict.</p>
+<h3 id="143-adding-new-database-objects">14.3 Adding new database objects</h3>
+<p>Append idempotent DDL to <code>dao/src/main/resources/sql/schema-inferrix.sql</code>. Nothing else changes: no
+upstream schema file, no new seam, no new ledger row. See <a href="#21-the-database-schema-overlay">§2.1</a>.</p>
+<h3 id="144-conventions">14.4 Conventions</h3>
+<ul>
+<li>New Inferrix-authored files carry a <code>The Inferrix Authors</code> licence header, not
+  <code>The Thingsboard Authors</code>. The form is <strong>build-enforced</strong>: <code>license:check</code> in the Maven reactor
+  compares each header line for line against the plugin's own SPDX templates, so an indent or a year
+  range that looks right can still fail the build. A pre-commit hook checks the staged copy against
+  the same templates, and <code>--fix</code> stamps the exact header the plugin accepts.</li>
+<li>In Angular templates, use the <code>translate</code> <strong>pipe</strong>, not the <code>translate</code> attribute. As an attribute on
+  Material components (<code>mat-option</code>, <code>mat-checkbox</code>) it silently ships the raw i18n key.</li>
+<li>Reuse ThingsBoard's own services directly. The Inferrix modules depend on all upstream modules;
+  parallel implementations of something the platform already provides are the wrong shape here.</li>
+</ul>
+<h3 id="145-keeping-this-document-current">14.5 Keeping this document current</h3>
+<p><code>INFERRIX.md</code> is the source. <code>docs/guide/inferrix-guide.html</code> is its published rendering, produced by
+<code>docs/guide/render-guide.py</code> — deterministic, offline, and the only thing that should ever write that
+HTML. Do not edit the rendering; regenerate it.</p>
+<pre><code class="language-bash">python3 docs/guide/render-guide.py            # rewrite the HTML from the markdown
+python3 docs/guide/render-guide.py --check    # fail if the committed HTML is stale
+</code></pre>
+<p>Two git hooks keep the pair honest. <code>.git/hooks</code> is not tracked, so install them once per clone:</p>
+<pre><code class="language-bash">bash docs/guide/install-hooks.sh
+</code></pre>
+<ul>
+<li><strong>pre-commit</strong> re-renders the guide whenever <code>INFERRIX.md</code> is staged, and stages the result, so the
+  markdown and the HTML land in the same commit and cannot disagree. It refuses the commit if the
+  markdown links to a section that no longer exists — renumbered sections are the one way this
+  document rots. (It also runs the licence-header check described in
+  <a href="#144-conventions">§14.4</a>, when that script is present — it lives in the gitignored <code>.claude/</code>, so a
+  fresh clone has the guide hooks but not that one, and the installer says so.)</li>
+<li><strong>post-commit</strong> records any <code>feat</code> or <code>fix</code> commit that changed code this guide describes without
+  touching <code>INFERRIX.md</code>, as an unticked line in <code>docs/guide/DOC-DEBT.md</code>.</li>
+</ul>
+<p>Neither hook writes prose, amends a commit, or commits anything. What a feature <em>does</em> is a sentence a
+person has to write; the debt list is the reminder that one is owed. Publishing the rendered guide as
+an Artifact is likewise a deliberate step — a hook cannot do it.</p>
+</article>
+</div>

@@ -3,8 +3,10 @@
 # SPDX-FileCopyrightText: Copyright The Inferrix Authors
 # SPDX-License-Identifier: Apache-2.0
 #
+
 # Self-test for docs-sync.sh, run against a throwaway repository:
 #   bash docs/guide/docs-sync.test.sh
+
 set -uo pipefail
 
 HOOK=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/docs-sync.sh

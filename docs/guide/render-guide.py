@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
+#
 # SPDX-FileCopyrightText: Copyright The Inferrix Authors
 # SPDX-License-Identifier: Apache-2.0
+#
+
 """Render INFERRIX.md into the styled feature guide published as an Artifact.
 
 The markdown is the source of truth; this script only dresses it, so the

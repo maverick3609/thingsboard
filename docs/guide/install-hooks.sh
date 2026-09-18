@@ -3,8 +3,10 @@
 # SPDX-FileCopyrightText: Copyright The Inferrix Authors
 # SPDX-License-Identifier: Apache-2.0
 #
+
 # Installs this repository's git hooks. .git/hooks is not tracked, so every clone
 # needs this once:  bash docs/guide/install-hooks.sh
+
 set -euo pipefail
 
 root=$(git rev-parse --show-toplevel)

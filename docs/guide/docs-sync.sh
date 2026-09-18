@@ -3,10 +3,11 @@
 # SPDX-FileCopyrightText: Copyright The Inferrix Authors
 # SPDX-License-Identifier: Apache-2.0
 #
+
 # Keeps the feature documentation honest around a commit. Install with
 # docs/guide/install-hooks.sh; .git/hooks is not tracked.
 #
-#   --stage   (pre-commit)   INFERRIX.md is staged → re-render the published guide
+#   --stage   (pre-commit)   INFERRIX.md is staged -> re-render the published guide
 #                            from it and stage the result, so the markdown and the
 #                            HTML can never disagree. Blocks the commit only when the
 #                            markdown itself is broken (a link to a section that no
@@ -16,8 +17,9 @@
 #                            touching INFERRIX.md is recorded in docs/guide/DOC-DEBT.md.
 #
 # What it deliberately does NOT do: write prose, amend a commit, or commit anything
-# itself. A hook cannot know what a feature does — it can only render what the
+# itself. A hook cannot know what a feature does - it can only render what the
 # markdown already says and name what is missing.
+
 set -uo pipefail
 
 root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0

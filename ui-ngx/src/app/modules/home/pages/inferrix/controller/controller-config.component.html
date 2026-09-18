@@ -4,8 +4,10 @@
     SPDX-License-Identifier: Apache-2.0
 
 -->
-<div class="mat-padding tb-absolute-fill flex flex-col gap-4">
-  <div class="tb-form-panel stroked no-gap">
+<div class="mat-padding flex flex-1 flex-col gap-4">
+  <!-- Ownership and the draft controls share one panel: every row of chrome above the table is a row
+       of records the reader has to scroll for. -->
+  <div class="tb-form-panel stroked">
     <div class="tb-form-row no-border no-padding">
       <mat-icon>{{ !owner ? 'help_outline' : owner === 'local' ? 'edit' : 'lock' }}</mat-icon>
       <div class="flex-1" *ngIf="owner === 'local'" translate>inferrix.owner-local</div>
@@ -18,9 +20,6 @@
         {{ 'inferrix.hand-back-ownership' | translate }}
       </button>
     </div>
-  </div>
-
-  <div class="tb-form-panel stroked">
     <div class="flex flex-row items-center gap-2">
       <mat-button-toggle-group [value]="showDraft" (change)="toggleDraft($event.value)">
         <mat-button-toggle [value]="true">{{ 'inferrix.draft' | translate }}</mat-button-toggle>

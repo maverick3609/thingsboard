@@ -14,7 +14,10 @@
 @if (entity) {
   <mat-tab label="{{ 'inferrix.tab-points' | translate }}" #pointsTab="matTab">
     @for (controller of [entity]; track controller.id.id) {
-      <tb-controller-points [active]="pointsTab.isActive" [deviceId]="controller.id.id"
+      <!-- min-h-full, not tb-absolute-fill: the table is free to be taller than the tab frame, and
+           the frame scrolls. Pinned to the frame, a page of records lives behind an inner scrollbar. -->
+      <tb-controller-points class="flex flex-col min-h-full"
+                            [active]="pointsTab.isActive" [deviceId]="controller.id.id"
                             [readonly]="readonly"></tb-controller-points>
     }
   </mat-tab>
@@ -26,7 +29,8 @@
   </mat-tab>
   <mat-tab label="{{ 'inferrix.tab-config' | translate }}" #configTab="matTab">
     @for (controller of [entity]; track controller.id.id) {
-      <tb-controller-config [active]="configTab.isActive" [deviceId]="controller.id.id"
+      <tb-controller-config class="flex flex-col min-h-full"
+                            [active]="configTab.isActive" [deviceId]="controller.id.id"
                             [readonly]="readonly"></tb-controller-config>
     }
   </mat-tab>

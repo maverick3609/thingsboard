@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Component } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
+import { PageEvent } from '@angular/material/paginator';
 import { Subscription, timer } from 'rxjs';
 import { switchMap, takeUntil } from 'rxjs/operators';
 import { ControllerPanelComponent } from '@home/pages/inferrix/controller/controller-panel.component';
@@ -27,6 +28,10 @@ import {
 export class ControllerPointsComponent extends ControllerPanelComponent {
 
   points: ControllerPoint[] = [];
+  pagedPoints: ControllerPoint[] = [];
+  readonly pageSizeOptions = [10, 20, 50, 100];
+  pageSize = 10;
+  pageIndex = 0;
   total = 0;
   truncated = false;
   loading = false;
@@ -117,8 +122,23 @@ export class ControllerPointsComponent extends ControllerPanelComponent {
     return point.v === undefined || point.v === null ? '—' : String(point.v);
   }
 
+  pageChanged(event: PageEvent): void {
+    this.pageIndex = event.pageIndex;
+    this.pageSize = event.pageSize;
+    this.slicePage();
+  }
+
+  /** Auto-refresh re-applies the whole list every 5s, so the page has to survive it. */
+  private slicePage(): void {
+    const lastPage = Math.max(0, Math.ceil(this.points.length / this.pageSize) - 1);
+    this.pageIndex = Math.min(this.pageIndex, lastPage);
+    const start = this.pageIndex * this.pageSize;
+    this.pagedPoints = this.points.slice(start, start + this.pageSize);
+  }
+
   private apply(result: PagedRecords): void {
     this.points = result.records as ControllerPoint[];
+    this.slicePage();
     this.total = result.total;
     // True only when points exist that are not on screen: the walk hit the page cap, or the
     // device predates the paging support and can only serve its first page.

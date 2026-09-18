@@ -1912,6 +1912,13 @@ names the offending record with the device's own <code>ICC_*</code> verdict.</p>
 <p>Point sources are <code>0</code> local DI, <code>1</code> local DO, <code>2</code> local AI, <code>3</code> local AO, <code>4</code> Modbus RTU, <code>5</code> Wirepas,
 <code>6</code> system register, <code>7</code> peer controller. A point name is capped at 15 characters <em>on the device</em> —
 shorter than the 64 the telemetry key allows.</p>
+<p>Each section is a table of 10 records per page (the page size follows the paginator, up to 100). The
+table is never given less room than a full page needs, so a page of records is read without scrolling
+inside it; a tall panel scrolls as a whole instead. The same holds for the Points tab.</p>
+<p>Every field that names another section's record — a point's <code>query_id</code>, a publish policy's
+<code>point_id</code>, a scaling reference — is <strong>picked from a list</strong>, never typed, and the list shows the
+record's name beside its id (<code>#9 · DO1</code>). An id typed by hand is only caught when the whole draft is
+applied, which is the worst moment to learn it was wrong.</p>
 <p>Two details regularly cost an afternoon:</p>
 <ul>
 <li><strong><code>deadband_bits</code> is a raw IEEE-754 single-precision bit pattern</strong>, not a number. The UI converts;

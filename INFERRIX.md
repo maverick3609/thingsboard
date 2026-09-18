@@ -1227,6 +1227,15 @@ Point sources are `0` local DI, `1` local DO, `2` local AI, `3` local AO, `4` Mo
 `6` system register, `7` peer controller. A point name is capped at 15 characters *on the device* —
 shorter than the 64 the telemetry key allows.
 
+Each section is a table of 10 records per page (the page size follows the paginator, up to 100). The
+table is never given less room than a full page needs, so a page of records is read without scrolling
+inside it; a tall panel scrolls as a whole instead. The same holds for the Points tab.
+
+Every field that names another section's record — a point's `query_id`, a publish policy's
+`point_id`, a scaling reference — is **picked from a list**, never typed, and the list shows the
+record's name beside its id (`#9 · DO1`). An id typed by hand is only caught when the whole draft is
+applied, which is the worst moment to learn it was wrong.
+
 Two details regularly cost an afternoon:
 
 - **`deadband_bits` is a raw IEEE-754 single-precision bit pattern**, not a number. The UI converts;

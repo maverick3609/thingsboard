@@ -17,6 +17,8 @@ import { controllerRecordError } from '@shared/models/inferrix-controller.models
 export abstract class ControllerPanelComponent implements OnChanges, OnDestroy {
 
   @Input() deviceId: string;
+  /** Only ever shown, never resolved: it names a saved configuration after the controller it came from. */
+  @Input() deviceName: string;
   @Input() readonly = false;
   @Input() active = false;
 

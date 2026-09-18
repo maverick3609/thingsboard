@@ -3,15 +3,17 @@
 import { ChangeDetectorRef, Component, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { PageEvent } from '@angular/material/paginator';
-import { Subscription, timer } from 'rxjs';
-import { switchMap, takeWhile } from 'rxjs/operators';
+import { from, Subscription, timer } from 'rxjs';
+import { concatMap, switchMap, takeUntil, takeWhile, tap } from 'rxjs/operators';
 import { TranslateService } from '@ngx-translate/core';
 import { DialogService } from '@core/services/dialog.service';
 import { InferrixControllerService } from '@core/http/inferrix-controller.service';
 import {
   bitsToFloat,
   CONTROLLER_CONFIG_SECTIONS,
+  CONTROLLER_TEMPLATE_WRITE_ORDER,
   ControllerConfigSection,
+  ControllerTemplate,
   ControllerProvisionStatus,
   ControllerSettingField,
   DATA_FORMATS,
@@ -19,6 +21,8 @@ import {
   POINT_SOURCES
 } from '@shared/models/inferrix-controller.models';
 import { ControllerConfigRecordDialogComponent } from './controller-config-record-dialog.component';
+import { ControllerTemplateDialogComponent, ControllerTemplateDialogData }
+  from './controller-template-dialog.component';
 import { ControllerPanelComponent } from '@home/pages/inferrix/controller/controller-panel.component';
 
 /**
@@ -57,6 +61,8 @@ export class ControllerConfigComponent extends ControllerPanelComponent implemen
   loading = false;
   error: string;
   applyResult: string;
+  /** Progress of a template read or write, both of which are one device call per step. */
+  templateProgress: string;
   /** The local I/O provisioning job this tab started or found running, until the operator leaves. */
   provision: ControllerProvisionStatus;
 
@@ -221,6 +227,123 @@ export class ControllerConfigComponent extends ControllerPanelComponent implemen
           this.error = this.applyError(error);
         }
       });
+    });
+  }
+
+  /**
+   * Saves what is on screen — every section, not just the one selected — under a name.
+   *
+   * The read is the slow half: six sections, one device call each (more when a section pages), and
+   * the firmware answers one at a time. It runs against whichever side the operator is looking at,
+   * so a template can be taken from the running configuration as well as from the draft.
+   */
+  saveAsTemplate(): void {
+    this.error = null;
+    this.applyResult = null;
+    const snapshot: {[sectionKey: string]: any[]} = {};
+    let read = 0;
+    this.templateProgress = this.translate.instant('inferrix.template-reading',
+      {done: 0, total: this.sections.length});
+    from(this.sections).pipe(
+      concatMap(section => this.controllerService.readConfigSection(this.deviceId, section, this.showDraft)
+        .pipe(tap(records => {
+          snapshot[section.key] = records || [];
+          this.templateProgress = this.translate.instant('inferrix.template-reading',
+            {done: ++read, total: this.sections.length});
+          this.cd.markForCheck();
+        }))),
+      takeUntil(this.destroy$)
+    ).subscribe({
+      complete: () => {
+        this.templateProgress = null;
+        this.openTemplateDialog('save', snapshot);
+      },
+      error: error => {
+        this.templateProgress = null;
+        this.error = this.messageOf(error);
+      }
+    });
+  }
+
+  applyTemplate(): void {
+    this.error = null;
+    this.applyResult = null;
+    this.openTemplateDialog('apply');
+  }
+
+  private openTemplateDialog(mode: 'save' | 'apply', config?: {[sectionKey: string]: any[]}): void {
+    this.dialog.open<ControllerTemplateDialogComponent, ControllerTemplateDialogData, ControllerTemplate>(
+      ControllerTemplateDialogComponent, {
+        disableClose: true,
+        panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
+        data: {
+          mode,
+          kind: 'config',
+          config,
+          sourceName: this.deviceName,
+          suggestedName: `${this.deviceName || 'Controller'} · ${new Date().toISOString().slice(0, 10)}`
+        }
+      }).afterClosed().subscribe(template => {
+      if (!template) {
+        return;
+      }
+      if (mode === 'save') {
+        this.applyResult = this.translate.instant('inferrix.template-saved', {name: template.name});
+      } else {
+        this.writeTemplate(template);
+      }
+    });
+  }
+
+  /**
+   * Writes a saved configuration into this controller's draft, one record at a time.
+   *
+   * Records the template does not name are left alone: this is an upsert by id, not a replacement of
+   * the draft. Discard first for a clean base. Nothing goes live either way — Apply still has to
+   * compile and verify the whole draft.
+   *
+   * ponytail: driven from the page, so it stops if the operator leaves the tab, and a full 1024-point
+   * template takes about twenty minutes at the firmware's ~1.4s per write. Move it behind a job like
+   * local I/O provisioning (InferrixProvisionService) if templates that size become normal.
+   */
+  private writeTemplate(template: ControllerTemplate): void {
+    const writes: {section: ControllerConfigSection; record: any}[] = [];
+    CONTROLLER_TEMPLATE_WRITE_ORDER.forEach(key => {
+      const section = this.sections.find(candidate => candidate.key === key);
+      if (section) {
+        (template.config?.[key] || []).forEach(record => writes.push({section, record}));
+      }
+    });
+    if (!writes.length) {
+      this.error = this.translate.instant('inferrix.template-empty');
+      return;
+    }
+    let written = 0;
+    this.templateProgress = this.translate.instant('inferrix.template-writing',
+      {done: 0, total: writes.length});
+    from(writes).pipe(
+      concatMap(write => this.controllerService.upsertConfigRecord(this.deviceId, write.section, write.record)
+        .pipe(tap(() => {
+          this.templateProgress = this.translate.instant('inferrix.template-writing',
+            {done: ++written, total: writes.length});
+          this.cd.markForCheck();
+        }))),
+      takeUntil(this.destroy$)
+    ).subscribe({
+      complete: () => {
+        this.templateProgress = null;
+        this.applyResult = this.translate.instant('inferrix.template-applied',
+          {count: writes.length, name: template.name});
+        this.reload();
+      },
+      error: error => {
+        this.templateProgress = null;
+        // Which record, not just which error: the write stops at the first refusal, and the rest of
+        // the template is still on the operator's side of the wire.
+        this.error = this.translate.instant('inferrix.template-write-failed',
+          {done: written, total: writes.length, error: this.messageOf(error)});
+        this.reload();
+      }
     });
   }
 

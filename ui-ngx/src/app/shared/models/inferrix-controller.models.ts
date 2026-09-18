@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { DeviceInfo } from '@shared/models/device.models';
 import { HasUUID } from '@shared/models/id/has-uuid';
+import { LogicProgram } from '@shared/models/inferrix-logic.models';
 
 /** The device profile the platform creates on first adoption; see InferrixAdoptionService. */
 export const INFERRIX_CONTROLLER_PROFILE = 'Inferrix Controller';
@@ -525,3 +526,35 @@ export const CONTROLLER_CONFIG_SECTIONS: ControllerConfigSection[] = [
     ]
   }
 ];
+
+/**
+ * A saved controller configuration, as the picker lists it.
+ *
+ * Config plane records and/or a logic program, and nothing else: network addressing, MQTT, identity
+ * and the ownership password are per-controller and never travel in a template.
+ */
+export interface ControllerTemplateSummary {
+  id: string;
+  createdTime: number;
+  name: string;
+  sourceName?: string;
+  recordCount: number;
+  hasLogic: boolean;
+}
+
+/** The same template with its payload: section key -> that section's records, as the device serves them. */
+export interface ControllerTemplate extends ControllerTemplateSummary {
+  config?: {[sectionKey: string]: any[]};
+  logic?: LogicProgram;
+}
+
+/**
+ * The order a template's sections are written back in.
+ *
+ * A record that names another section's record is rejected on the spot, so the named section has to
+ * exist first: queries name a bus, points name a query and a scaling, policies name a point. Apply
+ * verifies the whole draft again at the end, but a write that fails here fails one record at a time
+ * and would leave the operator guessing.
+ */
+export const CONTROLLER_TEMPLATE_WRITE_ORDER = ['buses', 'queries', 'scalings', 'points',
+  'mqtt-policies', 'peers'];

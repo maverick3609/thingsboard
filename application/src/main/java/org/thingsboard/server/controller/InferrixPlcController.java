@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -35,6 +36,7 @@ import org.thingsboard.server.service.inferrix.InferrixProxyRoutes;
 import org.thingsboard.server.service.inferrix.InferrixControllerSighting;
 import org.thingsboard.server.service.inferrix.InferrixDiscoveryService;
 import org.thingsboard.server.service.inferrix.InferrixProvisionService;
+import org.thingsboard.server.service.inferrix.InferrixTemplateService;
 import org.thingsboard.server.service.inferrix.InferrixUploadService;
 import org.thingsboard.server.service.security.model.SecurityUser;
 import org.thingsboard.server.service.security.permission.Operation;
@@ -76,6 +78,8 @@ public class InferrixPlcController extends BaseController {
     private final ObjectProvider<InferrixControllerAccess> controllerAccess;
     private final ObjectProvider<InferrixUploadService> uploadService;
     private final ObjectProvider<InferrixProvisionService> provisionService;
+    /** Unconditional, unlike its neighbours: a template store needs no controller access. */
+    private final InferrixTemplateService templateService;
 
     @ApiOperation(value = "List discovered controllers (discovered)",
             notes = "Controllers that have announced themselves on the discovery port and have not "
@@ -573,6 +577,70 @@ public class InferrixPlcController extends BaseController {
         } catch (Exception e) {
             throw handleException(e);
         }
+    }
+
+    @ApiOperation(value = "List saved controller templates (controllerTemplates)",
+            notes = "The tenant's saved controller configurations, newest first, without their payloads: "
+                    + "a template taken from a controller with a thousand points is far too big to send "
+                    + "once per row. A template holds config plane records and/or a logic program only — "
+                    + "never network settings, MQTT, identity or the ownership password, which stay "
+                    + "per controller.")
+    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    @GetMapping("/templates")
+    public List<InferrixTemplateService.ControllerTemplateSummary> getControllerTemplates() throws ThingsboardException {
+        SecurityUser user = getCurrentUser();
+        accessControlService.checkPermission(user, Resource.DEVICE, Operation.READ);
+        return templateService.list(user.getTenantId());
+    }
+
+    @ApiOperation(value = "Read one saved controller template (controllerTemplate)",
+            notes = "The template with its payload, ready to be written into a controller's draft. "
+                    + "A template belonging to another tenant reads as not found.")
+    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    @GetMapping("/templates/{templateId}")
+    public InferrixTemplateService.ControllerTemplate getControllerTemplate(
+            @PathVariable("templateId") String strTemplateId) throws ThingsboardException {
+        checkParameter("templateId", strTemplateId);
+        SecurityUser user = getCurrentUser();
+        accessControlService.checkPermission(user, Resource.DEVICE, Operation.READ);
+        InferrixTemplateService.ControllerTemplate template =
+                templateService.get(user.getTenantId(), toUUID(strTemplateId));
+        if (template == null) {
+            // Same answer for "no such template" and "not yours", as for uploads and provisioning.
+            throw new ThingsboardException("No such template", ThingsboardErrorCode.ITEM_NOT_FOUND);
+        }
+        return template;
+    }
+
+    @ApiOperation(value = "Save a controller template (saveControllerTemplate)",
+            notes = "Stores a controller's configuration under a name, replacing whatever that name held. "
+                    + "The caller sends what it has already read from the controller; the platform stores "
+                    + "it and counts the records. Saving does not touch any controller.")
+    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    @PostMapping("/templates")
+    public InferrixTemplateService.ControllerTemplate saveControllerTemplate(
+            @RequestBody InferrixTemplateService.SaveTemplateRequest request) throws ThingsboardException {
+        SecurityUser user = getCurrentUser();
+        // WRITE rather than READ: this is the tenant writing durable state, even though no device
+        // is touched. A role that may only read devices may not save their configurations.
+        accessControlService.checkPermission(user, Resource.DEVICE, Operation.WRITE);
+        try {
+            return templateService.save(user.getTenantId(), request);
+        } catch (IllegalArgumentException e) {
+            throw new ThingsboardException(e.getMessage(), ThingsboardErrorCode.BAD_REQUEST_PARAMS);
+        }
+    }
+
+    @ApiOperation(value = "Delete a saved controller template (deleteControllerTemplate)",
+            notes = "Removes the template. Controllers already configured from it are untouched.")
+    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    @DeleteMapping("/templates/{templateId}")
+    public void deleteControllerTemplate(@PathVariable("templateId") String strTemplateId)
+            throws ThingsboardException {
+        checkParameter("templateId", strTemplateId);
+        SecurityUser user = getCurrentUser();
+        accessControlService.checkPermission(user, Resource.DEVICE, Operation.WRITE);
+        templateService.delete(user.getTenantId(), toUUID(strTemplateId));
     }
 
     private InferrixControllerAccess requireAccess() throws ThingsboardException {

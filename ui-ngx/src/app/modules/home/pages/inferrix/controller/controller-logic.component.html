@@ -127,6 +127,16 @@
       @if (busy) {
         <mat-spinner diameter="24"></mat-spinner>
       }
+      <!-- Until a program is saved it lives only in this editor: leaving the tab loses it, and the
+           controller cannot be asked for it back. -->
+      <button mat-stroked-button [disabled]="busy" (click)="saveAsTemplate()"
+              matTooltip="{{ 'inferrix.save-logic-template-hint' | translate }}" matTooltipPosition="above">
+        <mat-icon>bookmark_add</mat-icon>{{ 'inferrix.save-template' | translate }}
+      </button>
+      <button mat-stroked-button [disabled]="busy || readonly" (click)="loadTemplate()"
+              matTooltip="{{ 'inferrix.load-logic-template-hint' | translate }}" matTooltipPosition="above">
+        <mat-icon>bookmark</mat-icon>{{ 'inferrix.load-template' | translate }}
+      </button>
       <button mat-stroked-button [disabled]="busy" (click)="verify()">
         <mat-icon>fact_check</mat-icon>{{ 'inferrix.logic-verify' | translate }}
       </button>

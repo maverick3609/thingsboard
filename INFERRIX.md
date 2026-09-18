@@ -1363,6 +1363,42 @@ which means the controller is still on the shared development certificate.
 Device-bound secrets — the ownership password especially — are restricted to printable ASCII without
 `"` or `\`, because the firmware copies JSON strings byte for byte without unescaping them.
 
+### 10.11 Saved configurations (templates)
+
+A controller's configuration exists in two places only: on the controller, and in whatever the
+operator remembers. A **template** is a third — a copy in the platform's own database, so a
+configuration can be put back after a mistake or put on a second controller.
+
+A template holds the six config plane sections, a logic program, or both. It holds nothing else, and
+that is the point: **network addressing, MQTT, identity and the ownership password never travel in
+a template**. They are per-controller by nature, and a template carrying a password would hand every
+controller the first one's credentials the moment it was applied. Nothing about a second controller
+has to be opted out of, because nothing about the first one was taken.
+
+| Where | Action | What it does |
+|---|---|---|
+| Configuration tab | Save as template | Reads all six sections — whichever of draft or active is on screen — and stores them under a name. |
+| Configuration tab | Apply template | Writes a saved configuration into this controller's **draft**, one record at a time. |
+| Logic tab | Save as template | Stores the program in the editor. Until this exists, a program lives only in the open tab. |
+| Logic tab | Load template | Replaces the editor's program with a saved one, after confirming. |
+
+Three things are worth knowing before relying on it:
+
+- **Applying is an upsert, not a replacement.** Records the template does not name are left where
+  they are. Discard the draft first for a clean base.
+- **Nothing goes live.** Apply (the config plane's own) still has to compile and verify the whole
+  draft, exactly as for a hand-made edit.
+- **The write runs from the open page**, one device call per record, at roughly a second and a half
+  each. Seventy records take about two minutes and the tab has to stay open; a full 1024-point
+  controller is not a job for this path.
+
+Sections are written in dependency order — buses, queries, scalings, points, publish policies,
+peers — because a record naming a record that does not exist yet is refused on the spot.
+
+Templates are tenant-private, capped at 200 per tenant, and stored in `inferrix_controller_template`
+([§14.3](#143-adding-new-database-objects)). They are deliberately not a ThingsBoard entity type: nothing
+else in the platform refers to one, and they are outside export and alias resolution.
+
 ---
 
 ## 11. Configuration reference
@@ -1529,6 +1565,10 @@ URL patterns); each checks its own permission.
 | `GET` | `/provisions/{jobId}` | Poll one provisioning job. |
 | `POST` | `/{deviceId}/attest` | Device signs a platform nonce; checked against the pinned certificate and the adopted UID. Device `Read`. |
 | `POST` | `/{deviceId}/password` | Rotate the ownership password and re-seal it. Tenant admin + device `Write`. Never proxied. |
+| `GET` | `/templates` | The tenant's saved configurations, without payloads. Tenant admin + device `Read`. |
+| `GET` | `/templates/{templateId}` | One saved configuration with its payload. Another tenant's id reads as not found. |
+| `POST` | `/templates` | Store a configuration under a name, replacing whatever that name held. Device `Write`. Touches no controller. |
+| `DELETE` | `/templates/{templateId}` | Remove a saved configuration. Controllers configured from it are untouched. |
 
 Reboot and PID auto-tune have no endpoints of their own — they are proxy routes
 (`POST /api/v1/system/reboot`, `POST /api/v1/logic/tune`).

@@ -6,7 +6,8 @@ import { defer, EMPTY, Observable, of, timer } from 'rxjs';
 import { catchError, exhaustMap, expand, first, map, reduce, timeout } from 'rxjs/operators';
 import { defaultHttpOptionsFromConfig, defaultHttpUploadOptions, RequestConfig } from '@core/http/http-utils';
 import { AdoptControllerRequest, ControllerAttestation, ControllerConfigSection, ControllerPoint,
-  ControllerProvisionStatus, ControllerUploadKind, ControllerUploadStatus, DiscoveredController,
+  ControllerProvisionStatus, ControllerTemplate, ControllerTemplateSummary, ControllerUploadKind,
+  ControllerUploadStatus, DiscoveredController,
   pointWriteBody } from '@shared/models/inferrix-controller.models';
 import { Device } from '@shared/models/device.models';
 import { floatToBits, LogicCompileResult, LogicProgram, PidTuneRequest,
@@ -222,6 +223,36 @@ export class InferrixControllerService {
 
   public discardConfig(deviceId: string): Observable<any> {
     return this.proxy(deviceId, 'POST', '/api/v1/config/discard', null, {ignoreErrors: true});
+  }
+
+  /**
+   * The tenant's saved controller configurations, newest first and without their payloads.
+   *
+   * These four are the only calls on this service that talk to the platform's own database rather
+   * than to a controller: a template is stored and read back here, and only the pages that apply one
+   * ever touch a device with it.
+   */
+  public getControllerTemplates(config?: RequestConfig): Observable<ControllerTemplateSummary[]> {
+    return this.http.get<ControllerTemplateSummary[]>('/api/inferrix/controllers/templates',
+      defaultHttpOptionsFromConfig(config));
+  }
+
+  public getControllerTemplate(templateId: string, config?: RequestConfig): Observable<ControllerTemplate> {
+    return this.http.get<ControllerTemplate>(`/api/inferrix/controllers/templates/${templateId}`,
+      defaultHttpOptionsFromConfig(config));
+  }
+
+  /** Saving under a name that already exists replaces it; the caller warns first. */
+  public saveControllerTemplate(request: {name: string; sourceName?: string;
+                                          config?: {[sectionKey: string]: any[]}; logic?: LogicProgram},
+                                config?: RequestConfig): Observable<ControllerTemplate> {
+    return this.http.post<ControllerTemplate>('/api/inferrix/controllers/templates', request,
+      defaultHttpOptionsFromConfig(config));
+  }
+
+  public deleteControllerTemplate(templateId: string, config?: RequestConfig): Observable<void> {
+    return this.http.delete<void>(`/api/inferrix/controllers/templates/${templateId}`,
+      defaultHttpOptionsFromConfig(config));
   }
 
   public getConfigOwner(deviceId: string): Observable<{owner: string}> {

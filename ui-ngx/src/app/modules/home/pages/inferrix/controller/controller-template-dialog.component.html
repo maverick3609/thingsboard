@@ -1,0 +1,79 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Inferrix Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<mat-toolbar color="primary">
+  <h2>{{ (isSave ? 'inferrix.save-template' : 'inferrix.apply-template') | translate }}</h2>
+  <span class="flex-1"></span>
+  <button mat-icon-button (click)="cancel()" type="button">
+    <mat-icon class="material-icons">close</mat-icon>
+  </button>
+</mat-toolbar>
+<mat-progress-bar color="warn" mode="indeterminate" *ngIf="loading"></mat-progress-bar>
+<div style="height: 4px;" *ngIf="!loading"></div>
+<div mat-dialog-content>
+  <div class="tb-error-message" *ngIf="errorMessage">{{ errorMessage }}</div>
+
+  <div *ngIf="isSave" class="flex flex-col">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'inferrix.template-name' | translate }}</mat-label>
+      <input matInput type="text" [(ngModel)]="name" maxlength="255" required/>
+      <mat-hint *ngIf="replaces">{{ 'inferrix.template-replaces' | translate }}</mat-hint>
+    </mat-form-field>
+    <div class="tb-form-hint">{{ 'inferrix.template-scope-hint' | translate }}</div>
+  </div>
+
+  <div class="tb-form-hint" *ngIf="!isSave && !loading && !offered.length">
+    {{ 'inferrix.no-templates' | translate }}
+  </div>
+
+  <!-- The list doubles as the save form's "what is already there": a name that is on this list is a
+       name that will be replaced. -->
+  <table mat-table [dataSource]="offered" *ngIf="offered.length" class="tb-controller-table">
+    <ng-container matColumnDef="name">
+      <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.template-name' | translate }}</th>
+      <td mat-cell *matCellDef="let template">
+        {{ template.name }}
+        <span class="tb-form-hint" *ngIf="template.sourceName"> · {{ template.sourceName }}</span>
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="holds">
+      <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.template-holds' | translate }}</th>
+      <td mat-cell *matCellDef="let template">
+        <span *ngIf="template.recordCount">{{ 'inferrix.template-records'
+          | translate: {count: template.recordCount} }}</span>
+        <span *ngIf="template.recordCount && template.hasLogic"> · </span>
+        <span *ngIf="template.hasLogic">{{ 'inferrix.template-logic' | translate }}</span>
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="createdTime">
+      <th mat-header-cell *matHeaderCellDef>{{ 'common.created-time' | translate }}</th>
+      <td mat-cell *matCellDef="let template">{{ template.createdTime | date: 'yyyy-MM-dd HH:mm' }}</td>
+    </ng-container>
+    <ng-container matColumnDef="actions">
+      <th mat-header-cell *matHeaderCellDef></th>
+      <td mat-cell *matCellDef="let template" class="tb-config-actions">
+        <button mat-stroked-button *ngIf="!isSave" [disabled]="loading" (click)="apply(template)">
+          {{ 'inferrix.use-template' | translate }}
+        </button>
+        <button mat-icon-button class="tb-mat-32" [disabled]="loading" (click)="delete(template, $event)"
+                matTooltip="{{ 'action.delete' | translate }}" matTooltipPosition="above">
+          <mat-icon>delete</mat-icon>
+        </button>
+      </td>
+    </ng-container>
+    <tr mat-header-row *matHeaderRowDef="columns"></tr>
+    <tr mat-row *matRowDef="let row; columns: columns"></tr>
+  </table>
+</div>
+<div mat-dialog-actions class="flex flex-row items-center justify-end">
+  <button mat-button color="primary" type="button" (click)="cancel()" cdkFocusInitial>
+    {{ 'action.cancel' | translate }}
+  </button>
+  <button mat-raised-button color="primary" type="button" *ngIf="isSave"
+          [disabled]="loading || !name.trim()" (click)="save()">
+    {{ 'action.save' | translate }}
+  </button>
+</div>

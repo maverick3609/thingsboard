@@ -10,6 +10,12 @@ import { CONTROLLER_CONFIG_SECTIONS, ControllerUploadStatus, isRealPoint,
 import { LOGIC_BINDINGS, LOGIC_SYSTEM_REGISTERS, LogicBinding, LogicCompileResult, LogicProgram,
   LogicTag } from '@shared/models/inferrix-logic.models';
 import { ControllerPanelComponent } from '@home/pages/inferrix/controller/controller-panel.component';
+import { MatDialog } from '@angular/material/dialog';
+import { DialogService } from '@core/services/dialog.service';
+import { of } from 'rxjs';
+import { ControllerTemplate } from '@shared/models/inferrix-controller.models';
+import { ControllerTemplateDialogComponent, ControllerTemplateDialogData }
+  from './controller-template-dialog.component';
 
 /**
  * Writing a logic program for the controller.
@@ -59,8 +65,60 @@ export class ControllerLogicComponent extends ControllerPanelComponent {
   private poll: Subscription;
 
   constructor(private controllerService: InferrixControllerService,
-              private translate: TranslateService) {
+              private translate: TranslateService,
+              private dialog: MatDialog,
+              private dialogService: DialogService) {
     super();
+  }
+
+  /**
+   * Stores the program under a name.
+   *
+   * This is the only place a logic program is kept anywhere but the controller's own flash: the
+   * editor starts empty every time the tab opens, and a controller will not read a program back.
+   */
+  saveAsTemplate(): void {
+    this.dialog.open<ControllerTemplateDialogComponent, ControllerTemplateDialogData, ControllerTemplate>(
+      ControllerTemplateDialogComponent, {
+        disableClose: true,
+        panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
+        data: {
+          mode: 'save',
+          kind: 'logic',
+          logic: this.program,
+          sourceName: this.deviceName,
+          suggestedName: `${this.deviceName || 'Controller'} · ${new Date().toISOString().slice(0, 10)}`
+        }
+      });
+  }
+
+  loadTemplate(): void {
+    this.dialog.open<ControllerTemplateDialogComponent, ControllerTemplateDialogData, ControllerTemplate>(
+      ControllerTemplateDialogComponent, {
+        disableClose: true,
+        panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
+        data: {mode: 'apply', kind: 'logic'}
+      }).afterClosed().subscribe(template => {
+      if (!template?.logic) {
+        return;
+      }
+      // Whatever is in the editor is unsaved by definition, so replacing it is asked for first.
+      const written = this.program.tags.length || this.program.statements.length;
+      const confirmed = written
+        ? this.dialogService.confirm(
+            this.translate.instant('inferrix.load-template'),
+            this.translate.instant('inferrix.load-template-text'),
+            this.translate.instant('action.cancel'),
+            this.translate.instant('inferrix.load-template'))
+        : of(true);
+      confirmed.subscribe(answer => {
+        if (answer) {
+          this.program = template.logic;
+          this.error = null;
+          this.result = null;
+        }
+      });
+    });
   }
 
   protected load(): void {

@@ -31,12 +31,14 @@
     @for (controller of [entity]; track controller.id.id) {
       <tb-controller-config class="flex flex-col min-h-full"
                             [active]="configTab.isActive" [deviceId]="controller.id.id"
+                            [deviceName]="controller.name"
                             [readonly]="readonly"></tb-controller-config>
     }
   </mat-tab>
   <mat-tab label="{{ 'inferrix.tab-logic' | translate }}" #logicTab="matTab">
     @for (controller of [entity]; track controller.id.id) {
       <tb-controller-logic [active]="logicTab.isActive" [deviceId]="controller.id.id"
+                           [deviceName]="controller.name"
                            [readonly]="readonly"></tb-controller-logic>
     }
   </mat-tab>

@@ -107,3 +107,21 @@ CREATE TABLE IF NOT EXISTS user_role (
     CONSTRAINT user_role_pkey PRIMARY KEY (user_id, role_id)
 );
 CREATE INDEX IF NOT EXISTS idx_user_role_role_id ON user_role(role_id);
+
+-- IO CONTROLLER CONFIG TEMPLATES
+-- A saved copy of a controller's config plane and/or its logic program, so a configuration can be
+-- rolled back or put on a second controller. Deliberately not a TB EntityType: nothing else in the
+-- platform refers to a template, it is never exported, and it holds no credentials — network,
+-- identity, MQTT and the ownership password stay per-controller.
+CREATE TABLE IF NOT EXISTS inferrix_controller_template (
+    id uuid NOT NULL CONSTRAINT inferrix_controller_template_pkey PRIMARY KEY,
+    created_time bigint NOT NULL,
+    tenant_id uuid NOT NULL,
+    name varchar(255) NOT NULL,
+    source_name varchar(255),
+    record_count int NOT NULL DEFAULT 0,
+    has_logic boolean NOT NULL DEFAULT false,
+    config jsonb,
+    logic jsonb,
+    CONSTRAINT inferrix_controller_template_name_unq_key UNIQUE (tenant_id, name)
+);

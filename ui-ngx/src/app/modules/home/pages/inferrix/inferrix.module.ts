@@ -11,6 +11,7 @@ import { AssignControllerDialogComponent } from '@home/pages/inferrix/assign-con
 import { ControllerComponent } from '@home/pages/inferrix/controller/controller.component';
 import { ControllerTabsComponent } from '@home/pages/inferrix/controller/controller-tabs.component';
 import { ControllerPointsComponent } from '@home/pages/inferrix/controller/controller-points.component';
+import { ControllerTemplateDialogComponent } from '@home/pages/inferrix/controller/controller-template-dialog.component';
 import { ControllerSettingsComponent } from '@home/pages/inferrix/controller/controller-settings.component';
 import { ControllerDiagnosticsComponent } from '@home/pages/inferrix/controller/controller-diagnostics.component';
 import { ControllerConfigComponent } from '@home/pages/inferrix/controller/controller-config.component';
@@ -31,6 +32,7 @@ import { ControllerPointWriteDialogComponent }
     ControllerComponent,
     ControllerTabsComponent,
     ControllerPointsComponent,
+    ControllerTemplateDialogComponent,
     ControllerSettingsComponent,
     ControllerDiagnosticsComponent,
     ControllerConfigComponent,

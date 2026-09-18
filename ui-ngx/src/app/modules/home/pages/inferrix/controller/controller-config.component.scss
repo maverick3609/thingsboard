@@ -6,9 +6,18 @@
 }
 
 /* The record columns are whatever the config section declares, so a wide section scrolls inside the
-   table, one line per record, with the actions pinned to the right edge. */
+   table, one line per record, with the actions pinned to the right edge.
+
+   The min-height matters as much as the min-width: the panel fills its tab frame (tb-absolute-fill),
+   and without it a flex item refuses to shrink below its content, so a section with many records
+   grew the whole panel to thousands of pixels and scrolled the page instead of the table. */
 .tb-config-records {
   min-width: 0;
+  min-height: 0;
+
+  .tb-entity-table-content {
+    min-height: 0;
+  }
 
   td {
     white-space: nowrap;

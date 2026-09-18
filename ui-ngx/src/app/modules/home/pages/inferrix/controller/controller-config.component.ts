@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { ChangeDetectorRef, Component, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
+import { PageEvent } from '@angular/material/paginator';
 import { Subscription, timer } from 'rxjs';
 import { switchMap, takeWhile } from 'rxjs/operators';
 import { TranslateService } from '@ngx-translate/core';
@@ -43,6 +44,11 @@ export class ControllerConfigComponent extends ControllerPanelComponent implemen
 
   section: ControllerConfigSection = CONTROLLER_CONFIG_SECTIONS[0];
   records: any[] = [];
+  /** The slice on screen. A points section holds up to 1024 records; the device sends them all. */
+  pagedRecords: any[] = [];
+  readonly pageSizeOptions = [10, 20, 50, 100];
+  pageSize = 10;
+  pageIndex = 0;
   columns: string[] = [];
 
   /** `local` = this REST surface owns the config; `platform` = a manifest does and CRUD is refused. */
@@ -115,6 +121,7 @@ export class ControllerConfigComponent extends ControllerPanelComponent implemen
     this.loading = true;
     this.error = null;
     this.records = [];
+    this.pagedRecords = [];
     // A section read pages, so it can take a while; clicking through sections would otherwise let
     // an earlier read land its records under a later section's columns.
     const token = ++this.readToken;
@@ -124,6 +131,8 @@ export class ControllerConfigComponent extends ControllerPanelComponent implemen
           return;
         }
         this.records = records;
+        this.pageIndex = 0;
+        this.slicePage();
         this.loading = false;
       },
       error: error => {
@@ -134,6 +143,17 @@ export class ControllerConfigComponent extends ControllerPanelComponent implemen
         this.loading = false;
       }
     });
+  }
+
+  pageChanged(event: PageEvent): void {
+    this.pageIndex = event.pageIndex;
+    this.pageSize = event.pageSize;
+    this.slicePage();
+  }
+
+  private slicePage(): void {
+    const start = this.pageIndex * this.pageSize;
+    this.pagedRecords = this.records.slice(start, start + this.pageSize);
   }
 
   toggleDraft(showDraft: boolean): void {
@@ -296,11 +316,40 @@ export class ControllerConfigComponent extends ControllerPanelComponent implemen
     });
   }
 
+  /**
+   * Opens the record editor, first fetching whatever section this one points at.
+   *
+   * A policy names a point and an RTU point names a query, and both are stored as a bare id. Typed
+   * by hand, a wrong one is only caught when the whole draft is applied — so the field is a picker,
+   * and the picker needs the other section's records. The read is best-effort: if it fails the
+   * dialog still opens and the field falls back to the plain number input it has always been.
+   */
   private openRecord(record: any): void {
+    const refKind = this.section.fields.find(field => field.optionsFrom)?.optionsFrom;
+    const refSection = refKind && CONTROLLER_CONFIG_SECTIONS.find(candidate => candidate.key === refKind);
+    if (!refSection) {
+      this.showRecord(record, null);
+      return;
+    }
+    this.loading = true;
+    this.controllerService.readConfigSection(this.deviceId, refSection, this.showDraft).subscribe({
+      next: refRecords => {
+        this.loading = false;
+        this.showRecord(record, refRecords);
+      },
+      error: () => {
+        this.loading = false;
+        this.showRecord(record, null);
+      }
+    });
+  }
+
+  private showRecord(record: any, refRecords: any[]): void {
     this.dialog.open(ControllerConfigRecordDialogComponent, {
       disableClose: true,
       panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
-      data: {deviceId: this.deviceId, section: this.section, record}
+      data: {deviceId: this.deviceId, section: this.section, record, refRecords,
+             takenKeys: this.records.map(existing => Number(existing[this.section.idField]))}
     }).afterClosed().subscribe(saved => {
       if (saved) {
         this.reload();

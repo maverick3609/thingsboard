@@ -39,7 +39,17 @@
               </mat-option>
             </mat-select>
           </mat-form-field>
-          <mat-form-field *ngIf="field.type === 'text' || field.type === 'number'"
+          <!-- An id that names another section's record is picked, never typed: a wrong number is
+               otherwise only caught when the whole draft is applied. -->
+          <mat-form-field *ngIf="refOptions(field) as refs" class="flex-1" appearance="outline"
+                          subscriptSizing="dynamic">
+            <mat-select [formControlName]="field.key">
+              <mat-option *ngFor="let option of refs" [value]="option.value">{{ option.label }}</mat-option>
+            </mat-select>
+            <mat-hint *ngIf="!refs.length">{{ (field.optionsFrom === 'points'
+              ? 'inferrix.no-free-points' : 'inferrix.no-queries') | translate }}</mat-hint>
+          </mat-form-field>
+          <mat-form-field *ngIf="!refOptions(field) && (field.type === 'text' || field.type === 'number')"
                           class="flex-1" appearance="outline" subscriptSizing="dynamic">
             <!-- Two inputs, not one with [type] bound: Angular picks NumberValueAccessor off the
                  static `type="number"` attribute, and a bound [type] never matches it. With the

@@ -9,13 +9,18 @@ import { AppState } from '@core/core.state';
 import { DialogComponent } from '@shared/components/dialog.component';
 import { InferrixControllerService } from '@core/http/inferrix-controller.service';
 import { bitsToFloat, ControllerConfigSection, controllerRecordError, ControllerSettingField,
-  FLOAT_DATA_FORMATS, floatToBits, LOCAL_POINT_SOURCES, NO_SCALING } from '@shared/models/inferrix-controller.models';
+  FLOAT_DATA_FORMATS, floatToBits, LOCAL_POINT_SOURCES, NO_SCALING, refOptionLabel,
+  RTU_POINT_SOURCE } from '@shared/models/inferrix-controller.models';
 
 export interface ControllerConfigRecordDialogData {
   deviceId: string;
   section: ControllerConfigSection;
   /** Absent when adding. */
   record?: any;
+  /** Records of the section this one references, for the id pickers. Null if that read failed. */
+  refRecords?: any[];
+  /** Keys already used in this section, so a picker cannot offer one that is taken. */
+  takenKeys?: number[];
 }
 
 /**
@@ -40,6 +45,8 @@ export class ControllerConfigRecordDialogComponent
   recordForm: UntypedFormGroup;
   errorMessage: string = null;
 
+  private refOptionsByKey: {[key: string]: {value: any; label: string}[]} = {};
+
   constructor(protected store: Store<AppState>,
               protected router: Router,
               @Inject(MAT_DIALOG_DATA) public data: ControllerConfigRecordDialogData,
@@ -58,12 +65,52 @@ export class ControllerConfigRecordDialogComponent
     if (this.isPointSection) {
       const source = this.recordForm.get('source');
       this.applySourceRules(source.value);
-      source.valueChanges.subscribe(value => this.applySourceRules(value));
+      source.valueChanges.subscribe(value => {
+        this.applySourceRules(value);
+        this.rebuildRefOptions();
+      });
     }
+    this.rebuildRefOptions();
   }
 
   get isPointSection(): boolean {
     return this.section.key === 'points';
+  }
+
+  /**
+   * The picker for a field that holds another section's key, or null to type the id as before.
+   *
+   * A query is only named by an RTU point — every other source reads `source_ref` as something else
+   * entirely (a local channel index, a peer id), so the picker would be lying. A policy may name any
+   * point that has no policy yet; the device allows at most one each, and offering a taken point
+   * would just move the rejection to Apply.
+   */
+  refOptions(field: ControllerSettingField): {value: any; label: string}[] {
+    return this.refOptionsByKey[field.key] ?? null;
+  }
+
+  /**
+   * Builds the pickers once per source change, not per change-detection pass: a points section holds
+   * up to 1024 records, and rebuilding that list in a template expression would rebuild it on every
+   * keystroke in the dialog.
+   */
+  private rebuildRefOptions(): void {
+    this.refOptionsByKey = {};
+    this.section.fields.filter(field => field.optionsFrom).forEach(field => {
+      if (!this.data.refRecords) {
+        return;
+      }
+      if (field.optionsFrom === 'queries'
+          && this.recordForm.get('source')?.value !== RTU_POINT_SOURCE) {
+        return;
+      }
+      const idKey = field.optionsFrom === 'queries' ? 'query_id' : 'point_id';
+      const own = Number(this.data.record?.[field.key]);
+      const taken = field.optionsFrom === 'points' ? this.data.takenKeys ?? [] : [];
+      this.refOptionsByKey[field.key] = this.data.refRecords
+        .filter(record => Number(record[idKey]) === own || !taken.includes(Number(record[idKey])))
+        .map(record => ({value: Number(record[idKey]), label: refOptionLabel(field.optionsFrom, record)}));
+    });
   }
 
   /** A local point is offered no float format: the controller refuses one at apply (firmware 0.1.16). */

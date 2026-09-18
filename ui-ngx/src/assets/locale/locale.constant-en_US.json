@@ -4240,6 +4240,8 @@
         "section-peers": "Peer IO controllers",
         "records-count": "{{count}} of {{limit}}",
         "no-records": "Nothing in this section.",
+    "no-free-points": "Every point already has a publish policy. Add a point first, or edit the existing policy.",
+    "no-queries": "No Modbus queries are configured yet. Add a query first, then point this record at it.",
         "add-record": "Add",
         "edit-record": "Edit",
         "delete-record-title": "Delete this record?",

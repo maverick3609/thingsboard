@@ -181,6 +181,11 @@ export interface ControllerSettingField {
   /** Held on the device as a raw IEEE-754 f32 bit pattern but edited as a decimal. */
   float32Bits?: boolean;
   /**
+   * The field holds another section's key, so it is picked from that section's records rather than
+   * typed. A wrong id here is only caught at Apply, by which point the operator has left the field.
+   */
+  optionsFrom?: 'points' | 'queries';
+  /**
    * Prefilled when adding a record. Every config field is required on a full-record write, so a
    * field with an obvious value (no flags, no scaling, QoS 0) needs one or the operator has to type
    * it — and a bitmask rendered as checkboxes has no input to type into at all.
@@ -297,6 +302,8 @@ export const POINT_SOURCES = [
 ];
 
 /** The on-board DI, DO, AI and AO sources: no float format, and DI/DO take no scaling (firmware 0.1.16). */
+/** `POINT_SOURCES` value for a point read over Modbus RTU, the one source that names a query. */
+export const RTU_POINT_SOURCE = 4;
 export const LOCAL_POINT_SOURCES = [0, 1, 2, 3];
 export const FLOAT_DATA_FORMATS = [4, 5];
 export const NO_SCALING = 65535;
@@ -393,6 +400,19 @@ export const bitsToFloat = (bits: number): number => {
 
 const HEX_24 = /^[0-9a-f]{24}$/;
 
+/**
+ * How one referenced record reads in a picker. A query has no name of its own, so it is described by
+ * what it polls; a point has one, and the id still shows because that is what the device stores.
+ */
+export function refOptionLabel(kind: 'points' | 'queries', record: any): string {
+  if (kind === 'queries') {
+    const from = Number(record.start_reg);
+    const to = from + Number(record.count) - 1;
+    return `#${record.query_id} \u00b7 unit ${record.unit_id} \u00b7 FC${record.function} \u00b7 reg ${from}-${to}`;
+  }
+  return `#${record.point_id} \u00b7 ${record.name ?? ''}`.trim();
+}
+
 export const CONTROLLER_CONFIG_SECTIONS: ControllerConfigSection[] = [
   {
     key: 'buses', titleKey: 'inferrix.section-buses', readSection: 'buses', crudPath: 'buses',
@@ -446,7 +466,7 @@ export const CONTROLLER_CONFIG_SECTIONS: ControllerConfigSection[] = [
       {key: 'data_format', label: 'inferrix.data-format', type: 'select', options: DATA_FORMATS,
         required: true},
       {key: 'source_ref', label: 'inferrix.source-ref', type: 'number', min: 0, max: 65535,
-        required: true, hint: 'inferrix.source-ref-hint'},
+        required: true, hint: 'inferrix.source-ref-hint', optionsFrom: 'queries'},
       {key: 'offset', label: 'inferrix.point-offset', type: 'number', min: 0, max: 65535,
         required: true, hint: 'inferrix.point-offset-hint'},
       {key: 'scaling_idx', label: 'inferrix.scaling-idx', type: 'number', min: 0, max: 65535,
@@ -477,7 +497,7 @@ export const CONTROLLER_CONFIG_SECTIONS: ControllerConfigSection[] = [
     columns: ['point_id', 'trigger', 'qos', 'interval_s', 'deadband_bits'],
     fields: [
       {key: 'point_id', label: 'inferrix.point-id', type: 'number', min: 0, max: 65535,
-        required: true, keyField: true},
+        required: true, keyField: true, optionsFrom: 'points'},
       {key: 'trigger', label: 'inferrix.trigger', type: 'flags', required: true, defaultValue: 0,
         bits: [
           {value: 1, label: 'inferrix.trigger-interval'},

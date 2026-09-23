@@ -22,6 +22,7 @@ import org.thingsboard.server.dao.device.DeviceService;
 import org.thingsboard.server.service.entitiy.device.TbDeviceService;
 import org.thingsboard.server.service.inferrix.InferrixSecretCodec;
 import org.thingsboard.server.service.inferrix.gateway.InferrixGatewayAdoption.AdoptRequest;
+import org.thingsboard.server.service.inferrix.gateway.InferrixGatewayAdoption.ConnectionRequest;
 import org.thingsboard.server.service.inferrix.gateway.InferrixGatewayClient.GatewayResponse;
 import org.thingsboard.server.service.inferrix.gateway.InferrixGatewayClient.GatewayToken;
 import org.thingsboard.server.service.telemetry.TelemetrySubscriptionService;
@@ -386,6 +387,105 @@ class InferrixGatewayAdoptionServiceTest {
                 .satisfies(e -> assertThat(e.getMessage()).doesNotContain("Remove the device"));
     }
 
+    // --- Changing where an adopted gateway is reached ------------------------------------------
+
+    @Test
+    void changingTheAddressRepinsAndLeavesTheCredentialAlone() throws Exception {
+        Device gateway = existingGateway();
+        stubStoredFingerprint(GOOD_FINGERPRINT);
+        stubSealedCredential();
+
+        service.changeConnection(tenantId, gateway, new ConnectionRequest("gw2.local", 9443, null));
+
+        // Spent against the NEW address, with the credential recovered through the seal. This is
+        // what makes a saved address mean "the gateway answers there" rather than "a TLS handshake
+        // completed" -- and it is the only proof available, since the operator cannot read the
+        // secret back to re-type it.
+        verify(client).exchangeToken("https://gw2.local:9443", GOOD_FINGERPRINT, "cid", "s3cr3t");
+
+        ArgumentCaptor<AttributesSaveRequest> saved =
+                ArgumentCaptor.forClass(AttributesSaveRequest.class);
+        verify(tsSubService).saveAttributes(saved.capture());
+        List<AttributeKvEntry> entries = saved.getValue().getEntries();
+        assertThat(value(entries, InferrixGatewayAccess.MANAGEMENT_ADDRESS)).isEqualTo("gw2.local");
+        assertThat(value(entries, InferrixGatewayAccess.MANAGEMENT_PORT)).isEqualTo("9443");
+        // Re-pinned rather than left alone: whatever answers at the new address is what the
+        // platform will be talking to, and a stale pin makes every later call a changed
+        // certificate.
+        assertThat(value(entries, InferrixGatewayAccess.CERT_FINGERPRINT)).isEqualTo(GOOD_FINGERPRINT);
+        // The credential is untouched. Rewriting it here would mean re-sealing a secret this path
+        // never asked for, and a bug in that would lock the gateway out with no way back.
+        assertThat(entries).noneMatch(entry -> entry.getKey().equals(InferrixGatewayAccess.CLIENT_ID)
+                || entry.getKey().equals(InferrixGatewayAccess.CLIENT_SECRET));
+        // The device record is not part of this at all.
+        verify(tbDeviceService, never()).save(any(), any(), any(User.class));
+    }
+
+    @Test
+    void changingTheAddressOntoADifferentGatewayIsRefusedUnlessConfirmed() throws Exception {
+        Device gateway = existingGateway();
+        stubStoredFingerprint("cd".repeat(32));
+        stubSealedCredential();
+
+        // The same mistake re-adoption guards, reached by the shorter route: a typo'd address that
+        // lands on some other gateway on the same LAN. Accepting it would repoint the device -- and
+        // its dashboards, alarm rules and telemetry -- at different physical plant.
+        assertThatThrownBy(() ->
+                service.changeConnection(tenantId, gateway, new ConnectionRequest("gw2.local", 9443, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("different certificate");
+        // Refused before the credential is spent: this may not be a gateway the platform should be
+        // handing its token to at all.
+        verify(client, never()).exchangeToken(anyString(), anyString(), anyString(), anyString());
+        verify(tsSubService, never()).saveAttributes(any(AttributesSaveRequest.class));
+
+        service.changeConnection(tenantId, gateway, new ConnectionRequest("gw2.local", 9443, true));
+        verify(tsSubService).saveAttributes(any(AttributesSaveRequest.class));
+    }
+
+    @Test
+    void aGatewayWithNoSealedTokenCannotBeMoved() throws Exception {
+        // Nothing stored means nothing to prove the new address with, and this path deliberately
+        // has no way to accept a credential -- so it must refuse rather than write an address that
+        // would never be reachable.
+        stubStoredFingerprint(GOOD_FINGERPRINT);
+        assertThatThrownBy(() -> service.changeConnection(tenantId, existingGateway(),
+                new ConnectionRequest("gw2.local", 9443, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Adopt it instead");
+        verify(tsSubService, never()).saveAttributes(any(AttributesSaveRequest.class));
+    }
+
+    @Test
+    void aGatewayWithNoPinnedCertificateCannotBeMovedEither() throws Exception {
+        stubSealedCredential();
+
+        // Adoption may trust a certificate on first use because the operator is typing the
+        // credential as they do it. Here the platform would be posting a sealed secret it already
+        // holds to whatever answers at an address, with nothing to say that is the right box --
+        // so an absent pin has to be a refusal rather than a fresh trust-on-first-use.
+        assertThatThrownBy(() -> service.changeConnection(tenantId, existingGateway(),
+                new ConnectionRequest("gw2.local", 9443, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Adopt it instead");
+        verify(client, never()).exchangeToken(anyString(), anyString(), anyString(), anyString());
+        verify(tsSubService, never()).saveAttributes(any(AttributesSaveRequest.class));
+    }
+
+    @Test
+    void movingAGatewayForgetsWhatWasCachedAboutTheOldAddress() throws Exception {
+        Device gateway = existingGateway();
+        stubStoredFingerprint(GOOD_FINGERPRINT);
+        stubSealedCredential();
+
+        service.changeConnection(tenantId, gateway, new ConnectionRequest("gw2.local", 9443, null));
+
+        // The cached JWT was issued by whatever was at the old address, and the cached schema
+        // document describes it. Neither survives the move as a safe assumption.
+        verify(access).forget(gateway.getId());
+        verify(schemaService).forget(gateway.getId());
+    }
+
     // --- The pending list ----------------------------------------------------------------------
 
     @Test
@@ -465,6 +565,18 @@ class InferrixGatewayAdoptionServiceTest {
         existing.setDeviceProfileId(profileId);
         when(deviceService.findDeviceByTenantIdAndName(tenantId, "gw-1")).thenReturn(existing);
         return existing;
+    }
+
+    /** As adoption sealed it: {@link InferrixGatewayAccess} opens both halves through the codec. */
+    private void stubSealedCredential() throws Exception {
+        InferrixSecretCodec codec = new InferrixSecretCodec(KEY);
+        stubStoredAttribute(InferrixGatewayAccess.CLIENT_ID, codec.encrypt("cid"));
+        stubStoredAttribute(InferrixGatewayAccess.CLIENT_SECRET, codec.encrypt("s3cr3t"));
+    }
+
+    private void stubStoredAttribute(String key, String value) throws Exception {
+        when(adoptionAttributes.find(any(), any(), eq(AttributeScope.SERVER_SCOPE), eq(key)))
+                .thenReturn(Futures.immediateFuture(java.util.Optional.of(strAttr(key, value))));
     }
 
     private void stubStoredFingerprint(String fingerprint) {

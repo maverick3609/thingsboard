@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Authority } from '@shared/models/authority.enum';
 import {
+  gatewayConnectionOf,
   gatewayReachabilityTone,
   gatewayTableAccess,
   GATEWAY_COLUMN_VALUES,
@@ -101,6 +102,47 @@ describe('inferrix-gateway.models', () => {
       // add one, and an unknown failure is still a failure.
       expect(gatewayReachabilityTone('SOMETHING_NEW' as any)).toBe('error');
       expect(gatewayReachabilityTone(undefined as any)).toBe('error');
+    });
+  });
+
+  describe('the connection block', () => {
+
+    it('reads the address, port and pin out of attribute rows', () => {
+      expect(gatewayConnectionOf([
+        {key: 'gwManagementAddress', value: '10.0.0.5'},
+        {key: 'gwManagementPort', value: 8443},
+        {key: 'gwCertFingerprint', value: 'abc123'}
+      ] as any)).toEqual({address: '10.0.0.5', port: 8443, certFingerprint: 'abc123',
+        reportedAddress: undefined});
+    });
+
+    it('keeps what the gateway claims separate from what the platform recorded', () => {
+      // Two different questions: where the platform sends the credential, and where the gateway
+      // says it is. The second is written by the device and is never used to reach it -- it is
+      // shown because the two disagreeing is what an operator is looking at after a move.
+      const connection = gatewayConnectionOf(
+        [{key: 'gwManagementAddress', value: '10.0.0.5'}] as any,
+        [{key: 'managementAddress', value: '10.9.9.9'}] as any);
+      expect(connection.address).toBe('10.0.0.5');
+      expect(connection.reportedAddress).toBe('10.9.9.9');
+    });
+
+    it('leaves an unusable port absent rather than showing a zero', () => {
+      // A gateway adopted before the port was stored has no attribute at all, and the platform
+      // reaches it on 443. Turning that into a 0 would make the form offer to save a port the
+      // gateway does not listen on.
+      expect(gatewayConnectionOf([{key: 'gwManagementAddress', value: '10.0.0.5'}] as any).port)
+        .toBeUndefined();
+      expect(gatewayConnectionOf([{key: 'gwManagementPort', value: 'nonsense'}] as any).port)
+        .toBeUndefined();
+      expect(gatewayConnectionOf([{key: 'gwManagementPort', value: 0}] as any).port).toBeUndefined();
+    });
+
+    it('survives an empty read', () => {
+      // A customer user without READ_ATTRIBUTES gets an error the component swallows into [].
+      expect(gatewayConnectionOf([])).toEqual({address: undefined, port: undefined,
+        certFingerprint: undefined, reportedAddress: undefined});
+      expect(gatewayConnectionOf(undefined as any).address).toBeUndefined();
     });
   });
 

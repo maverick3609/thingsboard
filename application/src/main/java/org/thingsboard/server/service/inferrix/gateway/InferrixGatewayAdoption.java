@@ -74,14 +74,7 @@ public final class InferrixGatewayAdoption {
         if (request == null) {
             throw new IllegalArgumentException("No adoption request was supplied");
         }
-        if (isBlank(request.address()) || !HOST.matcher(request.address()).matches()) {
-            throw new IllegalArgumentException(
-                    "The management address must be a bare host name or IP address, with no scheme,"
-                            + " port or path");
-        }
-        if (request.port() != null && (request.port() < 1 || request.port() > 65535)) {
-            throw new IllegalArgumentException("The management port must be between 1 and 65535");
-        }
+        validateAddress(request.address(), request.port());
         // Cortex generates no secret for a gateway: the operator issues an API token there and
         // pastes both halves in, so a half-filled form is the likely mistake.
         if (isBlank(request.clientId())) {
@@ -89,6 +82,25 @@ public final class InferrixGatewayAdoption {
         }
         if (isBlank(request.clientSecret())) {
             throw new IllegalArgumentException("The API token's client secret is required");
+        }
+    }
+
+    /**
+     * The address rules, applied wherever an operator supplies one.
+     *
+     * <p>Adoption and a later change of address ask the same question, so they get the same answer
+     * from the same place: a host carrying a path or a query composes into a URL whose path is an
+     * endpoint the allowlist never approved, and that is true whichever form the operator typed it
+     * into.
+     */
+    public static void validateAddress(String address, Integer port) {
+        if (isBlank(address) || !HOST.matcher(address).matches()) {
+            throw new IllegalArgumentException(
+                    "The management address must be a bare host name or IP address, with no scheme,"
+                            + " port or path");
+        }
+        if (port != null && (port < 1 || port > 65535)) {
+            throw new IllegalArgumentException("The management port must be between 1 and 65535");
         }
     }
 
@@ -144,6 +156,24 @@ public final class InferrixGatewayAdoption {
          * failed hardware, and adopting the wrong gateway from a saved form — look identical to
          * the platform and only the operator can tell them apart.
          */
+        public boolean confirmsDifferentGateway() {
+            return Boolean.TRUE.equals(acceptDifferentGateway);
+        }
+    }
+
+    /**
+     * A change of where an already-adopted gateway is reached.
+     *
+     * <p>Note the absence of a credential. A gateway is reachable on a LAN or a VPN and nowhere
+     * else, so its address is a property of the network rather than of the box: a renumbered
+     * subnet, a new VPN or a moved cabinet changes it while the hardware, its certificate and its
+     * API token stay exactly as they were. The platform already holds that token sealed, so it
+     * spends it against the new address itself — asking the operator to paste a secret Cortex
+     * never gives back would turn every renumbering into a re-adoption.
+     */
+    public record ConnectionRequest(String address, Integer port, Boolean acceptDifferentGateway) {
+
+        /** Same meaning as on {@link AdoptRequest}: only the operator can tell the two cases apart. */
         public boolean confirmsDifferentGateway() {
             return Boolean.TRUE.equals(acceptDifferentGateway);
         }

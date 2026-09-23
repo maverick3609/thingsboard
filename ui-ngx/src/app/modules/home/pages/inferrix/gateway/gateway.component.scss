@@ -1,0 +1,10 @@
+// SPDX-FileCopyrightText: Copyright The Inferrix Authors
+// SPDX-License-Identifier: Apache-2.0
+
+/* A SHA-256 is 64 characters and the details drawer is narrow; the full value is on the tooltip. */
+.tb-gateway-fingerprint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 45%;
+}

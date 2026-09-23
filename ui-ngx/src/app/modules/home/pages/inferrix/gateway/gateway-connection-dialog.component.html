@@ -1,0 +1,50 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Inferrix Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<form [formGroup]="connectionForm" (ngSubmit)="save()">
+  <mat-toolbar color="primary">
+    <h2 translate>inferrix.gateway.change-connection</h2>
+    <span class="flex-1"></span>
+    <button mat-icon-button type="button" (click)="cancel()">
+      <mat-icon class="material-icons">close</mat-icon>
+    </button>
+  </mat-toolbar>
+  <mat-progress-bar color="warn" mode="indeterminate" *ngIf="saving"></mat-progress-bar>
+  <div mat-dialog-content class="flex flex-col">
+    <div class="tb-form-panel-hint" translate>inferrix.gateway.change-connection-hint</div>
+
+    <div class="flex flex-row flex-wrap gap-2">
+      <mat-form-field class="flex-1">
+        <mat-label translate>inferrix.gateway.address</mat-label>
+        <input matInput formControlName="address" required/>
+        <mat-hint subscriptSizing="dynamic" translate>inferrix.gateway.address-hint</mat-hint>
+      </mat-form-field>
+      <mat-form-field class="gateway-port">
+        <mat-label translate>inferrix.gateway.port</mat-label>
+        <!-- Plain type="number", never a bound [type]: a bound one skips NumberValueAccessor and
+             the control ends up holding a string, which the server rejects. -->
+        <input matInput type="number" formControlName="port"/>
+      </mat-form-field>
+    </div>
+
+    <div class="tb-error-message" *ngIf="error">{{ error }}</div>
+    <!-- Only after the server has said so. Offering this up front would make it a box people tick
+         without reading, which is the opposite of what it is for. -->
+    <div class="tb-form-panel stroked" *ngIf="certificateChanged">
+      <div class="tb-form-panel-hint" translate>inferrix.gateway.replace-hardware-hint</div>
+    </div>
+  </div>
+  <div mat-dialog-actions class="flex flex-row items-center justify-end gap-2">
+    <button mat-button type="button" [disabled]="saving" (click)="cancel()">
+      {{ 'action.cancel' | translate }}
+    </button>
+    <button mat-raised-button color="primary" type="submit"
+            [disabled]="saving || connectionForm.invalid">
+      {{ (certificateChanged ? 'inferrix.gateway.change-connection-replacement' : 'action.save')
+          | translate }}
+    </button>
+  </div>
+</form>

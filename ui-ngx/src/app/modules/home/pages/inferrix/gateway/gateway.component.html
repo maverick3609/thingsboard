@@ -4,22 +4,95 @@
     SPDX-License-Identifier: Apache-2.0
 
 -->
-<div class="flex flex-col" [formGroup]="entityForm">
-  <mat-form-field class="mat-block">
-    <mat-label translate>device.name</mat-label>
-    <input matInput formControlName="name" required/>
-    <mat-error *ngIf="entityForm.get('name').hasError('required')">
-      {{ 'device.name-required' | translate }}
-    </mat-error>
-  </mat-form-field>
-  <mat-form-field class="mat-block">
-    <mat-label translate>device.label</mat-label>
-    <input matInput formControlName="label"/>
-  </mat-form-field>
-  <div formGroupName="additionalInfo" class="flex flex-col">
-    <mat-form-field class="mat-block">
-      <mat-label translate>device.description</mat-label>
-      <textarea matInput formControlName="description" rows="2"></textarea>
-    </mat-form-field>
+<div class="tb-details-buttons xs:flex xs:flex-col">
+  <button mat-raised-button color="primary"
+          [disabled]="(isLoading$ | async)"
+          (click)="onEntityAction($event, 'open')"
+          [class.!hidden]="isEdit || isDetailsPage">
+    {{ 'common.open-details-page' | translate }}
+  </button>
+  <button mat-raised-button color="primary"
+          [disabled]="(isLoading$ | async)"
+          (click)="onEntityAction($event, 'delete')"
+          [class.!hidden]="hideDelete() || isEdit">
+    {{ 'inferrix.gateway.delete-gateway' | translate }}
+  </button>
+</div>
+<div class="mat-padding flex flex-col">
+  <form [formGroup]="entityForm">
+    <fieldset [disabled]="(isLoading$ | async) || !isEdit">
+      <mat-form-field class="mat-block">
+        <mat-label translate>device.name</mat-label>
+        <input matInput formControlName="name" required>
+        <mat-error *ngIf="entityForm.get('name').hasError('required')">
+          {{ 'device.name-required' | translate }}
+        </mat-error>
+        <mat-error *ngIf="entityForm.get('name').hasError('maxlength')">
+          {{ 'device.name-max-length' | translate }}
+        </mat-error>
+      </mat-form-field>
+      <mat-form-field class="mat-block">
+        <mat-label translate>device.label</mat-label>
+        <input matInput formControlName="label">
+        <mat-error *ngIf="entityForm.get('label').hasError('maxlength')">
+          {{ 'device.label-max-length' | translate }}
+        </mat-error>
+      </mat-form-field>
+      <div formGroupName="additionalInfo" class="flex flex-col">
+        <mat-form-field class="mat-block">
+          <mat-label translate>device.description</mat-label>
+          <textarea matInput formControlName="description" rows="2"></textarea>
+        </mat-form-field>
+      </div>
+    </fieldset>
+  </form>
+
+  <!--
+    Hidden while editing, as the controller's identity block is: the form above owns the screen in
+    edit mode, and none of this is part of what saving it writes.
+  -->
+  <div class="flex flex-col gap-4" [class.!hidden]="isEdit">
+    <div class="tb-form-panel stroked">
+      <div class="flex flex-row items-center">
+        <div class="tb-form-panel-title flex-1" translate>inferrix.gateway.connection</div>
+        <!--
+          Only for a gateway that has one. This table lists every device on the profile, which
+          includes ones that have provisioned themselves and never been adopted -- and moving one
+          of those is not a thing that can succeed: there is no sealed token to prove the new
+          address with. Adoption is the page for that.
+        -->
+        <button mat-stroked-button class="shrink-0" *ngIf="!readonly && connection?.address"
+                [disabled]="connectionLoading" (click)="changeConnection()">
+          {{ 'inferrix.gateway.change-connection' | translate }}
+        </button>
+      </div>
+      <div class="tb-form-panel-hint" translate>inferrix.gateway.connection-hint</div>
+      <mat-progress-bar color="primary" mode="indeterminate" *ngIf="connectionLoading"></mat-progress-bar>
+      <div class="tb-form-row space-between">
+        <div translate>inferrix.gateway.address</div>
+        <div>{{ connection?.address || ('inferrix.gateway.not-adopted' | translate) }}</div>
+      </div>
+      @if (connection?.address) {
+        <div class="tb-form-row space-between">
+          <div translate>inferrix.gateway.port</div>
+          <!-- 443 is what InferrixGatewayAccess falls back to when the attribute is absent, so a
+               gateway adopted before the port was stored is reached there. Show what is in force. -->
+          <div>{{ connection.port ?? 443 }}</div>
+        </div>
+        <div class="tb-form-row space-between">
+          <div translate>inferrix.gateway.certificate</div>
+          <!-- Truncated with the full value on hover: a SHA-256 is 64 characters and would push
+               the label off a narrow details drawer, but an operator compares it to the gateway. -->
+          <div class="tb-gateway-fingerprint" [matTooltip]="connection.certFingerprint"
+               matTooltipPosition="above">{{ connection.certFingerprint || '—' }}</div>
+        </div>
+      }
+      <div class="tb-form-row space-between" *ngIf="connection?.reportedAddress">
+        <div translate>inferrix.gateway.reported-address</div>
+        <!-- The gateway's own claim over MQTT. Shown next to the platform's because the two
+             disagreeing is exactly what an operator is looking for after the network changed. -->
+        <div>{{ connection.reportedAddress }}</div>
+      </div>
+    </div>
   </div>
 </div>

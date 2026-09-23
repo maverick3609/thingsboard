@@ -141,7 +141,8 @@ public class InferrixGatewayClient {
      * what adoption checks before storing it — see
      * {@link InferrixGatewayAdoption#isKnownBadCertificate(String)}.
      *
-     * <p>Used only at adoption. Every other call supplies a pin.
+     * <p>Used only where the platform is deciding what to pin -- adoption, and a later change of
+     * address, which re-pins whatever answers at the new one. Every other call supplies a pin.
      */
     public String captureFingerprint(String baseUrl) throws IOException {
         FingerprintCapturingTrustManager trust = new FingerprintCapturingTrustManager(null);

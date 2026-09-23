@@ -6,7 +6,7 @@ import { Observable, throwError } from 'rxjs';
 import { catchError, shareReplay } from 'rxjs/operators';
 import { defaultHttpOptionsFromConfig, QueryParams, RequestConfig } from '@core/http/http-utils';
 import { Device } from '@shared/models/device.models';
-import { AdoptGatewayRequest, GatewayReachability,
+import { AdoptGatewayRequest, ChangeGatewayConnectionRequest, GatewayReachability,
   PendingGateway } from '@shared/models/inferrix-gateway.models';
 import { GatewaySchemaDocument } from '@shared/models/inferrix-gateway-schema.models';
 import { GatewayDataPoint, GatewayDataSource, GatewayDataSourceType, GatewayListQuery,
@@ -52,6 +52,19 @@ export class InferrixGatewayService {
    */
   public adoptGateway(request: AdoptGatewayRequest, config?: RequestConfig): Observable<Device> {
     return this.http.post<Device>('/api/inferrix/gateways/adopt', request,
+      defaultHttpOptionsFromConfig(config));
+  }
+
+  /**
+   * Points an adopted gateway at a new address.
+   *
+   * The credential is not asked for and not sent: the platform already holds this gateway's sealed
+   * API token and spends it against the new address to prove the move. Nothing is stored until it
+   * does, so a failure here leaves the gateway reachable where it was.
+   */
+  public changeConnection(deviceId: string, request: ChangeGatewayConnectionRequest,
+                          config?: RequestConfig): Observable<void> {
+    return this.http.post<void>(`/api/inferrix/gateways/${deviceId}/connection`, request,
       defaultHttpOptionsFromConfig(config));
   }
 

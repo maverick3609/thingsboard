@@ -35,6 +35,7 @@ import org.thingsboard.server.queue.util.TbCoreComponent;
 import org.thingsboard.server.service.entitiy.device.TbDeviceService;
 import org.thingsboard.server.service.inferrix.InferrixSecretCodec;
 import org.thingsboard.server.service.inferrix.gateway.InferrixGatewayAdoption.AdoptRequest;
+import org.thingsboard.server.service.inferrix.gateway.InferrixGatewayAdoption.ConnectionRequest;
 import org.thingsboard.server.service.inferrix.gateway.InferrixGatewayClient.GatewayResponse;
 import org.thingsboard.server.service.inferrix.gateway.InferrixGatewayClient.GatewayToken;
 import org.thingsboard.rule.engine.api.AttributesSaveRequest;
@@ -144,12 +145,7 @@ public class InferrixGatewayAdoptionService {
         // gateway still serving the pre-5.1.0 keystore is presenting a certificate whose private
         // key is public, and pinning it would record a fingerprint that authenticates nobody.
         String fingerprint = client.captureFingerprint(baseUrl);
-        if (InferrixGatewayAdoption.isKnownBadCertificate(fingerprint)) {
-            throw new IllegalStateException("The gateway at " + request.address() + " is serving the"
-                    + " default certificate that shipped with every Inferrix stack before 5.1.0."
-                    + " Its private key is public, so pinning it would secure nothing. Upgrade the"
-                    + " gateway to 5.1.0 or later, which generates its own key pair, and adopt again.");
-        }
+        requireUsableCertificate(fingerprint, request.address());
 
         // Spending the credential is also how it is validated: a gateway that refuses the token
         // throws here, before any device exists, rather than leaving one that cannot be reached.
@@ -157,7 +153,8 @@ public class InferrixGatewayAdoptionService {
         // first: establish that this is the gateway the operator means. See requireSameGateway.
         Device existing = deviceService.findDeviceByTenantIdAndName(tenantId, deviceName(request));
         boolean created = existing == null;
-        requireSameGateway(tenantId, existing, fingerprint, request);
+        requireSameGateway(tenantId, existing, fingerprint, request.address(),
+                request.confirmsDifferentGateway());
 
         GatewayToken token = client.exchangeToken(
                 baseUrl, fingerprint, request.clientId(), request.clientSecret());
@@ -180,6 +177,99 @@ public class InferrixGatewayAdoptionService {
     }
 
     /**
+     * Moves an adopted gateway to a new address, spending its own sealed credential to prove it.
+     *
+     * <p>This exists because the address is a property of the network, not of the box. A gateway is
+     * reachable on a LAN or a VPN and nowhere else, so a renumbered subnet, a new VPN or a moved
+     * cabinet changes where it lives while the hardware, its certificate and its API token stay
+     * exactly as they were. Re-adoption could already express that, but only by asking for a client
+     * secret Cortex sealed and never gives back — so in practice the answer was to write the
+     * attributes by hand, which skips both checks below.
+     *
+     * <p>Nothing is written until the new address answers, and the order is adoption's for
+     * adoption's reasons: capture the certificate, judge it, then spend the credential. A typo that
+     * lands on another host fails at the certificate; a host that is not this gateway fails at the
+     * token; and either way the device keeps the configuration that was working.
+     *
+     * <p>What it deliberately does not touch: the credential, which has not changed, and
+     * {@link #ATTR_PLATFORM_LINK_ADMIN}, which describes the account that token is bound to rather
+     * than the address it is spent at.
+     */
+    public void changeConnection(TenantId tenantId, Device device, ConnectionRequest request)
+            throws Exception {
+        InferrixGatewayAdoption.requireSealingKey(secretCodec);
+        if (request == null) {
+            throw new IllegalArgumentException("No connection request was supplied");
+        }
+        InferrixGatewayAdoption.validateAddress(request.address(), request.port());
+
+        DeviceId deviceId = device.getId();
+        String clientId = attribute(tenantId, deviceId, AttributeScope.SERVER_SCOPE,
+                InferrixGatewayAccess.CLIENT_ID);
+        String clientSecret = attribute(tenantId, deviceId, AttributeScope.SERVER_SCOPE,
+                InferrixGatewayAccess.CLIENT_SECRET);
+        // A pinned certificate is required, not merely compared against. Adoption can trust on
+        // first use because the operator is typing the credential as they do it; here the platform
+        // would be posting a sealed secret it holds to whatever answers, on the say-so of an
+        // address alone. A gateway with no pin cannot be called at all -- InferrixGatewayAccess
+        // refuses it -- so this rules out nothing that was working.
+        String pinned = attribute(tenantId, deviceId, AttributeScope.SERVER_SCOPE,
+                InferrixGatewayAccess.CERT_FINGERPRINT);
+        if (clientId == null || clientSecret == null || pinned == null) {
+            throw new IllegalArgumentException("'" + device.getName() + "' has no sealed API token"
+                    + " and pinned certificate, so there is nothing to prove a new address with."
+                    + " Adopt it instead.");
+        }
+
+        int port = InferrixGatewayAdoption.portOrDefault(request.port());
+        String baseUrl = "https://" + request.address() + ":" + port;
+
+        String fingerprint = client.captureFingerprint(baseUrl);
+        requireUsableCertificate(fingerprint, request.address());
+        requireSameGateway(tenantId, device, fingerprint, request.address(),
+                request.confirmsDifferentGateway());
+        // Proves two things at once, and both matter: that something at the new address speaks the
+        // gateway API, and that it accepts this device's credential. Without it a successful save
+        // would mean only that a TLS handshake completed.
+        client.exchangeToken(baseUrl, fingerprint,
+                secretCodec.decrypt(clientId), secretCodec.decrypt(clientSecret));
+
+        long now = System.currentTimeMillis();
+        saveServerAttributes(tenantId, deviceId, List.of(
+                new BaseAttributeKvEntry(new StringDataEntry(
+                        InferrixGatewayAccess.MANAGEMENT_ADDRESS, request.address()), now),
+                new BaseAttributeKvEntry(new LongDataEntry(
+                        InferrixGatewayAccess.MANAGEMENT_PORT, (long) port), now),
+                // Re-pinned, not left alone. Replacement hardware at the new address presents its
+                // own certificate, and the operator has just confirmed that above; keeping the old
+                // pin would make every call afterwards fail as a changed certificate.
+                new BaseAttributeKvEntry(new StringDataEntry(
+                        InferrixGatewayAccess.CERT_FINGERPRINT, fingerprint), now)), false);
+
+        // The cached JWT was issued by the gateway at the old address and the cached schema
+        // document describes whatever was there; neither survives the move as a safe assumption.
+        gatewayAccess.forget(deviceId);
+        schemaService.forget(deviceId);
+
+        log.info("Inferrix gateway {} now reached at {}:{}", deviceId, request.address(), port);
+    }
+
+    /**
+     * Trust on first use, with the one exception that is the whole point of doing it here.
+     *
+     * <p>A gateway still serving the pre-5.1.0 keystore presents a certificate whose private key is
+     * public, so pinning it would record a fingerprint that authenticates nobody.
+     */
+    private void requireUsableCertificate(String fingerprint, String address) {
+        if (InferrixGatewayAdoption.isKnownBadCertificate(fingerprint)) {
+            throw new IllegalStateException("The gateway at " + address + " is serving the"
+                    + " default certificate that shipped with every Inferrix stack before 5.1.0."
+                    + " Its private key is public, so pinning it would secure nothing. Upgrade the"
+                    + " gateway to 5.1.0 or later, which generates its own key pair, and try again.");
+        }
+    }
+
+    /**
      * Refuses to repoint an existing gateway device at what is provably a different gateway.
      *
      * <p>The sibling controller service anchors this on the device's reported {@code uid}. A
@@ -193,8 +283,8 @@ public class InferrixGatewayAdoptionService {
      * difference between a deliberate replacement and adopting the wrong box from a saved form.
      */
     private void requireSameGateway(TenantId tenantId, Device existing, String fingerprint,
-                                    AdoptRequest request) throws Exception {
-        if (existing == null || request.confirmsDifferentGateway()) {
+                                    String address, boolean confirmed) throws Exception {
+        if (existing == null || confirmed) {
             return;
         }
         Optional<AttributeKvEntry> stored = attributesService.find(
@@ -203,7 +293,7 @@ public class InferrixGatewayAdoptionService {
         String previous = stored.flatMap(AttributeKvEntry::getStrValue).orElse(null);
         if (previous != null && !previous.equalsIgnoreCase(fingerprint)) {
             throw new IllegalArgumentException("'" + existing.getName() + "' is already adopted and"
-                    + " the gateway answering at " + request.address() + " presents a different"
+                    + " the gateway answering at " + address + " presents a different"
                     + " certificate, so it is different hardware. Everything recorded against this"
                     + " device — dashboards, alarm rules, telemetry — refers to the old gateway."
                     + " If you are replacing it, confirm that and adopt again; otherwise adopt the"
@@ -293,12 +383,24 @@ public class InferrixGatewayAdoptionService {
                 new BaseAttributeKvEntry(new BooleanDataEntry(
                         ATTR_PLATFORM_LINK_ADMIN, platformLinkAdmin), now));
 
-        // SERVER_SCOPE deliberately: the gateway must never be able to read or overwrite the
-        // platform's own record of how to reach and authenticate to it. What the device asserts
-        // about itself lands in CLIENT_SCOPE under its own key instead.
-        // Waited on rather than fired and forgotten -- if the sealed secret fails to persist, the
-        // gateway is unreachable from the moment its JWT expires, and the operator needs to learn
-        // that now rather than an hour later.
+        saveServerAttributes(tenantId, deviceId, entries, created);
+    }
+
+    /**
+     * SERVER_SCOPE deliberately: the gateway must never be able to read or overwrite the platform's
+     * own record of how to reach and authenticate to it. What the device asserts about itself lands
+     * in CLIENT_SCOPE under its own key instead.
+     *
+     * <p>Waited on rather than fired and forgotten — if this fails to persist, the gateway is
+     * unreachable from the moment its JWT expires, and the operator needs to learn that now rather
+     * than an hour later.
+     *
+     * @param created whether this is a first adoption, which is the only thing that changes what
+     *                the operator should do about a failure
+     */
+    private void saveServerAttributes(TenantId tenantId, DeviceId deviceId,
+                                      List<AttributeKvEntry> entries, boolean created)
+            throws Exception {
         SettableFuture<Void> saved = SettableFuture.create();
         tsSubService.saveAttributes(AttributesSaveRequest.builder()
                 .tenantId(tenantId)
@@ -321,14 +423,14 @@ public class InferrixGatewayAdoptionService {
             saved.get(ATTRIBUTE_SAVE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (Exception e) {
             // Deliberately different advice per case. On a first adoption the device really is
-            // orphaned and removing it is right. On a re-adoption it is not: that device may carry
-            // years of telemetry, dashboards and alarm rules, and its previous credentials still
-            // work — telling the operator to delete it would be unrecoverable advice for what is
-            // usually a transient database failure.
+            // orphaned and removing it is right. On a re-adoption or a change of address it is
+            // not: that device may carry years of telemetry, dashboards and alarm rules, and its
+            // previous settings still work — telling the operator to delete it would be
+            // unrecoverable advice for what is usually a transient database failure.
             throw new IllegalStateException(created
                     ? "The gateway's credentials could not be stored, so it has not been adopted."
                             + " Remove the device and try again."
-                    : "The gateway's credentials could not be stored, so nothing was changed and"
+                    : "The gateway's settings could not be stored, so nothing was changed and"
                             + " the previous configuration is still in place. Try again.", e);
         }
     }

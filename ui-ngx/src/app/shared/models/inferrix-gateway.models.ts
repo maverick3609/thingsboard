@@ -34,6 +34,70 @@ export interface AdoptGatewayRequest {
 }
 
 /**
+ * Where the platform reaches an already-adopted gateway.
+ *
+ * No credential, in either direction. The platform holds this gateway's API token sealed and
+ * spends it against the new address itself, so a renumbered subnet or a new VPN is a change of
+ * address rather than a re-adoption — which is the only other way to say it, and needs a secret
+ * Cortex never gives back.
+ */
+export interface ChangeGatewayConnectionRequest {
+  address: string;
+  port?: number;
+  /** Only ever set deliberately: it overrides the changed-certificate refusal. */
+  acceptDifferentGateway?: boolean;
+}
+
+/** What the platform recorded about how to reach a gateway, as the Details tab shows it. */
+export interface GatewayConnection {
+  address?: string;
+  port?: number;
+  certFingerprint?: string;
+  /** The gateway's own claim, published over MQTT under its own key. Never used to reach it. */
+  reportedAddress?: string;
+}
+
+/**
+ * Read through ThingsBoard's own attribute API rather than an endpoint of ours.
+ *
+ * These three are already served to anyone holding READ_ATTRIBUTES on the device — the adoption
+ * endpoint says so in as many words — and the one server-scope value that is *not* readable, the
+ * sealed credential, is not among them. A bespoke read would add a second way to ask the same
+ * question and no privacy.
+ */
+export const GATEWAY_CONNECTION_KEYS =
+  ['gwManagementAddress', 'gwManagementPort', 'gwCertFingerprint'];
+
+/**
+ * The gateway's own key, in CLIENT_SCOPE because the device writes it.
+ *
+ * Shown next to the platform's address rather than instead of it: the two disagreeing is exactly
+ * what an operator is looking at after a network change, and it is the value they would then type
+ * into the form. It is never used to reach the gateway — the device does not get to choose where
+ * the platform sends its credential.
+ */
+export const GATEWAY_REPORTED_KEYS = ['managementAddress'];
+
+/**
+ * Attribute rows to a connection.
+ *
+ * The port arrives as a number from the platform's own attribute API, but a gateway adopted before
+ * the port was stored has none at all — so absent stays absent rather than becoming a 0 the form
+ * would then offer to save.
+ */
+export const gatewayConnectionOf = (attributes: {key: string; value: any}[],
+                                    reported?: {key: string; value: any}[]): GatewayConnection => {
+  const values = new Map((attributes ?? []).map(attribute => [attribute.key, attribute.value]));
+  const port = Number(values.get('gwManagementPort'));
+  return {
+    address: values.get('gwManagementAddress') || undefined,
+    port: Number.isFinite(port) && port > 0 ? port : undefined,
+    certFingerprint: values.get('gwCertFingerprint') || undefined,
+    reportedAddress: (reported ?? []).find(a => a.key === 'managementAddress')?.value || undefined
+  };
+};
+
+/**
  * Why the platform can or cannot reach a gateway.
  *
  * Mirrors {@code InferrixGatewayReachability} exactly. Kept as a union rather than an enum so an

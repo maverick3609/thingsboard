@@ -27,6 +27,7 @@ import org.thingsboard.server.config.annotations.ApiOperation;
 import org.thingsboard.server.queue.util.TbCoreComponent;
 import org.thingsboard.server.service.inferrix.gateway.InferrixGatewayAccess;
 import org.thingsboard.server.service.inferrix.gateway.InferrixGatewayAdoption.AdoptRequest;
+import org.thingsboard.server.service.inferrix.gateway.InferrixGatewayAdoption.ConnectionRequest;
 import org.thingsboard.server.service.inferrix.gateway.InferrixGatewayAdoptionService;
 import org.thingsboard.server.service.inferrix.gateway.InferrixGatewayAdoptionService.PendingGateway;
 import org.thingsboard.server.service.inferrix.gateway.InferrixGatewayReachability;
@@ -149,6 +150,31 @@ public class InferrixGatewayController extends BaseController {
     public Device adopt(@RequestBody AdoptRequest request) throws ThingsboardException {
         try {
             return adoption().adopt(getTenantId(), getCurrentUser(), request);
+        } catch (Exception e) {
+            throw handleException(e);
+        }
+    }
+
+    @ApiOperation(value = "Change where an adopted gateway is reached",
+            notes = "Points an already-adopted gateway at a new address and port. The platform "
+                    + "spends the API token it already holds, so no credential is asked for or "
+                    + "returned -- a renumbered subnet or a new VPN is not a re-adoption. Nothing "
+                    + "is written until the new address presents a usable certificate and accepts "
+                    + "that token, and a certificate that differs from the pinned one is refused "
+                    + "until the operator confirms it is replacement hardware. Tenant-admin only, "
+                    + "and WRITE on the device: this decides where the platform sends the "
+                    + "gateway's own credential.")
+    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    @PostMapping("/{deviceId}/connection")
+    public void changeConnection(@PathVariable("deviceId") String strDeviceId,
+                                 @RequestBody ConnectionRequest request) throws ThingsboardException {
+        checkParameter("deviceId", strDeviceId);
+        DeviceId deviceId = new DeviceId(toUUID(strDeviceId));
+        InferrixPublicLink.requireNotPublicLink(getCurrentUser());
+        Device device = checkDeviceId(deviceId, Operation.WRITE);
+        requireGatewayProfile(device, strDeviceId);
+        try {
+            adoption().changeConnection(getTenantId(), device, request);
         } catch (Exception e) {
             throw handleException(e);
         }

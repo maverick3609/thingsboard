@@ -26,6 +26,8 @@ import { ControllerPointWriteDialogComponent }
   from '@home/pages/inferrix/controller/controller-point-write-dialog.component';
 import { AdoptGatewayDialogComponent } from '@home/pages/inferrix/adopt-gateway-dialog.component';
 import { GatewayComponent } from '@home/pages/inferrix/gateway/gateway.component';
+import { GatewayConnectionDialogComponent }
+  from '@home/pages/inferrix/gateway/gateway-connection-dialog.component';
 import { GatewayTabsComponent } from '@home/pages/inferrix/gateway/gateway-tabs.component';
 import { GatewayHealthComponent } from '@home/pages/inferrix/gateway/gateway-health.component';
 import { GatewayDataSourcesComponent }
@@ -75,6 +77,7 @@ import { WidgetSettingsCommonModule }
     ControllerPointWriteDialogComponent,
     AdoptGatewayDialogComponent,
     GatewayComponent,
+    GatewayConnectionDialogComponent,
     GatewayTabsComponent,
     GatewayHealthComponent,
     GatewayDataSourcesComponent,

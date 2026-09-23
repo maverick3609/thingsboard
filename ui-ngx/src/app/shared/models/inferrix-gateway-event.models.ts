@@ -27,7 +27,8 @@ export interface GatewayEventDetector {
  * An event handler: what happens when a detector trips.
  *
  * Four types exist and the set is closed — EMAIL, SMS, SET_POINT, PROCESS are core-owned with none
- * contributed by protocol modules, unlike data sources.
+ * contributed by protocol modules, unlike data sources. Cortex offers three of them; see
+ * {@link gatewayHandlerRunsCommands} for why the fourth is not one this UI creates.
  */
 export interface GatewayEventHandler {
   id?: number;
@@ -123,6 +124,33 @@ export const gatewayAlarmTone = (level: string): GatewayAlarmTone => {
 };
 
 /**
+ * A handler whose configuration is a command line the gateway runs.
+ *
+ * `PROCESS_HANDLER` carries `activeProcessCommand` and `inactiveProcessCommand`, and the gateway
+ * hands both to `Runtime.getRuntime().exec` when the handler fires. Creating one is therefore
+ * **remote code execution on the gateway host**, expressed as an ordinary text field in an
+ * ordinary schema-driven form.
+ *
+ * That was survivable while the gateway refused the call: until 2026-09-23 a handler could only be
+ * created by a full gateway administrator, and the platform's service account is deliberately not
+ * one. Stack fix D16 widened handler creation to the gateway-configuration permission — the exact
+ * credential Cortex holds — and the stack's own release notes say what that means: "this permission
+ * now carries the ability to run commands on the gateway host. It is no longer meaningfully less
+ * than administrator."
+ *
+ * So the restraint has to live here now. Cortex already excludes `/v2/script*` from the proxy for
+ * this reason (`InferrixGatewayRoutes`, INFERRIX.md 11.7); a command handler is the same hazard
+ * arriving through a route that is allowed for four other reasons. Offering it would make the RCE
+ * decision that section says must be taken deliberately, by accident and in a dropdown.
+ *
+ * Existing ones stay **visible and deletable** — hiding a row that is on the device would make the
+ * list lie about what the gateway will do, and deleting one only ever reduces what it can run.
+ * They open read-only.
+ */
+export const gatewayHandlerRunsCommands = (handlerType: string): boolean =>
+  handlerType === 'PROCESS_HANDLER';
+
+/**
  * The handler types this gateway can actually be asked for.
  *
  * Read from the schema document rather than from `GET /v2/event-handler-types`. That endpoint does
@@ -134,7 +162,10 @@ export const gatewayAlarmTone = (level: string): GatewayAlarmTone => {
  * `gatewayDetectorTypes` intersects; handlers have no such per-point narrowing, so one read does.
  */
 export const gatewayHandlerTypes = (doc: GatewaySchemaDocument): GatewayTypeOption[] =>
-  Object.keys(doc?.families?.eventHandler ?? {}).sort().map(type => ({type}));
+  Object.keys(doc?.families?.eventHandler ?? {})
+    .filter(type => !gatewayHandlerRunsCommands(type))
+    .sort()
+    .map(type => ({type}));
 
 /**
  * Detector types valid for one data type, narrowed to those the gateway published a schema for.

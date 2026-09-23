@@ -13,6 +13,9 @@
     </button>
   </mat-toolbar>
   <div mat-dialog-content>
+    @if (data.readonlyNote) {
+      <div class="tb-error-message">{{ data.readonlyNote }}</div>
+    }
     <div class="flex flex-row gap-2 xs:flex-col" [formGroup]="identityForm">
       <mat-form-field class="flex-1">
         <mat-label translate>inferrix.gateway.model-name</mat-label>

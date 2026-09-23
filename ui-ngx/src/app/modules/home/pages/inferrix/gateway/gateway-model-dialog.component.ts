@@ -30,6 +30,8 @@ export interface GatewayModelDialogData {
   recipientFields?: string[];
   /** Fields carried through a save untouched, with a note saying so. */
   carriedFields?: {id: string; note: string}[];
+  /** Why this dialog is read-only, when the reason is the model rather than the user's authority. */
+  readonlyNote?: string;
 }
 
 /**

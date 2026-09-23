@@ -821,21 +821,60 @@ Bakes Inferrix branding into the default build (every `yarn build:prod` output i
   (0 of 90 monitor rows, down from 7, with 24 unsubstituted `{0}` placeholders also fixed). D11
   followed the same afternoon, so schedules and rule sets can now be created with the narrow
   credential.
-- **What the same afternoon's probing found instead, and it is larger.** Driving the gateway with an
+- **What the same afternoon's probing found instead, and it was larger.** Driving the gateway with an
   account holding only the gateway-configuration permission — the credential this feature is designed
-  around — shows that **create was widened and edit and delete were not**: a data source, schedule or
-  rule set created that way answers 403 on every later `PUT` and `DELETE`, because the gateway checks
-  each object's own edit-permission string and nothing sets one. Data points, event detectors and
-  event handlers are still administrator-only outright. Separately, a gateway user with *no*
-  permissions can list every data source and point with full configuration, while the single-object
-  read correctly refuses. All of it is written up with reproductions in
-  `Inferrix-stack/docs/specs/2026-09-23-cortex-gateway-open-items.md` (D15-D19, A13) — nothing in
-  this repo changes for it, but those tabs need a gateway administrator credential until it lands.
+  around — showed that **create had been widened and edit and delete had not**: a data source,
+  schedule or rule set created that way answered 403 on every later `PUT` and `DELETE`, because the
+  gateway checked each object's own edit-permission string and nothing set one. Data points, event
+  detectors and event handlers were administrator-only outright. Separately, a gateway user with *no*
+  permissions could list every data source and point with full configuration, while the single-object
+  read correctly refused. Written up with reproductions in
+  `Inferrix-stack/docs/specs/2026-09-23-cortex-gateway-open-items.md` (D15-D19, A13).
+- **All of it landed the same day, and one of the fixes has to be met halfway here.** Re-verified
+  against the gateway built 2026-09-23 14:01: the narrow credential now creates, edits and deletes
+  data sources, points, detectors, handlers, schedules and rule sets; a zero-permission user gets
+  `{"items": [], "total": 0}` from every list endpoint where it used to get all 12 data sources and
+  all 100 points; a data source with no polling interval answers 422 naming `timePeriod` (and a
+  period with no unit, `timePeriod.timePeriodType`); `GET /v2/system-setting` answers 99 keys with
+  the licence blob and the PoE token gone; no stored point name carries `???…???`; and the five
+  platform-link reads accept the permission. So **no Cortex workaround survives** — what changes
+  instead is one thing the widening brought with it, below.
+- **The permission now carries command execution, so Cortex stops offering the handler that uses
+  it.** D16 put event-handler creation within reach of the gateway-configuration permission, and a
+  `PROCESS_HANDLER`'s `activeProcessCommand` is handed to `Runtime.getRuntime().exec` on the gateway
+  host — the stack's own release notes say the permission "is no longer meaningfully less than
+  administrator". This repo already excludes `/v2/script*` from the proxy as remote code execution
+  (`InferrixGatewayRoutes`, INFERRIX.md §11.7); a command handler is the same hazard reaching a route
+  that is allowed for four other reasons, so offering it would take that decision in a dropdown.
+  `gatewayHandlerTypes` drops the type from the add menu and existing rows open read-only with the
+  reason on screen. They stay **listed and deletable**: hiding a row that is on the device would make
+  the list lie about what the gateway will do, and deleting one only reduces what it can run.
+- **The proxy refuses the body too, because a dropdown is not a boundary.** `InferrixGatewayRoutes`'s
+  own javadoc says the allowlist "is the entire security boundary" and that "there is no second line
+  behind it" — true only if the boundary sees the payload, and the proxy forwards the body opaquely
+  as a `String`. A UI-only filter would have left a hand-written `POST /v2/event-handler` working and
+  made INFERRIX.md §11.7 overclaim. `bodyIsAllowed(method, path, body)` reads the one discriminator
+  on the one route, called from both `InferrixGatewayController.proxyToGateway` (403, with a message
+  that says *body*, not *route*) and `InferrixGatewayAccess.call`. `DELETE` is not inspected — no
+  body to judge, and removing a handler only reduces what runs. Missing, non-textual or unparseable
+  discriminators are refused rather than raised: a body that cannot be read cannot be shown to be
+  safe, and letting the parse error out would turn a bad payload into a 500. The exact match is
+  exact because the gateway's is — `process_handler`, `Process_Handler` and `"PROCESS_HANDLER "`
+  each answered 400 "Failed to read request" when probed, so no spelling this lets past is one the
+  gateway will build. The other creation surface was checked and is not one: a detector carries
+  `handlerXids`, references only, so it can attach an existing handler but never make one.
+- **Stack ask A13 shipped, and the mapper already spoke it.** The schema document now publishes
+  `required`; `schemaToFormProperties` has read it since G3, so the only change is the fixture. The
+  one field marked is `timePeriod` on the polling data-source base — the stack emits `required` per
+  annotation, so every other mandatory field is still unmarked and still discovered as a 422 from
+  the device. The test pins both the marking and that nothing else carries one, so it cannot pass by
+  saying nothing.
 - **Still operator-pending:** nothing has been verified visually in a browser. The mapper is now
   exercised against a verbatim slice of a real 5.1.0 document
   (`inferrix-gateway-schema.live.json` — six data source types, four locators, three detectors, all
-  four handlers, one publisher and their full `$ref` closure), which is a much stronger check than
-  the hand-written fixture beside it, but it is not a rendered page.
+  four handlers, one publisher and their full `$ref` closure; re-taken from the 2026-09-23 14:01
+  gateway, which added exactly the six `required` blocks and nothing else), which is a much stronger
+  check than the hand-written fixture beside it, but it is not a rendered page.
 
 ### TB-core files modified
 
@@ -844,7 +883,7 @@ Bakes Inferrix branding into the default build (every `yarn build:prod` output i
 | IG1 | `ui-ngx/src/app/modules/home/pages/entities/entities-routing.module.ts` | Import swapped: `gatewaysRoutes` from `@home/pages/gateways/gateways-routing.module` replaced by `inferrixGatewayRoutes` from `@home/pages/inferrix/inferrix-routing.module`, and the `...gatewaysRoutes` spread in the `entities` children replaced by `...inferrixGatewayRoutes`. **Upstream re-adds both on merge — re-apply the swap.** | `/entities/gateways` is where `MenuId.gateways` already points. Mounting ours there means the menu entry, breadcrumb and every existing link keep working, and there is no second Gateways item to explain |
 | IG2 | `ui-ngx/src/app/modules/home/pages/home-pages.module.ts` | `GatewaysModule` import and its entry in `imports` **deleted** (a comment marks the spot). **Upstream re-adds it — delete it again.** | It existed only to serve the stock gateways dashboard, which `InferrixModule` now replaces at the same route. Leaving it imported keeps a dead module and its `/gateways` redirect in the bundle |
 | IG3 | `ui-ngx/src/app/core/services/menu.models.ts` | One line: `{id: MenuId.gateways},` added to the **CUSTOMER_USER** section's `MenuId.entities.pages`, immediately before `{id: MenuId.controllers}`. The TENANT_ADMIN entry and the `MenuId.gateways` definition itself (`path: '/entities/gateways'`) are **unchanged** | The route and the table resolver both handle a customer user read-only — `gatewayTableAccess` scopes the filter to their customer — but the menu only listed gateways for tenant admins, so they had access with no way in. Controllers were already listed in both sections; this makes gateways match |
-| IG4 | `ui-ngx/src/assets/locale/locale.constant-en_US.json` | `inferrix.gateway` block added (183 keys: 43 in G2, 28 in G4 for the data-source and data-point panels, 50 in G5 for events, handlers, alert routing and detectors, 62 in G6 for schedules, rule sets and the system tab) immediately after the `"inferrix": {` line. **Splice raw, take-ours, do not reformat** — a JSON round-trip rewrites all ~11 400 lines of this file | Every string the gateway section renders. The reachability reasons are the bulk of it, and each maps one backend `reason` to a sentence that says where to go and fix it |
+| IG4 | `ui-ngx/src/assets/locale/locale.constant-en_US.json` | `inferrix.gateway` block added (186 keys: 43 in G2, 28 in G4 for the data-source and data-point panels, 50 in G5 for events, handlers, alert routing and detectors, 62 in G6 for schedules, rule sets and the system tab, 3 added since) immediately after the `"inferrix": {` line. **Splice raw, take-ours, do not reformat** — a JSON round-trip rewrites all ~11 400 lines of this file | Every string the gateway section renders. The reachability reasons are the bulk of it, and each maps one backend `reason` to a sentence that says where to go and fix it |
 
 ### Merge recovery
 

@@ -474,6 +474,36 @@ describe('inferrix-gateway-schema.models against a live gateway document', () =>
     expect(Object.keys(live.families.pointLocator)).not.toContain('MODBUS_IP.PL');
   });
 
+  it('marks the mandatory field the gateway now publishes, at both levels', () => {
+    // Stack ask A13. The document carried no `required` at all until 2026-09-23, so a form could
+    // not mark a mandatory field and the one field that is mandatory -- `timePeriod` on every
+    // polling data source -- was discovered as an HTTP 500 (stack finding D18, now a 422).
+    //
+    // Two levels, because the gateway marks both: `timePeriod` on the polling model itself, and
+    // `timePeriodType` inside the TimePeriod object, which is what a period with a number and no
+    // unit trips. The nested one only works if `required` survives the fieldset recursion.
+    const virtual = schemaToFormProperties(live, 'dataSource', 'VIRTUAL.DS');
+    const period = virtual.find(property => property.id === 'timePeriod');
+    expect(period.required).toBeTrue();
+    expect(period.type).toBe(FormPropertyType.fieldset);
+    const unit = ((period as any).properties as FormProperty[])
+      .find(property => property.id === 'timePeriodType');
+    expect(unit.required).toBeTrue();
+    expect(((period as any).properties as FormProperty[])
+      .find(property => property.id === 'timePeriod').required).toBeFalsy();
+
+    // Inherited through allOf, not restated per type: MODBUS_IP.DS is
+    // allOf [AbstractPollingDataSourceModel, {its own}] and gets it from the base.
+    expect(schemaToFormProperties(live, 'dataSource', 'MODBUS_IP.DS')
+      .find(property => property.id === 'timePeriod').required).toBeTrue();
+
+    // And nothing else is marked, which is the honest state of A13: the stack marks `required`
+    // per annotation, so every other mandatory field is still an unmarked field. A test that
+    // asserted "requireds exist" would pass while saying nothing.
+    expect(virtual.filter(property => property.required).map(property => property.id))
+      .toEqual(['timePeriod']);
+  });
+
   it('carries no point-locator pairing — that lives on /v2/data-source-types', () => {
     // Stack ask A11 shipped, but on the type endpoint rather than here: a data source's schema
     // entry says nothing about which locator its points take. So a reader looking for the pairing

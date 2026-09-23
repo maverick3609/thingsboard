@@ -1468,7 +1468,7 @@ happens to open.
 | **Data sources** | The protocol connections — a Modbus device, a BACnet network, an MQTT broker |
 | **Data points** | The individual measured and controlled values of one data source |
 | **Event log** | The events the gateway has raised, and acknowledging them |
-| **Event handlers** | What the gateway does when an event fires — email, SMS, a set point, a process |
+| **Event handlers** | What the gateway does when an event fires — email, SMS or a set point |
 | **Alert routing** | Who is notified, from which severity upwards |
 | **Schedules** | Weekly active/inactive patterns that handlers and alert routing follow |
 | **Rule sets** | Named groups of dates that a schedule makes exceptions for |
@@ -1500,14 +1500,20 @@ replicating those would make them the project — and would put Cortex in perman
 gateway, needing a release every time the gateway gained a module.
 
 A real gateway publishes 63 data source types, 61 point locators, 6 publishers, 14 event detectors
-and 4 event handlers, sharing 178 component schemas between them. Two things in that document decide
-how a field is rendered, and both come from the gateway rather than from any table here:
+and 4 event handlers, sharing 178 component schemas between them. Three things in that document
+decide how a field is rendered, and all of them come from the gateway rather than from any table
+here:
 
 - **`readOnly`** — a value the gateway computes and will not accept back, such as a data source's
   connection description. Shown, never editable.
 - **`writeOnly`** — a secret the gateway accepts and never returns: an MQTT broker password, an OPC
   password, a private key. Shown as a password field, and **an empty one means "unchanged"** rather
   than "erase it", because the field is always empty on load whether or not a credential is stored.
+- **`required`** — marked in the form, so a mandatory field is refused before the round trip rather
+  than after it. Published since 2026-09-23 (stack ask A13) and, so far, **on one field**: the
+  polling interval every polling data source needs. The stack emits `required` per annotation, so
+  every other mandatory field is still an unmarked one and is still discovered as a 422 from the
+  device carrying the field's name.
 
 A few things are hand-written on purpose rather than for want of a schema:
 
@@ -1537,14 +1543,15 @@ a date with any part left open meaning "any", so 25 December of every year is a 
 month 12, day 25. Rule sets live on their own tab because they are shared.
 
 > [!IMPORTANT]
-> **With a non-administrator gateway credential, creating works and changing does not.** Verified
-> against stack 5.1.0 on 2026-09-23: an account holding only the gateway-configuration permission can
-> create a data source, a schedule and a rule set, and is refused when it tries to edit or delete any
-> of them — the gateway checks each object's own edit permission, which is empty on everything
-> created over REST. The same account cannot create a data point, an event detector or an event
-> handler at all. Tracked as **D15** and **D16** in
-> `Inferrix-stack/docs/specs/2026-09-23-cortex-gateway-open-items.md`. Until they land, those actions
-> need a gateway administrator credential; everything read-only works as documented.
+> **Grant the gateway-configuration permission as if it were administrator.** Stack fixes D15 and
+> D16 (2026-09-23) made the permission able to edit and delete what it creates, and reach data
+> points, event detectors and event handlers — which is what makes the whole non-administrator
+> design work. The cost is stated in the stack's own release notes: creating an event handler
+> reaches `Runtime.getRuntime().exec` through a process handler's command, so the permission now
+> carries command execution on the gateway host and **is no longer meaningfully less than a gateway
+> administrator**. Cortex will not create or change a process handler for exactly that reason
+> ([§11.7](#117-what-cortex-will-not-do-to-a-gateway)); the gateway itself will, for anything else
+> holding the permission.
 
 ### 11.6 The System tab is read-only, deliberately
 
@@ -1554,9 +1561,12 @@ phase: the gateway's settings-write route takes an arbitrary key over its entire
 keyspace — mail relay, backup paths, thread pools, licence — and is not on the platform's allowlist.
 Settings are changed in the gateway's own interface.
 
-Two settings the gateway returns are withheld from the page: its licence blob and a third-party API
-token. Reading them is already permitted, so this is not an access control — it is surface. A
-diagnostics table that gets screenshotted into a ticket has no business carrying either.
+A current gateway withholds its licence blob and its third-party API token itself (stack fix D7,
+2026-09-23). Cortex drops them again, along with anything whose key ends in token, password, secret,
+passphrase or private key. That is not an access control and never was — it is surface, for the two
+cases the gateway's fix does not cover: an older gateway is still adoptable and still sends both,
+and the next `…Token` a later version adds has no business in a diagnostics table that gets
+screenshotted into a ticket.
 
 ### 11.7 What Cortex will not do to a gateway
 
@@ -1569,8 +1579,18 @@ by decision, and adding any of them is a deliberate act, not a follow-up task:
 | `/certificate-service/**`, `/certificate-authority-service/**` | Signs arbitrary certificate requests — escalation well beyond configuration |
 | `PUT /v2/system-setting/{key}` | An arbitrary-key write over the gateway's whole configuration keyspace ([§11.6](#116-the-system-tab-is-read-only-deliberately)) |
 | `PUT /v2/point-value/{xid}` | Writing a live point value is a write to building plant. It needs its own decision, not a line item |
+| Creating or changing a **PROCESS** event handler | Its configuration *is* a command line the gateway executes, so it is the first row of this table wearing a different form. Existing ones are listed and can be deleted — hiding a row that is on the device would make the list lie about what the gateway will do — and they open read-only |
 
-Scripts remain editable in the gateway's own interface. That is the intended outcome, not a gap.
+Scripts and process handlers remain editable in the gateway's own interface. That is the intended
+outcome, not a gap.
+
+The last row is the one exception to "verb and path only": a process handler is chosen by the
+`handlerType` in the request *body*, on a route that email, SMS and set-point handlers legitimately
+share, so it cannot be excluded by leaving a path off the list. `InferrixGatewayRoutes.bodyIsAllowed`
+reads that one discriminator, and both the controller and `InferrixGatewayAccess` call it — so a
+hand-written POST is refused the same as the UI, which is what makes this table a boundary rather
+than a description of the screens. `DELETE` is deliberately not inspected: it carries no body, and
+removing a process handler only reduces what the gateway can be made to run.
 
 ### 11.8 Who can see and do what
 
@@ -1589,14 +1609,15 @@ Scripts remain editable in the gateway's own interface. That is the intended out
 | Symptom | Cause |
 |---|---|
 | Every form is empty | The gateway's `/v2/model-schemas` is returning an empty document. Hand-written tabs still work. Fixed in the stack on 2026-09-23 (finding D8); an older gateway will still do this |
-| Adding a data source fails with a server error | The gateway rejects a polling data source with no polling interval by throwing, and nothing in its schema marks the field required (stack findings D18, A13). Set the update period before saving |
+| Adding a data source fails with a server error | An older gateway throws on a polling data source with no polling interval. Fixed in the stack on 2026-09-23 (findings D18, A13): a current one answers "timePeriod: Required value" and the field is marked required in the form |
 | Health says the certificate changed | The gateway is presenting a different certificate than at adoption. Either the box was rebuilt, or something else is answering on that address. Re-adopt only once you know which |
 | Health says forbidden | Expected on the administrator-only routes: the service account is not a gateway administrator by design |
-| Save worked once, then every edit is denied | The gateway grants *create* to the gateway-configuration permission but checks each object's own edit permission — which is empty on anything created over REST — for edit and delete (stack finding D15). A gateway administrator credential is the workaround |
-| Adding a point, a detector or a handler is denied | Those three are still administrator-only on the gateway (stack finding D16), even on a data source the same account just created |
+| Save worked once, then every edit is denied | An older gateway grants *create* to the gateway-configuration permission but checks each object's own edit permission — empty on anything created over REST — for edit and delete. Fixed in the stack on 2026-09-23 (finding D15); before that build, editing needs a gateway administrator credential |
+| Adding a point, a detector or a handler is denied | Those three were administrator-only on a gateway built before 2026-09-23 (stack finding D16), even on a data source the same account just created |
+| A PROCESS event handler cannot be edited | Deliberate. Its configuration is a command line the gateway runs ([§11.7](#117-what-cortex-will-not-do-to-a-gateway)); change it in the gateway's own interface, or delete it from here |
 | "Add point" is disabled | The gateway did not publish a `pointLocatorType` for this data source type *and* it has no points to learn one from. One real type does this (`BACNET_MSTP.DS`); create its first point in the gateway's own interface |
 | A schedule will not enable | It was saved with fewer than seven days by something other than Cortex. Newer gateways refuse this at save time (finding D9) |
-| Stray `???some.key(i18n_en)???` text | An untranslated key rendered by the gateway and passed through unchanged. Fixed in the stack (finding D14); Cortex shows such text as sent rather than hiding a gateway-side gap |
+| Stray `???some.key(i18n_en)???` text | An untranslated key rendered by the gateway and passed through unchanged. Fixed in the stack — on the response path (finding D14) and then for names already stored (D19); Cortex shows such text as sent rather than hiding a gateway-side gap |
 | The stock ThingsBoard gateways dashboard came back | `TB_GATEWAY_DASHBOARD_SYNC_ENABLED` is not `false` ([§11.2](#112-adopting-a-gateway)) |
 
 ---

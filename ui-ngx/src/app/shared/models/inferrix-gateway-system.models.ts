@@ -47,9 +47,12 @@ export type GatewaySystemSettings = {[key: string]: any};
  * diagnostics table that an operator may screenshot or paste into a ticket has no business carrying
  * the gateway's licence blob or a third-party API token, neither of which diagnoses anything.
  *
- * The gateway already withholds `emailSmtpPassword` and `httpClientProxyPassword` itself; it does
- * **not** withhold `poeLightingToken` or `license`. The suffix rules are what covers a later gateway
- * version that adds another one, since nothing in the current hundred keys matches them by accident.
+ * A current gateway withholds these itself: stack fix D7 (2026-09-23) put the licence blob and
+ * `poeLightingToken` behind an explicit registry beside its own name pattern, so `GET
+ * /v2/system-setting` now answers 99 keys rather than 101 and none of them is a secret. This stays
+ * anyway, for two reasons that outlast that fix: an older gateway is still adoptable and still
+ * sends both, and the suffix rules cover the next `…Token` or `…Secret` a later gateway version
+ * adds, on either side of the wire. Nothing in the current hundred keys matches them by accident.
  */
 const WITHHELD_KEYS = new Set<string>(['license']);
 const WITHHELD_SUFFIX = /(token|password|secret|passphrase|privatekey)$/i;

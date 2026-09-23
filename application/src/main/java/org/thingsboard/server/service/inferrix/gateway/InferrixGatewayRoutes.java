@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.thingsboard.server.service.inferrix.gateway;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import org.thingsboard.common.util.JacksonUtil;
+
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -26,7 +29,10 @@ import java.util.regex.Pattern;
  *       outlives its access control, or revoke the credential Cortex is using.</li>
  *   <li><b>Host-level access.</b> Script evaluation is remote code execution; the file store serves
  *       an arbitrary sub-path under a store name; the certificate services sign arbitrary CSRs.
- *       None of these become acceptable because the tenant owns the device.</li>
+ *       None of these become acceptable because the tenant owns the device. One route reaches the
+ *       host through its <em>body</em> rather than its path, and so cannot be excluded by being
+ *       left off this list — see {@link #bodyIsAllowed}, the one exception to "verb and path
+ *       only".</li>
  *   <li><b>Live device control.</b> Mesh, thermostat, OTA, ToF and the Modbus/OPC ad-hoc tools drive
  *       real plant or real bus traffic. This feature configures a gateway; it does not operate
  *       one.</li>
@@ -175,9 +181,15 @@ public final class InferrixGatewayRoutes {
             route("/v2/system-actions/cancel/" + XID, "DELETE"),
 
             // --- Platform link -------------------------------------------------------------
-            // Every route here is isAdmin() on the gateway and was not widened by stack ask A5, so
-            // a non-admin service account gets 403 on all of them. That is expected and handled in
-            // the UI (spec 2.9), not worked around here.
+            // The five reads accept the gateway-configuration permission since stack ask A10
+            // (2026-09-23): a service account can now see whether the gateway believes it is
+            // connected to this platform, which is exactly what to look at when it is not. The
+            // writes, and device-profile/sync, remain isAdmin() on the gateway.
+            //
+            // Cortex's own gate is unchanged and is a separate question: this whole family stays
+            // in ADMIN_FAMILIES below, so a Cortex customer user is refused it here regardless of
+            // what the gateway would allow. It names the ThingsBoard URL and the tenant-admin
+            // username the gateway connects with.
             //
             // Reads and broker settings only. POST /server-details writes the ThingsBoard
             // tenant-admin credential that stack recommendation R1 exists to remove, and the
@@ -225,6 +237,85 @@ public final class InferrixGatewayRoutes {
             "/v2/system-setting",
             "/v2/platform-integration",
             "/v2/server");
+
+    /** Event-handler routes that carry a handler model in their body. */
+    private static final Pattern EVENT_HANDLER_WRITE =
+            Pattern.compile("/v2/event-handler(/validate|/" + XID + ")?");
+
+    /**
+     * The verbs that send one. {@code DELETE} is not among them, and that is the point: it carries
+     * no body to judge, and removing a process handler only ever reduces what the gateway can run.
+     */
+    private static final Set<String> BODY_VERBS = Set.of("POST", "PUT", "PATCH");
+
+    /**
+     * The handler whose configuration is a command line, named by Jackson's discriminator.
+     *
+     * <p>{@code ProcessEventHandlerVO.activeProcessCommand} is handed to
+     * {@code Runtime.getRuntime().exec} by {@code ProcessWorkItem}, so creating one is remote code
+     * execution on the gateway host.
+     */
+    private static final String COMMAND_HANDLER_TYPE = "PROCESS_HANDLER";
+
+    /**
+     * Whether this request's body may be forwarded.
+     *
+     * <p>The only body this list inspects, and it exists because one allowlisted route grew a
+     * payload that reaches past configuration into the host — which is precisely what the excluded
+     * families above are excluded for.
+     *
+     * <p>Until 2026-09-23 the gateway refused a non-administrator asking for any event handler, and
+     * the platform's service account is deliberately not an administrator, so
+     * {@code POST /v2/event-handler} could not do this. Stack fix D16 widened handler creation to
+     * the gateway-configuration permission — the credential the platform holds for every site — and
+     * the stack's own release notes say what came with it: "this permission now carries the ability
+     * to run commands on the gateway host. It is no longer meaningfully less than administrator."
+     *
+     * <p>The route cannot simply be dropped: email, SMS and set-point handlers are the feature and
+     * they share it. So the discriminator is read instead. It is <em>required</em> rather than
+     * merely checked — a body with no {@code handlerType} cannot be shown to be one of the three
+     * that are allowed, and a {@code PATCH} of one field into an existing process handler is
+     * exactly that shape. Cortex's own UI always sends the whole model, so nothing it does is
+     * refused here.
+     *
+     * <p>{@code DELETE} is untouched. It carries nothing to judge, and removing a process handler
+     * only reduces what the gateway can be made to run — so a rule that refused it would protect
+     * the command rather than the host.
+     *
+     * <p>Jackson on both sides, so what this reads and what the gateway deserialises cannot
+     * disagree about a duplicate key or a JSON-escaped character. The match is exact
+     * because the gateway's own is: {@code process_handler}, {@code Process_Handler} and
+     * {@code "PROCESS_HANDLER "} were each answered 400 "Failed to read request" when probed
+     * (2026-09-23), so no spelling this lets past is a spelling the gateway will build. Anything
+     * that does not parse as a JSON object is refused: a body that cannot be read cannot be shown
+     * to be safe.
+     *
+     * @param body the raw request body, exactly as it would be forwarded
+     */
+    public static boolean bodyIsAllowed(String method, String path, String body) {
+        if (method == null || path == null) {
+            return false;
+        }
+        if (!ASCII_METHOD.matcher(method).matches()
+                || !BODY_VERBS.contains(method.toUpperCase(Locale.ROOT))
+                || !EVENT_HANDLER_WRITE.matcher(path).matches()) {
+            return true;
+        }
+        JsonNode json;
+        try {
+            json = JacksonUtil.toJsonNode(body);
+        } catch (IllegalArgumentException malformed) {
+            // Unparseable is refused, not raised: the body is forwarded opaquely, so nothing has
+            // parsed it before now, and letting the exception out would turn a bad payload into a
+            // 500 where the caller is owed "this cannot be forwarded".
+            return false;
+        }
+        if (json == null || !json.isObject()) {
+            return false;
+        }
+        JsonNode type = json.get("handlerType");
+        return type != null && type.isTextual() && !COMMAND_HANDLER_TYPE.equals(type.asText());
+    }
 
     /**
      * Whether forwarding this changes something on the gateway.

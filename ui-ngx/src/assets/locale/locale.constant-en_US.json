@@ -4283,6 +4283,7 @@
       "delete-event-handler-title": "Delete event handler '{{name}}'?",
       "delete-event-handler-text": "Detectors that call this handler will stop notifying anyone. This cannot be undone.",
       "no-event-handlers": "This gateway has no event handlers",
+      "handler-runs-commands": "This handler runs a command on the gateway host, so Cortex shows it but will not create or change one. Use the gateway's own interface.",
       "add-alert-list": "Add alert routing",
       "delete-alert-list-title": "Delete alert routing '{{name}}'?",
       "delete-alert-list-text": "Everyone on this list stops being notified. This cannot be undone.",

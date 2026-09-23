@@ -2,6 +2,9 @@
   "families": {
     "dataSource": {
       "MODBUS_IP.DS": {
+        "required": [
+          "timePeriod"
+        ],
         "type": "object",
         "properties": {
           "connectionDescription": {
@@ -276,6 +279,9 @@
         ]
       },
       "OPC.DS": {
+        "required": [
+          "timePeriod"
+        ],
         "type": "object",
         "allOf": [
           {
@@ -419,6 +425,9 @@
         }
       },
       "BACNET_IP.DS": {
+        "required": [
+          "timePeriod"
+        ],
         "type": "object",
         "allOf": [
           {
@@ -498,6 +507,9 @@
         ]
       },
       "VIRTUAL.DS": {
+        "required": [
+          "timePeriod"
+        ],
         "type": "object",
         "allOf": [
           {
@@ -1597,6 +1609,9 @@
         }
       },
       "AbstractPollingDataSourceModel": {
+        "required": [
+          "timePeriod"
+        ],
         "type": "object",
         "properties": {
           "connectionDescription": {
@@ -1930,6 +1945,9 @@
         }
       },
       "TimePeriod": {
+        "required": [
+          "timePeriodType"
+        ],
         "type": "object",
         "properties": {
           "timePeriod": {

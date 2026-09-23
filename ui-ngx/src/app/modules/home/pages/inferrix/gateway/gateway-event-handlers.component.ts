@@ -11,7 +11,7 @@ import { GatewayModelDialogComponent,
   GatewayModelDialogData } from '@home/pages/inferrix/gateway/gateway-model-dialog.component';
 import { GATEWAY_IDENTITY_FIELDS, GatewayListQuery,
   GatewayPage } from '@shared/models/inferrix-gateway-data.models';
-import { GatewayEventHandler, gatewayHandlerTypes, GatewayTypeOption,
+import { GatewayEventHandler, gatewayHandlerRunsCommands, gatewayHandlerTypes, GatewayTypeOption,
   HANDLER_STRUCTURAL_FIELDS } from '@shared/models/inferrix-gateway-event.models';
 import { GatewaySchemaDocument,
   schemaToFormProperties } from '@shared/models/inferrix-gateway-schema.models';
@@ -22,6 +22,11 @@ import { FormProperty } from '@shared/models/dynamic-form.models';
  *
  * Four types, closed and core-owned: EMAIL, SMS, SET_POINT and PROCESS. Unlike data sources, no
  * protocol module can add one, so the set cannot grow behind this screen's back.
+ *
+ * Three of the four are offered. A PROCESS handler's configuration *is* a command line the gateway
+ * executes, so creating one from here is remote code execution on the gateway host — see
+ * {@link gatewayHandlerRunsCommands}. Existing ones are listed and can be deleted, and open
+ * read-only.
  *
  * Recipient lists are edited by {@link GatewayRecipientsComponent}, not by the schema form. The
  * gateway declares `RecipientEntryModel` as a bare discriminator and ships none of its subtypes,
@@ -104,6 +109,8 @@ export class GatewayEventHandlersComponent extends GatewayListPanelComponent<Gat
   }
 
   private open(model: GatewayEventHandler, title: string): void {
+    // Read-only for a reason the operator is told, rather than a Save button that appears to work.
+    const runsCommands = gatewayHandlerRunsCommands(model.handlerType);
     const all = schemaToFormProperties(this.schemas, 'eventHandler', model.handlerType);
     const recipientFields = GatewayEventHandlersComponent.RECIPIENT_FIELDS
       .filter(field => all.some(property => property.id === field));
@@ -114,7 +121,10 @@ export class GatewayEventHandlersComponent extends GatewayListPanelComponent<Gat
       GatewayModelDialogComponent, {
         disableClose: true,
         panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
-        data: {title, model, properties, recipientFields, readonly: this.readonly}
+        data: {title, model, properties, recipientFields,
+          readonly: this.readonly || runsCommands,
+          readonlyNote: runsCommands
+            ? this.translate.instant('inferrix.gateway.handler-runs-commands') : undefined}
       }).afterClosed().subscribe(saved => {
       if (saved) {
         this.gatewayService.saveEventHandler(this.deviceId, saved, {ignoreLoading: true}).subscribe({

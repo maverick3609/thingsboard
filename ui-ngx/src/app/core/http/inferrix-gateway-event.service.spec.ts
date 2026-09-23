@@ -3,10 +3,11 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { InferrixGatewayService } from '@core/http/inferrix-gateway.service';
-import { buildRecipient, gatewayAlarmTone, gatewayDetectorTypes, gatewayHandlerTypes,
-  recipientValue } from '@shared/models/inferrix-gateway-event.models';
+import { buildRecipient, gatewayAlarmTone, gatewayDetectorTypes, gatewayHandlerRunsCommands,
+  gatewayHandlerTypes, recipientValue } from '@shared/models/inferrix-gateway-event.models';
 import { GatewaySchemaDocument } from '@shared/models/inferrix-gateway-schema.models';
 import fixture from '@shared/models/inferrix-gateway-schema.fixture.json';
+import liveFixture from '@shared/models/inferrix-gateway-schema.live.json';
 
 /**
  * Events, detectors, handlers and alert routing.
@@ -127,6 +128,23 @@ describe('gateway event model helpers', () => {
     // which types there is a form for.
     expect(gatewayHandlerTypes(doc).map(t => t.type)).toEqual(['EMAIL_HANDLER']);
     expect(gatewayHandlerTypes(null)).toEqual([]);
+  });
+
+  it('will not offer the handler type whose configuration is a command line', () => {
+    // Against the real document, which carries all four core handler types. PROCESS_HANDLER's
+    // activeProcessCommand reaches Runtime.getRuntime().exec on the gateway host, and stack fix
+    // D16 put handler creation within reach of the permission Cortex's service account holds --
+    // so this filter is now the only thing between a dropdown and remote code execution.
+    const live = liveFixture as unknown as GatewaySchemaDocument;
+    expect(Object.keys(live.families.eventHandler)).toContain('PROCESS_HANDLER');
+    expect(gatewayHandlerTypes(live).map(t => t.type))
+      .toEqual(['EMAIL_HANDLER', 'SET_POINT_HANDLER', 'SMS_HANDLER']);
+
+    expect(gatewayHandlerRunsCommands('PROCESS_HANDLER')).toBeTrue();
+    // Named exactly. A prefix or substring test would also swallow a future EMAIL_PROCESS_HANDLER
+    // and silently stop offering something harmless.
+    ['EMAIL_HANDLER', 'SMS_HANDLER', 'SET_POINT_HANDLER', 'PROCESS', '', null, undefined]
+      .forEach(type => expect(gatewayHandlerRunsCommands(type)).toBeFalse());
   });
 
   it('offers only detector types that are both suitable and renderable', () => {

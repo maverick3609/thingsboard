@@ -354,6 +354,65 @@ class InferrixGatewayRoutesTest {
     }
 
     @Test
+    void aProcessEventHandlerIsRefusedByItsBody() {
+        // The one payload this list inspects. /v2/event-handler has to be forwardable -- email, SMS
+        // and set-point handlers are the feature -- but a PROCESS handler's activeProcessCommand is
+        // handed to Runtime.getRuntime().exec on the gateway host, and stack fix D16 (2026-09-23)
+        // put handler creation within reach of the gateway-configuration permission the platform
+        // holds. Before that the gateway refused it and the path-only list was enough.
+        String process = "{\"handlerType\":\"PROCESS_HANDLER\",\"name\":\"h\","
+                + "\"activeProcessCommand\":\"/bin/sh -c id\"}";
+        String email = "{\"handlerType\":\"EMAIL_HANDLER\",\"name\":\"h\"}";
+
+        assertTrue(InferrixGatewayRoutes.isAllowed("POST", "/v2/event-handler"),
+                "the route itself must stay forwardable, or three legitimate handler types die with it");
+        assertFalse(InferrixGatewayRoutes.bodyIsAllowed("POST", "/v2/event-handler", process));
+        assertFalse(InferrixGatewayRoutes.bodyIsAllowed("PUT", "/v2/event-handler/EH_1", process));
+        assertFalse(InferrixGatewayRoutes.bodyIsAllowed("PATCH", "/v2/event-handler/EH_1", process));
+        assertFalse(InferrixGatewayRoutes.bodyIsAllowed("POST", "/v2/event-handler/validate", process));
+        assertTrue(InferrixGatewayRoutes.bodyIsAllowed("POST", "/v2/event-handler", email));
+        assertTrue(InferrixGatewayRoutes.bodyIsAllowed("PUT", "/v2/event-handler/EH_1", email));
+
+        // A write with no discriminator cannot be shown to be one of the three that are allowed --
+        // and a PATCH of one field into an existing process handler is exactly that shape.
+        assertFalse(InferrixGatewayRoutes.bodyIsAllowed("PATCH", "/v2/event-handler/EH_1",
+                "{\"activeProcessCommand\":\"/bin/sh -c id\"}"));
+        assertFalse(InferrixGatewayRoutes.bodyIsAllowed("POST", "/v2/event-handler", null));
+        assertFalse(InferrixGatewayRoutes.bodyIsAllowed("POST", "/v2/event-handler", ""));
+        assertFalse(InferrixGatewayRoutes.bodyIsAllowed("POST", "/v2/event-handler", "not json"));
+        assertFalse(InferrixGatewayRoutes.bodyIsAllowed("POST", "/v2/event-handler", "[]"));
+        // A non-textual discriminator is not a discriminator. Without the isTextual() check,
+        // asText() on a number or null node returns "" and the handler sails through.
+        assertFalse(InferrixGatewayRoutes.bodyIsAllowed("POST", "/v2/event-handler",
+                "{\"handlerType\":null}"));
+        assertFalse(InferrixGatewayRoutes.bodyIsAllowed("POST", "/v2/event-handler",
+                "{\"handlerType\":7}"));
+
+        // Jackson keeps the LAST duplicate key, and so does the gateway, so the two cannot be made
+        // to read one body differently.
+        assertFalse(InferrixGatewayRoutes.bodyIsAllowed("POST", "/v2/event-handler",
+                "{\"handlerType\":\"EMAIL_HANDLER\",\"handlerType\":\"PROCESS_HANDLER\"}"));
+        assertTrue(InferrixGatewayRoutes.bodyIsAllowed("POST", "/v2/event-handler",
+                "{\"handlerType\":\"PROCESS_HANDLER\",\"handlerType\":\"EMAIL_HANDLER\"}"));
+    }
+
+    @Test
+    void everyOtherRouteKeepsItsBodyUninspected() {
+        // Deliberately one route, not a habit. The proxy forwards bodies opaquely; a list that
+        // grew a second body rule would be claiming to understand payloads it does not.
+        assertTrue(InferrixGatewayRoutes.bodyIsAllowed("POST", "/v2/data-source", "not json"));
+        assertTrue(InferrixGatewayRoutes.bodyIsAllowed("PUT", "/v2/data-point/DP_1", null));
+        assertTrue(InferrixGatewayRoutes.bodyIsAllowed("POST", "/v2/events/counts", "{}"));
+        // Reads carry no body worth judging, and /v2/event-handler GET is a list.
+        assertTrue(InferrixGatewayRoutes.bodyIsAllowed("GET", "/v2/event-handler", null));
+        assertTrue(InferrixGatewayRoutes.bodyIsAllowed("DELETE", "/v2/event-handler/EH_1", null));
+        // Not a handler route despite the prefix.
+        assertTrue(InferrixGatewayRoutes.bodyIsAllowed("GET", "/v2/event-handler-types", null));
+        assertFalse(InferrixGatewayRoutes.bodyIsAllowed(null, "/v2/event-handler", "{}"));
+        assertFalse(InferrixGatewayRoutes.bodyIsAllowed("POST", null, "{}"));
+    }
+
+    @Test
     void theGatewayProvisioningEndpointIsNotForwarded() {
         // Spec 2.7: it registers the whole stack as one TB device, but only works because the
         // gateway holds Cortex tenant-admin credentials -- the custody inversion R1 removes.

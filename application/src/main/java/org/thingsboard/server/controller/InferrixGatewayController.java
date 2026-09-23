@@ -202,6 +202,12 @@ public class InferrixGatewayController extends BaseController {
             throw new ThingsboardException("This gateway route cannot be called through the platform: "
                     + request.getMethod() + " " + path, ThingsboardErrorCode.PERMISSION_DENIED);
         }
+        // Separate message on purpose: the route is fine and the payload is not, and "route cannot
+        // be called" would send an operator looking for the wrong thing.
+        if (!InferrixGatewayRoutes.bodyIsAllowed(request.getMethod(), path, body)) {
+            throw new ThingsboardException("This gateway request body cannot be forwarded: "
+                    + request.getMethod() + " " + path, ThingsboardErrorCode.PERMISSION_DENIED);
+        }
 
         String query = rql(pageSize, page, textSearch, sortProperty, sortOrder,
                 filterField, filterValue, enabled, restart);

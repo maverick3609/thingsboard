@@ -172,6 +172,9 @@ public class InferrixGatewayAccess {
         if (!InferrixGatewayRoutes.isAllowed(method, path)) {
             throw new IllegalArgumentException("Not a forwardable gateway route: " + method + " " + path);
         }
+        if (!InferrixGatewayRoutes.bodyIsAllowed(method, path, body)) {
+            throw new IllegalArgumentException("Not a forwardable gateway body: " + method + " " + path);
+        }
         if (!secretCodec.isConfigured()) {
             throw new IllegalStateException(
                     "inferrix.controller.credentials_key is not set, so gateway credentials cannot be"

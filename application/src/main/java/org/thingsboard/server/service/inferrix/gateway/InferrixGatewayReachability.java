@@ -91,7 +91,12 @@ public record InferrixGatewayReachability(boolean reachable, String reason, Stri
         // successful probe into a failed one.
         try {
             JsonNode json = JacksonUtil.toJsonNode(body);
-            return json != null && json.hasNonNull("version") ? json.get("version").asText() : null;
+            // The field is "stackVersion", not "version": /v2/about serves
+            // {"stackVersion":"5.1.0","schemaVersion":29,"hostName":...,"modules":[...]}, and the
+            // only "version" keys in it sit inside each modules[] entry. Confirmed against a live
+            // 5.1.0 gateway (2026-09-23) after this read returned null for every reachable box.
+            return json != null && json.hasNonNull("stackVersion")
+                    ? json.get("stackVersion").asText() : null;
         } catch (RuntimeException e) {
             return null;
         }

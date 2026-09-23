@@ -348,7 +348,7 @@ class InferrixGatewayAccessTest {
     void probeReportsWhyRatherThanJustWhether() throws Exception {
         stubAttributes("10.0.0.5", null);
         when(client.call(anyString(), any(), eq("GET"), eq("/v2/about"), any(), anyString(), any()))
-                .thenReturn(new GatewayResponse(200, "{\"version\":\"5.1.0\"}"));
+                .thenReturn(new GatewayResponse(200, "{\"stackVersion\":\"5.1.0\"}"));
 
         InferrixGatewayReachability ok = access.probe(TENANT_ID, DEVICE_ID);
         assertThat(ok.reachable()).isTrue();

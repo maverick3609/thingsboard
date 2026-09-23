@@ -25,7 +25,11 @@ class InferrixGatewayReachabilityTest {
     @Test
     void aGatewayThatAnswersIsReachableAndReportsItsVersion() {
         InferrixGatewayReachability result = InferrixGatewayReachability.of(new GatewayResponse(200,
-                "{\"version\":\"5.1.0\",\"schemaVersion\":\"42\",\"hostName\":\"gw-1\"}"));
+                // The real /v2/about shape, captured from a 5.1.0 gateway. The earlier fixture
+                // said "version", which no stack has ever served -- so this test and the code
+                // agreed with each other while both disagreed with the device.
+                "{\"stackVersion\":\"5.1.0\",\"schemaVersion\":29,\"hostName\":\"gw-1\","
+                        + "\"modules\":[{\"name\":\"CORE.MODULE\",\"version\":\"5.1.0\"}]}"));
 
         assertTrue(result.reachable());
         assertEquals("OK", result.reason());

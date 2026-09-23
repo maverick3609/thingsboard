@@ -86,7 +86,8 @@ public class InferrixGatewayClient {
      * {@code client_secret}. The exchange still has to happen, so it happens here and only here.
      *
      * <p>RFC 6749 §4.4 — and note the body is <b>form-encoded, not JSON</b>. It is the one call in
-     * this client that is, and sending JSON yields a 400 that reads like a bad credential.
+     * this client that is; sending JSON is answered 415, not 401, so a failure here is a wiring
+     * mistake and never a rejected credential (probed live against stack 5.1.0, 2026-09-23).
      */
     public GatewayToken exchangeToken(String baseUrl, String fingerprint,
                                       String clientId, String clientSecret) throws IOException {

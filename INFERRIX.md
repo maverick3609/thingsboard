@@ -1481,6 +1481,14 @@ places — none of them the network. Amber is used deliberately for the expected
 platform's service account is *not* a gateway administrator by design, so a refusal on the
 administrator-only routes is a healthy gateway, not a fault.
 
+**The health probe carries the gateway's version, because `/v2/about` is the only place it exists.**
+The stack serves no version or uptime endpoint besides that one, so the probe that establishes
+reachability also reports identity rather than making the Details and Health tabs spend a second call
+on it. The field to read is `stackVersion` — `/v2/about` answers
+`{"stackVersion":"5.1.0","schemaVersion":29,"hostName":...,"modules":[...]}`, and the only `version`
+keys in that document belong to the individual entries of `modules[]`. Reading the wrong one is silent:
+the gateway is still reachable, the probe still succeeds, and the version is simply never shown.
+
 **The schema document is fetched once per gateway, not once per tab.** It is 531 KB uncompressed and
 four panels want it, while ThingsBoard ships with `HTTP_COMPRESSION_ENABLED` defaulting to false — so
 it is cached in the browser for the same 30 minutes the platform already caches it for. Turning HTTP

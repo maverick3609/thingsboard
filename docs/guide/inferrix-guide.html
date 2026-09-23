@@ -2246,6 +2246,13 @@ and a gateway that was never finished being adopted are four different problems 
 places — none of them the network. Amber is used deliberately for the expected steady states: the
 platform's service account is <em>not</em> a gateway administrator by design, so a refusal on the
 administrator-only routes is a healthy gateway, not a fault.</p>
+<p><strong>The health probe carries the gateway's version, because <code>/v2/about</code> is the only place it exists.</strong>
+The stack serves no version or uptime endpoint besides that one, so the probe that establishes
+reachability also reports identity rather than making the Details and Health tabs spend a second call
+on it. The field to read is <code>stackVersion</code> — <code>/v2/about</code> answers
+<code>{"stackVersion":"5.1.0","schemaVersion":29,"hostName":...,"modules":[...]}</code>, and the only <code>version</code>
+keys in that document belong to the individual entries of <code>modules[]</code>. Reading the wrong one is silent:
+the gateway is still reachable, the probe still succeeds, and the version is simply never shown.</p>
 <p><strong>The schema document is fetched once per gateway, not once per tab.</strong> It is 531 KB uncompressed and
 four panels want it, while ThingsBoard ships with <code>HTTP_COMPRESSION_ENABLED</code> defaulting to false — so
 it is cached in the browser for the same 30 minutes the platform already caches it for. Turning HTTP

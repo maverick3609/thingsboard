@@ -34,9 +34,9 @@
     </div>
 
     <div class="flex flex-row items-center gap-2 xs:flex-col xs:items-start">
-      <mat-checkbox formControlName="enabled">
+      <mat-slide-toggle formControlName="enabled">
         {{ 'inferrix.gateway.schedule-enabled' | translate }}
-      </mat-checkbox>
+      </mat-slide-toggle>
       <span class="flex-1"></span>
       <mat-form-field class="flex-1">
         <mat-label translate>inferrix.gateway.schedule-alarm-level</mat-label>

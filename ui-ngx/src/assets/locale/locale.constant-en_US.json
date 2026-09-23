@@ -4364,6 +4364,7 @@
       "rule-to": "To",
       "system": "System",
       "system-read-only": "Reported by the gateway. Its settings are changed in the gateway\u2019s own interface, not here.",
+      "system-needs-admin": "Some readings are not shown because they need a gateway administrator credential, and the platform connects with a narrower one on purpose.",
       "host-name": "Host name",
       "started-at": "Started at",
       "schema-version": "Database schema version",

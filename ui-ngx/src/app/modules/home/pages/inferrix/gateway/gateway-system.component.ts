@@ -40,6 +40,9 @@ export class GatewaySystemComponent extends GatewayPanelComponent {
   /** How many settings the gateway sent that this page deliberately does not paint. */
   withheldCount = 0;
 
+  /** A read was refused while the gateway itself answered — almost always the admin-only pair. */
+  restricted = false;
+
   loading = false;
   error: string;
 
@@ -58,17 +61,30 @@ export class GatewaySystemComponent extends GatewayPanelComponent {
     }
     this.loading = true;
     this.error = null;
+    this.restricted = false;
     const config = {ignoreLoading: true};
-    // `null` rather than a rethrow, so one refused read costs its own card and nothing else. The
-    // first error still reaches the operator -- `about` is the one that fails when the gateway is
-    // simply unreachable, and that is the message worth showing.
-    const soft = <T>(source: Observable<T>): Observable<T> =>
+    // `null` rather than a rethrow, so one refused read costs its own card and nothing else.
+    //
+    // Only `about` sets the panel error, and that is the point. Two of these five reads are
+    // administrator-only on the gateway -- `/v2/system-setting` goes through `ensureAdminRole` and
+    // so does `/v2/stack-monitor` -- while the platform's service account is deliberately NOT a
+    // gateway administrator (stack ask A5). So a 403 on those two is the expected steady state of a
+    // correctly configured gateway, not a fault, and painting it red would have operators chasing a
+    // healthy device. They are reported once, quietly, as "needs an administrator credential".
+    //
+    // `about` is different: it is the one read that needs no privilege at all, so its failure means
+    // the gateway is unreachable or the credential is bad, and that message is worth showing.
+    const soft = <T>(source: Observable<T>, primary = false): Observable<T> =>
       source.pipe(catchError((error: any) => {
-        this.error = this.error ?? this.messageOf(error);
+        if (primary) {
+          this.error = this.messageOf(error);
+        } else {
+          this.restricted = true;
+        }
         return of(null as T);
       }));
     forkJoin({
-      about: soft(this.gatewayService.getAbout(this.deviceId, config)),
+      about: soft(this.gatewayService.getAbout(this.deviceId, config), true),
       settings: soft(this.gatewayService.getSystemSettings(this.deviceId, config)),
       interfaces: soft(
         this.gatewayService.getNetworkInterfaces(this.deviceId, config)),

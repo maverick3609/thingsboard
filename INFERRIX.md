@@ -35,10 +35,11 @@ if you need to know which line of which upstream file carries a feature, read th
 8. [Widget Data Export](#8-widget-data-export)
 9. [Branding and navigation](#9-branding-and-navigation)
 10. [IO Controllers](#10-io-controllers)
-11. [Configuration reference](#11-configuration-reference)
-12. [REST API reference](#12-rest-api-reference)
-13. [Troubleshooting](#13-troubleshooting)
-14. [Maintaining the fork](#14-maintaining-the-fork)
+11. [Gateways](#11-gateways)
+12. [Configuration reference](#12-configuration-reference)
+13. [REST API reference](#13-rest-api-reference)
+14. [Troubleshooting](#14-troubleshooting)
+15. [Maintaining the fork](#15-maintaining-the-fork)
 
 ---
 
@@ -161,7 +162,7 @@ export INFERRIX_LICENSE_KEY="..."
 ```
 
 `thingsboard.yml` reads it via `license.key: "${INFERRIX_LICENSE_KEY:}"`. Four more tunables live in the
-same `license:` block — see the [configuration reference](#111-license-control).
+same `license:` block — see the [configuration reference](#121-license-control).
 
 ### 3.2 First boot
 
@@ -1110,7 +1111,7 @@ is the silicon UID, client id is `infx-{uid}`, and the password is 23 random byt
 because the firmware truncates `settings_mqtt.password` at 31 characters.
 
 **3. The discovery listener, if you want greenfield discovery.** Off by default. See
-[§11.6](#116-io-controllers).
+[§12.6](#126-io-controllers).
 
 ### 10.3 Discovery and adoption
 
@@ -1396,19 +1397,202 @@ Sections are written in dependency order — buses, queries, scalings, points, p
 peers — because a record naming a record that does not exist yet is refused on the spot.
 
 Templates are tenant-private, capped at 200 per tenant, and stored in `inferrix_controller_template`
-([§14.3](#143-adding-new-database-objects)). They are deliberately not a ThingsBoard entity type: nothing
+([§15.3](#153-adding-new-database-objects)). They are deliberately not a ThingsBoard entity type: nothing
 else in the platform refers to one, and they are outside export and alias resolution.
 
 ---
 
-## 11. Configuration reference
+## 11. Gateways
+
+Inferrix gateways — the Mango-derived edge server that speaks BACnet, Modbus, MQTT, SNMP, OPC-DA and
+Wirepas to a building's plant — configured end to end from Cortex. This **replaces ThingsBoard's own
+Gateways page in place**: the menu entry, the breadcrumb and every existing `/entities/gateways` link
+keep working, and there is no second Gateways item to explain.
+
+**Where:** Entities → **Gateways** (`/entities/gateways`) for the adopted fleet, and **Pending
+gateways** for boxes that have announced themselves but have not been adopted.
+
+Distinct from IO Controllers ([§10](#10-io-controllers)). A controller is a soft-PLC board; a gateway is
+a Linux server running the Inferrix stack, with its own REST API, its own users and its own database.
+The two features share patterns and one security guard, nothing else.
+
+### 11.1 The constraint everything follows from
+
+**A gateway is reachable on the local LAN or over a VPN, and no other way.** That is a deployment
+fact, not a policy, and it decides the whole design:
+
+- **Cortex must sit on the same network.** A cloud-hosted Cortex cannot manage a gateway at all.
+- **No public CA can issue a certificate for it.** Its address is RFC1918 or `.local`, so trust is
+  established by pinning the certificate the gateway presents at adoption and refusing any change to
+  it afterwards.
+- **The platform is the only thing that talks to a gateway.** It holds the pinned fingerprint and the
+  API token, exchanges the token for a short-lived JWT, and proxies every call. The browser holds
+  none of them and never connects to a gateway directly.
+- **The outbound guard must keep permitting private addresses**, because reaching *into* a private
+  network is the product. It blocks loopback, any-local, link-local and multicast instead.
+
+### 11.2 Adopting a gateway
+
+A gateway announces itself over the platform's own MQTT transport and appears under **Pending
+gateways**. Adoption takes the API token pair the gateway's own interface issues, dials the address
+the gateway published, captures the certificate it presents, and — only if that certificate is not a
+known-compromised one — seals the credential and writes it to device attributes.
+
+**The ordering is load-bearing.** The certificate is vetted *before* the credential is spent, so a
+box serving a leaked certificate never receives the operator's token.
+
+An adopted gateway is a `DEVICE` on the auto-created **`Inferrix Gateway`** device profile. Nothing
+about it is special-cased: attributes, telemetry, alarms, audit log, rule chains, dashboards and the
+licence device cap all apply as they do to any other device.
+
+> [!WARNING]
+> **Re-adopting under an existing name overwrites its address, pin and credential.** Every dashboard,
+> alarm rule and telemetry series on that device then reflects different physical plant. Replacing
+> failed hardware is a legitimate reason to do it, so the platform asks rather than refuses — but it
+> asks for a reason.
+
+> [!IMPORTANT]
+> Set `TB_GATEWAY_DASHBOARD_SYNC_ENABLED=false` in `/etc/thingsboard/conf/thingsboard.yml`, or
+> `DashboardSyncService` git-pulls ThingsBoard's stock gateways dashboard back every 24 hours.
+
+### 11.3 What the tabs do
+
+A gateway's details page carries eight tabs. Each one talks to the device only once its tab is
+opened — every panel is a real call across a LAN to a small box behind a per-device connection
+limiter, so a panel that loaded on construction would spend one on every details drawer an operator
+happens to open.
+
+| Tab | What it is for |
+|---|---|
+| **Health** | Whether the platform can reach this gateway, and if not, *why* |
+| **Data sources** | The protocol connections — a Modbus device, a BACnet network, an MQTT broker |
+| **Data points** | The individual measured and controlled values of one data source |
+| **Event log** | The events the gateway has raised, and acknowledging them |
+| **Event handlers** | What the gateway does when an event fires — email, SMS, a set point, a process |
+| **Alert routing** | Who is notified, from which severity upwards |
+| **Schedules** | Weekly active/inactive patterns that handlers and alert routing follow |
+| **Rule sets** | Named groups of dates that a schedule makes exceptions for |
+| **System** | What the gateway reports about itself — version, modules, network, settings |
+
+**Health reports a reason, not a verdict.** "Unreachable" is the answer an operator expects and the
+one that teaches them nothing, while a rejected token, an under-privileged one, a changed certificate
+and a gateway that was never finished being adopted are four different problems in four different
+places — none of them the network. Amber is used deliberately for the expected steady states: the
+platform's service account is *not* a gateway administrator by design, so a refusal on the
+administrator-only routes is a healthy gateway, not a fault.
+
+**Data points are always scoped to one data source.** A gateway in a building carries thousands of
+points; an unscoped list would page through all of them, and an operator looking for the points of
+one Modbus device would never find them. Live values are read one point at a time, on request,
+because the gateway has no bulk point-value endpoint.
+
+### 11.4 Forms come from the gateway, not from Cortex
+
+Most of what these tabs edit is rendered from a schema the gateway publishes, so a Modbus data source
+and a BACnet one are the same component with different inputs. That is the economic argument for the
+whole feature: the gateway's own interface hand-codes roughly forty per-protocol forms, and
+replicating those would make them the project — and would put Cortex in permanent lock-step with the
+gateway, needing a release every time the gateway gained a module.
+
+> [!IMPORTANT]
+> **Schema-driven forms currently render nothing**, because the gateway's `/v2/model-schemas`
+> endpoint returns an empty document on stack 5.1.0. This is a gateway-side defect, tracked as **D8**
+> in the stack findings document (`Inferrix-stack/docs/specs/2026-09-23-cortex-gateway-g4-g6-stack-findings.md`).
+> The hand-written surfaces — alert routing, recipients, schedules, rule sets, system — are
+> unaffected and work today.
+
+A few things are hand-written on purpose rather than for want of a schema:
+
+- **Recipients**, because the gateway declares the type but ships none of its five subtypes, so a
+  schema-built form would render the kind of recipient and silently drop the address.
+- **Alert routing**, because it has no subtypes and so is not a schema family at all.
+- **Schedules and rule sets**, for the same reason — and the published schema would not have helped
+  if it existed: it describes a weekly schedule as an object while the gateway sends an array.
+
+### 11.5 Schedules
+
+A schedule is a weekly active/inactive pattern. Set-point handlers and alert routing follow it, so
+this is where "the plant runs 08:00 to 17:00 on weekdays" is written down.
+
+**Times toggle the schedule; they are not on/off pairs.** The state carries over from the previous
+day, so `08:00, 17:00` on a Monday is an active window only if Monday began inactive. This is the
+gateway's model and the form does not pretend otherwise.
+
+Each day is one comma-separated field — `08:00, 17:00` — accepting `HH:mm`, `HH:mm:ss` or
+`HH:mm:ss.SSS`, strictly increasing. A week is always seven days, Sunday first, and Cortex pads it
+before sending: the gateway accepts a shorter week and then fails when the schedule is *enabled*,
+leaving a schedule that can never be turned on.
+
+**Exceptions** replace the weekly times on dates a rule set selects. A rule set is a named group of
+dates — "public holidays" — written once and pointed at by every schedule that needs it. Each rule is
+a date with any part left open meaning "any", so 25 December of every year is a rule with no year,
+month 12, day 25. Rule sets live on their own tab because they are shared.
+
+> [!NOTE]
+> Creating a schedule or a rule set requires a **gateway administrator** credential. The platform
+> connects with a narrower one by design, so with the default service account these tabs can list and
+> edit but not create. Tracked as **D11** in the stack findings document.
+
+### 11.6 The System tab is read-only, deliberately
+
+It reports the gateway's version, module list, licence usage, network interfaces, languages, runtime
+monitor values and system settings. It writes nothing, and that is a decision rather than an unfinished
+phase: the gateway's settings-write route takes an arbitrary key over its entire configuration
+keyspace — mail relay, backup paths, thread pools, licence — and is not on the platform's allowlist.
+Settings are changed in the gateway's own interface.
+
+Two settings the gateway returns are withheld from the page: its licence blob and a third-party API
+token. Reading them is already permitted, so this is not an access control — it is surface. A
+diagnostics table that gets screenshotted into a ticket has no business carrying either.
+
+### 11.7 What Cortex will not do to a gateway
+
+The platform proxies only an explicit allowlist of verb-and-path pairs. Three families are excluded
+by decision, and adding any of them is a deliberate act, not a follow-up task:
+
+| Excluded | Why |
+|---|---|
+| `/v2/script`, `/v2/global-scripts`, `/v2/script-data-source` | Remote code execution on the gateway host. Allowing these needs a recorded decision on who may call them, an audit-log entry for every script write, and a review that treats it as an RCE feature — because it is |
+| `/certificate-service/**`, `/certificate-authority-service/**` | Signs arbitrary certificate requests — escalation well beyond configuration |
+| `PUT /v2/system-setting/{key}` | An arbitrary-key write over the gateway's whole configuration keyspace ([§11.6](#116-the-system-tab-is-read-only-deliberately)) |
+| `PUT /v2/point-value/{xid}` | Writing a live point value is a write to building plant. It needs its own decision, not a line item |
+
+Scripts remain editable in the gateway's own interface. That is the intended outcome, not a gap.
+
+### 11.8 Who can see and do what
+
+- **Tenant administrators** adopt gateways and change their configuration.
+- **Customer users** see the gateways assigned to their customer, read-only.
+- **Administrator-only gateway routes** — system settings, the runtime monitor, and the platform-link
+  routes — additionally require the Cortex user to be a tenant administrator, because reading a
+  gateway's settings is not the same question as writing to a device.
+- **Holders of a shared public-dashboard link get nothing.** ThingsBoard builds that viewer as a real
+  customer user on the public customer and the public role grants device read, so authority alone
+  cannot tell them apart. The proxy identifies and refuses them explicitly, and the IO Controller
+  proxy shares the same guard.
+
+### 11.9 Troubleshooting
+
+| Symptom | Cause |
+|---|---|
+| Every form is empty | The gateway's `/v2/model-schemas` returns an empty document — stack defect D8. Hand-written tabs still work |
+| Health says the certificate changed | The gateway is presenting a different certificate than at adoption. Either the box was rebuilt, or something else is answering on that address. Re-adopt only once you know which |
+| Health says forbidden | Expected on the administrator-only routes: the service account is not a gateway administrator by design |
+| "Add point" is disabled | The data source has no points yet, so the point type cannot be determined. The gateway publishes no data-source-to-point-type mapping (stack ask A11); create the first point in the gateway's own interface |
+| A schedule will not enable | It was saved with fewer than seven days by something other than Cortex — stack defect D9 |
+| Stray `???some.key(i18n_en)???` text | An untranslated key rendered by the gateway and passed through unchanged. Stack defect D14; Cortex shows it as sent rather than hiding a gateway-side gap |
+| The stock ThingsBoard gateways dashboard came back | `TB_GATEWAY_DASHBOARD_SYNC_ENABLED` is not `false` ([§11.2](#112-adopting-a-gateway)) |
+
+---
+
+## 12. Configuration reference
 
 Every Inferrix-added configuration key, its environment variable, and its default. Set environment
 variables in `/etc/thingsboard/conf/thingsboard.conf`; the YAML paths below refer to
 `/etc/thingsboard/conf/thingsboard.yml` — see [§2.2](#22-configuration-file-layout) for why the external
 file is the one that counts.
 
-### 11.1 License Control
+### 12.1 License Control
 
 | YAML path | Env var | Default | Meaning |
 |---|---|---|---|
@@ -1418,7 +1602,7 @@ file is the one that counts.
 | `license.clock_tolerance_ms` | `INFERRIX_LICENSE_CLOCK_TOLERANCE_MS` | `3600000` (1h) | How far the clock may move backwards before it counts as tampering. Absorbs an NTP correction. |
 | `license.max_high_water_advance_ms` | `INFERRIX_LICENSE_MAX_HIGH_WATER_ADVANCE_MS` | `86400000` (24h) | How far a single check may advance the clock-rollback high-water mark. See [§3.5](#35-recovering-from-exit-code-18). |
 
-### 11.2 Reporting
+### 12.2 Reporting
 
 | YAML path | Env var | Default | Meaning |
 |---|---|---|---|
@@ -1430,27 +1614,27 @@ file is the one that counts.
 | `reports.generation_timeout_ms` | `REPORTS_GENERATION_TIMEOUT_MS` | `120000` | Per-render timeout. |
 | `reports.test_report_pool_size` | `REPORTS_TEST_REPORT_POOL_SIZE` | `12` | Pool for preview/test renders. |
 
-### 11.3 Scheduler
+### 12.3 Scheduler
 
 | YAML path | Env var | Default | Meaning |
 |---|---|---|---|
 | `scheduler.min_interval` | `SCHEDULER_MIN_INTERVAL_IN_SEC` | `60` | Minimum interval for `TIMER` events, in seconds. |
 | `audit-log.logging-level.mask.scheduler_event` | `AUDIT_LOG_MASK_SCHEDULER_EVENT` | `W` | Audit-log mask for scheduler event CRUD. |
 
-### 11.4 White Labeling
+### 12.4 White Labeling
 
 | YAML path | Env var | Default | Meaning |
 |---|---|---|---|
 | `cache.specs.whiteLabeling.timeToLiveInMinutes` | `CACHE_SPECS_WHITE_LABELING_TTL` | `1440` | WL parameter cache TTL. |
 | `cache.specs.whiteLabeling.maxSize` | `CACHE_SPECS_WHITE_LABELING_MAX_SIZE` | `10000` | `0` disables the cache. |
 
-### 11.5 Branding
+### 12.5 Branding
 
 | YAML path | Env var | Default | Meaning |
 |---|---|---|---|
 | `security.jwt.tokenIssuer` | `JWT_TOKEN_ISSUER` | `inferrix.com` | JWT issuer, shown under Security → General. Changed from upstream's `thingsboard.io`. |
 
-### 11.6 IO Controllers
+### 12.6 IO Controllers
 
 | YAML path | Env var | Default | Meaning |
 |---|---|---|---|
@@ -1465,18 +1649,18 @@ The broker the platform points adopted controllers at is **not** configuration �
 
 ---
 
-## 12. REST API reference
+## 13. REST API reference
 
 Inferrix-added endpoints. All are under `/api` and require a bearer token except where marked
 `noauth`. Stock ThingsBoard endpoints are unchanged and documented upstream.
 
-### 12.1 License
+### 13.1 License
 
 | Method | Path | Notes |
 |---|---|---|
 | `GET` | `/api/license/info` | Capacity, expiry. Customer name and instance ID **omitted** for non-sys-admin callers. |
 
-### 12.2 Roles
+### 13.2 Roles
 
 | Method | Path | Notes |
 |---|---|---|
@@ -1487,7 +1671,7 @@ Inferrix-added endpoints. All are under `/api` and require a bearer token except
 | `GET` | `/api/user/{userId}/roles` | |
 | `POST` | `/api/user/{userId}/roles` | Replaces the user's whole role set. Refused for non-customer users and for your own account. |
 
-### 12.3 White labeling
+### 13.3 White labeling
 
 | Method | Path | Notes |
 |---|---|---|
@@ -1509,7 +1693,7 @@ Inferrix-added endpoints. All are under `/api` and require a bearer token except
 | `GET` | `/api/whiteLabel/mailTemplates` | Sys admin. |
 | `POST` | `/api/whiteLabel/mailTemplates` | Sys admin. |
 
-### 12.4 Scheduler
+### 13.4 Scheduler
 
 | Method | Path | Notes |
 |---|---|---|
@@ -1523,7 +1707,7 @@ Inferrix-added endpoints. All are under `/api` and require a bearer token except
 | `GET` | `/api/schedulerEvents?startTime&endTime` | Calendar window. |
 | `GET` | `/api/schedulerEvents?schedulerEventIds=` | By id list. |
 
-### 12.5 Reporting
+### 13.5 Reporting
 
 | Method | Path | Notes |
 |---|---|---|
@@ -1544,7 +1728,7 @@ Inferrix-added endpoints. All are under `/api` and require a bearer token except
 | `POST` | `/api/report/{dashboardId}/download` | On-demand dashboard render → `application/pdf`, `image/png`, `image/jpeg`. |
 | `POST` | `/api/report/test` | On-demand dashboard render of an unsaved dashboard-report config. Distinct from `/api/v2/report/test` above. |
 
-### 12.6 IO Controllers
+### 13.6 IO Controllers
 
 All under `/api/inferrix/controllers`. None is covered by the RBAC read gate (an allowlist of upstream
 URL patterns); each checks its own permission.
@@ -1579,7 +1763,7 @@ Reboot and PID auto-tune have no endpoints of their own — they are proxy route
 
 ---
 
-## 13. Troubleshooting
+## 14. Troubleshooting
 
 | Symptom | Most likely cause |
 |---|---|
@@ -1617,9 +1801,9 @@ Reboot and PID auto-tune have no endpoints of their own — they are proxy route
 
 ---
 
-## 14. Maintaining the fork
+## 15. Maintaining the fork
 
-### 14.1 Where Inferrix code lives
+### 15.1 Where Inferrix code lives
 
 Two kinds of change:
 
@@ -1643,7 +1827,7 @@ ui-ngx/src/app/shared/models/{scheduler-event,report,report-configuration,white-
 **Modifications to upstream files.** Every one of these is recorded in `INFERRIX-PATCHES.md` with what
 was changed, why, and how to recover it. There are roughly 160 such rows across ten features.
 
-### 14.2 Upstream merges
+### 15.2 Upstream merges
 
 Upstream periodically **rebuilds** `release-4.3`'s history, so a sync is a re-merge against an old merge
 base rather than a fast-forward. Expect roughly 68 conflicts, including spurious rename/rename
@@ -1675,12 +1859,12 @@ The highest-risk files, in order:
 Version bumps follow one rule: bump only if upstream ships a database upgrade at a version we already
 occupy. A shared version label on its own is not a conflict.
 
-### 14.3 Adding new database objects
+### 15.3 Adding new database objects
 
 Append idempotent DDL to `dao/src/main/resources/sql/schema-inferrix.sql`. Nothing else changes: no
 upstream schema file, no new seam, no new ledger row. See [§2.1](#21-the-database-schema-overlay).
 
-### 14.4 Conventions
+### 15.4 Conventions
 
 - New Inferrix-authored files carry a `The Inferrix Authors` licence header, not
   `The Thingsboard Authors`. The form is **build-enforced**: `license:check` in the Maven reactor
@@ -1692,7 +1876,7 @@ upstream schema file, no new seam, no new ledger row. See [§2.1](#21-the-databa
 - Reuse ThingsBoard's own services directly. The Inferrix modules depend on all upstream modules;
   parallel implementations of something the platform already provides are the wrong shape here.
 
-### 14.5 Keeping this document current
+### 15.5 Keeping this document current
 
 `INFERRIX.md` is the source. `docs/guide/inferrix-guide.html` is its published rendering, produced by
 `docs/guide/render-guide.py` — deterministic, offline, and the only thing that should ever write that
@@ -1713,7 +1897,7 @@ bash docs/guide/install-hooks.sh
   markdown and the HTML land in the same commit and cannot disagree. It refuses the commit if the
   markdown links to a section that no longer exists — renumbered sections are the one way this
   document rots. (It also runs the licence-header check described in
-  [§14.4](#144-conventions), when that script is present — it lives in the gitignored `.claude/`, so a
+  [§15.4](#154-conventions), when that script is present — it lives in the gitignored `.claude/`, so a
   fresh clone has the guide hooks but not that one, and the installer says so.)
 - **post-commit** records any `feat` or `fix` commit that changed code this guide describes without
   touching `INFERRIX.md`, as an unticked line in `docs/guide/DOC-DEBT.md`.

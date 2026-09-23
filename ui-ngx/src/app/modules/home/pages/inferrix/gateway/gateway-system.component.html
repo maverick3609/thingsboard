@@ -18,6 +18,14 @@
     @if (error) {
       <div class="tb-error-message">{{ error }}</div>
     }
+    <!--
+      Not an error. The platform's service account is deliberately not a gateway administrator, and
+      the settings and monitor reads are administrator-only, so this is the expected steady state of
+      a healthy gateway.
+    -->
+    @if (restricted && !error) {
+      <div class="tb-form-panel-hint" translate>inferrix.gateway.system-needs-admin</div>
+    }
     <div class="tb-form-panel-hint" translate>inferrix.gateway.system-read-only</div>
   </div>
 

@@ -77,6 +77,16 @@ export class GatewayDetectorsDialogComponent
     return this.data.point?.pointLocator?.dataType;
   }
 
+  /**
+   * The gateway publishes a human name for every detector type it offers, so show that rather than
+   * the enum. A detector whose type is not in the offered set -- one added before the point's data
+   * type changed, say -- still has to say something, and the enum is what there is.
+   */
+  typeName(detector: GatewayEventDetector): string {
+    return this.types.find(type => type.type === detector.detectorType)?.name
+      || detector.detectorType;
+  }
+
   handlerSummary(detector: GatewayEventDetector): string {
     const xids = Array.isArray(detector?.handlerXids) ? detector.handlerXids : [];
     return xids.length ? xids.join(', ') : '—';

@@ -27,7 +27,7 @@
     </ng-container>
     <ng-container matColumnDef="detectorType">
       <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.gateway.model-kind' | translate }}</th>
-      <td mat-cell *matCellDef="let detector">{{ detector.detectorType }}</td>
+      <td mat-cell *matCellDef="let detector">{{ typeName(detector) }}</td>
     </ng-container>
     <ng-container matColumnDef="alarmLevel">
       <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.gateway.alarm-level' | translate }}</th>

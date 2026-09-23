@@ -2246,6 +2246,10 @@ and a gateway that was never finished being adopted are four different problems 
 places — none of them the network. Amber is used deliberately for the expected steady states: the
 platform's service account is <em>not</em> a gateway administrator by design, so a refusal on the
 administrator-only routes is a healthy gateway, not a fault.</p>
+<p><strong>The schema document is fetched once per gateway, not once per tab.</strong> It is 531 KB uncompressed and
+four panels want it, while ThingsBoard ships with <code>HTTP_COMPRESSION_ENABLED</code> defaulting to false — so
+it is cached in the browser for the same 30 minutes the platform already caches it for. Turning HTTP
+compression on is worth doing anyway: this document gzips to 27 KB.</p>
 <p><strong>Data points are always scoped to one data source.</strong> A gateway in a building carries thousands of
 points; an unscoped list would page through all of them, and an operator looking for the points of
 one Modbus device would never find them. Live values are read one point at a time, on request,
@@ -2256,14 +2260,16 @@ and a BACnet one are the same component with different inputs. That is the econo
 whole feature: the gateway's own interface hand-codes roughly forty per-protocol forms, and
 replicating those would make them the project — and would put Cortex in permanent lock-step with the
 gateway, needing a release every time the gateway gained a module.</p>
-<aside class="callout">
-<p>[!IMPORTANT]
-<strong>Schema-driven forms currently render nothing</strong>, because the gateway's <code>/v2/model-schemas</code>
-endpoint returns an empty document on stack 5.1.0. This is a gateway-side defect, tracked as <strong>D8</strong>
-in the stack findings document (<code>Inferrix-stack/docs/specs/2026-09-23-cortex-gateway-g4-g6-stack-findings.md</code>).
-The hand-written surfaces — alert routing, recipients, schedules, rule sets, system — are
-unaffected and work today.</p>
-</aside>
+<p>A real gateway publishes 63 data source types, 61 point locators, 6 publishers, 14 event detectors
+and 4 event handlers, sharing 178 component schemas between them. Two things in that document decide
+how a field is rendered, and both come from the gateway rather than from any table here:</p>
+<ul>
+<li><strong><code>readOnly</code></strong> — a value the gateway computes and will not accept back, such as a data source's
+  connection description. Shown, never editable.</li>
+<li><strong><code>writeOnly</code></strong> — a secret the gateway accepts and never returns: an MQTT broker password, an OPC
+  password, a private key. Shown as a password field, and <strong>an empty one means "unchanged"</strong> rather
+  than "erase it", because the field is always empty on load whether or not a credential is stored.</li>
+</ul>
 <p>A few things are hand-written on purpose rather than for want of a schema:</p>
 <ul>
 <li><strong>Recipients</strong>, because the gateway declares the type but ships none of its five subtypes, so a
@@ -2290,7 +2296,7 @@ month 12, day 25. Rule sets live on their own tab because they are shared.</p>
 <p>[!NOTE]
 Creating a schedule or a rule set requires a <strong>gateway administrator</strong> credential. The platform
 connects with a narrower one by design, so with the default service account these tabs can list and
-edit but not create. Tracked as <strong>D11</strong> in the stack findings document.</p>
+edit but not create. Tracked as <strong>D11</strong> in the stack findings document and still open.</p>
 </aside>
 <h3 id="116-the-system-tab-is-read-only-deliberately">11.6 The System tab is read-only, deliberately</h3>
 <p>It reports the gateway's version, module list, licence usage, network interfaces, languages, runtime
@@ -2354,7 +2360,7 @@ by decision, and adding any of them is a deliberate act, not a follow-up task:</
 <tbody>
 <tr>
 <td>Every form is empty</td>
-<td>The gateway's <code>/v2/model-schemas</code> returns an empty document — stack defect D8. Hand-written tabs still work</td>
+<td>The gateway's <code>/v2/model-schemas</code> is returning an empty document. Hand-written tabs still work. Fixed in the stack on 2026-09-23 (finding D8); an older gateway will still do this</td>
 </tr>
 <tr>
 <td>Health says the certificate changed</td>
@@ -2366,15 +2372,15 @@ by decision, and adding any of them is a deliberate act, not a follow-up task:</
 </tr>
 <tr>
 <td>"Add point" is disabled</td>
-<td>The data source has no points yet, so the point type cannot be determined. The gateway publishes no data-source-to-point-type mapping (stack ask A11); create the first point in the gateway's own interface</td>
+<td>The gateway did not publish a <code>pointLocatorType</code> for this data source type <em>and</em> it has no points to learn one from. One real type does this (<code>BACNET_MSTP.DS</code>); create its first point in the gateway's own interface</td>
 </tr>
 <tr>
 <td>A schedule will not enable</td>
-<td>It was saved with fewer than seven days by something other than Cortex — stack defect D9</td>
+<td>It was saved with fewer than seven days by something other than Cortex. Newer gateways refuse this at save time (finding D9)</td>
 </tr>
 <tr>
 <td>Stray <code>???some.key(i18n_en)???</code> text</td>
-<td>An untranslated key rendered by the gateway and passed through unchanged. Stack defect D14; Cortex shows it as sent rather than hiding a gateway-side gap</td>
+<td>An untranslated key rendered by the gateway and passed through unchanged. Fixed in the stack (finding D14); Cortex shows such text as sent rather than hiding a gateway-side gap</td>
 </tr>
 <tr>
 <td>The stock ThingsBoard gateways dashboard came back</td>

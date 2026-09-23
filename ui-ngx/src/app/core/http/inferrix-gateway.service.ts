@@ -2,14 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, throwError } from 'rxjs';
+import { catchError, shareReplay } from 'rxjs/operators';
 import { defaultHttpOptionsFromConfig, RequestConfig } from '@core/http/http-utils';
 import { Device } from '@shared/models/device.models';
 import { AdoptGatewayRequest, GatewayReachability,
   PendingGateway } from '@shared/models/inferrix-gateway.models';
 import { GatewaySchemaDocument } from '@shared/models/inferrix-gateway-schema.models';
-import { GatewayDataPoint, GatewayDataSource, GatewayListQuery, GatewayPage,
-  GatewayPointValue, GatewayProxyParams } from '@shared/models/inferrix-gateway-data.models';
+import { GatewayDataPoint, GatewayDataSource, GatewayDataSourceType, GatewayListQuery,
+  GatewayPage, GatewayPointValue, GatewayProxyParams } from '@shared/models/inferrix-gateway-data.models';
 import { GatewayAlertList, GatewayEventDetector, GatewayEventHandler, GatewayEventInstance,
   GatewayTypeOption } from '@shared/models/inferrix-gateway-event.models';
 import { GatewayCalendarRuleSet, GatewaySchedule,
@@ -25,10 +26,17 @@ import { GatewayAbout, GatewayLanguage, GatewayMonitorValue, GatewayNetworkInter
  * certificate can assert — so the platform holds the pinned fingerprint, and it holds the API
  * token that is exchanged for a short-lived JWT. The browser handles none of them.
  */
+/** Matches `InferrixGatewaySchemaService.CACHE_TTL` on the platform side. */
+const SCHEMA_CACHE_MS = 30 * 60 * 1000;
+
 @Injectable({
   providedIn: 'root'
 })
 export class InferrixGatewayService {
+
+  /** Per-gateway schema documents, see {@link getSchemas}. */
+  private readonly schemaCache =
+    new Map<string, {at: number; document$: Observable<GatewaySchemaDocument>}>();
 
   constructor(private http: HttpClient) {}
 
@@ -63,9 +71,40 @@ export class InferrixGatewayService {
    * so a slice would hold dangling references. Cached platform-side per device for 30 minutes — it
    * changes only when the gateway's build changes.
    */
+  /**
+   * The gateway's whole schema document, fetched at most once per gateway per cache window.
+   *
+   * **The caching is not a micro-optimisation.** A real 5.1.0 document is 531 KB — 63 data source
+   * types, 61 locators, 178 shared components — and four panels want it: data sources, data points,
+   * event handlers and the detectors dialog. ThingsBoard ships with `HTTP_COMPRESSION_ENABLED`
+   * defaulting to **false**, so without this a tenant administrator opening one gateway's details
+   * page downloads and parses two megabytes of JSON to render four forms.
+   *
+   * The window matches `InferrixGatewaySchemaService.CACHE_TTL` on the platform side deliberately.
+   * Within it the platform would answer from its own cache with the same bytes, so holding them here
+   * adds no staleness that was not already there — it only stops the browser asking for what it was
+   * about to be told again. A gateway upgraded mid-window shows its old forms until the window
+   * passes or the page is reloaded, which is the same behaviour the platform cache already has.
+   *
+   * `shareReplay` rather than a stored value: several panels activate at once on a details page, and
+   * a plain flag would let all four fire before the first response arrived.
+   */
   public getSchemas(deviceId: string, config?: RequestConfig): Observable<GatewaySchemaDocument> {
-    return this.http.get<GatewaySchemaDocument>(`/api/inferrix/gateways/${deviceId}/schemas`,
-      defaultHttpOptionsFromConfig(config));
+    const cached = this.schemaCache.get(deviceId);
+    if (cached && Date.now() - cached.at < SCHEMA_CACHE_MS) {
+      return cached.document$;
+    }
+    const document$ = this.http.get<GatewaySchemaDocument>(
+      `/api/inferrix/gateways/${deviceId}/schemas`, defaultHttpOptionsFromConfig(config)).pipe(
+        // A failure must not be cached as though it were a document, or one unreachable moment
+        // would blank every form on this gateway for the rest of the window.
+        catchError(error => {
+          this.schemaCache.delete(deviceId);
+          return throwError(() => error);
+        }),
+        shareReplay({bufferSize: 1, refCount: false}));
+    this.schemaCache.set(deviceId, {at: Date.now(), document$});
+    return document$;
   }
 
   /**
@@ -134,9 +173,10 @@ export class InferrixGatewayService {
       {enabled, restart: enabled && restart});
   }
 
+  /** Carries `pointLocatorType` — the only published data-source-to-point-locator pairing. */
   public getDataSourceTypes(deviceId: string,
-                            config?: RequestConfig): Observable<GatewayPage<{type: string; name: string}>> {
-    return this.proxy<GatewayPage<{type: string; name: string}>>(deviceId, 'GET',
+                            config?: RequestConfig): Observable<GatewayPage<GatewayDataSourceType>> {
+    return this.proxy<GatewayPage<GatewayDataSourceType>>(deviceId, 'GET',
       '/v2/data-source-types', null, config);
   }
 

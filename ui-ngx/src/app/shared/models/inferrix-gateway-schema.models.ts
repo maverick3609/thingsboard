@@ -47,22 +47,49 @@ const REF_PREFIX = '#/components/schemas/';
 const PROPERTY_NAME = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 
 /**
- * Components whose schema does not describe what is actually on the wire.
+ * Components a gateway declares as an object while putting a plain string on the wire.
  *
- * `MessageTranslation` is declared as `{key, args}` because that is the Java class swagger
- * introspected, but `StackRestJacksonModule` registers a **serializer only**
- * (`MessageTranslationSerializer`) that writes `translate(...)` — a plain string. So the gateway
- * sends a string and the schema says object, and a form built from the schema would offer `key`
- * and `args` inputs for a field that is one line of text.
+ * `MessageTranslation` is the only one, and it is **legacy handling kept on purpose**. It was
+ * declared `{key, args}` because that is the Java class swagger introspected, while
+ * `StackRestJacksonModule` registers a serializer and no deserializer — so the wire carries a
+ * translated string in both directions, a form built from that schema offered two inputs for one
+ * line of text, and a value written back became the *key*.
  *
- * Rendered read-only, which is the other half of the same asymmetry: there is no deserializer, so
- * a string written back becomes the *key*, and an unknown key comes back as `???text(en)???`
- * rather than as itself. These fields are derived display strings the gateway computes (a data
- * source's connection description, for instance), so showing them and never writing them is both
- * correct and the only safe option. The model's original value survives regardless — the dialog
- * merges the untouched model under the form's values.
+ * Stack ask A12 fixed it: a current gateway declares these as `{"type": "string", "readOnly": true}`
+ * and {@link isReadOnly} handles them with no type name involved. But A12 landed **after** 5.1.0
+ * shipped, and a 5.1.0 gateway from before it is still adoptable and still sends the `$ref`. So this
+ * stays until the oldest adoptable gateway carries the fix, and not one release longer — a generic
+ * mapper carrying a list of model class names is exactly the debt A12 was raised to remove.
  */
 const WIRE_STRING_COMPONENTS = new Set<string>(['MessageTranslation']);
+
+/**
+ * A field the gateway computes and will not accept back.
+ *
+ * `readOnly` is the gateway's own word for it, and there are 436 of them in a real 5.1.0 document —
+ * a data source's connection description, a point's runtime state, every derived display string.
+ * Rendering one as an editable input invites an operator to change a value that is silently
+ * discarded, and leaves them with no way to tell which fields their edit will actually reach.
+ *
+ * It is also how a current gateway declares the fields {@link WIRE_STRING_COMPONENTS} names by hand,
+ * which is why that set is legacy and has a removal condition rather than a future.
+ */
+const isReadOnly = (schema: any): boolean => schema?.readOnly === true;
+
+/**
+ * A field the gateway accepts but never returns.
+ *
+ * `writeOnly` marks exactly the secrets: an MQTT broker's `userPassword` and `privateKey`, an OPC
+ * server's `password`. It is the **only** signal for them — a real document carries no
+ * `format: password` at all, so a mapper that keyed on format alone would render a broker
+ * credential as a plain text input.
+ *
+ * Two consequences, and the second is the one that bites. Rendering: password-typed, never in the
+ * clear. Saving: the field comes back absent on read, so the form holds an empty value for it, and
+ * a save that sent that empty value would **blank the stored secret**. Emptiness therefore has to
+ * mean "unchanged" — see {@link GatewayModelDialogComponent.save}.
+ */
+const isWriteOnly = (schema: any): boolean => schema?.writeOnly === true;
 
 /**
  * Turns one model type's schema into ThingsBoard form properties.
@@ -191,6 +218,15 @@ const toProperty = (key: string, raw: any, required: boolean, doc: GatewaySchema
 
   if (resolved.description) {
     base.hint = escapeCell(resolved.description);
+  }
+
+  // Checked on both the property's own schema and the resolved one: swagger writes `readOnly`
+  // beside a `$ref` as often as inside the target, and either spelling means the same thing.
+  if (isReadOnly(raw) || isReadOnly(resolved)) {
+    return {...base, disabled: true};
+  }
+  if (isWriteOnly(raw) || isWriteOnly(resolved)) {
+    return {...base, type: FormPropertyType.password};
   }
 
   const branch = refName ? new Set<string>([...seen, refName]) : seen;

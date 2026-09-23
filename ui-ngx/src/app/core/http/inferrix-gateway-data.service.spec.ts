@@ -183,3 +183,96 @@ describe('gateway page mapping', () => {
     });
   });
 });
+
+describe('InferrixGatewayService schema document', () => {
+
+  const DEVICE = 'device-1';
+  let service: InferrixGatewayService;
+  let httpMock: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
+      providers: [InferrixGatewayService]
+    });
+    service = TestBed.inject(InferrixGatewayService);
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => httpMock.verify());
+
+  it('fetches one gateway\'s schemas once however many panels ask', () => {
+    // A real document is 531 KB and four panels want it. ThingsBoard ships with HTTP compression
+    // off by default, so without this a details page pulls two megabytes to render four forms.
+    const seen: any[] = [];
+    service.getSchemas(DEVICE).subscribe(document => seen.push(document));
+    service.getSchemas(DEVICE).subscribe(document => seen.push(document));
+
+    httpMock.expectOne(`/api/inferrix/gateways/${DEVICE}/schemas`).flush({families: {}, components: {schemas: {}}});
+
+    service.getSchemas(DEVICE).subscribe(document => seen.push(document));
+    httpMock.expectNone(`/api/inferrix/gateways/${DEVICE}/schemas`);
+    expect(seen.length).toBe(3);
+  });
+
+  it('keeps one gateway\'s schemas out of another\'s', () => {
+    service.getSchemas('gateway-a').subscribe();
+    service.getSchemas('gateway-b').subscribe();
+    httpMock.expectOne('/api/inferrix/gateways/gateway-a/schemas').flush({families: {}, components: {schemas: {}}});
+    httpMock.expectOne('/api/inferrix/gateways/gateway-b/schemas').flush({families: {}, components: {schemas: {}}});
+  });
+
+  it('does not cache a failure', () => {
+    // One unreachable moment must not blank every form on this gateway for the whole window.
+    service.getSchemas(DEVICE).subscribe({next: () => {}, error: () => {}});
+    httpMock.expectOne(`/api/inferrix/gateways/${DEVICE}/schemas`)
+      .flush('nope', {status: 503, statusText: 'Service Unavailable'});
+
+    service.getSchemas(DEVICE).subscribe({next: () => {}, error: () => {}});
+    httpMock.expectOne(`/api/inferrix/gateways/${DEVICE}/schemas`)
+      .flush({families: {}, components: {schemas: {}}});
+  });
+});
+
+describe('point locator pairing', () => {
+
+  const DEVICE = 'device-1';
+  let service: InferrixGatewayService;
+  let httpMock: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
+      providers: [InferrixGatewayService]
+    });
+    service = TestBed.inject(InferrixGatewayService);
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => httpMock.verify());
+
+  it('reads the pairing the gateway publishes rather than deriving one', () => {
+    // The only place it appears. The naming looks like a `.DS` -> `.PL` rename and is not one:
+    // MODBUS_IP.DS and MODBUS_SERIAL.DS both take MODBUS.PL, and no MODBUS_IP.PL exists. This is
+    // the live response shape, verbatim.
+    let types: any;
+    service.getDataSourceTypes(DEVICE).subscribe(page => types = page.items);
+    httpMock.expectOne(r => r.url.endsWith('/proxy/v2/data-source-types')).flush({
+      items: [
+        {type: 'MODBUS_IP.DS', name: 'Modbus I/P', pointLocatorType: 'MODBUS.PL'},
+        {type: 'MODBUS_SERIAL.DS', name: 'Modbus Serial', pointLocatorType: 'MODBUS.PL'},
+        {type: 'VIRTUAL.DS', name: 'Virtual', pointLocatorType: 'VIRTUAL.PL'},
+        // One real type answers null, so a caller needs an answer for "the gateway did not say".
+        {type: 'BACNET_MSTP.DS', name: 'BACnet MS/TP', pointLocatorType: null}
+      ],
+      total: 4
+    });
+
+    const pairing = new Map(types.map((t: any) => [t.type, t.pointLocatorType]));
+    expect(pairing.get('MODBUS_IP.DS')).toBe('MODBUS.PL');
+    expect(pairing.get('MODBUS_SERIAL.DS')).toBe('MODBUS.PL');
+    expect(pairing.get('BACNET_MSTP.DS')).toBeNull();
+    // The rename that used to live in this codebase would have produced MODBUS_IP.PL here.
+    expect([...pairing.values()]).not.toContain('MODBUS_IP.PL');
+  });
+});

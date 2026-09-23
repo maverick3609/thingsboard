@@ -7,7 +7,7 @@ import { Router } from '@angular/router';
 import { Store } from '@ngrx/store';
 import { AppState } from '@core/core.state';
 import { DialogComponent } from '@shared/components/dialog.component';
-import { FormProperty } from '@shared/models/dynamic-form.models';
+import { FormProperty, FormPropertyType } from '@shared/models/dynamic-form.models';
 import { GatewayRecipient } from '@shared/models/inferrix-gateway-event.models';
 
 export interface GatewayModelDialogData {
@@ -99,12 +99,14 @@ export class GatewayModelDialogComponent
     // Spread the original first so everything the form does not render -- modelType, the surrogate
     // id, and any field a newer gateway added that this schema mapper skipped -- survives the
     // round trip. A save that sent only the rendered fields would silently reset the rest.
-    const saved: any = {...this.data.model, ...this.values, name: identity.name};
+    const saved: any = {...this.data.model, ...this.keep(this.values, this.data.properties),
+      name: identity.name};
     if (identity.xid) {
       saved.xid = identity.xid;
     }
     if (this.data.locatorProperties?.length) {
-      saved.pointLocator = {...(this.data.model?.pointLocator ?? {}), ...this.locatorValues};
+      saved.pointLocator = {...(this.data.model?.pointLocator ?? {}),
+        ...this.keep(this.locatorValues, this.data.locatorProperties)};
     }
     (this.data.recipientFields ?? []).forEach(field => {
       saved[field] = this.recipients[field] ?? [];
@@ -114,6 +116,36 @@ export class GatewayModelDialogComponent
 
   cancel(): void {
     this.dialogRef.close(null);
+  }
+
+  /**
+   * The form's values, minus the secrets the operator did not type into.
+   *
+   * A `writeOnly` field -- an MQTT broker password, an OPC password, a private key -- is accepted by
+   * the gateway and never returned by it. So the form always starts empty for one, whether or not a
+   * secret is stored, and there is no way to tell the two apart from here.
+   *
+   * Sending that empty value would **erase the stored credential** and take the data source offline
+   * on the next poll, with nothing in the UI suggesting that is what happened. Empty therefore has
+   * to mean "unchanged": the key is dropped from the payload entirely rather than sent as `''`, and
+   * `save` spreads the original model underneath, so whatever the gateway already holds stays.
+   *
+   * Only password-typed properties are treated this way. An ordinary text field cleared on purpose
+   * is a real edit and must reach the gateway as one.
+   */
+  private keep(values: {[id: string]: any}, properties: FormProperty[]): {[id: string]: any} {
+    const secrets = new Set((properties ?? [])
+      .filter(property => property.type === FormPropertyType.password)
+      .map(property => property.id));
+    const kept: {[id: string]: any} = {};
+    Object.keys(values ?? {}).forEach(id => {
+      const value = values[id];
+      if (secrets.has(id) && (value === null || value === undefined || value === '')) {
+        return;
+      }
+      kept[id] = value;
+    });
+    return kept;
   }
 
   /**

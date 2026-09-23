@@ -1481,6 +1481,11 @@ places — none of them the network. Amber is used deliberately for the expected
 platform's service account is *not* a gateway administrator by design, so a refusal on the
 administrator-only routes is a healthy gateway, not a fault.
 
+**The schema document is fetched once per gateway, not once per tab.** It is 531 KB uncompressed and
+four panels want it, while ThingsBoard ships with `HTTP_COMPRESSION_ENABLED` defaulting to false — so
+it is cached in the browser for the same 30 minutes the platform already caches it for. Turning HTTP
+compression on is worth doing anyway: this document gzips to 27 KB.
+
 **Data points are always scoped to one data source.** A gateway in a building carries thousands of
 points; an unscoped list would page through all of them, and an operator looking for the points of
 one Modbus device would never find them. Live values are read one point at a time, on request,
@@ -1494,12 +1499,15 @@ whole feature: the gateway's own interface hand-codes roughly forty per-protocol
 replicating those would make them the project — and would put Cortex in permanent lock-step with the
 gateway, needing a release every time the gateway gained a module.
 
-> [!IMPORTANT]
-> **Schema-driven forms currently render nothing**, because the gateway's `/v2/model-schemas`
-> endpoint returns an empty document on stack 5.1.0. This is a gateway-side defect, tracked as **D8**
-> in the stack findings document (`Inferrix-stack/docs/specs/2026-09-23-cortex-gateway-g4-g6-stack-findings.md`).
-> The hand-written surfaces — alert routing, recipients, schedules, rule sets, system — are
-> unaffected and work today.
+A real gateway publishes 63 data source types, 61 point locators, 6 publishers, 14 event detectors
+and 4 event handlers, sharing 178 component schemas between them. Two things in that document decide
+how a field is rendered, and both come from the gateway rather than from any table here:
+
+- **`readOnly`** — a value the gateway computes and will not accept back, such as a data source's
+  connection description. Shown, never editable.
+- **`writeOnly`** — a secret the gateway accepts and never returns: an MQTT broker password, an OPC
+  password, a private key. Shown as a password field, and **an empty one means "unchanged"** rather
+  than "erase it", because the field is always empty on load whether or not a credential is stored.
 
 A few things are hand-written on purpose rather than for want of a schema:
 
@@ -1531,7 +1539,7 @@ month 12, day 25. Rule sets live on their own tab because they are shared.
 > [!NOTE]
 > Creating a schedule or a rule set requires a **gateway administrator** credential. The platform
 > connects with a narrower one by design, so with the default service account these tabs can list and
-> edit but not create. Tracked as **D11** in the stack findings document.
+> edit but not create. Tracked as **D11** in the stack findings document and still open.
 
 ### 11.6 The System tab is read-only, deliberately
 
@@ -1575,12 +1583,12 @@ Scripts remain editable in the gateway's own interface. That is the intended out
 
 | Symptom | Cause |
 |---|---|
-| Every form is empty | The gateway's `/v2/model-schemas` returns an empty document — stack defect D8. Hand-written tabs still work |
+| Every form is empty | The gateway's `/v2/model-schemas` is returning an empty document. Hand-written tabs still work. Fixed in the stack on 2026-09-23 (finding D8); an older gateway will still do this |
 | Health says the certificate changed | The gateway is presenting a different certificate than at adoption. Either the box was rebuilt, or something else is answering on that address. Re-adopt only once you know which |
 | Health says forbidden | Expected on the administrator-only routes: the service account is not a gateway administrator by design |
-| "Add point" is disabled | The data source has no points yet, so the point type cannot be determined. The gateway publishes no data-source-to-point-type mapping (stack ask A11); create the first point in the gateway's own interface |
-| A schedule will not enable | It was saved with fewer than seven days by something other than Cortex — stack defect D9 |
-| Stray `???some.key(i18n_en)???` text | An untranslated key rendered by the gateway and passed through unchanged. Stack defect D14; Cortex shows it as sent rather than hiding a gateway-side gap |
+| "Add point" is disabled | The gateway did not publish a `pointLocatorType` for this data source type *and* it has no points to learn one from. One real type does this (`BACNET_MSTP.DS`); create its first point in the gateway's own interface |
+| A schedule will not enable | It was saved with fewer than seven days by something other than Cortex. Newer gateways refuse this at save time (finding D9) |
+| Stray `???some.key(i18n_en)???` text | An untranslated key rendered by the gateway and passed through unchanged. Fixed in the stack (finding D14); Cortex shows such text as sent rather than hiding a gateway-side gap |
 | The stock ThingsBoard gateways dashboard came back | `TB_GATEWAY_DASHBOARD_SYNC_ENABLED` is not `false` ([§11.2](#112-adopting-a-gateway)) |
 
 ---

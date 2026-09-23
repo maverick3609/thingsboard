@@ -10,7 +10,7 @@ import { GatewayListPanelComponent } from '@home/pages/inferrix/gateway/gateway-
 import { GatewayModelDialogComponent,
   GatewayModelDialogData } from '@home/pages/inferrix/gateway/gateway-model-dialog.component';
 import { GATEWAY_IDENTITY_FIELDS, GatewayDataSource, GatewayListQuery,
-  GatewayPage } from '@shared/models/inferrix-gateway-data.models';
+  GatewayDataSourceType, GatewayPage } from '@shared/models/inferrix-gateway-data.models';
 import { GatewaySchemaDocument,
   schemaToFormProperties } from '@shared/models/inferrix-gateway-schema.models';
 import { FormProperty } from '@shared/models/dynamic-form.models';
@@ -33,7 +33,7 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
 
   /** Loaded once per gateway: it changes only when the gateway's build does. */
   private schemas: GatewaySchemaDocument;
-  private types: {type: string; name: string}[] = [];
+  private types: GatewayDataSourceType[] = [];
 
   constructor(private gatewayService: InferrixGatewayService,
               private dialog: MatDialog,
@@ -68,7 +68,7 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
     return this.gatewayService.getDataSources(this.deviceId, query, {ignoreLoading: true});
   }
 
-  get addableTypes(): {type: string; name: string}[] {
+  get addableTypes(): GatewayDataSourceType[] {
     return this.types;
   }
 
@@ -79,7 +79,7 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
    * part of the value, not something the caller appends. Verified live against a running gateway,
    * where appending one produced `MODBUS_IP.DS.DS` and a Jackson subtype that resolves to nothing.
    */
-  add(type: {type: string; name: string}): void {
+  add(type: GatewayDataSourceType): void {
     this.open({modelType: type.type, enabled: false},
       this.translate.instant('inferrix.gateway.add-data-source'));
   }

@@ -1,0 +1,1959 @@
+{
+  "families": {
+    "dataSource": {
+      "MODBUS_IP.DS": {
+        "type": "object",
+        "properties": {
+          "connectionDescription": {
+            "type": "string",
+            "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+            "readOnly": true,
+            "example": "5 minutes(s)"
+          },
+          "description": {
+            "type": "string",
+            "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+            "readOnly": true,
+            "example": "5 minutes(s)"
+          },
+          "purgeOverride": {
+            "type": "boolean",
+            "description": "When true, this data source uses its own purgePeriod instead of the system default retention."
+          },
+          "purgePeriod": {
+            "$ref": "#/components/schemas/TimePeriod"
+          },
+          "editPermission": {
+            "type": "string",
+            "description": "Permission group(s) allowed to edit this data source, comma-separated."
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "alarmLevels": {
+            "type": "array",
+            "description": "Per-event-type alarm level overrides for this data source's built-in event types.",
+            "items": {
+              "$ref": "#/components/schemas/EventTypeAlarmLevelModel"
+            }
+          },
+          "quantize": {
+            "type": "boolean",
+            "description": "When true, polls are aligned to the boundaries of the update period rather than to the source's start time."
+          },
+          "timePeriod": {
+            "$ref": "#/components/schemas/TimePeriod"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "Response timeout in milliseconds for each Modbus request.",
+            "format": "int32",
+            "example": 500
+          },
+          "retries": {
+            "type": "integer",
+            "description": "Number of retries per request before giving up.",
+            "format": "int32",
+            "example": 2
+          },
+          "multipleWritesOnly": {
+            "type": "boolean",
+            "description": "Always use multi-register write function codes, even for single-value writes."
+          },
+          "contiguousBatches": {
+            "type": "boolean",
+            "description": "Only batch reads across registers that are contiguous."
+          },
+          "createSlaveMonitorPoints": {
+            "type": "boolean",
+            "description": "Auto-create points that monitor each slave's online/offline status."
+          },
+          "maxReadBitCount": {
+            "type": "integer",
+            "description": "Maximum number of bits/coils read in a single request.",
+            "format": "int32",
+            "example": 2000
+          },
+          "maxReadRegisterCount": {
+            "type": "integer",
+            "description": "Maximum number of registers read in a single request.",
+            "format": "int32",
+            "example": 125
+          },
+          "maxWriteRegisterCount": {
+            "type": "integer",
+            "description": "Maximum number of registers written in a single request.",
+            "format": "int32",
+            "example": 120
+          },
+          "discardDataDelay": {
+            "type": "integer",
+            "description": "Discard polled data older than this delay before publishing it.",
+            "format": "int32"
+          },
+          "logIO": {
+            "type": "boolean",
+            "description": "Enable low-level Modbus I/O logging for this data source."
+          },
+          "ioLogFileSizeMBytes": {
+            "type": "number",
+            "description": "Maximum size of each I/O log file, in megabytes.",
+            "format": "float",
+            "example": 1
+          },
+          "maxHistoricalIOLogs": {
+            "type": "integer",
+            "description": "Number of rotated I/O log files to retain.",
+            "format": "int32",
+            "example": 1
+          },
+          "transportType": {
+            "type": "string",
+            "description": "IP transport protocol used to reach the device.",
+            "example": "TCP",
+            "enum": [
+              "TCP",
+              "TCP_KEEP_ALIVE",
+              "UDP"
+            ]
+          },
+          "host": {
+            "type": "string"
+          },
+          "port": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "encapsulated": {
+            "type": "boolean",
+            "description": "Use RTU-over-TCP (encapsulated) framing instead of native Modbus/TCP."
+          },
+          "lingerTime": {
+            "type": "integer",
+            "description": "Socket SO_LINGER time in seconds; -1 leaves the OS default.",
+            "format": "int32",
+            "example": -1
+          },
+          "scaleFactor": {
+            "type": "number",
+            "description": "Multiplier that grows the reconnect back-off period after repeated failures.",
+            "format": "float",
+            "example": 1.5
+          },
+          "maxBackOffPeriod": {
+            "$ref": "#/components/schemas/TimePeriod"
+          },
+          "maxConcurrentConnections": {
+            "type": "integer",
+            "description": "Maximum concurrent TCP connections to the device; 0 means unlimited.",
+            "format": "int32",
+            "example": 0
+          },
+          "modelType": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "description": "ID of object in database",
+            "format": "int32"
+          },
+          "xid": {
+            "type": "string",
+            "description": "XID of object"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of object"
+          }
+        }
+      },
+      "MQTT.DS": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AbstractDataSourceModel"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "connectionDescription": {
+                "type": "string",
+                "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+                "readOnly": true,
+                "example": "5 minutes(s)"
+              },
+              "description": {
+                "type": "string",
+                "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+                "readOnly": true,
+                "example": "5 minutes(s)"
+              },
+              "purgeOverride": {
+                "type": "boolean",
+                "description": "When true, this data source uses its own purgePeriod instead of the system default retention."
+              },
+              "purgePeriod": {
+                "$ref": "#/components/schemas/TimePeriod"
+              },
+              "editPermission": {
+                "type": "string",
+                "description": "Permission group(s) allowed to edit this data source, comma-separated."
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "alarmLevels": {
+                "type": "array",
+                "description": "Per-event-type alarm level overrides for this data source's built-in event types.",
+                "items": {
+                  "$ref": "#/components/schemas/EventTypeAlarmLevelModel"
+                }
+              },
+              "brokerUri": {
+                "type": "string"
+              },
+              "x509CaCrt": {
+                "type": "string"
+              },
+              "x509ClientCrt": {
+                "type": "string"
+              },
+              "privateKey": {
+                "type": "string",
+                "writeOnly": true
+              },
+              "useCertificate": {
+                "type": "boolean"
+              },
+              "clientId": {
+                "type": "string"
+              },
+              "userName": {
+                "type": "string"
+              },
+              "userPassword": {
+                "type": "string",
+                "writeOnly": true
+              },
+              "topicFilters": {
+                "type": "string"
+              },
+              "autoReconnect": {
+                "type": "boolean"
+              },
+              "cleanSession": {
+                "type": "boolean"
+              },
+              "keepAliveInterval": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "connectionTimeout": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "qosType": {
+                "type": "string"
+              },
+              "modelType": {
+                "type": "string"
+              },
+              "id": {
+                "type": "integer",
+                "description": "ID of object in database",
+                "format": "int32"
+              },
+              "xid": {
+                "type": "string",
+                "description": "XID of object"
+              },
+              "name": {
+                "type": "string",
+                "description": "Name of object"
+              }
+            }
+          }
+        ]
+      },
+      "OPC.DS": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AbstractDataSourceModel"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "connectionDescription": {
+                "type": "string",
+                "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+                "readOnly": true,
+                "example": "5 minutes(s)"
+              },
+              "description": {
+                "type": "string",
+                "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+                "readOnly": true,
+                "example": "5 minutes(s)"
+              },
+              "purgeOverride": {
+                "type": "boolean",
+                "description": "When true, this data source uses its own purgePeriod instead of the system default retention."
+              },
+              "purgePeriod": {
+                "$ref": "#/components/schemas/TimePeriod"
+              },
+              "editPermission": {
+                "type": "string",
+                "description": "Permission group(s) allowed to edit this data source, comma-separated."
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "alarmLevels": {
+                "type": "array",
+                "description": "Per-event-type alarm level overrides for this data source's built-in event types.",
+                "items": {
+                  "$ref": "#/components/schemas/EventTypeAlarmLevelModel"
+                }
+              },
+              "quantize": {
+                "type": "boolean",
+                "description": "When true, polls are aligned to the boundaries of the update period rather than to the source's start time."
+              },
+              "timePeriod": {
+                "$ref": "#/components/schemas/TimePeriod"
+              },
+              "host": {
+                "type": "string",
+                "description": "Hostname or IP of the machine running the OPC-DA server",
+                "example": "localhost"
+              },
+              "domain": {
+                "type": "string",
+                "description": "Windows/DCOM domain used to authenticate; leave blank for a workgroup or local account"
+              },
+              "user": {
+                "type": "string"
+              },
+              "password": {
+                "type": "string",
+                "writeOnly": true
+              },
+              "server": {
+                "type": "string",
+                "description": "Program ID / name of the OPC-DA server to poll (as returned by the list-servers tool)"
+              },
+              "modelType": {
+                "type": "string"
+              },
+              "id": {
+                "type": "integer",
+                "description": "ID of object in database",
+                "format": "int32"
+              },
+              "xid": {
+                "type": "string",
+                "description": "XID of object"
+              },
+              "name": {
+                "type": "string",
+                "description": "Name of object"
+              }
+            }
+          }
+        ]
+      },
+      "META.DS": {
+        "type": "object",
+        "properties": {
+          "connectionDescription": {
+            "type": "string",
+            "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+            "readOnly": true,
+            "example": "5 minutes(s)"
+          },
+          "description": {
+            "type": "string",
+            "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+            "readOnly": true,
+            "example": "5 minutes(s)"
+          },
+          "purgeOverride": {
+            "type": "boolean",
+            "description": "When true, this data source uses its own purgePeriod instead of the system default retention."
+          },
+          "purgePeriod": {
+            "$ref": "#/components/schemas/TimePeriod"
+          },
+          "editPermission": {
+            "type": "string",
+            "description": "Permission group(s) allowed to edit this data source, comma-separated."
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "alarmLevels": {
+            "type": "array",
+            "description": "Per-event-type alarm level overrides for this data source's built-in event types.",
+            "items": {
+              "$ref": "#/components/schemas/EventTypeAlarmLevelModel"
+            }
+          },
+          "modelType": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "description": "ID of object in database",
+            "format": "int32"
+          },
+          "xid": {
+            "type": "string",
+            "description": "XID of object"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of object"
+          }
+        }
+      },
+      "BACNET_IP.DS": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AbstractDataSourceModel"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "connectionDescription": {
+                "type": "string",
+                "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+                "readOnly": true,
+                "example": "5 minutes(s)"
+              },
+              "description": {
+                "type": "string",
+                "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+                "readOnly": true,
+                "example": "5 minutes(s)"
+              },
+              "purgeOverride": {
+                "type": "boolean",
+                "description": "When true, this data source uses its own purgePeriod instead of the system default retention."
+              },
+              "purgePeriod": {
+                "$ref": "#/components/schemas/TimePeriod"
+              },
+              "editPermission": {
+                "type": "string",
+                "description": "Permission group(s) allowed to edit this data source, comma-separated."
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "alarmLevels": {
+                "type": "array",
+                "description": "Per-event-type alarm level overrides for this data source's built-in event types.",
+                "items": {
+                  "$ref": "#/components/schemas/EventTypeAlarmLevelModel"
+                }
+              },
+              "quantize": {
+                "type": "boolean",
+                "description": "When true, polls are aligned to the boundaries of the update period rather than to the source's start time."
+              },
+              "timePeriod": {
+                "$ref": "#/components/schemas/TimePeriod"
+              },
+              "localDeviceConfig": {
+                "type": "string",
+                "description": "Configuration of the local (gateway-side) BACnet device used to communicate with the network."
+              },
+              "covSubscriptionTimeoutMinutes": {
+                "type": "integer",
+                "description": "Lifetime of COV subscriptions in minutes before they are renewed.",
+                "format": "int32",
+                "example": 60
+              },
+              "modelType": {
+                "type": "string"
+              },
+              "id": {
+                "type": "integer",
+                "description": "ID of object in database",
+                "format": "int32"
+              },
+              "xid": {
+                "type": "string",
+                "description": "XID of object"
+              },
+              "name": {
+                "type": "string",
+                "description": "Name of object"
+              }
+            }
+          }
+        ]
+      },
+      "VIRTUAL.DS": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AbstractPollingDataSourceModel"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "connectionDescription": {
+                "type": "string",
+                "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+                "readOnly": true,
+                "example": "5 minutes(s)"
+              },
+              "description": {
+                "type": "string",
+                "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+                "readOnly": true,
+                "example": "5 minutes(s)"
+              },
+              "purgeOverride": {
+                "type": "boolean",
+                "description": "When true, this data source uses its own purgePeriod instead of the system default retention."
+              },
+              "purgePeriod": {
+                "$ref": "#/components/schemas/TimePeriod"
+              },
+              "editPermission": {
+                "type": "string",
+                "description": "Permission group(s) allowed to edit this data source, comma-separated."
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "alarmLevels": {
+                "type": "array",
+                "description": "Per-event-type alarm level overrides for this data source's built-in event types.",
+                "items": {
+                  "$ref": "#/components/schemas/EventTypeAlarmLevelModel"
+                }
+              },
+              "quantize": {
+                "type": "boolean",
+                "description": "When true, polls are aligned to the boundaries of the update period rather than to the source's start time."
+              },
+              "timePeriod": {
+                "$ref": "#/components/schemas/TimePeriod"
+              },
+              "modelType": {
+                "type": "string"
+              },
+              "id": {
+                "type": "integer",
+                "description": "ID of object in database",
+                "format": "int32"
+              },
+              "xid": {
+                "type": "string",
+                "description": "XID of object"
+              },
+              "name": {
+                "type": "string",
+                "description": "Name of object"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "pointLocator": {
+      "MODBUS.PL": {
+        "type": "object",
+        "properties": {
+          "dataType": {
+            "type": "string",
+            "description": "Data type of the value at this point.",
+            "enum": [
+              "BINARY",
+              "MULTISTATE",
+              "NUMERIC",
+              "ALPHANUMERIC",
+              "IMAGE"
+            ]
+          },
+          "settable": {
+            "type": "boolean"
+          },
+          "relinquishable": {
+            "type": "boolean",
+            "description": "Whether a set value can be relinquished back to the device's own control (e.g. BACnet priority array)."
+          },
+          "configurationDescription": {
+            "type": "string",
+            "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+            "readOnly": true,
+            "example": "5 minutes(s)"
+          },
+          "range": {
+            "type": "string",
+            "description": "Modbus register range this point reads from.",
+            "example": "HOLDING_REGISTER",
+            "enum": [
+              "COIL_STATUS",
+              "INPUT_STATUS",
+              "HOLDING_REGISTER",
+              "INPUT_REGISTER"
+            ]
+          },
+          "modbusDataType": {
+            "type": "string",
+            "description": "Modbus data-type code used to decode the raw registers.",
+            "example": "FOUR_BYTE_FLOAT"
+          },
+          "slaveId": {
+            "type": "integer",
+            "description": "Modbus slave/unit id (0-255).",
+            "format": "int32",
+            "example": 1
+          },
+          "slaveMonitor": {
+            "type": "boolean",
+            "description": "Whether this point monitors the slave's online/offline status rather than a register value."
+          },
+          "offset": {
+            "type": "integer",
+            "description": "Zero-based register/coil offset within the slave.",
+            "format": "int32"
+          },
+          "bit": {
+            "type": "string",
+            "description": "Bit index within the register, used for the BINARY data type.",
+            "format": "byte"
+          },
+          "registerCount": {
+            "type": "integer",
+            "description": "Number of 16-bit registers spanned, used for CHAR/VARCHAR data types.",
+            "format": "int32"
+          },
+          "charset": {
+            "type": "string",
+            "description": "Charset used to decode CHAR/VARCHAR values.",
+            "example": "ASCII"
+          },
+          "writeType": {
+            "type": "string",
+            "description": "Whether/how the point may be written back to the device.",
+            "example": "SETTABLE",
+            "enum": [
+              "NOT_SETTABLE",
+              "SETTABLE",
+              "WRITE_ONLY"
+            ]
+          },
+          "multiplier": {
+            "type": "number",
+            "description": "Multiplier applied to the raw value: rendered = raw * multiplier + additive.",
+            "format": "double",
+            "example": 1
+          },
+          "additive": {
+            "type": "number",
+            "description": "Additive offset applied after the multiplier.",
+            "format": "double",
+            "example": 0
+          },
+          "multistateNumeric": {
+            "type": "boolean",
+            "description": "Render the value as a multistate point instead of numeric."
+          },
+          "modbusDataTypeId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "modelType": {
+            "type": "string"
+          },
+          "rangeId": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "MQTT.PL": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PointLocatorModel"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "dataType": {
+                "type": "string",
+                "description": "Data type of the value at this point.",
+                "enum": [
+                  "BINARY",
+                  "MULTISTATE",
+                  "NUMERIC",
+                  "ALPHANUMERIC",
+                  "IMAGE"
+                ]
+              },
+              "settable": {
+                "type": "boolean"
+              },
+              "relinquishable": {
+                "type": "boolean",
+                "description": "Whether a set value can be relinquished back to the device's own control (e.g. BACnet priority array)."
+              },
+              "configurationDescription": {
+                "type": "string",
+                "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+                "readOnly": true,
+                "example": "5 minutes(s)"
+              },
+              "publishTopic": {
+                "type": "string"
+              },
+              "publishTopicType": {
+                "type": "string"
+              },
+              "publishQosType": {
+                "type": "string"
+              },
+              "subscribeTopic": {
+                "type": "string"
+              },
+              "subscribeTopicType": {
+                "type": "string"
+              },
+              "modelType": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "VIRTUAL.PL": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PointLocatorModel"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "dataType": {
+                "type": "string",
+                "description": "Data type of the value at this point.",
+                "enum": [
+                  "BINARY",
+                  "MULTISTATE",
+                  "NUMERIC",
+                  "ALPHANUMERIC",
+                  "IMAGE"
+                ]
+              },
+              "settable": {
+                "type": "boolean"
+              },
+              "relinquishable": {
+                "type": "boolean",
+                "description": "Whether a set value can be relinquished back to the device's own control (e.g. BACnet priority array)."
+              },
+              "configurationDescription": {
+                "type": "string",
+                "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+                "readOnly": true,
+                "example": "5 minutes(s)"
+              },
+              "changeType": {
+                "type": "string"
+              },
+              "startValue": {
+                "type": "string"
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "min": {
+                "type": "number",
+                "format": "double"
+              },
+              "max": {
+                "type": "number",
+                "format": "double"
+              },
+              "roll": {
+                "type": "boolean"
+              },
+              "change": {
+                "type": "number",
+                "format": "double"
+              },
+              "maxChange": {
+                "type": "number",
+                "format": "double"
+              },
+              "volatility": {
+                "type": "number",
+                "format": "double"
+              },
+              "attractionPointXid": {
+                "type": "string"
+              },
+              "modelType": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "BACNET_IP.PL": {
+        "type": "object",
+        "properties": {
+          "dataType": {
+            "type": "string",
+            "description": "Data type of the value at this point.",
+            "enum": [
+              "BINARY",
+              "MULTISTATE",
+              "NUMERIC",
+              "ALPHANUMERIC",
+              "IMAGE"
+            ]
+          },
+          "settable": {
+            "type": "boolean"
+          },
+          "relinquishable": {
+            "type": "boolean",
+            "description": "Whether a set value can be relinquished back to the device's own control (e.g. BACnet priority array)."
+          },
+          "configurationDescription": {
+            "type": "string",
+            "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+            "readOnly": true,
+            "example": "5 minutes(s)"
+          },
+          "remoteDeviceInstanceNumber": {
+            "type": "integer",
+            "description": "BACnet device instance number of the remote device this point is read from.",
+            "format": "int32",
+            "example": 1001
+          },
+          "objectTypeId": {
+            "type": "string",
+            "description": "BACnet object type of the target object.",
+            "example": "ANALOG_INPUT"
+          },
+          "objectInstanceNumber": {
+            "type": "integer",
+            "description": "Instance number of the target BACnet object within its object type.",
+            "format": "int32",
+            "example": 0
+          },
+          "propertyIdentifierId": {
+            "type": "string",
+            "description": "BACnet property identifier read from the object (property name).",
+            "example": "presentValue"
+          },
+          "useCovSubscription": {
+            "type": "boolean",
+            "description": "When true, subscribe for Change-of-Value (COV) notifications instead of polling this point."
+          },
+          "writePriority": {
+            "type": "integer",
+            "description": "BACnet write priority (1 = highest, 16 = lowest) used when writing to a settable point.",
+            "format": "int32",
+            "example": 16
+          },
+          "multiplier": {
+            "type": "number",
+            "description": "Scaling multiplier applied to the raw value: scaled = raw * multiplier + additive.",
+            "format": "double",
+            "example": 1
+          },
+          "additive": {
+            "type": "number",
+            "description": "Scaling offset added after the multiplier: scaled = raw * multiplier + additive.",
+            "format": "double",
+            "example": 0
+          },
+          "modelType": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "eventDetector": {
+      "BINARY_STATE_DETECTOR": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "description": "Xid of the data point the detector monitors."
+          },
+          "description": {
+            "type": "string",
+            "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+            "readOnly": true,
+            "example": "5 minutes(s)"
+          },
+          "rtnApplicable": {
+            "type": "boolean",
+            "description": "Whether the detector produces a return-to-normal (inactive) transition when the condition clears."
+          },
+          "alarmLevel": {
+            "type": "string",
+            "description": "Alarm level raised when the detector trips.",
+            "enum": [
+              "NONE",
+              "INFORMATION",
+              "WARNING",
+              "URGENT",
+              "CRITICAL",
+              "EMERGENCY",
+              "DO_NOT_LOG",
+              "IGNORE"
+            ]
+          },
+          "sourceTypeName": {
+            "type": "string",
+            "description": "Source type of the detector (the kind of object being monitored)."
+          },
+          "handlerXids": {
+            "type": "array",
+            "description": "Xids of the event handlers invoked when this detector raises an event.",
+            "items": {
+              "type": "string",
+              "description": "Xids of the event handlers invoked when this detector raises an event."
+            }
+          },
+          "dataPoint": {
+            "$ref": "#/components/schemas/DataPointModel"
+          },
+          "duration": {
+            "$ref": "#/components/schemas/TimePeriod"
+          },
+          "state": {
+            "type": "boolean",
+            "description": "Boolean value the point must hold for the detector to trip."
+          },
+          "detectorType": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "description": "ID of object in database",
+            "format": "int32"
+          },
+          "xid": {
+            "type": "string",
+            "description": "XID of object"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of object"
+          }
+        }
+      },
+      "ANALOG_HIGH_LIMIT_DETECTOR": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "description": "Xid of the data point the detector monitors."
+          },
+          "description": {
+            "type": "string",
+            "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+            "readOnly": true,
+            "example": "5 minutes(s)"
+          },
+          "rtnApplicable": {
+            "type": "boolean",
+            "description": "Whether the detector produces a return-to-normal (inactive) transition when the condition clears."
+          },
+          "alarmLevel": {
+            "type": "string",
+            "description": "Alarm level raised when the detector trips.",
+            "enum": [
+              "NONE",
+              "INFORMATION",
+              "WARNING",
+              "URGENT",
+              "CRITICAL",
+              "EMERGENCY",
+              "DO_NOT_LOG",
+              "IGNORE"
+            ]
+          },
+          "sourceTypeName": {
+            "type": "string",
+            "description": "Source type of the detector (the kind of object being monitored)."
+          },
+          "handlerXids": {
+            "type": "array",
+            "description": "Xids of the event handlers invoked when this detector raises an event.",
+            "items": {
+              "type": "string",
+              "description": "Xids of the event handlers invoked when this detector raises an event."
+            }
+          },
+          "dataPoint": {
+            "$ref": "#/components/schemas/DataPointModel"
+          },
+          "duration": {
+            "$ref": "#/components/schemas/TimePeriod"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Threshold the point value must exceed for the detector to trip.",
+            "format": "double"
+          },
+          "resetLimit": {
+            "type": "number",
+            "description": "Value the point must fall back below to clear the event, when useResetLimit is true.",
+            "format": "double"
+          },
+          "useResetLimit": {
+            "type": "boolean",
+            "description": "Whether resetLimit is applied to clear the event (adds hysteresis)."
+          },
+          "notHigher": {
+            "type": "boolean",
+            "description": "When true, the detector trips while the value is NOT above the limit rather than above it."
+          },
+          "detectorType": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "description": "ID of object in database",
+            "format": "int32"
+          },
+          "xid": {
+            "type": "string",
+            "description": "XID of object"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of object"
+          }
+        }
+      },
+      "ALPHANUMERIC_REGEX_STATE_DETECTOR": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "description": "Xid of the data point the detector monitors."
+          },
+          "description": {
+            "type": "string",
+            "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+            "readOnly": true,
+            "example": "5 minutes(s)"
+          },
+          "rtnApplicable": {
+            "type": "boolean",
+            "description": "Whether the detector produces a return-to-normal (inactive) transition when the condition clears."
+          },
+          "alarmLevel": {
+            "type": "string",
+            "description": "Alarm level raised when the detector trips.",
+            "enum": [
+              "NONE",
+              "INFORMATION",
+              "WARNING",
+              "URGENT",
+              "CRITICAL",
+              "EMERGENCY",
+              "DO_NOT_LOG",
+              "IGNORE"
+            ]
+          },
+          "sourceTypeName": {
+            "type": "string",
+            "description": "Source type of the detector (the kind of object being monitored)."
+          },
+          "handlerXids": {
+            "type": "array",
+            "description": "Xids of the event handlers invoked when this detector raises an event.",
+            "items": {
+              "type": "string",
+              "description": "Xids of the event handlers invoked when this detector raises an event."
+            }
+          },
+          "dataPoint": {
+            "$ref": "#/components/schemas/DataPointModel"
+          },
+          "duration": {
+            "$ref": "#/components/schemas/TimePeriod"
+          },
+          "state": {
+            "type": "string",
+            "description": "Regular expression the point value must match for the detector to trip."
+          },
+          "detectorType": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "description": "ID of object in database",
+            "format": "int32"
+          },
+          "xid": {
+            "type": "string",
+            "description": "XID of object"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of object"
+          }
+        }
+      }
+    },
+    "eventHandler": {
+      "EMAIL_HANDLER": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AbstractEventHandlerModel"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "disabled": {
+                "type": "boolean",
+                "description": "Whether this handler is disabled and will not run."
+              },
+              "eventTypes": {
+                "type": "array",
+                "description": "Event type matchers that determine which events trigger this handler.",
+                "items": {
+                  "$ref": "#/components/schemas/EventTypeMatcherModel"
+                }
+              },
+              "activeRecipients": {
+                "type": "array",
+                "description": "Recipients emailed when a matching event becomes active.",
+                "items": {
+                  "$ref": "#/components/schemas/RecipientEntryModel"
+                }
+              },
+              "sendEscalation": {
+                "type": "boolean",
+                "description": "Whether escalation emails are sent if the event stays active past the escalation period."
+              },
+              "escalationPeriod": {
+                "$ref": "#/components/schemas/TimePeriod"
+              },
+              "escalationRecipients": {
+                "type": "array",
+                "description": "Recipients emailed on escalation.",
+                "items": {
+                  "$ref": "#/components/schemas/RecipientEntryModel"
+                }
+              },
+              "sendInactive": {
+                "type": "boolean",
+                "description": "Whether an email is sent when the event returns to normal (inactive)."
+              },
+              "inactiveOverride": {
+                "type": "boolean",
+                "description": "When true, inactive notifications go to inactiveRecipients instead of the active recipients."
+              },
+              "inactiveRecipients": {
+                "type": "array",
+                "description": "Recipients emailed when the event returns to normal, when inactiveOverride is set.",
+                "items": {
+                  "$ref": "#/components/schemas/RecipientEntryModel"
+                }
+              },
+              "customTemplate": {
+                "type": "string",
+                "description": "Custom email body template; when null the default template is used."
+              },
+              "subject": {
+                "type": "string",
+                "description": "Coded email subject-line style."
+              },
+              "handlerType": {
+                "type": "string"
+              },
+              "id": {
+                "type": "integer",
+                "description": "ID of object in database",
+                "format": "int32"
+              },
+              "xid": {
+                "type": "string",
+                "description": "XID of object"
+              },
+              "name": {
+                "type": "string",
+                "description": "Name of object"
+              }
+            }
+          }
+        ]
+      },
+      "SET_POINT_HANDLER": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AbstractEventHandlerModel"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "disabled": {
+                "type": "boolean",
+                "description": "Whether this handler is disabled and will not run."
+              },
+              "eventTypes": {
+                "type": "array",
+                "description": "Event type matchers that determine which events trigger this handler.",
+                "items": {
+                  "$ref": "#/components/schemas/EventTypeMatcherModel"
+                }
+              },
+              "targetPointXid": {
+                "type": "string",
+                "description": "Xid of the data point whose value this handler sets."
+              },
+              "activeAction": {
+                "type": "string",
+                "description": "Action taken on the target point when a matching event becomes active (e.g. set a static value or copy another point's value)."
+              },
+              "activeValueToSet": {
+                "type": "object",
+                "description": "Static value written to the target point when active, for the static-value action."
+              },
+              "activePointXid": {
+                "type": "string",
+                "description": "Xid of the point whose value is copied to the target when active, for the point-value action."
+              },
+              "inactiveAction": {
+                "type": "string",
+                "description": "Action taken on the target point when a matching event returns to normal (inactive)."
+              },
+              "inactiveValueToSet": {
+                "type": "object",
+                "description": "Static value written to the target point when inactive, for the static-value action."
+              },
+              "inactivePointXid": {
+                "type": "string",
+                "description": "Xid of the point whose value is copied to the target when inactive, for the point-value action."
+              },
+              "handlerType": {
+                "type": "string"
+              },
+              "id": {
+                "type": "integer",
+                "description": "ID of object in database",
+                "format": "int32"
+              },
+              "xid": {
+                "type": "string",
+                "description": "XID of object"
+              },
+              "name": {
+                "type": "string",
+                "description": "Name of object"
+              }
+            }
+          }
+        ]
+      },
+      "SMS_HANDLER": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AbstractEventHandlerModel"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "disabled": {
+                "type": "boolean",
+                "description": "Whether this handler is disabled and will not run."
+              },
+              "eventTypes": {
+                "type": "array",
+                "description": "Event type matchers that determine which events trigger this handler.",
+                "items": {
+                  "$ref": "#/components/schemas/EventTypeMatcherModel"
+                }
+              },
+              "activeRecipients": {
+                "type": "array",
+                "description": "Recipients texted when a matching event becomes active.",
+                "items": {
+                  "$ref": "#/components/schemas/RecipientEntryModel"
+                }
+              },
+              "sendEscalation": {
+                "type": "boolean",
+                "description": "Whether escalation messages are sent if the event stays active past the escalation period."
+              },
+              "escalationPeriod": {
+                "$ref": "#/components/schemas/TimePeriod"
+              },
+              "escalationRecipients": {
+                "type": "array",
+                "description": "Recipients texted on escalation.",
+                "items": {
+                  "$ref": "#/components/schemas/RecipientEntryModel"
+                }
+              },
+              "sendInactive": {
+                "type": "boolean",
+                "description": "Whether a message is sent when the event returns to normal (inactive)."
+              },
+              "inactiveOverride": {
+                "type": "boolean",
+                "description": "When true, inactive notifications go to inactiveRecipients instead of the active recipients."
+              },
+              "inactiveRecipients": {
+                "type": "array",
+                "description": "Recipients texted when the event returns to normal, when inactiveOverride is set.",
+                "items": {
+                  "$ref": "#/components/schemas/RecipientEntryModel"
+                }
+              },
+              "customTemplate": {
+                "type": "string",
+                "description": "Custom message template; when null the default template is used."
+              },
+              "subject": {
+                "type": "string",
+                "description": "Coded message subject-line style."
+              },
+              "handlerType": {
+                "type": "string"
+              },
+              "id": {
+                "type": "integer",
+                "description": "ID of object in database",
+                "format": "int32"
+              },
+              "xid": {
+                "type": "string",
+                "description": "XID of object"
+              },
+              "name": {
+                "type": "string",
+                "description": "Name of object"
+              }
+            }
+          }
+        ]
+      },
+      "PROCESS_HANDLER": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AbstractEventHandlerModel"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "disabled": {
+                "type": "boolean",
+                "description": "Whether this handler is disabled and will not run."
+              },
+              "eventTypes": {
+                "type": "array",
+                "description": "Event type matchers that determine which events trigger this handler.",
+                "items": {
+                  "$ref": "#/components/schemas/EventTypeMatcherModel"
+                }
+              },
+              "activeProcessCommand": {
+                "type": "string",
+                "description": "OS command executed when a matching event becomes active."
+              },
+              "activeProcessTimeout": {
+                "type": "integer",
+                "description": "Maximum time, in seconds, to wait for the active command to complete.",
+                "format": "int32"
+              },
+              "inactiveProcessCommand": {
+                "type": "string",
+                "description": "OS command executed when a matching event returns to normal (inactive)."
+              },
+              "inactiveProcessTimeout": {
+                "type": "integer",
+                "description": "Maximum time, in seconds, to wait for the inactive command to complete.",
+                "format": "int32"
+              },
+              "handlerType": {
+                "type": "string"
+              },
+              "id": {
+                "type": "integer",
+                "description": "ID of object in database",
+                "format": "int32"
+              },
+              "xid": {
+                "type": "string",
+                "description": "XID of object"
+              },
+              "name": {
+                "type": "string",
+                "description": "Name of object"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "publisher": {
+      "BACNET_SENDER.PUB": {
+        "type": "object",
+        "properties": {
+          "connectionDescription": {
+            "type": "string",
+            "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+            "readOnly": true,
+            "example": "5 minutes(s)"
+          },
+          "description": {
+            "type": "string",
+            "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+            "readOnly": true,
+            "example": "5 minutes(s)"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "eventAlarmLevels": {
+            "type": "array",
+            "description": "Per-event-type alarm levels raised for this publisher (for example a queue-size warning), each mapping a publisher event type to an alarm level.",
+            "items": {
+              "$ref": "#/components/schemas/EventTypeAlarmLevelModel"
+            }
+          },
+          "points": {
+            "type": "array",
+            "description": "The points this publisher forwards to the external system.",
+            "items": {
+              "$ref": "#/components/schemas/AbstractPublishedPointModelBACnetPublishedPoint"
+            }
+          },
+          "publishType": {
+            "type": "string",
+            "description": "Which values are published: ALL point values, only CHANGES_ONLY, only LOGGED_ONLY values, or NONE.",
+            "enum": [
+              "ALL",
+              "CHANGES_ONLY",
+              "LOGGED_ONLY",
+              "NONE"
+            ]
+          },
+          "cacheWarningSize": {
+            "type": "integer",
+            "description": "Queued-item count at which a cache-warning event is raised.",
+            "format": "int32",
+            "example": 100
+          },
+          "cacheDiscardSize": {
+            "type": "integer",
+            "description": "Queued-item count at which the oldest queued items are discarded.",
+            "format": "int32",
+            "example": 1000
+          },
+          "sendSnapshot": {
+            "type": "boolean",
+            "description": "When true, publish a full snapshot of current values on the snapshotSendPeriod, not just updates."
+          },
+          "snapshotSendPeriod": {
+            "$ref": "#/components/schemas/TimePeriod"
+          },
+          "localDeviceId": {
+            "type": "string",
+            "description": "Reference to the local BACnet device configuration this publisher exposes its objects through; must resolve to an existing local device."
+          },
+          "modelType": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "description": "ID of object in database",
+            "format": "int32"
+          },
+          "xid": {
+            "type": "string",
+            "description": "XID of object"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of object"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AbstractDataSourceModel": {
+        "type": "object",
+        "properties": {
+          "connectionDescription": {
+            "type": "string",
+            "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+            "readOnly": true,
+            "example": "5 minutes(s)"
+          },
+          "description": {
+            "type": "string",
+            "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+            "readOnly": true,
+            "example": "5 minutes(s)"
+          },
+          "purgeOverride": {
+            "type": "boolean",
+            "description": "When true, this data source uses its own purgePeriod instead of the system default retention."
+          },
+          "purgePeriod": {
+            "$ref": "#/components/schemas/TimePeriod"
+          },
+          "editPermission": {
+            "type": "string",
+            "description": "Permission group(s) allowed to edit this data source, comma-separated."
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "alarmLevels": {
+            "type": "array",
+            "description": "Per-event-type alarm level overrides for this data source's built-in event types.",
+            "items": {
+              "$ref": "#/components/schemas/EventTypeAlarmLevelModel"
+            }
+          },
+          "modelType": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "description": "ID of object in database",
+            "format": "int32"
+          },
+          "xid": {
+            "type": "string",
+            "description": "XID of object"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of object"
+          }
+        },
+        "discriminator": {
+          "propertyName": "modelType"
+        }
+      },
+      "AbstractEventHandlerModel": {
+        "type": "object",
+        "properties": {
+          "disabled": {
+            "type": "boolean",
+            "description": "Whether this handler is disabled and will not run."
+          },
+          "eventTypes": {
+            "type": "array",
+            "description": "Event type matchers that determine which events trigger this handler.",
+            "items": {
+              "$ref": "#/components/schemas/EventTypeMatcherModel"
+            }
+          },
+          "handlerType": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "description": "ID of object in database",
+            "format": "int32"
+          },
+          "xid": {
+            "type": "string",
+            "description": "XID of object"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of object"
+          }
+        },
+        "discriminator": {
+          "propertyName": "handlerType"
+        }
+      },
+      "AbstractPollingDataSourceModel": {
+        "type": "object",
+        "properties": {
+          "connectionDescription": {
+            "type": "string",
+            "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+            "readOnly": true,
+            "example": "5 minutes(s)"
+          },
+          "description": {
+            "type": "string",
+            "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+            "readOnly": true,
+            "example": "5 minutes(s)"
+          },
+          "purgeOverride": {
+            "type": "boolean",
+            "description": "When true, this data source uses its own purgePeriod instead of the system default retention."
+          },
+          "purgePeriod": {
+            "$ref": "#/components/schemas/TimePeriod"
+          },
+          "editPermission": {
+            "type": "string",
+            "description": "Permission group(s) allowed to edit this data source, comma-separated."
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "alarmLevels": {
+            "type": "array",
+            "description": "Per-event-type alarm level overrides for this data source's built-in event types.",
+            "items": {
+              "$ref": "#/components/schemas/EventTypeAlarmLevelModel"
+            }
+          },
+          "quantize": {
+            "type": "boolean",
+            "description": "When true, polls are aligned to the boundaries of the update period rather than to the source's start time."
+          },
+          "timePeriod": {
+            "$ref": "#/components/schemas/TimePeriod"
+          },
+          "modelType": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "description": "ID of object in database",
+            "format": "int32"
+          },
+          "xid": {
+            "type": "string",
+            "description": "XID of object"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of object"
+          }
+        }
+      },
+      "AbstractPublishedPointModelBACnetPublishedPoint": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "xid": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "dataPointXid": {
+            "type": "string",
+            "description": "XID of the internal data point whose values are published by this point."
+          },
+          "publisherXid": {
+            "type": "string",
+            "description": "XID of the publisher that owns this published point."
+          },
+          "modelType": {
+            "type": "string"
+          }
+        },
+        "description": "The points this publisher forwards to the external system.",
+        "discriminator": {
+          "propertyName": "modelType"
+        }
+      },
+      "BaseTextRendererModel": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          }
+        },
+        "description": "How the point's raw value is rendered to a display string; the concrete type is selected by its 'type' discriminator.",
+        "discriminator": {
+          "propertyName": "type"
+        }
+      },
+      "DataPointModel": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "deviceName": {
+            "type": "string"
+          },
+          "purgeOverride": {
+            "type": "boolean",
+            "description": "When true, this point uses its own purgePeriod instead of the system default retention."
+          },
+          "purgePeriod": {
+            "$ref": "#/components/schemas/TimePeriod"
+          },
+          "textRenderer": {
+            "$ref": "#/components/schemas/BaseTextRendererModel"
+          },
+          "loggingPropertiesModel": {
+            "$ref": "#/components/schemas/LoggingPropertiesModel"
+          },
+          "readPermission": {
+            "type": "string",
+            "description": "Permission group(s) allowed to read this point, comma-separated."
+          },
+          "setPermission": {
+            "type": "string",
+            "description": "Permission group(s) allowed to set (write) this point, comma-separated."
+          },
+          "settable": {
+            "type": "boolean"
+          },
+          "pointLocator": {
+            "$ref": "#/components/schemas/PointLocatorModel"
+          },
+          "dataSourceId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "dataSourceXid": {
+            "type": "string"
+          },
+          "dataSourceName": {
+            "type": "string"
+          },
+          "extendedName": {
+            "type": "string",
+            "description": "Read-only combined device name and point name."
+          },
+          "id": {
+            "type": "integer",
+            "description": "ID of object in database",
+            "format": "int32"
+          },
+          "xid": {
+            "type": "string",
+            "description": "XID of object"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of object"
+          }
+        }
+      },
+      "EventTypeAlarmLevelModel": {
+        "type": "object",
+        "properties": {
+          "eventType": {
+            "type": "string",
+            "description": "Export code identifying the data source event type this alarm level applies to."
+          },
+          "duplicateHandling": {
+            "type": "string",
+            "description": "How duplicate occurrences of this event are handled.",
+            "enum": [
+              "DO_NOT_ALLOW",
+              "IGNORE",
+              "IGNORE_SAME_MESSAGE",
+              "ALLOW"
+            ]
+          },
+          "level": {
+            "type": "string",
+            "description": "Alarm level raised for this event type.",
+            "enum": [
+              "NONE",
+              "INFORMATION",
+              "WARNING",
+              "URGENT",
+              "CRITICAL",
+              "EMERGENCY",
+              "DO_NOT_LOG",
+              "IGNORE"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+            "readOnly": true,
+            "example": "5 minutes(s)"
+          }
+        }
+      },
+      "EventTypeMatcherModel": {
+        "type": "object",
+        "properties": {
+          "eventType": {
+            "type": "string"
+          },
+          "subType": {
+            "type": "string"
+          },
+          "referenceId1": {
+            "type": "integer",
+            "description": "Primary reference id the handler matches on (e.g. data source or data point id); null matches any.",
+            "format": "int32"
+          },
+          "referenceId2": {
+            "type": "integer",
+            "description": "Secondary reference id the handler matches on; null matches any.",
+            "format": "int32"
+          }
+        },
+        "description": "Event type matchers that determine which events trigger this handler."
+      },
+      "LoggingPropertiesModel": {
+        "type": "object",
+        "properties": {
+          "loggingType": {
+            "type": "string",
+            "description": "When values are persisted to history.",
+            "enum": [
+              "ON_CHANGE",
+              "ALL",
+              "NONE",
+              "INTERVAL",
+              "ON_TS_CHANGE",
+              "ON_CHANGE_INTERVAL"
+            ]
+          },
+          "intervalLoggingType": {
+            "type": "string",
+            "description": "Aggregation applied to interval logging (only when loggingType is INTERVAL).",
+            "enum": [
+              "INSTANT",
+              "MAXIMUM",
+              "MINIMUM",
+              "AVERAGE"
+            ]
+          },
+          "intervalLoggingPeriod": {
+            "$ref": "#/components/schemas/TimePeriod"
+          },
+          "tolerance": {
+            "type": "number",
+            "description": "Deadband; a value is logged on change only if it differs from the last logged value by more than this amount.",
+            "format": "double"
+          },
+          "discardExtremeValues": {
+            "type": "boolean",
+            "description": "When true, values outside the discard low/high limits are rejected rather than logged."
+          },
+          "discardLowLimit": {
+            "type": "number",
+            "description": "Lower bound for discarding extreme values (used when discardExtremeValues is true).",
+            "format": "double"
+          },
+          "discardHighLimit": {
+            "type": "number",
+            "description": "Upper bound for discarding extreme values (used when discardExtremeValues is true).",
+            "format": "double"
+          },
+          "cacheSize": {
+            "type": "integer",
+            "description": "Number of most-recent values kept in the in-memory cache.",
+            "format": "int32"
+          }
+        },
+        "description": "Logging configuration controlling how and when values are persisted to history."
+      },
+      "PointLocatorModel": {
+        "type": "object",
+        "properties": {
+          "dataType": {
+            "type": "string",
+            "description": "Data type of the value at this point.",
+            "enum": [
+              "BINARY",
+              "MULTISTATE",
+              "NUMERIC",
+              "ALPHANUMERIC",
+              "IMAGE"
+            ]
+          },
+          "settable": {
+            "type": "boolean"
+          },
+          "relinquishable": {
+            "type": "boolean",
+            "description": "Whether a set value can be relinquished back to the device's own control (e.g. BACnet priority array)."
+          },
+          "configurationDescription": {
+            "type": "string",
+            "description": "A display string the gateway has already translated. StackRestJacksonModule registers a serializer and no deserializer, so this is a string on the wire in both directions and writing one back is not meaningful -- the value would be taken as a translation key rather than as text. Read-only, and typed as a string, so a generated client does not present it as a writable object.",
+            "readOnly": true,
+            "example": "5 minutes(s)"
+          },
+          "modelType": {
+            "type": "string"
+          }
+        },
+        "discriminator": {
+          "propertyName": "modelType"
+        }
+      },
+      "RecipientEntryModel": {
+        "type": "object",
+        "properties": {
+          "recipientType": {
+            "type": "string"
+          }
+        },
+        "discriminator": {
+          "propertyName": "recipientType"
+        }
+      },
+      "TimePeriod": {
+        "type": "object",
+        "properties": {
+          "timePeriod": {
+            "type": "integer",
+            "description": "Count of time units; interpreted together with timePeriodType.",
+            "format": "int32",
+            "example": 5
+          },
+          "timePeriodType": {
+            "type": "string",
+            "description": "Unit that the timePeriod count is expressed in.",
+            "enum": [
+              "MILLISECONDS",
+              "SECONDS",
+              "MINUTES",
+              "HOURS",
+              "DAYS",
+              "WEEKS",
+              "MONTHS",
+              "YEARS"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

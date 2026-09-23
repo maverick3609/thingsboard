@@ -787,18 +787,44 @@ Bakes Inferrix branding into the default build (every `yarn build:prod` output i
   reproduced on the same build, and `MODBUS_IP.PL` was refused with HTTP 400 `Failed to read
   request` — Jackson cannot resolve a subtype that does not exist, which is the direct proof that
   the deleted `.DS`→`.PL` rename was wrong.
-- **Blocker to raise on the gateway, not in this repo: `/v2/model-schemas` returns an empty document
-  on 5.1.0.** All five families come back `{}` and `components.schemas` is `{}`; the endpoint itself
-  is live (an unknown `family` is a correct 404) and the deployed `inferrix-stack-5.1.0.jar` carries
-  `ModelSchemaService`. Nothing is logged, so the resolver never ran — the service snapshots its
-  injected `List<VoModelMapping>` **once in its constructor**, and the sibling `VoModelMapper`
-  holding the same list clearly has entries, since `/v2/data-source` maps models and subtype
-  deserialisation works. That points at construction ordering rather than at missing mappings, and
-  resolving lazily on first request would close it. **Consequence for this feature:** every
-  schema-driven form — the keystone of G3, G4 and G5 — renders nothing against this gateway. The
-  hand-written surfaces (alert routing, recipients, schedules, rule sets, system) are unaffected.
-- **Still operator-pending:** nothing has been verified visually in a browser, and no schema-driven
-  form has ever rendered against a real device — blocked on the item above, not on this code.
+- **That blocker is now fixed on the gateway side, and fixing it found two gaps here.** A populated
+  document (178 components, 63 data source types, 61 locators, 14 detectors, 4 handlers) was the
+  first real test the schema mapper ever had, and a hand-written fixture could not have caught
+  either:
+  - **`readOnly` was ignored** — 436 occurrences in the real document, each rendered as an editable
+    input inviting an operator to change a value the gateway computes. Now disabled. This also
+    subsumes the `MessageTranslation` special case: stack ask A12 shipped, so those fields are
+    declared `{"type":"string","readOnly":true}` and need no type name in the mapper. The old
+    hard-coded set stays only until the oldest adoptable gateway carries A12, and says so.
+  - **`writeOnly` was ignored, and it is the only signal for a secret.** The real document carries
+    no `format: password` anywhere, so an MQTT broker password and an OPC password rendered as plain
+    text inputs. Worse: a write-only field is absent on read, so the form held an empty value for it
+    and a save would have sent `userPassword: ""` and **erased the stored credential**, taking the
+    data source offline on its next poll with nothing in the UI saying so. Verified against a live
+    gateway — an MQTT data source created with a password returns it absent while `userName` comes
+    back. An empty secret field now means "unchanged" and is dropped from the payload entirely.
+- **Stack ask A11 shipped, so a workaround was deleted rather than a feature added.**
+  `/v2/data-source-types` now carries `pointLocatorType`, which confirms what this code worked out
+  the hard way: `MODBUS_IP.DS` and `MODBUS_SERIAL.DS` both take `MODBUS.PL`. A new point's locator
+  type comes from that field now, with the sibling-point derivation kept only as a fallback — one
+  real type answers `null` (`BACNET_MSTP.DS`), and a gateway older than the field answers nothing.
+- **The schema document is cached per gateway in the browser.** It is 531 KB uncompressed, four
+  panels want it, and ThingsBoard ships with `HTTP_COMPRESSION_ENABLED` defaulting to **false** — so
+  without this one details page pulled two megabytes to render four forms. The window matches
+  `InferrixGatewaySchemaService.CACHE_TTL`, within which the platform would have answered from its
+  own cache with the same bytes, so it adds no staleness that was not already there. A failed fetch
+  is never cached.
+- **Four other gateway findings were fixed the same day and re-verified:** a short weekly schedule is
+  now refused at save time rather than breaking on enable; a wrong point locator answers 422 with a
+  message naming the fix rather than 500 with two internal class names; 500s carry a correlation
+  reference instead of exception text; and the untranslated `???key(i18n_en)???` strings are gone
+  (0 of 90 monitor rows, down from 7, with 24 unsubstituted `{0}` placeholders also fixed). Two
+  remain open and neither blocks anything — see the findings document.
+- **Still operator-pending:** nothing has been verified visually in a browser. The mapper is now
+  exercised against a verbatim slice of a real 5.1.0 document
+  (`inferrix-gateway-schema.live.json` — six data source types, four locators, three detectors, all
+  four handlers, one publisher and their full `$ref` closure), which is a much stronger check than
+  the hand-written fixture beside it, but it is not a rendered page.
 
 ### TB-core files modified
 

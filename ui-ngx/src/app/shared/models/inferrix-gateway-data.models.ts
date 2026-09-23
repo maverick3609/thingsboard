@@ -96,6 +96,23 @@ export interface GatewayPointValue {
 export const GATEWAY_IDENTITY_FIELDS = ['id', 'xid', 'name', 'modelType'];
 
 /**
+ * A data source type as `/v2/data-source-types` reports it.
+ *
+ * `type` is already the full Jackson discriminator (`MODBUS_IP.DS`) — nothing appends a suffix to
+ * it. `pointLocatorType` is the type a point on such a data source must carry, and **it is the only
+ * place that pairing is published**: the naming looks like a rename and is not one, since
+ * `MODBUS_IP.DS` and `MODBUS_SERIAL.DS` both take `MODBUS.PL` and no `MODBUS_IP.PL` exists.
+ *
+ * Nullable, and one real type returns null (`BACNET_MSTP.DS` on stack 5.1.0), so a caller must have
+ * an answer for "the gateway did not say".
+ */
+export interface GatewayDataSourceType {
+  type: string;
+  name?: string;
+  pointLocatorType?: string | null;
+}
+
+/**
  * Turns a gateway page into the page shape TB's tables expect.
  *
  * `hasNext` is computed from `total`, which is why the gateway's total mattering more than the page

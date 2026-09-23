@@ -11,8 +11,8 @@ import { GatewayModelDialogComponent,
   GatewayModelDialogData } from '@home/pages/inferrix/gateway/gateway-model-dialog.component';
 import { GatewayDetectorsDialogComponent, GatewayDetectorsDialogData }
   from '@home/pages/inferrix/gateway/gateway-detectors-dialog.component';
-import { GATEWAY_IDENTITY_FIELDS, GatewayDataPoint, GatewayDataSource, GatewayListQuery,
-  GatewayPage } from '@shared/models/inferrix-gateway-data.models';
+import { GATEWAY_IDENTITY_FIELDS, GatewayDataPoint, GatewayDataSource, GatewayDataSourceType,
+  GatewayListQuery, GatewayPage } from '@shared/models/inferrix-gateway-data.models';
 import { componentToFormProperties, GatewaySchemaDocument,
   schemaToFormProperties } from '@shared/models/inferrix-gateway-schema.models';
 import { FormProperty } from '@shared/models/dynamic-form.models';
@@ -51,6 +51,9 @@ export class GatewayDataPointsComponent extends GatewayListPanelComponent<Gatewa
 
   private schemas: GatewaySchemaDocument;
 
+  /** Data source types, for the published point-locator pairing. See {@link locatorType}. */
+  private types: GatewayDataSourceType[] = [];
+
   constructor(private gatewayService: InferrixGatewayService,
               private dialog: MatDialog,
               private dialogService: DialogService,
@@ -63,6 +66,13 @@ export class GatewayDataPointsComponent extends GatewayListPanelComponent<Gatewa
     this.gatewayService.getSchemas(this.deviceId, {ignoreLoading: true}).subscribe({
       next: schemas => {
         this.schemas = schemas;
+        this.cd.markForCheck();
+      },
+      error: () => {}
+    });
+    this.gatewayService.getDataSourceTypes(this.deviceId, {ignoreLoading: true}).subscribe({
+      next: page => {
+        this.types = page?.items ?? [];
         this.cd.markForCheck();
       },
       error: () => {}
@@ -148,26 +158,25 @@ export class GatewayDataPointsComponent extends GatewayListPanelComponent<Gatewa
   }
 
   /**
-   * The point-locator type a new point on this data source must carry, taken from a point that
-   * already has one.
+   * The point-locator type a new point on this data source must carry.
    *
-   * There is no way to derive it and no endpoint that publishes it. The stack names its Jackson
-   * subtypes `<PROTOCOL>.DS` and `<PROTOCOL>.PL`, which makes a rename look like the pairing, and
-   * for some protocols it is -- but `MODBUS_IP.DS` takes `MODBUS.PL`, there is no `MODBUS_IP.PL`
-   * at all, and `MODBUS_SLAVE_DEVICE.PL` and `MODBUS_CONTROLLER.PL` sit beside it. So the rename
-   * is a coincidence that holds for the four protocols a test fixture happens to contain.
+   * **The gateway publishes this and nothing else does.** `/v2/data-source-types` reports
+   * `pointLocatorType` per data source type, which is the only place the pairing appears: the naming
+   * looks like a rename of `.DS` to `.PL` and is not one — `MODBUS_IP.DS` and `MODBUS_SERIAL.DS`
+   * both take `MODBUS.PL`, and no `MODBUS_IP.PL` exists on any build. Sending the wrong one used to
+   * be an HTTP 500 `ClassCastException`; it is now a validation message that points here.
    *
-   * Sending the wrong one is not a validation error the operator can read: the gateway casts the
-   * deserialized locator to the data source's own locator class and answers HTTP 500
-   * `ClassCastException`, and sending none at all answers HTTP 500 `NullPointerException`. Both
-   * verified live. A guess that is wrong for Modbus is therefore worse than no guess.
-   *
-   * A sibling point is the one authority that is free -- this panel is already scoped to one data
-   * source, so its loaded rows are points of exactly this data source. When there are none, the
-   * type is unknowable from here and adding is refused rather than attempted.
+   * The fallback is not decoration. One real type answers `pointLocatorType: null`
+   * (`BACNET_MSTP.DS` on stack 5.1.0), and a gateway from before the field existed answers nothing
+   * at all — in either case a sibling point of this same data source still knows, for free, because
+   * this panel is already scoped to one data source. Only when there is neither is adding refused.
    */
   get locatorType(): string | null {
-    return this.rows.find(row => row.pointLocator?.modelType)?.pointLocator?.modelType ?? null;
+    const published = this.types
+      .find(type => type.type === this.selectedDataSource?.modelType)?.pointLocatorType;
+    return published
+      ?? this.rows.find(row => row.pointLocator?.modelType)?.pointLocator?.modelType
+      ?? null;
   }
 
   add(): void {

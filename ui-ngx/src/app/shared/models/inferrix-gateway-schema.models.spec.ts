@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: Copyright The Inferrix Authors
 // SPDX-License-Identifier: Apache-2.0
-import { FormPropertyType } from '@shared/models/dynamic-form.models';
+import { FormProperty, FormPropertyType } from '@shared/models/dynamic-form.models';
 import {
   GatewaySchemaDocument,
   SCHEMA_MAX_DEPTH,
@@ -8,6 +8,7 @@ import {
   schemaToFormProperties
 } from '@shared/models/inferrix-gateway-schema.models';
 import fixture from './inferrix-gateway-schema.fixture.json';
+import liveFixture from './inferrix-gateway-schema.live.json';
 
 /**
  * The gateway's schema document is the least trusted input in this feature.
@@ -352,5 +353,193 @@ describe('inferrix-gateway-schema.models', () => {
       expect(required.find(p => p.id === 'a').required).toBeTrue();
       expect(required.find(p => p.id === 'b').required).toBeFalsy();
     });
+  });
+});
+
+/**
+ * The same mapper, against a document a real gateway actually served.
+ *
+ * `inferrix-gateway-schema.live.json` is a verbatim slice of `GET /v2/model-schemas` from stack
+ * 5.1.0 — six data source types, four locators, three detectors, all four handlers, one publisher,
+ * and the transitive `$ref` closure of all of them. Nothing in it is hand-written, which is the
+ * point: the other fixture tests the mapper against deliberately hostile input, and this one tests
+ * it against what the gateway is really like.
+ *
+ * It exists because the schema endpoint served an **empty** document until the stack side was fixed,
+ * so until then every one of these forms was unexercised against anything real. The first look at a
+ * populated document found two gaps, both covered below.
+ */
+describe('inferrix-gateway-schema.models against a live gateway document', () => {
+
+  const live = liveFixture as unknown as GatewaySchemaDocument;
+  const families = ['dataSource', 'pointLocator', 'eventDetector', 'eventHandler', 'publisher'];
+
+  const everyProperty = (): FormProperty[] => {
+    const all: FormProperty[] = [];
+    const collect = (properties: FormProperty[]) => properties.forEach(property => {
+      all.push(property);
+      collect(((property as any).properties ?? []) as FormProperty[]);
+    });
+    families.forEach(family => Object.keys(live.families[family] ?? {})
+      .forEach(type => collect(schemaToFormProperties(live, family, type))));
+    return all;
+  };
+
+  it('maps every type the document carries without throwing or coming back empty', () => {
+    let types = 0;
+    families.forEach(family => Object.keys(live.families[family] ?? {}).forEach(type => {
+      const properties = schemaToFormProperties(live, family, type);
+      expect(properties.length)
+        .withContext(`${family}/${type} mapped to nothing`).toBeGreaterThan(0);
+      types++;
+    }));
+    expect(types).toBe(18);
+  });
+
+  it('never assigns a type that renders executable or markup content', () => {
+    // The mapper's central rule, checked against real input rather than a crafted case: the type
+    // comes from a fixed table, so no schema can talk it into javascript, html or markdown --
+    // and TB compiles FormProperty.condition to executable JavaScript.
+    const forbidden = [FormPropertyType.javascript, FormPropertyType.html, FormPropertyType.markdown];
+    everyProperty().forEach(property => expect(forbidden).not.toContain(property.type));
+  });
+
+  it('never emits a property id that is not a plain identifier', () => {
+    // 292 distinct property names in the full document, none of which this refuses -- so the guard
+    // costs nothing real while still closing __proto__.
+    everyProperty().forEach(property => expect(property.id).toMatch(/^[A-Za-z][A-Za-z0-9_]{0,63}$/));
+  });
+
+  it('disables a field the gateway marks readOnly', () => {
+    // 436 of them in the full document. Rendering one editable invites an operator to change a
+    // value the gateway computes, which is either discarded or worse.
+    const meta = schemaToFormProperties(live, 'dataSource', 'META.DS');
+    const connection = meta.find(property => property.id === 'connectionDescription');
+    expect(connection).toBeTruthy();
+    expect(connection.disabled).toBe(true);
+
+    // This is also what replaced the MessageTranslation special case: the field is now declared as
+    // the string it always was on the wire, and readOnly says the rest.
+    expect(connection.type).toBe(FormPropertyType.text);
+  });
+
+  it('renders a writeOnly secret as a password, which no format tells it', () => {
+    // The ONLY signal. A real document carries no `format: password` anywhere, so a mapper keying
+    // on format would put an MQTT broker credential in a plain text input.
+    const mqtt = schemaToFormProperties(live, 'dataSource', 'MQTT.DS');
+    expect(mqtt.find(property => property.id === 'userPassword').type)
+      .toBe(FormPropertyType.password);
+    expect(mqtt.find(property => property.id === 'privateKey').type)
+      .toBe(FormPropertyType.password);
+    expect(schemaToFormProperties(live, 'dataSource', 'OPC.DS')
+      .find(property => property.id === 'password').type).toBe(FormPropertyType.password);
+  });
+
+  it('flattens allOf, so an inherited field is not silently dropped', () => {
+    // MODBUS_IP.DS is allOf [AbstractPollingDataSourceModel, {its own fields}]. A mapper reading
+    // only `properties` would render the Modbus half and lose every polling field.
+    const modbus = schemaToFormProperties(live, 'dataSource', 'MODBUS_IP.DS');
+    const ids = modbus.map(property => property.id);
+    expect(ids).toContain('host');        // its own
+    expect(ids).toContain('timePeriod');  // inherited from the polling base only
+    expect(ids).toContain('quantize');    // ditto
+    expect(ids).toContain('enabled');     // inherited from the data source base beneath it
+  });
+
+  it('carries the item fields of an array of objects up onto the array', () => {
+    // TB builds each row by cloning the ARRAY property and swapping its type for arrayItemType, so
+    // a fieldset row renders whatever `properties` sits on the array itself. Dropping them gave a
+    // row with no inputs -- and the renderer writes its value back over the whole array, so saving
+    // a handler would have reduced every event-type matcher to a bare discriminator.
+    const handler = schemaToFormProperties(live, 'eventHandler', 'EMAIL_HANDLER');
+    const eventTypes = handler.find(property => property.id === 'eventTypes');
+    expect(eventTypes.type).toBe(FormPropertyType.array);
+    expect(eventTypes.arrayItemType).toBe(FormPropertyType.fieldset);
+    expect(((eventTypes as any).properties ?? []).length).toBeGreaterThan(0);
+  });
+
+  it('builds a select from a real enum', () => {
+    const detector = schemaToFormProperties(live, 'eventDetector', 'ANALOG_HIGH_LIMIT_DETECTOR');
+    const level = detector.find(property => property.id === 'alarmLevel');
+    expect(level.type).toBe(FormPropertyType.select);
+    expect(level.items.map(item => item.value)).toContain('URGENT');
+  });
+
+  it('confirms the two type names the hand-written fixture had wrong', () => {
+    // The fixture's family keys were invented and three of them did not exist. These are the
+    // gateway's own, so this test fails if anyone reintroduces a guess.
+    expect(Object.keys(live.families.eventDetector)).toContain('BINARY_STATE_DETECTOR');
+    expect(Object.keys(live.families.eventHandler)).toContain('EMAIL_HANDLER');
+    expect(Object.keys(live.families.pointLocator)).toContain('MODBUS.PL');
+    expect(Object.keys(live.families.pointLocator)).not.toContain('MODBUS_IP.PL');
+  });
+
+  it('carries no point-locator pairing — that lives on /v2/data-source-types', () => {
+    // Stack ask A11 shipped, but on the type endpoint rather than here: a data source's schema
+    // entry says nothing about which locator its points take. So a reader looking for the pairing
+    // must go to `pointLocatorType` on /v2/data-source-types, which is what
+    // GatewayDataPointsComponent.locatorType does.
+    const modbus = JSON.stringify(live.families.dataSource['MODBUS_IP.DS']);
+    expect(modbus).not.toContain('.PL');
+  });
+});
+
+/**
+ * What a save built from a live schema actually sends.
+ *
+ * The mapper decides what a field *is*; this is the other half — what the dialog does with it. The
+ * `writeOnly` case is the one that matters, and it is a data-loss bug rather than a cosmetic one,
+ * so it is pinned here against the real document rather than against a crafted property list.
+ */
+describe('saving a model built from a live gateway schema', () => {
+
+  const live = liveFixture as unknown as GatewaySchemaDocument;
+
+  /**
+   * The rule {@link GatewayModelDialogComponent.keep} applies, restated so this file can check it
+   * without standing up Angular's dialog harness for one object transform.
+   */
+  const keep = (values: {[id: string]: any}, properties: FormProperty[]) => {
+    const secrets = new Set(properties
+      .filter(property => property.type === FormPropertyType.password)
+      .map(property => property.id));
+    const kept: {[id: string]: any} = {};
+    Object.keys(values).forEach(id => {
+      const value = values[id];
+      if (secrets.has(id) && (value === null || value === undefined || value === '')) {
+        return;
+      }
+      kept[id] = value;
+    });
+    return kept;
+  };
+
+  it('does not blank a stored secret the operator never typed into', () => {
+    const properties = schemaToFormProperties(live, 'dataSource', 'MQTT.DS');
+    const stored = {modelType: 'MQTT.DS', xid: 'DS_1', name: 'Broker', userPassword: undefined};
+
+    // What the form holds after rendering: a writeOnly field is absent on read, so it is empty
+    // whether or not the gateway is storing a credential, and the two are indistinguishable here.
+    const formValues = {host: 'broker.example.net', userPassword: '', privateKey: null};
+    const saved: any = {...stored, ...keep(formValues, properties)};
+
+    expect(saved.host).toBe('broker.example.net');
+    // Absent, not empty. An empty string reaches `userPassword` on the gateway and takes the data
+    // source offline on its next poll, with nothing in the UI saying that is what happened.
+    expect('userPassword' in keep(formValues, properties)).toBe(false);
+    expect('privateKey' in keep(formValues, properties)).toBe(false);
+  });
+
+  it('still sends a secret the operator did type', () => {
+    const properties = schemaToFormProperties(live, 'dataSource', 'MQTT.DS');
+    expect(keep({userPassword: 'hunter2'}, properties).userPassword).toBe('hunter2');
+  });
+
+  it('still sends an ordinary field cleared on purpose', () => {
+    // Emptiness only means "unchanged" for a secret. Clearing a text field is a real edit.
+    const properties = schemaToFormProperties(live, 'dataSource', 'MQTT.DS');
+    const cleared = keep({clientId: ''}, properties);
+    expect('clientId' in cleared).toBe(true);
+    expect(cleared.clientId).toBe('');
   });
 });

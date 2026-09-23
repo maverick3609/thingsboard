@@ -153,7 +153,7 @@
                 [rows]="property.rows || 2"
                 formControlName="{{ property.id }}"
                 [required]="property.required"
-                placeholder="{{ 'widget-config.set' | translate }}"></textarea>
+                [placeholder]="stackedLabels ? '' : ('widget-config.set' | translate)"></textarea>
     </mat-form-field>
     <mat-form-field *ngIf="[FormPropertyType.text, FormPropertyType.password].includes(property.type)"
                     [class]="singleField ? 'flex' : property.fieldClass"
@@ -164,7 +164,7 @@
              [type]="property.type"
              formControlName="{{ property.id }}"
              [required]="property.required"
-             placeholder="{{ 'widget-config.set' | translate }}">
+             [placeholder]="stackedLabels ? '' : ('widget-config.set' | translate)">
       <div class="lt-md:!hidden" matSuffix *ngIf="property.fieldSuffix">{{ property.fieldSuffix | customTranslate }}</div>
     </mat-form-field>
     <mat-form-field *ngIf="property.type === FormPropertyType.number"
@@ -180,7 +180,7 @@
              [min]="property.min"
              [max]="property.max"
              [step]="property.step"
-             placeholder="{{ 'widget-config.set' | translate }}">
+             [placeholder]="stackedLabels ? '' : ('widget-config.set' | translate)">
       <div class="lt-md:!hidden" matSuffix *ngIf="property.fieldSuffix">{{ property.fieldSuffix | customTranslate }}</div>
     </mat-form-field>
     <mat-form-field *ngIf="property.type === FormPropertyType.select"

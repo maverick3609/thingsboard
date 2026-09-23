@@ -1,0 +1,25 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Inferrix Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<div class="flex flex-col" [formGroup]="entityForm">
+  <mat-form-field class="mat-block">
+    <mat-label translate>device.name</mat-label>
+    <input matInput formControlName="name" required/>
+    <mat-error *ngIf="entityForm.get('name').hasError('required')">
+      {{ 'device.name-required' | translate }}
+    </mat-error>
+  </mat-form-field>
+  <mat-form-field class="mat-block">
+    <mat-label translate>device.label</mat-label>
+    <input matInput formControlName="label"/>
+  </mat-form-field>
+  <div formGroupName="additionalInfo" class="flex flex-col">
+    <mat-form-field class="mat-block">
+      <mat-label translate>device.description</mat-label>
+      <textarea matInput formControlName="description" rows="2"></textarea>
+    </mat-form-field>
+  </div>
+</div>

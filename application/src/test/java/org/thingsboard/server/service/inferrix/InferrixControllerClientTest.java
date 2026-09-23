@@ -5,9 +5,11 @@ package org.thingsboard.server.service.inferrix;
 import org.junit.jupiter.api.Test;
 import org.thingsboard.server.service.inferrix.InferrixControllerClient.FingerprintCapturingTrustManager;
 
+import java.io.IOException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
@@ -78,4 +80,40 @@ class InferrixControllerClientTest {
         return certificate;
     }
 
+
+    @Test
+    void aNameThatResolvesToLoopbackAnywhereInItsRecordSetIsRefused() throws Exception {
+        java.net.InetAddress publicAddr = java.net.InetAddress.getByName("93.184.216.34");
+        java.net.InetAddress loopback = java.net.InetAddress.getByName("127.0.0.1");
+        java.net.InetAddress anyLocal = java.net.InetAddress.getByName("0.0.0.0");
+        java.net.InetAddress lanAddr = java.net.InetAddress.getByName("10.0.0.5");
+        java.net.InetAddress linkLocalV6 = java.net.InetAddress.getByName("fe80::1");
+
+        // getByName returns only the first address, so a record set that merely STARTS public
+        // walked straight past the old check while which address actually got dialled was the
+        // HTTP client's decision, not this one's. The platform's own REST API and actuator live
+        // on that loopback.
+        assertThatThrownBy(() -> InferrixControllerClient.requireReachable(
+                "rebind.example", new java.net.InetAddress[]{publicAddr, loopback}))
+                .isInstanceOf(IOException.class);
+        assertThatThrownBy(() -> InferrixControllerClient.requireReachable(
+                "rebind.example", new java.net.InetAddress[]{lanAddr, anyLocal}))
+                .isInstanceOf(IOException.class);
+
+        // But an mDNS name on a LAN routinely answers with an IPv4 address AND an IPv6 link-local
+        // one, and these devices are LAN-only by design. Rejecting the whole set for that would
+        // refuse legitimate gateways, so link-local is judged on the first address alone --
+        // which still blocks a name that resolves link-local first, including the 169.254 range
+        // the cloud metadata service lives on.
+        InferrixControllerClient.requireReachable(
+                "gw.local", new java.net.InetAddress[]{lanAddr, linkLocalV6});
+        assertThatThrownBy(() -> InferrixControllerClient.requireReachable(
+                "metadata.example", new java.net.InetAddress[]{
+                        java.net.InetAddress.getByName("169.254.169.254")}))
+                .isInstanceOf(IOException.class);
+
+        assertThatThrownBy(() -> InferrixControllerClient.requireReachable(
+                "empty.example", new java.net.InetAddress[0]))
+                .isInstanceOf(IOException.class);
+    }
 }

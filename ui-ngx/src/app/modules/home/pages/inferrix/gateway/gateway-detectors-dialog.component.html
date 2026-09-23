@@ -1,0 +1,83 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Inferrix Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<mat-toolbar color="primary">
+  <h2>{{ 'inferrix.gateway.detectors-for' | translate: {name: data.point.name} }}</h2>
+  <span class="flex-1"></span>
+  <button mat-icon-button type="button" (click)="close()">
+    <mat-icon class="material-icons">close</mat-icon>
+  </button>
+</mat-toolbar>
+<div mat-dialog-content class="tb-controller-table">
+  @if (loading) {
+    <mat-progress-bar color="warn" mode="indeterminate"></mat-progress-bar>
+  } @else {
+    <div style="height: 4px;"></div>
+  }
+  @if (error) {
+    <div class="tb-error-message">{{ error }}</div>
+  }
+  <table mat-table [dataSource]="detectors">
+    <ng-container matColumnDef="name">
+      <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.gateway.model-name' | translate }}</th>
+      <td mat-cell *matCellDef="let detector">{{ detector.name }}</td>
+    </ng-container>
+    <ng-container matColumnDef="detectorType">
+      <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.gateway.model-kind' | translate }}</th>
+      <td mat-cell *matCellDef="let detector">{{ detector.detectorType }}</td>
+    </ng-container>
+    <ng-container matColumnDef="alarmLevel">
+      <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.gateway.alarm-level' | translate }}</th>
+      <td mat-cell *matCellDef="let detector">{{ detector.alarmLevel }}</td>
+    </ng-container>
+    <!--
+      Xids rather than names: the gateway stores the link as a list of handler xids and publishes
+      no resolved names with it, so showing anything friendlier would mean a call per row.
+    -->
+    <ng-container matColumnDef="handlers">
+      <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.gateway.event-handlers' | translate }}</th>
+      <td mat-cell *matCellDef="let detector">{{ handlerSummary(detector) }}</td>
+    </ng-container>
+    <ng-container matColumnDef="actions">
+      <th mat-header-cell *matHeaderCellDef></th>
+      <td mat-cell *matCellDef="let detector">
+        @if (!data.readonly) {
+          <button mat-icon-button class="tb-mat-32"
+                  (click)="$event.stopPropagation(); delete(detector)"
+                  matTooltip="{{ 'action.delete' | translate }}" matTooltipPosition="above">
+            <mat-icon>delete</mat-icon>
+          </button>
+        }
+      </td>
+    </ng-container>
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns"
+        class="tb-pointer" (click)="edit(row)"></tr>
+  </table>
+  @if (!loading && !error && detectors.length === 0) {
+    <div class="tb-form-hint" translate>inferrix.gateway.no-detectors</div>
+  }
+  @if (!data.readonly && !types.length) {
+    <!--
+      Either the point has no data type yet, or this gateway published no schema for any detector
+      that suits it. Offering a type with no form would open an empty dialog.
+    -->
+    <div class="tb-form-hint" translate>inferrix.gateway.no-detector-types</div>
+  }
+</div>
+<div mat-dialog-actions class="flex flex-row items-center justify-end">
+  @if (!data.readonly && types.length) {
+    <button mat-stroked-button type="button" [matMenuTriggerFor]="typeMenu">
+      {{ 'inferrix.gateway.add-detector' | translate }}
+    </button>
+    <mat-menu #typeMenu="matMenu">
+      @for (type of types; track type.type) {
+        <button mat-menu-item (click)="add(type)">{{ type.name || type.type }}</button>
+      }
+    </mat-menu>
+  }
+  <button mat-button type="button" (click)="close()">{{ 'action.close' | translate }}</button>
+</div>

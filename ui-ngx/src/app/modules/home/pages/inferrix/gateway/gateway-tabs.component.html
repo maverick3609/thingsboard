@@ -1,0 +1,84 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Inferrix Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<!--
+  One-item loop tracked by the device id, as the controller tabs do. The details drawer keeps this
+  component alive and swaps only the entity, so a panel reused across that swap would go on showing
+  the last gateway's state while its actions reached the new one.
+-->
+@if (entity) {
+  <mat-tab label="{{ 'inferrix.gateway.tab-health' | translate }}" #healthTab="matTab">
+    @for (gateway of [entity]; track gateway.id.id) {
+      <tb-gateway-health class="flex min-h-full flex-col"
+                         [active]="healthTab.isActive"
+                         [deviceId]="gateway.id.id"></tb-gateway-health>
+    }
+  </mat-tab>
+  <mat-tab label="{{ 'inferrix.gateway.tab-data-sources' | translate }}" #dataSourcesTab="matTab">
+    @for (gateway of [entity]; track gateway.id.id) {
+      <tb-gateway-data-sources class="flex min-h-full flex-col"
+                               [active]="dataSourcesTab.isActive"
+                               [readonly]="readonly"
+                               [deviceId]="gateway.id.id"></tb-gateway-data-sources>
+    }
+  </mat-tab>
+  <mat-tab label="{{ 'inferrix.gateway.tab-data-points' | translate }}" #dataPointsTab="matTab">
+    @for (gateway of [entity]; track gateway.id.id) {
+      <tb-gateway-data-points class="flex min-h-full flex-col"
+                              [active]="dataPointsTab.isActive"
+                              [readonly]="readonly"
+                              [deviceId]="gateway.id.id"></tb-gateway-data-points>
+    }
+  </mat-tab>
+  <mat-tab label="{{ 'inferrix.gateway.tab-events' | translate }}" #eventsTab="matTab">
+    @for (gateway of [entity]; track gateway.id.id) {
+      <tb-gateway-events class="flex min-h-full flex-col"
+                         [active]="eventsTab.isActive"
+                         [readonly]="readonly"
+                         [deviceId]="gateway.id.id"></tb-gateway-events>
+    }
+  </mat-tab>
+  <mat-tab label="{{ 'inferrix.gateway.tab-event-handlers' | translate }}" #handlersTab="matTab">
+    @for (gateway of [entity]; track gateway.id.id) {
+      <tb-gateway-event-handlers class="flex min-h-full flex-col"
+                                 [active]="handlersTab.isActive"
+                                 [readonly]="readonly"
+                                 [deviceId]="gateway.id.id"></tb-gateway-event-handlers>
+    }
+  </mat-tab>
+  <mat-tab label="{{ 'inferrix.gateway.tab-alert-lists' | translate }}" #alertListsTab="matTab">
+    @for (gateway of [entity]; track gateway.id.id) {
+      <tb-gateway-alert-lists class="flex min-h-full flex-col"
+                              [active]="alertListsTab.isActive"
+                              [readonly]="readonly"
+                              [deviceId]="gateway.id.id"></tb-gateway-alert-lists>
+    }
+  </mat-tab>
+  <mat-tab label="{{ 'inferrix.gateway.tab-schedules' | translate }}" #schedulesTab="matTab">
+    @for (gateway of [entity]; track gateway.id.id) {
+      <tb-gateway-schedules class="flex min-h-full flex-col"
+                            [active]="schedulesTab.isActive"
+                            [readonly]="readonly"
+                            [deviceId]="gateway.id.id"></tb-gateway-schedules>
+    }
+  </mat-tab>
+  <mat-tab label="{{ 'inferrix.gateway.tab-rule-sets' | translate }}" #ruleSetsTab="matTab">
+    @for (gateway of [entity]; track gateway.id.id) {
+      <tb-gateway-rule-sets class="flex min-h-full flex-col"
+                            [active]="ruleSetsTab.isActive"
+                            [readonly]="readonly"
+                            [deviceId]="gateway.id.id"></tb-gateway-rule-sets>
+    }
+  </mat-tab>
+  <mat-tab label="{{ 'inferrix.gateway.tab-system' | translate }}" #systemTab="matTab">
+    @for (gateway of [entity]; track gateway.id.id) {
+      <!-- No `readonly`: this tab writes nothing. The settings write route is not allowlisted. -->
+      <tb-gateway-system class="flex min-h-full flex-col"
+                         [active]="systemTab.isActive"
+                         [deviceId]="gateway.id.id"></tb-gateway-system>
+    }
+  </mat-tab>
+}

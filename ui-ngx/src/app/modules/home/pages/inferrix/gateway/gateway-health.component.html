@@ -1,0 +1,39 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Inferrix Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<div class="mat-padding flex flex-1 flex-col gap-4">
+  <div class="tb-form-panel stroked">
+    <div class="tb-form-row no-border no-padding">
+      <div class="gateway-state flex flex-row items-center gap-2" [ngClass]="tone">
+        <mat-icon>{{ tone === 'ok' ? 'check_circle' : tone === 'warn' ? 'info' : 'error' }}</mat-icon>
+        <span class="flex-1">
+          {{ (reachability ? labelOf(reachability.reason) : 'inferrix.gateway.reachability-checking') | translate }}
+        </span>
+      </div>
+      <span class="flex-1"></span>
+      <button mat-stroked-button class="shrink-0" [disabled]="loading" (click)="probe()">
+        {{ 'inferrix.gateway.recheck' | translate }}
+      </button>
+    </div>
+    <!-- The platform's own sentence about what went wrong. It names the address, the status or the
+         fingerprint, which is what an operator needs to search for. -->
+    <div class="tb-form-panel-hint" *ngIf="reachability?.message">{{ reachability.message }}</div>
+    <mat-progress-bar color="primary" mode="indeterminate" *ngIf="loading"></mat-progress-bar>
+  </div>
+
+  <div class="tb-form-panel stroked" *ngIf="reachability?.reachable">
+    <div class="tb-form-panel-title" translate>inferrix.gateway.identity</div>
+    <div class="tb-form-row no-border">
+      <div class="flex-1" translate>inferrix.gateway.stack-version</div>
+      <!-- Absent on an older stack. Blank is honest; "unknown" reads like a fault. -->
+      <div>{{ reachability.stackVersion || '—' }}</div>
+    </div>
+    <div class="tb-form-row no-border">
+      <div class="flex-1" translate>inferrix.gateway.checked-at</div>
+      <div>{{ reachability.checkedAt | date: 'yyyy-MM-dd HH:mm:ss' }}</div>
+    </div>
+  </div>
+</div>

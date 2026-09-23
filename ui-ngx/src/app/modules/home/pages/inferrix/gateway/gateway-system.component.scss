@@ -1,0 +1,27 @@
+// SPDX-FileCopyrightText: Copyright The Inferrix Authors
+// SPDX-License-Identifier: Apache-2.0
+
+/* A hundred settings is a table, not a form: one scrollable block keeps the card a fixed size
+   instead of pushing every other card off the page. */
+.table-container {
+  max-height: 420px;
+  overflow: auto;
+}
+
+.tb-settings-table {
+  width: 100%;
+  font-size: 13px;
+  border-collapse: collapse;
+
+  td {
+    padding: 2px 8px 2px 0;
+    vertical-align: top;
+    word-break: break-word;
+  }
+}
+
+.tb-settings-key {
+  width: 45%;
+  color: rgba(0, 0, 0, 0.54);
+  font-family: monospace;
+}

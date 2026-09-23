@@ -1,0 +1,14 @@
+// SPDX-FileCopyrightText: Copyright The Inferrix Authors
+// SPDX-License-Identifier: Apache-2.0
+
+/* A dialog sizes itself through :host, which also needs a display -- Material makes dialog hosts
+   display: contents, so a width set without one does nothing. */
+:host {
+  display: block;
+  width: 600px;
+}
+
+/* Room for five digits plus the number spinner. */
+.gateway-port {
+  width: 120px;
+}

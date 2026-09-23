@@ -34,7 +34,9 @@ import { FeaturesModule } from '@home/pages/features/features.module';
 import { NotificationModule } from '@home/pages/notification/notification.module';
 import { AccountModule } from '@home/pages/account/account.module';
 import { ScadaSymbolModule } from '@home/pages/scada-symbol/scada-symbol.module';
-import { GatewaysModule } from '@home/pages/gateways/gateways.module';
+// Inferrix: the stock GatewaysModule only served the system gateways dashboard, which
+// InferrixModule now replaces at the same route. Upstream re-adds this import on merge -- delete it
+// again.
 import { MobileModule } from '@home/pages/mobile/mobile.module';
 import { AiModelModule } from '@home/pages/ai-model/ai-model.module';
 import { WhiteLabelingModule } from '@home/pages/white-labeling/white-labeling.module';
@@ -68,7 +70,6 @@ import { InferrixModule } from '@home/pages/inferrix/inferrix.module';
     DashboardModule,
     AuditLogModule,
     ApiUsageModule,
-    GatewaysModule,
     OtaUpdateModule,
     UserModule,
     VcModule,

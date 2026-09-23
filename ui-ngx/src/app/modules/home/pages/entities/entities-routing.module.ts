@@ -6,7 +6,10 @@ import { NgModule } from '@angular/core';
 import { deviceRoutes } from '@home/pages/device/device-routing.module';
 import { assetRoutes } from '@home/pages/asset/asset-routing.module';
 import { entityViewRoutes } from '@home/pages/entity-view/entity-view-routing.module';
-import { gatewaysRoutes } from '@home/pages/gateways/gateways-routing.module';
+// Inferrix: the stock Gateways page is a system dashboard; ours is an entities table over real
+// devices. Mounted at the same path so MenuId.gateways, the breadcrumb and existing links are
+// untouched. Upstream re-adds the gatewaysRoutes import on merge -- re-apply this swap.
+import { inferrixGatewayRoutes } from '@home/pages/inferrix/inferrix-routing.module';
 
 const routes: Routes = [
   {
@@ -29,7 +32,7 @@ const routes: Routes = [
       ...deviceRoutes,
       ...assetRoutes,
       ...entityViewRoutes,
-      ...gatewaysRoutes
+      ...inferrixGatewayRoutes
     ]
   }
 ];

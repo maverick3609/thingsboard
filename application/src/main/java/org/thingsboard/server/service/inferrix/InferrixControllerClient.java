@@ -423,7 +423,7 @@ public class InferrixControllerClient {
      * certificate with no {@code subjectAltName} still completes a handshake, while one whose
      * fingerprint does not match the pin still fails.
      */
-    static TlsSocketStrategy tlsStrategy(FingerprintCapturingTrustManager trust) throws IOException {
+    public static TlsSocketStrategy tlsStrategy(FingerprintCapturingTrustManager trust) throws IOException {
         return ClientTlsStrategyBuilder.create()
                 .setSslContext(sslContext(trust))
                 .setHostVerificationPolicy(HostnameVerificationPolicy.CLIENT)
@@ -449,15 +449,48 @@ public class InferrixControllerClient {
      * <p>Enforced here rather than in the callers so that every path is covered — adoption, the
      * proxy, and anything added later.
      */
-    static void requireReachableControllerAddress(String host) throws IOException {
-        InetAddress address;
+    public static void requireReachableControllerAddress(String host) throws IOException {
+        InetAddress[] addresses;
         try {
-            address = InetAddress.getByName(host);
+            // getAllByName, not getByName: the latter returns only the first address, so a name
+            // answering [93.184.216.34, 127.0.0.1] passes a first-address check while which one
+            // actually gets dialled is not this code's decision.
+            addresses = InetAddress.getAllByName(host);
         } catch (UnknownHostException e) {
             throw new IOException("Cannot resolve the controller address " + host, e);
         }
-        if (address.isLoopbackAddress() || address.isLinkLocalAddress()
-                || address.isAnyLocalAddress() || address.isMulticastAddress()) {
+        requireReachable(host, addresses);
+    }
+
+    /**
+     * Package-visible and taking the resolved addresses, so the rule can be tested against record
+     * sets that cannot be conjured from real DNS.
+     *
+     * <p>Deliberately asymmetric, and the asymmetry is the whole design. Loopback and any-local are
+     * rejected if <em>any</em> resolved address is one: no real device's name includes 127.0.0.1,
+     * so the only thing that check can break is the attack itself. Link-local and multicast are
+     * judged on the first address only, because these devices sit on private LANs where an mDNS
+     * name routinely answers with an IPv4 address <em>and</em> an IPv6 link-local one — rejecting
+     * the whole set on that would refuse legitimate gateways, and the symptom would be "adoption
+     * says my address is invalid".
+     *
+     * <p>What this still does not close: {@code InetAddress} resolves here and Apache HttpClient
+     * resolves again at connect, so a short-TTL name can answer differently for each. Closing that
+     * needs a {@code DnsResolver} pinned to the vetted address. With certificate pinning now
+     * mandatory in {@code InferrixGatewayAccess}, a rebind lands on a host that cannot present the
+     * pinned certificate, so the handshake fails before anything is sent.
+     */
+    static void requireReachable(String host, InetAddress[] addresses) throws IOException {
+        if (addresses == null || addresses.length == 0) {
+            throw new IOException("Cannot resolve the controller address " + host);
+        }
+        for (InetAddress address : addresses) {
+            if (address.isLoopbackAddress() || address.isAnyLocalAddress()) {
+                throw new IOException(host + " is not a usable controller address");
+            }
+        }
+        InetAddress first = addresses[0];
+        if (first.isLinkLocalAddress() || first.isMulticastAddress()) {
             throw new IOException(host + " is not a usable controller address");
         }
     }
@@ -499,7 +532,7 @@ public class InferrixControllerClient {
      * Records the served certificate's fingerprint and, when a pin is supplied, refuses anything
      * else. There is no CA in this trust model, so the fingerprint is the whole of it.
      */
-    static final class FingerprintCapturingTrustManager implements X509TrustManager {
+    public static final class FingerprintCapturingTrustManager implements X509TrustManager {
 
         private final String expectedFingerprint;
         @Getter
@@ -508,7 +541,7 @@ public class InferrixControllerClient {
         @Getter
         private volatile X509Certificate certificate;
 
-        FingerprintCapturingTrustManager(String expectedFingerprint) {
+        public FingerprintCapturingTrustManager(String expectedFingerprint) {
             this.expectedFingerprint = expectedFingerprint;
         }
 

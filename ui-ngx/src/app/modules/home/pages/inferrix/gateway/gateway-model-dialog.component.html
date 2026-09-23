@@ -1,0 +1,81 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Inferrix Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<form (ngSubmit)="save()">
+  <mat-toolbar color="primary">
+    <h2>{{ data.title }}</h2>
+    <span class="flex-1"></span>
+    <button mat-icon-button type="button" (click)="cancel()">
+      <mat-icon class="material-icons">close</mat-icon>
+    </button>
+  </mat-toolbar>
+  <div mat-dialog-content>
+    <div class="flex flex-row gap-2 xs:flex-col" [formGroup]="identityForm">
+      <mat-form-field class="flex-1">
+        <mat-label translate>inferrix.gateway.model-name</mat-label>
+        <input matInput formControlName="name" required>
+        @if (identityForm.get('name').hasError('required')) {
+          <mat-error translate>inferrix.gateway.model-name-required</mat-error>
+        }
+      </mat-form-field>
+      <mat-form-field class="flex-1">
+        <mat-label translate>inferrix.gateway.model-xid</mat-label>
+        <input matInput formControlName="xid">
+        <mat-hint subscriptSizing="dynamic">
+          {{ (isAdd ? 'inferrix.gateway.model-xid-hint' : 'inferrix.gateway.model-xid-fixed') | translate }}
+        </mat-hint>
+        @if (identityForm.get('xid').hasError('pattern')) {
+          <mat-error translate>inferrix.gateway.model-xid-invalid</mat-error>
+        }
+      </mat-form-field>
+    </div>
+
+    <!--
+      The form the gateway described. Every property here was constructed by the schema mapper from
+      a fixed table of types -- nothing from the device is copied into a FormProperty, because the
+      renderer compiles `condition` to executable JavaScript.
+    -->
+    @if (data.properties?.length) {
+      <tb-dynamic-form [properties]="data.properties" [disabled]="data.readonly"
+                       [(ngModel)]="values" [ngModelOptions]="{standalone: true}"></tb-dynamic-form>
+    } @else {
+      <div class="tb-form-hint" translate>inferrix.gateway.no-schema-for-type</div>
+    }
+
+    @for (field of data.recipientFields; track field) {
+      <tb-gateway-recipients [recipients]="recipients[field]" [disabled]="data.readonly"
+                            [label]="'inferrix.gateway.field-' + field | translate"
+                            (recipientsChange)="recipientsChanged(field, $event)">
+      </tb-gateway-recipients>
+    }
+
+    <!--
+      Not editable here, and carried through the save untouched. Dropping one of these would not
+      look like a bug: an alert list that stops being quiet at night simply starts paging people.
+    -->
+    @for (carried of data.carriedFields; track carried.id) {
+      <div class="tb-form-hint">{{ carried.note }}</div>
+    }
+
+    @if (data.locatorProperties?.length) {
+      <tb-dynamic-form [properties]="data.locatorProperties" [title]="data.locatorTitle"
+                       [disabled]="data.readonly" [(ngModel)]="locatorValues"
+                       [ngModelOptions]="{standalone: true}"></tb-dynamic-form>
+    } @else if (data.locatorMissing) {
+      <div class="tb-form-hint" translate>inferrix.gateway.no-locator-schema</div>
+    }
+  </div>
+  <div mat-dialog-actions class="flex flex-row items-center justify-end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ (data.readonly ? 'action.close' : 'action.cancel') | translate }}
+    </button>
+    @if (!data.readonly) {
+      <button mat-raised-button color="primary" type="submit" [disabled]="identityForm.invalid">
+        {{ 'action.save' | translate }}
+      </button>
+    }
+  </div>
+</form>

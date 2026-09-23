@@ -1,0 +1,44 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Inferrix Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<div class="tb-form-panel stroked">
+  <div class="tb-form-panel-title">{{ label }}</div>
+  @for (recipient of recipients; track $index) {
+    <div class="flex flex-row items-center gap-2 xs:flex-col xs:items-stretch">
+      <mat-form-field class="flex-1" subscriptSizing="dynamic">
+        <mat-label translate>inferrix.gateway.recipient-type</mat-label>
+        <mat-select [value]="recipient.recipientType" [disabled]="disabled"
+                    (valueChange)="typeChanged($index, $event)">
+          @for (type of types; track type.type) {
+            <mat-option [value]="type.type">
+              {{ 'inferrix.gateway.recipient-' + type.type | translate }}
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="flex-1" subscriptSizing="dynamic">
+        <mat-label translate>inferrix.gateway.recipient-value</mat-label>
+        <input matInput [value]="valueOf(recipient)" [disabled]="disabled"
+               (change)="valueChanged($index, $any($event.target).value)">
+      </mat-form-field>
+      @if (!disabled) {
+        <button mat-icon-button type="button" class="tb-mat-32" (click)="remove($index)"
+                matTooltip="{{ 'action.remove' | translate }}" matTooltipPosition="above">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+    </div>
+  } @empty {
+    <div class="tb-form-hint" translate>inferrix.gateway.no-recipients</div>
+  }
+  @if (!disabled) {
+    <div>
+      <button mat-stroked-button type="button" (click)="add()">
+        {{ 'inferrix.gateway.add-recipient' | translate }}
+      </button>
+    </div>
+  }
+</div>

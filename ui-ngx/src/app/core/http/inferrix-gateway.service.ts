@@ -1,0 +1,410 @@
+// SPDX-FileCopyrightText: Copyright The Inferrix Authors
+// SPDX-License-Identifier: Apache-2.0
+import { Injectable } from '@angular/core';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { defaultHttpOptionsFromConfig, RequestConfig } from '@core/http/http-utils';
+import { Device } from '@shared/models/device.models';
+import { AdoptGatewayRequest, GatewayReachability,
+  PendingGateway } from '@shared/models/inferrix-gateway.models';
+import { GatewaySchemaDocument } from '@shared/models/inferrix-gateway-schema.models';
+import { GatewayDataPoint, GatewayDataSource, GatewayListQuery, GatewayPage,
+  GatewayPointValue, GatewayProxyParams } from '@shared/models/inferrix-gateway-data.models';
+import { GatewayAlertList, GatewayEventDetector, GatewayEventHandler, GatewayEventInstance,
+  GatewayTypeOption } from '@shared/models/inferrix-gateway-event.models';
+import { GatewayCalendarRuleSet, GatewaySchedule,
+  gatewayWeek } from '@shared/models/inferrix-gateway-schedule.models';
+import { GatewayAbout, GatewayLanguage, GatewayMonitorValue, GatewayNetworkInterface,
+  GatewaySystemSettings } from '@shared/models/inferrix-gateway-system.models';
+
+/**
+ * HTTP client for /api/inferrix/gateways.
+ *
+ * Every call to a gateway goes through the platform, never the browser. A gateway serves a
+ * certificate no public CA can issue for — it lives on a LAN or a VPN under an address no
+ * certificate can assert — so the platform holds the pinned fingerprint, and it holds the API
+ * token that is exchanged for a short-lived JWT. The browser handles none of them.
+ */
+@Injectable({
+  providedIn: 'root'
+})
+export class InferrixGatewayService {
+
+  constructor(private http: HttpClient) {}
+
+  /** Gateways that have provisioned themselves over MQTT and have no sealed address yet. */
+  public getPendingGateways(config?: RequestConfig): Observable<PendingGateway[]> {
+    return this.http.get<PendingGateway[]>('/api/inferrix/gateways/pending',
+      defaultHttpOptionsFromConfig(config));
+  }
+
+  /**
+   * Both halves of the credential are issued on the gateway and pasted in — the platform mints
+   * nothing. It seals them, so neither half comes back out of any API afterwards.
+   */
+  public adoptGateway(request: AdoptGatewayRequest, config?: RequestConfig): Observable<Device> {
+    return this.http.post<Device>('/api/inferrix/gateways/adopt', request,
+      defaultHttpOptionsFromConfig(config));
+  }
+
+  /**
+   * Never errors: the endpoint turns every failure into a reason, because a probe that throws
+   * makes the one question it is asked unanswerable.
+   */
+  public getReachability(deviceId: string, config?: RequestConfig): Observable<GatewayReachability> {
+    return this.http.get<GatewayReachability>(`/api/inferrix/gateways/${deviceId}/reachability`,
+      defaultHttpOptionsFromConfig(config));
+  }
+
+  /**
+   * The gateway's own description of every model type it supports.
+   *
+   * The WHOLE document, never a slice: nested types are `$ref`s into its own `components.schemas`,
+   * so a slice would hold dangling references. Cached platform-side per device for 30 minutes — it
+   * changes only when the gateway's build changes.
+   */
+  public getSchemas(deviceId: string, config?: RequestConfig): Observable<GatewaySchemaDocument> {
+    return this.http.get<GatewaySchemaDocument>(`/api/inferrix/gateways/${deviceId}/schemas`,
+      defaultHttpOptionsFromConfig(config));
+  }
+
+  /**
+   * One allowlisted call to the gateway's own REST API.
+   *
+   * `path` is a resource path with no `/rest` prefix and **no query string**. The gateway parses a
+   * raw query string as RQL on every verb, so the platform refuses to forward one: paging, sorting
+   * and filtering travel as the typed `query` fields below, and the platform builds the RQL.
+   */
+  public proxy<T>(deviceId: string, method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+                  path: string, body?: any, config?: RequestConfig,
+                  params?: GatewayProxyParams): Observable<T> {
+    const url = `/api/inferrix/gateways/${deviceId}/proxy${path}`;
+    const options = {...defaultHttpOptionsFromConfig(config), params: httpParams(params)};
+    switch (method) {
+      case 'GET':
+        return this.http.get<T>(url, options);
+      case 'POST':
+        return this.http.post<T>(url, body ?? {}, options);
+      case 'PUT':
+        return this.http.put<T>(url, body ?? {}, options);
+      case 'PATCH':
+        return this.http.patch<T>(url, body ?? {}, options);
+      default:
+        return this.http.delete<T>(url, options);
+    }
+  }
+
+  // --- Data sources -------------------------------------------------------------------------
+
+  public getDataSources(deviceId: string, query: GatewayListQuery,
+                        config?: RequestConfig): Observable<GatewayPage<GatewayDataSource>> {
+    return this.proxy<GatewayPage<GatewayDataSource>>(deviceId, 'GET', '/v2/data-source',
+      null, config, query);
+  }
+
+  public getDataSource(deviceId: string, xid: string,
+                       config?: RequestConfig): Observable<GatewayDataSource> {
+    return this.proxy<GatewayDataSource>(deviceId, 'GET', `/v2/data-source/${encodeURIComponent(xid)}`,
+      null, config);
+  }
+
+  /**
+   * A saved data source keeps its `xid`: the gateway's own identifier is what every point, event
+   * detector and publisher on the device refers to it by, so a create that invented a new one and
+   * an update that changed it would both orphan everything pointing at it.
+   */
+  public saveDataSource(deviceId: string, dataSource: GatewayDataSource,
+                        config?: RequestConfig): Observable<GatewayDataSource> {
+    return dataSource.xid
+      ? this.proxy<GatewayDataSource>(deviceId, 'PUT',
+          `/v2/data-source/${encodeURIComponent(dataSource.xid)}`, dataSource, config)
+      : this.proxy<GatewayDataSource>(deviceId, 'POST', '/v2/data-source', dataSource, config);
+  }
+
+  public deleteDataSource(deviceId: string, xid: string, config?: RequestConfig): Observable<any> {
+    return this.proxy<any>(deviceId, 'DELETE', `/v2/data-source/${encodeURIComponent(xid)}`,
+      null, config);
+  }
+
+  /** `restart` only means anything with `enabled` true — the gateway says so itself. */
+  public setDataSourceEnabled(deviceId: string, xid: string, enabled: boolean,
+                              restart = false, config?: RequestConfig): Observable<any> {
+    return this.proxy<any>(deviceId, 'PATCH',
+      `/v2/data-source/enable-disable/${encodeURIComponent(xid)}`, null, config,
+      {enabled, restart: enabled && restart});
+  }
+
+  public getDataSourceTypes(deviceId: string,
+                            config?: RequestConfig): Observable<GatewayPage<{type: string; name: string}>> {
+    return this.proxy<GatewayPage<{type: string; name: string}>>(deviceId, 'GET',
+      '/v2/data-source-types', null, config);
+  }
+
+  // --- Data points --------------------------------------------------------------------------
+
+  public getDataPoints(deviceId: string, query: GatewayListQuery,
+                       config?: RequestConfig): Observable<GatewayPage<GatewayDataPoint>> {
+    return this.proxy<GatewayPage<GatewayDataPoint>>(deviceId, 'GET', '/v2/data-point',
+      null, config, query);
+  }
+
+  public getDataPoint(deviceId: string, xid: string,
+                      config?: RequestConfig): Observable<GatewayDataPoint> {
+    return this.proxy<GatewayDataPoint>(deviceId, 'GET', `/v2/data-point/${encodeURIComponent(xid)}`,
+      null, config);
+  }
+
+  public saveDataPoint(deviceId: string, point: GatewayDataPoint,
+                       config?: RequestConfig): Observable<GatewayDataPoint> {
+    return point.xid
+      ? this.proxy<GatewayDataPoint>(deviceId, 'PUT',
+          `/v2/data-point/${encodeURIComponent(point.xid)}`, point, config)
+      : this.proxy<GatewayDataPoint>(deviceId, 'POST', '/v2/data-point', point, config);
+  }
+
+  public setDataPointEnabled(deviceId: string, xid: string, enabled: boolean,
+                             config?: RequestConfig): Observable<any> {
+    return this.proxy<any>(deviceId, 'PATCH',
+      `/v2/data-point/enable-disable/${encodeURIComponent(xid)}`, null, config, {enabled});
+  }
+
+  public deleteDataPoint(deviceId: string, xid: string, config?: RequestConfig): Observable<any> {
+    return this.proxy<any>(deviceId, 'DELETE', `/v2/data-point/${encodeURIComponent(xid)}`,
+      null, config);
+  }
+
+  /**
+   * The point's most recent value.
+   *
+   * Read-only, deliberately. Writing one is a write to live building plant, and the platform's
+   * route allowlist permits only GET on `/v2/point-value` until that is decided explicitly.
+   */
+  public getLatestPointValue(deviceId: string, xid: string,
+                             config?: RequestConfig): Observable<GatewayPointValue[]> {
+    return this.proxy<GatewayPointValue[]>(deviceId, 'GET',
+      `/v2/point-value/latest/${encodeURIComponent(xid)}`, null, config);
+  }
+
+  // --- Event detectors ------------------------------------------------------------------------
+
+  /**
+   * The detectors watching one data point.
+   *
+   * Always scoped to a point: `sourceId` is a point xid, and a detector that watches nothing is
+   * not a thing the gateway can store. The scoping is an RQL `eq` term the platform builds, so it
+   * costs one page rather than a filter over every detector on the device.
+   */
+  public getDetectorsForPoint(deviceId: string, pointXid: string, query: GatewayListQuery,
+                              config?: RequestConfig): Observable<GatewayPage<GatewayEventDetector>> {
+    return this.proxy<GatewayPage<GatewayEventDetector>>(deviceId, 'GET', '/v2/event-detector',
+      null, config, {...query, filterField: 'sourceId', filterValue: pointXid});
+  }
+
+  /** Which detector types suit a point of this data type. The gateway decides, not this code. */
+  public getDetectorTypes(deviceId: string, dataType: string,
+                          config?: RequestConfig): Observable<GatewayPage<GatewayTypeOption>> {
+    return this.proxy<GatewayPage<GatewayTypeOption>>(deviceId, 'GET',
+      `/v2/event-detector-type/${encodeURIComponent(dataType)}`, null, config);
+  }
+
+  public saveDetector(deviceId: string, detector: GatewayEventDetector,
+                      config?: RequestConfig): Observable<GatewayEventDetector> {
+    return detector.xid
+      ? this.proxy<GatewayEventDetector>(deviceId, 'PUT',
+          `/v2/event-detector/${encodeURIComponent(detector.xid)}`, detector, config)
+      : this.proxy<GatewayEventDetector>(deviceId, 'POST', '/v2/event-detector', detector, config);
+  }
+
+  public deleteDetector(deviceId: string, xid: string, config?: RequestConfig): Observable<any> {
+    return this.proxy<any>(deviceId, 'DELETE', `/v2/event-detector/${encodeURIComponent(xid)}`,
+      null, config);
+  }
+
+  // --- Event handlers -------------------------------------------------------------------------
+
+  public getEventHandlers(deviceId: string, query: GatewayListQuery,
+                          config?: RequestConfig): Observable<GatewayPage<GatewayEventHandler>> {
+    return this.proxy<GatewayPage<GatewayEventHandler>>(deviceId, 'GET', '/v2/event-handler',
+      null, config, query);
+  }
+
+  public getEventHandler(deviceId: string, xid: string,
+                         config?: RequestConfig): Observable<GatewayEventHandler> {
+    return this.proxy<GatewayEventHandler>(deviceId, 'GET',
+      `/v2/event-handler/${encodeURIComponent(xid)}`, null, config);
+  }
+
+  public saveEventHandler(deviceId: string, handler: GatewayEventHandler,
+                          config?: RequestConfig): Observable<GatewayEventHandler> {
+    return handler.xid
+      ? this.proxy<GatewayEventHandler>(deviceId, 'PUT',
+          `/v2/event-handler/${encodeURIComponent(handler.xid)}`, handler, config)
+      : this.proxy<GatewayEventHandler>(deviceId, 'POST', '/v2/event-handler', handler, config);
+  }
+
+  public deleteEventHandler(deviceId: string, xid: string, config?: RequestConfig): Observable<any> {
+    return this.proxy<any>(deviceId, 'DELETE', `/v2/event-handler/${encodeURIComponent(xid)}`,
+      null, config);
+  }
+
+  // --- Alert routing --------------------------------------------------------------------------
+
+  public getAlertLists(deviceId: string, query: GatewayListQuery,
+                       config?: RequestConfig): Observable<GatewayPage<GatewayAlertList>> {
+    return this.proxy<GatewayPage<GatewayAlertList>>(deviceId, 'GET', '/v2/alert-list',
+      null, config, query);
+  }
+
+  public getAlertList(deviceId: string, xid: string,
+                      config?: RequestConfig): Observable<GatewayAlertList> {
+    return this.proxy<GatewayAlertList>(deviceId, 'GET',
+      `/v2/alert-list/${encodeURIComponent(xid)}`, null, config);
+  }
+
+  public saveAlertList(deviceId: string, alertList: GatewayAlertList,
+                       config?: RequestConfig): Observable<GatewayAlertList> {
+    return alertList.xid
+      ? this.proxy<GatewayAlertList>(deviceId, 'PUT',
+          `/v2/alert-list/${encodeURIComponent(alertList.xid)}`, alertList, config)
+      : this.proxy<GatewayAlertList>(deviceId, 'POST', '/v2/alert-list', alertList, config);
+  }
+
+  public deleteAlertList(deviceId: string, xid: string, config?: RequestConfig): Observable<any> {
+    return this.proxy<any>(deviceId, 'DELETE', `/v2/alert-list/${encodeURIComponent(xid)}`,
+      null, config);
+  }
+
+  // --- Event log ------------------------------------------------------------------------------
+
+  /**
+   * The raised events.
+   *
+   * No `textSearch`: the events table has no `name` column, and the platform's free-text search
+   * builds `match(name, ...)` — which the gateway answers with an unknown-property failure naming
+   * every column it does have.
+   */
+  public getEvents(deviceId: string, query: GatewayListQuery,
+                   config?: RequestConfig): Observable<GatewayPage<GatewayEventInstance>> {
+    return this.proxy<GatewayPage<GatewayEventInstance>>(deviceId, 'GET', '/v2/events',
+      null, config, {...query, textSearch: undefined});
+  }
+
+  /** Acknowledging takes the event's numeric id — the one place an id rather than an xid is used. */
+  public acknowledgeEvent(deviceId: string, id: number, config?: RequestConfig): Observable<any> {
+    return this.proxy<any>(deviceId, 'PUT', `/v2/events/acknowledge/${encodeURIComponent(String(id))}`,
+      null, config);
+  }
+
+  // --- Schedules ------------------------------------------------------------------------------
+
+  public getSchedules(deviceId: string, query: GatewayListQuery,
+                      config?: RequestConfig): Observable<GatewayPage<GatewaySchedule>> {
+    return this.proxy<GatewayPage<GatewaySchedule>>(deviceId, 'GET', '/v2/schedules',
+      null, config, query);
+  }
+
+  public getSchedule(deviceId: string, xid: string,
+                     config?: RequestConfig): Observable<GatewaySchedule> {
+    return this.proxy<GatewaySchedule>(deviceId, 'GET',
+      `/v2/schedules/${encodeURIComponent(xid)}`, null, config);
+  }
+
+  /**
+   * A schedule always goes out with seven days and an `exceptions` array.
+   *
+   * Both are enforced here rather than in the dialog because both are wire requirements rather than
+   * form rules, and both fail in a way the operator cannot act on: a missing `exceptions` is HTTP
+   * 422 `{"property":"exceptions","message":"Required value"}` on every save, and a week of any
+   * other length is accepted and then breaks on enable (see {@link gatewayWeek}).
+   */
+  public saveSchedule(deviceId: string, schedule: GatewaySchedule,
+                      config?: RequestConfig): Observable<GatewaySchedule> {
+    const body: GatewaySchedule = {...schedule,
+      defaultSchedule: gatewayWeek(schedule.defaultSchedule),
+      exceptions: schedule.exceptions ?? []};
+    return body.xid
+      ? this.proxy<GatewaySchedule>(deviceId, 'PUT',
+          `/v2/schedules/${encodeURIComponent(body.xid)}`, body, config)
+      : this.proxy<GatewaySchedule>(deviceId, 'POST', '/v2/schedules', body, config);
+  }
+
+  public deleteSchedule(deviceId: string, xid: string, config?: RequestConfig): Observable<any> {
+    return this.proxy<any>(deviceId, 'DELETE', `/v2/schedules/${encodeURIComponent(xid)}`,
+      null, config);
+  }
+
+  /** PUT, not PATCH — schedules are the one domain whose enable route is not a PATCH. */
+  public setScheduleEnabled(deviceId: string, xid: string, enabled: boolean,
+                            config?: RequestConfig): Observable<any> {
+    return this.proxy<any>(deviceId, 'PUT',
+      `/v2/schedules/enable-disable/${encodeURIComponent(xid)}`, null, config, {enabled});
+  }
+
+  // --- Calendar rule sets ---------------------------------------------------------------------
+
+  public getRuleSets(deviceId: string, query: GatewayListQuery,
+                     config?: RequestConfig): Observable<GatewayPage<GatewayCalendarRuleSet>> {
+    return this.proxy<GatewayPage<GatewayCalendarRuleSet>>(deviceId, 'GET',
+      '/v2/schedule-rule-sets', null, config, query);
+  }
+
+  public saveRuleSet(deviceId: string, ruleSet: GatewayCalendarRuleSet,
+                     config?: RequestConfig): Observable<GatewayCalendarRuleSet> {
+    return ruleSet.xid
+      ? this.proxy<GatewayCalendarRuleSet>(deviceId, 'PUT',
+          `/v2/schedule-rule-sets/${encodeURIComponent(ruleSet.xid)}`, ruleSet, config)
+      : this.proxy<GatewayCalendarRuleSet>(deviceId, 'POST', '/v2/schedule-rule-sets',
+          ruleSet, config);
+  }
+
+  public deleteRuleSet(deviceId: string, xid: string, config?: RequestConfig): Observable<any> {
+    return this.proxy<any>(deviceId, 'DELETE', `/v2/schedule-rule-sets/${encodeURIComponent(xid)}`,
+      null, config);
+  }
+
+  // --- System ---------------------------------------------------------------------------------
+
+  public getAbout(deviceId: string, config?: RequestConfig): Observable<GatewayAbout> {
+    return this.proxy<GatewayAbout>(deviceId, 'GET', '/v2/about', null, config);
+  }
+
+  public getSystemSettings(deviceId: string,
+                           config?: RequestConfig): Observable<GatewaySystemSettings> {
+    return this.proxy<GatewaySystemSettings>(deviceId, 'GET', '/v2/system-setting', null, config);
+  }
+
+  /**
+   * These three answer **bare arrays**, not the `{items, total}` page every other list route
+   * returns, so nothing here may go through `gatewayPageToPageData`.
+   */
+  public getMonitorValues(deviceId: string,
+                          config?: RequestConfig): Observable<GatewayMonitorValue[]> {
+    return this.proxy<GatewayMonitorValue[]>(deviceId, 'GET', '/v2/stack-monitor', null, config);
+  }
+
+  public getNetworkInterfaces(deviceId: string,
+                              config?: RequestConfig): Observable<GatewayNetworkInterface[]> {
+    return this.proxy<GatewayNetworkInterface[]>(deviceId, 'GET', '/v2/server/network-interfaces',
+      null, config);
+  }
+
+  public getLanguages(deviceId: string, config?: RequestConfig): Observable<GatewayLanguage[]> {
+    return this.proxy<GatewayLanguage[]>(deviceId, 'GET', '/v2/server/languages', null, config);
+  }
+}
+
+/**
+ * Only the fields that were actually asked for.
+ *
+ * An `undefined` left in would be serialised as the string "undefined" and the platform would then
+ * try to parse it as a page size.
+ */
+const httpParams = (query?: GatewayProxyParams): HttpParams => {
+  let params = new HttpParams();
+  Object.entries(query ?? {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      params = params.set(key, String(value));
+    }
+  });
+  return params;
+};

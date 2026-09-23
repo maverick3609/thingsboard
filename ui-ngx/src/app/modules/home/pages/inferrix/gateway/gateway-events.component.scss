@@ -1,0 +1,25 @@
+// SPDX-FileCopyrightText: Copyright The Inferrix Authors
+// SPDX-License-Identifier: Apache-2.0
+
+/* An alarm level is read at a glance across a wall-mounted screen, so the level carries colour
+ * rather than only text. DO_NOT_LOG and IGNORE deliberately fall through to the neutral tone:
+ * they are instructions about what not to record, not severities. */
+.tb-gateway-level {
+  font-weight: 500;
+
+  &.tb-gateway-level-error {
+    color: #d12730;
+  }
+
+  &.tb-gateway-level-warn {
+    color: #c07000;
+  }
+
+  &.tb-gateway-level-info {
+    color: #2b388f;
+  }
+
+  &.tb-gateway-level-none {
+    color: rgba(0, 0, 0, 0.54);
+  }
+}

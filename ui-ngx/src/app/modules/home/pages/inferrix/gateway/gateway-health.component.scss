@@ -1,0 +1,22 @@
+// SPDX-FileCopyrightText: Copyright The Inferrix Authors
+// SPDX-License-Identifier: Apache-2.0
+
+/* Three tones, not two. FORBIDDEN and the not-yet-adopted reasons are amber rather than red: the
+   service account is deliberately not a gateway administrator, so a 403 on the platform-link
+   routes is the expected steady state, and painting it red would have operators chasing a healthy
+   device. */
+.gateway-state {
+  font-size: 14px;
+
+  &.ok {
+    color: #198038;
+  }
+
+  &.warn {
+    color: #b06000;
+  }
+
+  &.error {
+    color: #d12730;
+  }
+}

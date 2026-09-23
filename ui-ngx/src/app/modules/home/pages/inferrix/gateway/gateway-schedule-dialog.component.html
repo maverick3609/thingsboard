@@ -1,0 +1,133 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Inferrix Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<form (ngSubmit)="save()" [formGroup]="form">
+  <mat-toolbar color="primary">
+    <h2>{{ data.title }}</h2>
+    <span class="flex-1"></span>
+    <button mat-icon-button type="button" (click)="cancel()">
+      <mat-icon class="material-icons">close</mat-icon>
+    </button>
+  </mat-toolbar>
+  <div mat-dialog-content>
+    <div class="flex flex-row gap-2 xs:flex-col">
+      <mat-form-field class="flex-1">
+        <mat-label translate>inferrix.gateway.model-name</mat-label>
+        <input matInput formControlName="name" required>
+        @if (form.get('name').hasError('required')) {
+          <mat-error translate>inferrix.gateway.model-name-required</mat-error>
+        }
+      </mat-form-field>
+      <mat-form-field class="flex-1">
+        <mat-label translate>inferrix.gateway.model-xid</mat-label>
+        <input matInput formControlName="xid">
+        <mat-hint subscriptSizing="dynamic">
+          {{ (isAdd ? 'inferrix.gateway.model-xid-hint' : 'inferrix.gateway.model-xid-fixed') | translate }}
+        </mat-hint>
+        @if (form.get('xid').hasError('pattern')) {
+          <mat-error translate>inferrix.gateway.model-xid-invalid</mat-error>
+        }
+      </mat-form-field>
+    </div>
+
+    <div class="flex flex-row items-center gap-2 xs:flex-col xs:items-start">
+      <mat-checkbox formControlName="enabled">
+        {{ 'inferrix.gateway.schedule-enabled' | translate }}
+      </mat-checkbox>
+      <span class="flex-1"></span>
+      <mat-form-field class="flex-1">
+        <mat-label translate>inferrix.gateway.schedule-alarm-level</mat-label>
+        <mat-select formControlName="alarmLevel">
+          @for (level of alarmLevels; track level) {
+            <mat-option [value]="level">{{ level }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="flex-1">
+        <mat-label translate>inferrix.gateway.schedule-error-alarm-level</mat-label>
+        <mat-select formControlName="errorAlarmLevel">
+          @for (level of alarmLevels; track level) {
+            <mat-option [value]="level">{{ level }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <!--
+      Seven days, Sunday first, because that is how the gateway indexes them. Each field is the
+      day's change times: every time TOGGLES the schedule, and the state carries over from the
+      previous day, so `08:00, 17:00` is a window only if the day began inactive.
+    -->
+    <fieldset class="min-w-0">
+      <legend class="tb-small">{{ 'inferrix.gateway.weekly-schedule' | translate }}</legend>
+      <div class="tb-form-hint" translate>inferrix.gateway.weekly-schedule-hint</div>
+      <div formArrayName="week">
+        @for (day of days; track day; let index = $index) {
+          <mat-form-field class="w-full">
+            <mat-label>{{ 'inferrix.gateway.day-' + day | translate }}</mat-label>
+            <input matInput [formControlName]="index" placeholder="08:00, 17:00">
+            @if (week.at(index).hasError('dayTimes')) {
+              <mat-error translate>inferrix.gateway.day-times-invalid</mat-error>
+            }
+          </mat-form-field>
+        }
+      </div>
+    </fieldset>
+
+    <fieldset class="min-w-0">
+      <legend class="tb-small">{{ 'inferrix.gateway.schedule-exceptions' | translate }}</legend>
+      @if (!ruleSets.length) {
+        <div class="tb-form-hint" translate>inferrix.gateway.no-rule-sets-for-exceptions</div>
+      } @else {
+        <div class="tb-form-hint" translate>inferrix.gateway.schedule-exceptions-hint</div>
+      }
+      <div formArrayName="exceptions">
+        @for (exception of exceptions.controls; track exception; let index = $index) {
+          <div class="flex flex-row items-center gap-2 xs:flex-col xs:items-stretch"
+               [formGroupName]="index">
+            <mat-form-field class="flex-1">
+              <mat-label translate>inferrix.gateway.rule-set</mat-label>
+              <mat-select formControlName="ruleSetXid" required>
+                @for (ruleSet of ruleSets; track ruleSet.xid) {
+                  <mat-option [value]="ruleSet.xid">{{ ruleSet.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field class="flex-1">
+              <mat-label translate>inferrix.gateway.exception-times</mat-label>
+              <input matInput formControlName="times" placeholder="09:00, 12:00">
+              @if (exception.get('times').hasError('dayTimes')) {
+                <mat-error translate>inferrix.gateway.day-times-invalid</mat-error>
+              }
+            </mat-form-field>
+            @if (!data.readonly) {
+              <button mat-icon-button type="button" class="tb-mat-32"
+                      (click)="removeException(index)"
+                      matTooltip="{{ 'action.remove' | translate }}" matTooltipPosition="above">
+                <mat-icon>delete</mat-icon>
+              </button>
+            }
+          </div>
+        }
+      </div>
+      @if (!data.readonly && ruleSets.length) {
+        <button mat-stroked-button type="button" (click)="addException()">
+          <mat-icon>add</mat-icon>{{ 'inferrix.gateway.add-exception' | translate }}
+        </button>
+      }
+    </fieldset>
+  </div>
+  <div mat-dialog-actions class="flex flex-row items-center justify-end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ (data.readonly ? 'action.close' : 'action.cancel') | translate }}
+    </button>
+    @if (!data.readonly) {
+      <button mat-raised-button color="primary" type="submit" [disabled]="form.invalid">
+        {{ 'action.save' | translate }}
+      </button>
+    }
+  </div>
+</form>

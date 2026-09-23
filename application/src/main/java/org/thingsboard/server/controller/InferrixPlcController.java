@@ -175,6 +175,13 @@ public class InferrixPlcController extends BaseController {
         DeviceId deviceId = new DeviceId(toUUID(strDeviceId));
         // Reads and writes are separated: pulling a controller's health is a READ, while changing
         // its network settings or applying a config is not something a read-only role may do.
+        // Same guard, and for the same reason, as InferrixGatewayController. A public-dashboard
+        // link holder is a real CUSTOMER_USER on the public customer and the public role grants
+        // DEVICE READ, so without this every GET this proxy allows -- /info, /health, /points,
+        // /diag/*, /config, /network, /mqtt, /identity -- is reachable by anyone with the link and
+        // no account.
+        InferrixPublicLink.requireNotPublicLink(getCurrentUser());
+
         boolean readOnly = HttpMethod.GET.matches(request.getMethod());
         if (!readOnly && !Authority.TENANT_ADMIN.equals(getCurrentUser().getAuthority())) {
             // Reading a controller's state is ordinary device access. Changing its network settings,

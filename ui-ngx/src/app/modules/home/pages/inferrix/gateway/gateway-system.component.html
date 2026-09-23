@@ -1,0 +1,119 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Inferrix Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<div class="mat-padding flex flex-1 flex-col gap-4">
+  <div class="tb-form-panel stroked">
+    <div class="tb-form-row no-border no-padding">
+      <div class="tb-form-panel-title flex-1" translate>inferrix.gateway.system</div>
+      <button mat-stroked-button class="shrink-0" [disabled]="loading" (click)="refresh()">
+        {{ 'action.refresh' | translate }}
+      </button>
+    </div>
+    @if (loading) {
+      <mat-progress-bar color="primary" mode="indeterminate"></mat-progress-bar>
+    }
+    @if (error) {
+      <div class="tb-error-message">{{ error }}</div>
+    }
+    <div class="tb-form-panel-hint" translate>inferrix.gateway.system-read-only</div>
+  </div>
+
+  @if (about) {
+    <div class="tb-form-panel stroked">
+      <div class="tb-form-panel-title" translate>inferrix.gateway.identity</div>
+      <div class="tb-form-row no-border">
+        <div class="flex-1" translate>inferrix.gateway.stack-version</div>
+        <div>{{ about.stackVersion || '—' }}</div>
+      </div>
+      <div class="tb-form-row no-border">
+        <div class="flex-1" translate>inferrix.gateway.host-name</div>
+        <!--
+          Not an identity. `/v2/about` reports `InetAddress.getLocalHost().getHostName()`, which is
+          neither unique nor stable -- the certificate is what identifies a gateway.
+        -->
+        <div>{{ about.hostName || '—' }}</div>
+      </div>
+      <div class="tb-form-row no-border">
+        <div class="flex-1" translate>inferrix.gateway.started-at</div>
+        <div>{{ about.startTime ? (about.startTime | date: 'yyyy-MM-dd HH:mm:ss') : '—' }}</div>
+      </div>
+      <div class="tb-form-row no-border">
+        <div class="flex-1" translate>inferrix.gateway.schema-version</div>
+        <div>{{ about.schemaVersion ?? '—' }}</div>
+      </div>
+      @if (about.license) {
+        <div class="tb-form-row no-border">
+          <div class="flex-1" translate>inferrix.gateway.license-points</div>
+          <div>{{ 'inferrix.gateway.license-points-value'
+                  | translate: {used: about.license.used ?? 0,
+                                available: about.license.available ?? 0} }}</div>
+        </div>
+      }
+      @if (about.modules?.length) {
+        <div class="tb-form-row no-border">
+          <div class="flex-1" translate>inferrix.gateway.modules</div>
+          <div>{{ about.modules.length }}</div>
+        </div>
+      }
+    </div>
+  }
+
+  @if (interfaces.length || languages.length) {
+    <div class="tb-form-panel stroked">
+      <div class="tb-form-panel-title" translate>inferrix.gateway.network</div>
+      @for (item of interfaces; track item.interfaceName) {
+        <div class="tb-form-row no-border">
+          <div class="flex-1">{{ item.interfaceName }}</div>
+          <div>{{ item.hostAddress }}</div>
+        </div>
+      }
+      @if (languages.length) {
+        <div class="tb-form-row no-border">
+          <div class="flex-1" translate>inferrix.gateway.languages</div>
+          <div>{{ languageList }}</div>
+        </div>
+      }
+    </div>
+  }
+
+  @if (monitor.length) {
+    <div class="tb-form-panel stroked">
+      <div class="tb-form-panel-title" translate>inferrix.gateway.monitor</div>
+      <!--
+        Names come through as the gateway rendered them, which on some builds means an untranslated
+        key in `???key(i18n_en)???` form or an unfilled `{0}` placeholder. Shown as sent: inventing
+        a label here would hide a gateway-side i18n gap rather than fix it.
+      -->
+      @for (item of monitor; track item.name) {
+        <div class="tb-form-row no-border">
+          <div class="flex-1">{{ item.name }}</div>
+          <div>{{ valueOf(item.value) }}</div>
+        </div>
+      }
+    </div>
+  }
+
+  @if (settings.length) {
+    <div class="tb-form-panel stroked">
+      <div class="tb-form-panel-title" translate>inferrix.gateway.settings</div>
+      @if (withheldCount) {
+        <div class="tb-form-panel-hint">
+          {{ 'inferrix.gateway.settings-withheld' | translate: {count: withheldCount} }}
+        </div>
+      }
+      <div class="table-container">
+        <table class="tb-settings-table">
+          @for (setting of settings; track setting.key) {
+            <tr>
+              <td class="tb-settings-key">{{ setting.key }}</td>
+              <td>{{ setting.value }}</td>
+            </tr>
+          }
+        </table>
+      </div>
+    </div>
+  }
+</div>

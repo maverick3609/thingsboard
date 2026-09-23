@@ -24,6 +24,36 @@ import { ControllerExpressionComponent } from '@home/pages/inferrix/controller/c
 import { ControllerTuneComponent } from '@home/pages/inferrix/controller/controller-tune.component';
 import { ControllerPointWriteDialogComponent }
   from '@home/pages/inferrix/controller/controller-point-write-dialog.component';
+import { AdoptGatewayDialogComponent } from '@home/pages/inferrix/adopt-gateway-dialog.component';
+import { GatewayComponent } from '@home/pages/inferrix/gateway/gateway.component';
+import { GatewayTabsComponent } from '@home/pages/inferrix/gateway/gateway-tabs.component';
+import { GatewayHealthComponent } from '@home/pages/inferrix/gateway/gateway-health.component';
+import { GatewayDataSourcesComponent }
+  from '@home/pages/inferrix/gateway/gateway-data-sources.component';
+import { GatewayDataPointsComponent }
+  from '@home/pages/inferrix/gateway/gateway-data-points.component';
+import { GatewayModelDialogComponent }
+  from '@home/pages/inferrix/gateway/gateway-model-dialog.component';
+import { GatewayRecipientsComponent }
+  from '@home/pages/inferrix/gateway/gateway-recipients.component';
+import { GatewayDetectorsDialogComponent }
+  from '@home/pages/inferrix/gateway/gateway-detectors-dialog.component';
+import { GatewayEventsComponent } from '@home/pages/inferrix/gateway/gateway-events.component';
+import { GatewayEventHandlersComponent }
+  from '@home/pages/inferrix/gateway/gateway-event-handlers.component';
+import { GatewaySchedulesComponent }
+  from '@home/pages/inferrix/gateway/gateway-schedules.component';
+import { GatewayScheduleDialogComponent }
+  from '@home/pages/inferrix/gateway/gateway-schedule-dialog.component';
+import { GatewayRuleSetsComponent }
+  from '@home/pages/inferrix/gateway/gateway-rule-sets.component';
+import { GatewayRuleSetDialogComponent }
+  from '@home/pages/inferrix/gateway/gateway-rule-set-dialog.component';
+import { GatewaySystemComponent } from '@home/pages/inferrix/gateway/gateway-system.component';
+import { GatewayAlertListsComponent }
+  from '@home/pages/inferrix/gateway/gateway-alert-lists.component';
+import { WidgetSettingsCommonModule }
+  from '@home/components/widget/lib/settings/common/widget-settings-common.module';
 
 @NgModule({
   declarations: [
@@ -42,13 +72,33 @@ import { ControllerPointWriteDialogComponent }
     ControllerStatementsComponent,
     ControllerExpressionComponent,
     ControllerTuneComponent,
-    ControllerPointWriteDialogComponent
+    ControllerPointWriteDialogComponent,
+    AdoptGatewayDialogComponent,
+    GatewayComponent,
+    GatewayTabsComponent,
+    GatewayHealthComponent,
+    GatewayDataSourcesComponent,
+    GatewayDataPointsComponent,
+    GatewayModelDialogComponent,
+    GatewayRecipientsComponent,
+    GatewayDetectorsDialogComponent,
+    GatewayEventsComponent,
+    GatewayEventHandlersComponent,
+    GatewayAlertListsComponent,
+    GatewaySchedulesComponent,
+    GatewayScheduleDialogComponent,
+    GatewayRuleSetsComponent,
+    GatewayRuleSetDialogComponent,
+    GatewaySystemComponent
   ],
   imports: [
     CommonModule,
     SharedModule,
     HomeComponentsModule,
     HomeDialogsModule,
+    // For tb-dynamic-form: a gateway's data source and point forms are built from the schema the
+    // device publishes, so the renderer is TB's own rather than a form per protocol module.
+    WidgetSettingsCommonModule,
     InferrixRoutingModule
   ]
 })

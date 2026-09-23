@@ -1100,6 +1100,7 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
           {id: MenuId.devices},
           {id: MenuId.assets},
           {id: MenuId.entity_views},
+          {id: MenuId.gateways},
           {id: MenuId.controllers}
         ]
       },

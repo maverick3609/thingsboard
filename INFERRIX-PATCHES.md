@@ -625,6 +625,203 @@ Bakes Inferrix branding into the default build (every `yarn build:prod` output i
 
 ---
 
+## Feature: Inferrix Gateway UI (G1-G6)
+
+- **Intent (2026-09-23):** configure the Inferrix gateway (the Mango-derived edge server in the
+  `Inferrix-stack` repo) end to end from Cortex, **replacing ThingsBoard's own Gateways page in
+  place**. The stock page is a system dashboard rendering `gateways_dashboard.json`; ours is an
+  entities table over real devices, mounted at the same `/entities/gateways` path.
+- **Locked constraint from the user:** a gateway is reachable on the local LAN or over VPN and no
+  other way. Cortex must therefore sit on the same network — a cloud-hosted Cortex cannot manage a
+  gateway at all — no public CA can issue for an RFC1918 or `.local` address (so TOFU pinning is
+  the only identity model available), and the SSRF guard must keep permitting RFC1918.
+- **Almost everything is additive and carries no ledger row:**
+  `application/.../service/inferrix/gateway/**` (`InferrixGatewayRoutes` — the proxy allowlist and
+  the entire security boundary, `InferrixGatewayClient`, `InferrixGatewayAccess`,
+  `InferrixGatewayAdoption`, `InferrixGatewayAdoptionService`, `InferrixGatewayReachability`),
+  `controller/InferrixGatewayController.java`, `controller/InferrixPublicLink.java`, and on the
+  frontend `ui-ngx/src/app/modules/home/pages/inferrix/gateway*`,
+  `pending-gateways-table-config.resolver.ts`, `adopt-gateway-dialog.component.*`,
+  `shared/models/inferrix-gateway.models.ts`, `core/http/inferrix-gateway.service.ts`.
+  Only IG1-IG4 below are TB-core.
+- **Security decisions that are easy to undo by accident** (each has a test; several were found by
+  adversarial review after the first implementation):
+  - `devicePath` must be fed `getRequestURI()` and **nothing else** — that is the raw, non-decoded
+    URI (verified in Tomcat 10.1.59 `CoyoteAdapter:664-668`), which is what lets the allowlist
+    refuse `%`. `getServletPath()` and `UriUtils.decode` are the decoded form; switching to either
+    as an "obvious cleanup" defeats the check silently with no test failing.
+  - The proxy and the probe refuse any device not on the `Inferrix Gateway` profile. Without it
+    they are a general "dial the address in this device's attributes" primitive, and since the SSRF
+    guard must permit RFC1918, tenant administration becomes readable SSRF from the platform's
+    network position.
+  - Authority cannot identify a public-dashboard link holder — TB builds it as a real
+    `CUSTOMER_USER` on the public customer and the public role grants `DEVICE READ`. Check
+    `UserPrincipal.Type.PUBLIC_ID`. `InferrixPublicLink` is shared with `InferrixPlcController`,
+    which had the identical hole.
+  - Reads are classified by route, not by verb: `/v2/platform-integration/device-profile/sync` is a
+    GET that **writes**, and `/v2/system-setting*`, `/v2/platform-integration*`, `/v2/server*` are
+    administrator reads on the gateway. `requiresTenantAdmin` gates authority;
+    `changesGatewayState` picks the device `Operation`; collapsing them makes *reading* gateway
+    settings demand device WRITE.
+  - Both halves of the API token are sealed. `SERVER_SCOPE` is **not** private — TB's generic
+    attribute read serves it to anyone with `READ_ATTRIBUTES`, public link holders included — so
+    the seal is what protects a credential, never the scope.
+  - `InferrixGatewayAccess.load()` requires a non-null `gwCertFingerprint`: a null pin means
+    `FingerprintCapturingTrustManager` skips the comparison, which with hostname verification off
+    is any certificate from any host.
+  - **The gateway's query string is an RQL expression, on every verb** — there is no `?limit=` and
+    no `?rql=` wrapper; `RQLUtils.parseRQLtoAST(request.getQueryString())` parses whatever is
+    there, and a custom argument resolver injects it into POSTs too. The proxy therefore forwards
+    **no** caller query string at all. Paging, sorting and filtering arrive as typed parameters
+    (TB's own `PageLink` names) and `InferrixGatewayRql` builds the expression platform-side:
+    field names are *validated* because RQL cannot quote an operand position, values are
+    *percent-encoded* because the gateway decodes them after parsing, and a value carries an
+    explicit `string:` cast because RQL auto-types otherwise — which makes `match` a
+    `ClassCastException` on the device and `eq` silently wrong for a name like `00123`.
+  - The path and the query stay apart all the way down to the HTTP client, because
+    `InferrixGatewayRoutes.isAllowed` refuses a path containing `?`: joining them earlier would
+    either fail that check or move it off the string actually sent.
+  - The schema mapper refuses a property name that is not a plain identifier. `JSON.parse` makes
+    `__proto__` a real own property, so a gateway can send one, and assigning that id onto a value
+    object walks the prototype setter instead of adding a key.
+  - A gateway's response is capped at 10 000 000 characters and **refused** rather than truncated
+    past it: `EntityUtils` truncates silently, and truncated JSON reaches the browser as a parse
+    error with nothing pointing at the cause.
+  - **Two places where the schema does not describe the wire, both found in G5 and both fixed in
+    the mapper because they were already wrong in G4.** `MessageTranslation` is declared
+    `{key, args}` but `StackRestJacksonModule` registers a *serializer only*, which writes
+    `translate(...)` — a plain string, with no deserializer to read one back, so a value written
+    back becomes the **key** and an unknown key reads as `???text(en)???`. Rendered read-only text.
+    And an **array of objects** was losing its item fields: TB builds each array row by cloning the
+    array property and swapping its type for `arrayItemType`, so a fieldset row renders whatever
+    `properties` sits on the array — dropping them gave a row with no inputs, and since the
+    renderer writes its value back over the whole array, opening an event handler and saving it
+    would have reduced every recipient and event-type matcher to a bare discriminator.
+  - **Recipients are hand-written, not schema-driven, and have to be.** The gateway declares
+    `RecipientEntryModel` as `{recipientType}` with a discriminator and ships none of its five
+    subtypes, so a schema-built form renders the kind and drops the address. The five kinds are
+    closed and core-owned (`RecipientListEntryType`), and each carries its value in a different
+    field — so a type change **rebuilds** the recipient rather than assigning over it, or a stale
+    `address` would ride along beside a new `number`.
+  - **Handler types come from the schema families, not from `/v2/event-handler-types`.** G5 gave a
+    wrong reason for this — it claimed the endpoint's response shape was unknowable — and a live
+    gateway disproved it: the endpoint works and answers
+    `{"items":[{"type":"EMAIL_HANDLER","name":"Email"},…],"total":4}`. The real reason is narrower.
+    That endpoint is authoritative about which handlers the gateway *supports*; the schema families
+    answer which handlers there is a **form** for, and a type with no schema entry opens an empty
+    dialog. The form-renderable set is a subset of the supported one, so one read does.
+- **Deferred deliberately:** `PUT /v2/point-value/{xid}` — writing a live point value — is not on
+  the allowlist and there is no client method for it. G4's plan listed "set value"; it is a write
+  to real building plant through a proxy whose caller may hold nothing but tenant administration,
+  so it needs its own decision rather than arriving as a line item. Live values are read-only, one
+  point at a time on request, because the gateway has no bulk point-value endpoint.
+- **G5 rough edges, stated rather than hidden:** an alert list's 672-slot do-not-disturb week is
+  carried through a save untouched but is not editable (it needs its own widget); a handler's
+  `eventTypes` matchers expose the gateway's numeric `referenceId1/2` because that is what the
+  model holds; a detector's `handlerXids` is a list of xids rather than a picker, since TB's form
+  renderer has no multi-select; and the Event log has no free-text search, because the events table
+  has no `name` column and the platform's search builds `match(name, ...)`.
+- **G6 — schedules, calendar rule sets, system reads.** Three tabs, no backend change: every route
+  was already allowlisted. Schedules are the first domain here that is **not** schema-driven and
+  cannot be — `ModelSchemaFamily` covers data sources, point locators, publishers, event detectors
+  and event handlers, and a schedule is none of them. The published OpenAPI would not have helped
+  either: swagger reports `WeeklySchedule` as `{dailySchedules, offsetCount}` because that is the
+  Java class, while `@JsonValue` puts a bare array of arrays of time strings on the wire — the same
+  class of schema-versus-wire gap as `MessageTranslation`, found the same way.
+  - **A week is padded to seven days on the way out, and that is a correctness guard.** Verified
+    live: the gateway creates a three-day `defaultSchedule` with HTTP 201 and then answers
+    `IndexOutOfBoundsException: Index 3 out of bounds for length 3` when the schedule is enabled,
+    because `WeeklyScheduleRT` reads index 0 through 6 unconditionally. A schedule saved short is
+    one an operator can never turn on, with a stack trace instead of a message.
+  - **`exceptions` is always sent, if only as `[]`.** Its absence is HTTP 422
+    `{"property":"exceptions","message":"Required value"}` on every save — a validation error
+    naming a field no form shows.
+  - **A nested calendar rule carries its own `type`.** A `WildcardDateRangeRule1` whose `startDate`
+    omits the discriminator is refused with HTTP 400 `Failed to read request`, which names neither
+    the field nor the rule. Found by sending one.
+  - **Exceptions reference a rule set by `{xid}` alone** and the gateway resolves it, so an edit
+    never carries — or rewrites — the rule set's own rules. Round-tripped live.
+  - **The System tab is read-only by decision, not by phase.** `PUT /v2/system-setting/{key}` is an
+    arbitrary-key write over the gateway's whole configuration keyspace and was removed from the
+    allowlist after adversarial review. The tab reports; the gateway's own interface is where
+    settings change.
+  - **Two settings values are withheld from the page.** A live gateway's `/v2/system-setting`
+    returns 101 keys. It filters `emailSmtpPassword` and `httpClientProxyPassword` itself; it does
+    **not** filter `license` (the licence blob) or `poeLightingToken` (a third-party API token).
+    Reading them is already permitted — the route is tenant-admin only and the same administrator
+    can fetch the object through the proxy — so this is surface, not access control: a diagnostics
+    table that gets screenshotted into a ticket has no business carrying either.
+- **The script routes are NOT in G6, and that is the recorded outcome of the plan's gate.**
+  `/v2/script`, `/v2/global-scripts` and `/v2/script-data-source` are remote code execution on the
+  gateway host. The plan required three things before any of them could be allowed: an explicit
+  recorded decision on who may call it, an audit-log entry for every script write, and a review
+  that treats it as an RCE feature. **None of the three has happened.** The plan states that
+  shipping G6 without them is an acceptable outcome; that is what shipped. The gateway's own
+  interface remains the way to edit scripts, and the routes stay off the allowlist.
+- **Certificate reads are not in G6 either.** The phase goal named them, but
+  `/certificate-service/**` and `/certificate-authority-service/**` are on the deny list — they
+  sign arbitrary CSRs — and no certificate read route is allowlisted. Nothing was added to reach
+  them.
+- **G6 rough edges, stated rather than hidden:** a day is a comma-separated text field rather than a
+  time-picker list, so an operator types `08:00, 17:00`; the change-time model is the gateway's
+  (each time *toggles*, state carries over from the previous day) and the form says so rather than
+  inventing on/off pairs; `stack-monitor` names are painted as the gateway rendered them, which on
+  some builds means `???key(i18n_en)???` or an unfilled `{0}`, because inventing a label here would
+  hide a gateway-side i18n gap rather than fix it.
+- **Three defects found by pointing the code at a live gateway and fixed before G6 started:**
+  `/v2/data-source-types` already returns `INTERNAL.DS`, so appending `.DS` produced
+  `INTERNAL.DS.DS`; the test fixture's family keys were invented (`BINARY_STATE` and `EMAIL` rather
+  than the `TYPE_NAME` constants `BINARY_STATE_DETECTOR` and `EMAIL_HANDLER`, and `MODBUS_IP.PL`
+  for a locator that does not exist on any build); and `pointLocatorTypeFor`'s `.DS`→`.PL` rename
+  was **deleted**, because it is a coincidence rather than a rule — `MODBUS_IP.DS` takes
+  `MODBUS.PL`, and sending the wrong locator answers HTTP 500 `ClassCastException` while sending
+  none answers HTTP 500 `NullPointerException`. A new point's locator type now comes from a sibling
+  point of the same data source, and "Add point" is disabled with a reason when a data source has
+  no points to learn it from.
+- **Status:** G1-G6 complete on `inferrix-release-4.3`. 214 Inferrix backend tests and 476 frontend
+  tests green; `ng build` and targeted `eslint` clean. **G5 and G6 needed no backend change** —
+  every route they use was already allowlisted, and paging arrives through the G4 parameters. The
+  wire formats of G6 were verified end to end against a live gateway (**stack 5.1.0**, schema
+  version 29, HTTPS 8443): rule set created, schedule created with an exception, **enabled
+  successfully**, read back, and every object deleted afterwards. Every failure mode above was
+  reproduced on the same build, and `MODBUS_IP.PL` was refused with HTTP 400 `Failed to read
+  request` — Jackson cannot resolve a subtype that does not exist, which is the direct proof that
+  the deleted `.DS`→`.PL` rename was wrong.
+- **Blocker to raise on the gateway, not in this repo: `/v2/model-schemas` returns an empty document
+  on 5.1.0.** All five families come back `{}` and `components.schemas` is `{}`; the endpoint itself
+  is live (an unknown `family` is a correct 404) and the deployed `inferrix-stack-5.1.0.jar` carries
+  `ModelSchemaService`. Nothing is logged, so the resolver never ran — the service snapshots its
+  injected `List<VoModelMapping>` **once in its constructor**, and the sibling `VoModelMapper`
+  holding the same list clearly has entries, since `/v2/data-source` maps models and subtype
+  deserialisation works. That points at construction ordering rather than at missing mappings, and
+  resolving lazily on first request would close it. **Consequence for this feature:** every
+  schema-driven form — the keystone of G3, G4 and G5 — renders nothing against this gateway. The
+  hand-written surfaces (alert routing, recipients, schedules, rule sets, system) are unaffected.
+- **Still operator-pending:** nothing has been verified visually in a browser, and no schema-driven
+  form has ever rendered against a real device — blocked on the item above, not on this code.
+
+### TB-core files modified
+
+| # | File | Change | Why |
+|---|------|--------|-----|
+| IG1 | `ui-ngx/src/app/modules/home/pages/entities/entities-routing.module.ts` | Import swapped: `gatewaysRoutes` from `@home/pages/gateways/gateways-routing.module` replaced by `inferrixGatewayRoutes` from `@home/pages/inferrix/inferrix-routing.module`, and the `...gatewaysRoutes` spread in the `entities` children replaced by `...inferrixGatewayRoutes`. **Upstream re-adds both on merge — re-apply the swap.** | `/entities/gateways` is where `MenuId.gateways` already points. Mounting ours there means the menu entry, breadcrumb and every existing link keep working, and there is no second Gateways item to explain |
+| IG2 | `ui-ngx/src/app/modules/home/pages/home-pages.module.ts` | `GatewaysModule` import and its entry in `imports` **deleted** (a comment marks the spot). **Upstream re-adds it — delete it again.** | It existed only to serve the stock gateways dashboard, which `InferrixModule` now replaces at the same route. Leaving it imported keeps a dead module and its `/gateways` redirect in the bundle |
+| IG3 | `ui-ngx/src/app/core/services/menu.models.ts` | One line: `{id: MenuId.gateways},` added to the **CUSTOMER_USER** section's `MenuId.entities.pages`, immediately before `{id: MenuId.controllers}`. The TENANT_ADMIN entry and the `MenuId.gateways` definition itself (`path: '/entities/gateways'`) are **unchanged** | The route and the table resolver both handle a customer user read-only — `gatewayTableAccess` scopes the filter to their customer — but the menu only listed gateways for tenant admins, so they had access with no way in. Controllers were already listed in both sections; this makes gateways match |
+| IG4 | `ui-ngx/src/assets/locale/locale.constant-en_US.json` | `inferrix.gateway` block added (183 keys: 43 in G2, 28 in G4 for the data-source and data-point panels, 50 in G5 for events, handlers, alert routing and detectors, 62 in G6 for schedules, rule sets and the system tab) immediately after the `"inferrix": {` line. **Splice raw, take-ours, do not reformat** — a JSON round-trip rewrites all ~11 400 lines of this file | Every string the gateway section renders. The reachability reasons are the bulk of it, and each maps one backend `reason` to a sentence that says where to go and fix it |
+
+### Merge recovery
+
+After `git merge upstream/<ref>`:
+
+1. `entities-routing.module.ts` — if `gatewaysRoutes` is back, re-apply IG1 (import + spread).
+2. `home-pages.module.ts` — if `GatewaysModule` is back, delete the import and the `imports` entry.
+3. `menu.models.ts` — confirm `MenuId.gateways` is still in the CUSTOMER_USER entities pages.
+4. `locale.constant-en_US.json` — confirm the `inferrix.gateway` block survived; if the file
+   conflicts, take ours for that block and splice by hand rather than resolving with a formatter.
+5. Rebuild: `ng build` plus `Inferrix*Test` in `application`.
+
+---
+
 ## How to extend this ledger
 
 When you modify a TB-core file for a new feature:

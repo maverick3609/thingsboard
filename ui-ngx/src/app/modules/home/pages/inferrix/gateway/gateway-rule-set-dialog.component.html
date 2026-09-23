@@ -1,0 +1,127 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Inferrix Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<!--
+  One wildcard date. Every part is optional and a blank one means "any", which is what makes
+  "25 December, every year" expressible without a rule kind of its own.
+-->
+<ng-template #dateFields let-group="group" let-label="label">
+  <div class="flex flex-row items-baseline gap-2 xs:flex-col xs:items-stretch" [formGroup]="group">
+    <span class="tb-small">{{ label }}</span>
+    <mat-form-field class="tb-inline-field">
+      <mat-label translate>inferrix.gateway.rule-year</mat-label>
+      <input matInput type="number" formControlName="year" min="1970" max="9999">
+    </mat-form-field>
+    <mat-form-field class="tb-inline-field">
+      <mat-label translate>inferrix.gateway.rule-month</mat-label>
+      <input matInput type="number" formControlName="month" min="1" max="12">
+    </mat-form-field>
+    <mat-form-field class="tb-inline-field">
+      <mat-label translate>inferrix.gateway.rule-day</mat-label>
+      <input matInput type="number" formControlName="day" min="1" max="31">
+    </mat-form-field>
+    <mat-form-field class="tb-inline-field">
+      <mat-label translate>inferrix.gateway.rule-day-of-week</mat-label>
+      <mat-select formControlName="dayOfWeek">
+        <mat-option [value]="null">{{ 'inferrix.gateway.rule-any' | translate }}</mat-option>
+        @for (day of days; track day; let index = $index) {
+          <mat-option [value]="index + 1">{{ 'inferrix.gateway.day-' + day | translate }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </div>
+</ng-template>
+
+<form (ngSubmit)="save()" [formGroup]="form">
+  <mat-toolbar color="primary">
+    <h2>{{ data.title }}</h2>
+    <span class="flex-1"></span>
+    <button mat-icon-button type="button" (click)="cancel()">
+      <mat-icon class="material-icons">close</mat-icon>
+    </button>
+  </mat-toolbar>
+  <div mat-dialog-content>
+    <div class="flex flex-row gap-2 xs:flex-col">
+      <mat-form-field class="flex-1">
+        <mat-label translate>inferrix.gateway.model-name</mat-label>
+        <input matInput formControlName="name" required>
+        @if (form.get('name').hasError('required')) {
+          <mat-error translate>inferrix.gateway.model-name-required</mat-error>
+        }
+      </mat-form-field>
+      <mat-form-field class="flex-1">
+        <mat-label translate>inferrix.gateway.model-xid</mat-label>
+        <input matInput formControlName="xid">
+        <mat-hint subscriptSizing="dynamic">
+          {{ (isAdd ? 'inferrix.gateway.model-xid-hint' : 'inferrix.gateway.model-xid-fixed') | translate }}
+        </mat-hint>
+        @if (form.get('xid').hasError('pattern')) {
+          <mat-error translate>inferrix.gateway.model-xid-invalid</mat-error>
+        }
+      </mat-form-field>
+    </div>
+
+    <fieldset class="min-w-0">
+      <legend class="tb-small">{{ 'inferrix.gateway.rules' | translate }}</legend>
+      <div class="tb-form-hint" translate>inferrix.gateway.rules-hint</div>
+      <div formArrayName="rules">
+        @for (rule of rules.controls; track rule; let index = $index) {
+          <div class="flex flex-row items-baseline gap-2 xs:flex-col xs:items-stretch"
+               [formGroupName]="index">
+            <div class="min-w-0 flex-1">
+              @if (rule.get('type').value === rangeType) {
+                <ng-container *ngTemplateOutlet="dateFields; context: {
+                  group: rule.get('startDate'),
+                  label: 'inferrix.gateway.rule-from' | translate}"></ng-container>
+                <ng-container *ngTemplateOutlet="dateFields; context: {
+                  group: rule.get('endDate'),
+                  label: 'inferrix.gateway.rule-to' | translate}"></ng-container>
+              } @else {
+                <ng-container *ngTemplateOutlet="dateFields; context: {
+                  group: rule.get('date'),
+                  label: 'inferrix.gateway.rule-on' | translate}"></ng-container>
+              }
+            </div>
+            @if (!data.readonly) {
+              <button mat-icon-button type="button" class="tb-mat-32" (click)="removeRule(index)"
+                      matTooltip="{{ 'action.remove' | translate }}" matTooltipPosition="above">
+                <mat-icon>delete</mat-icon>
+              </button>
+            }
+          </div>
+        }
+      </div>
+      @if (!data.readonly) {
+        <div class="flex flex-row gap-2">
+          <button mat-stroked-button type="button" (click)="addRule(dateType)">
+            <mat-icon>add</mat-icon>{{ 'inferrix.gateway.add-date-rule' | translate }}
+          </button>
+          <button mat-stroked-button type="button" (click)="addRule(rangeType)">
+            <mat-icon>add</mat-icon>{{ 'inferrix.gateway.add-date-range-rule' | translate }}
+          </button>
+        </div>
+      }
+    </fieldset>
+
+    <mat-form-field class="w-full">
+      <mat-label translate>inferrix.gateway.edit-permissions</mat-label>
+      <input matInput formControlName="editPermission">
+      <mat-hint subscriptSizing="dynamic">
+        {{ 'inferrix.gateway.permissions-hint' | translate }}
+      </mat-hint>
+    </mat-form-field>
+  </div>
+  <div mat-dialog-actions class="flex flex-row items-center justify-end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ (data.readonly ? 'action.close' : 'action.cancel') | translate }}
+    </button>
+    @if (!data.readonly) {
+      <button mat-raised-button color="primary" type="submit" [disabled]="form.invalid">
+        {{ 'action.save' | translate }}
+      </button>
+    }
+  </div>
+</form>

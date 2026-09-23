@@ -20,38 +20,48 @@
         {{ 'inferrix.hand-back-ownership' | translate }}
       </button>
     </div>
-    <div class="flex flex-row items-center gap-2">
+    <div class="flex flex-row flex-wrap items-center gap-2">
       <!-- What draft and active mean is a tooltip, not two permanent lines of prose: on a laptop
-           frame those lines cost a record row each. -->
-      <mat-button-toggle-group [value]="showDraft" (change)="toggleDraft($event.value)"
+           frame those lines cost a record row each.
+
+           shrink-0 is load-bearing, not tidying. A flex item shrinks below its content by default,
+           and with five buttons beside it this group was the thing that gave: "Active" rendered as
+           "Acti", so the control that says which configuration you are looking at was the one
+           truncated. It must keep its intrinsic width and the buttons must wrap instead. -->
+      <mat-button-toggle-group class="shrink-0" [value]="showDraft" (change)="toggleDraft($event.value)"
                                matTooltip="{{ (showDraft ? 'inferrix.draft-note' : 'inferrix.active-note') | translate }}"
                                matTooltipPosition="above">
         <mat-button-toggle [value]="true">{{ 'inferrix.draft' | translate }}</mat-button-toggle>
         <mat-button-toggle [value]="false">{{ 'inferrix.active' | translate }}</mat-button-toggle>
       </mat-button-toggle-group>
       <span class="flex-1"></span>
-      <!-- Saving reads the controller, so it is offered whichever side is on screen; applying writes
-           the draft and follows the same rule as every other edit here. -->
-      <button mat-stroked-button [disabled]="loading || provisioning || !!templateProgress"
-              (click)="saveAsTemplate()"
-              matTooltip="{{ 'inferrix.save-template-hint' | translate }}" matTooltipPosition="above">
-        {{ 'inferrix.save-template' | translate }}
-      </button>
-      <button mat-stroked-button [disabled]="!editable || provisioning || !!templateProgress"
-              (click)="applyTemplate()"
-              matTooltip="{{ 'inferrix.apply-template-hint' | translate }}" matTooltipPosition="above">
-        {{ 'inferrix.apply-template' | translate }}
-      </button>
-      <button mat-stroked-button [disabled]="!editable || provisioning" (click)="provisionLocalIo()"
-              matTooltip="{{ 'inferrix.provision-local-io-hint' | translate }}" matTooltipPosition="above">
-        {{ 'inferrix.provision-local-io' | translate }}
-      </button>
-      <button mat-stroked-button [disabled]="!editable || provisioning" (click)="discard()">
-        {{ 'inferrix.discard' | translate }}
-      </button>
-      <button mat-raised-button color="primary" [disabled]="!editable || provisioning" (click)="apply()">
-        {{ 'inferrix.apply' | translate }}
-      </button>
+      <!-- The buttons wrap among themselves rather than each breaking its own label across two
+           lines, which is what the squeeze was doing to "Save as template" and "Provision local
+           I/O". -->
+      <div class="flex flex-row flex-wrap items-center justify-end gap-2">
+        <!-- Saving reads the controller, so it is offered whichever side is on screen; applying writes
+             the draft and follows the same rule as every other edit here. -->
+        <button mat-stroked-button [disabled]="loading || provisioning || !!templateProgress"
+                (click)="saveAsTemplate()"
+                matTooltip="{{ 'inferrix.save-template-hint' | translate }}" matTooltipPosition="above">
+          {{ 'inferrix.save-template' | translate }}
+        </button>
+        <button mat-stroked-button [disabled]="!editable || provisioning || !!templateProgress"
+                (click)="applyTemplate()"
+                matTooltip="{{ 'inferrix.apply-template-hint' | translate }}" matTooltipPosition="above">
+          {{ 'inferrix.apply-template' | translate }}
+        </button>
+        <button mat-stroked-button [disabled]="!editable || provisioning" (click)="provisionLocalIo()"
+                matTooltip="{{ 'inferrix.provision-local-io-hint' | translate }}" matTooltipPosition="above">
+          {{ 'inferrix.provision-local-io' | translate }}
+        </button>
+        <button mat-stroked-button [disabled]="!editable || provisioning" (click)="discard()">
+          {{ 'inferrix.discard' | translate }}
+        </button>
+        <button mat-raised-button color="primary" [disabled]="!editable || provisioning" (click)="apply()">
+          {{ 'inferrix.apply' | translate }}
+        </button>
+      </div>
     </div>
     <mat-progress-bar color="warn" mode="indeterminate" *ngIf="loading || templateProgress"></mat-progress-bar>
     <div class="tb-form-panel-hint" *ngIf="templateProgress">{{ templateProgress }}</div>

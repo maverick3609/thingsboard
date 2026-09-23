@@ -20,6 +20,13 @@
   }
 }
 
+/* A button label belongs on one line. Without this the flex squeeze broke "Save as template" and
+   "Provision local I/O" across two, which made the whole row taller and still did not free enough
+   width to stop the Draft/Active group being truncated. */
+:host ::ng-deep .mat-mdc-button-base .mdc-button__label {
+  white-space: nowrap;
+}
+
 .tb-config-actions {
   white-space: nowrap;
   text-align: right;

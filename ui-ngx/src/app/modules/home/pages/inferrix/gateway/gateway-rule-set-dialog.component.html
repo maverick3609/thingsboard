@@ -52,10 +52,10 @@
           <mat-error translate>inferrix.gateway.model-name-required</mat-error>
         }
       </mat-form-field>
-      <mat-form-field class="flex-1">
+      <mat-form-field class="flex-1" subscriptSizing="dynamic">
         <mat-label translate>inferrix.gateway.model-xid</mat-label>
         <input matInput formControlName="xid">
-        <mat-hint subscriptSizing="dynamic">
+        <mat-hint>
           {{ (isAdd ? 'inferrix.gateway.model-xid-hint' : 'inferrix.gateway.model-xid-fixed') | translate }}
         </mat-hint>
         @if (form.get('xid').hasError('pattern')) {
@@ -106,10 +106,10 @@
       }
     </fieldset>
 
-    <mat-form-field class="w-full">
+    <mat-form-field class="w-full" subscriptSizing="dynamic">
       <mat-label translate>inferrix.gateway.edit-permissions</mat-label>
       <input matInput formControlName="editPermission">
-      <mat-hint subscriptSizing="dynamic">
+      <mat-hint>
         {{ 'inferrix.gateway.permissions-hint' | translate }}
       </mat-hint>
     </mat-form-field>

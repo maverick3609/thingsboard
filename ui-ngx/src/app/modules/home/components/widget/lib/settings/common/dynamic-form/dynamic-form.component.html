@@ -45,6 +45,7 @@
                        formControlName="{{ propertyContainer.property.id }}"
                        title="{{ propertyContainer.label | customTranslate }}"
                        stroked
+                       [stackedLabels]="stackedLabels"
                        [properties]="propertyContainer.properties">
       </tb-dynamic-form>
       <ng-container *ngIf="propertyContainer.type === FormPropertyContainerType.array">
@@ -70,9 +71,18 @@
 </ng-template>
 
 <ng-template #propertyFieldTpl let-property="property">
-  <div [formGroup]="propertiesFormGroup" class="tb-form-row no-border no-padding tb-standard-fields">
+  <div [formGroup]="propertiesFormGroup" class="tb-form-row no-border no-padding tb-standard-fields"
+       [class.tb-stacked-field]="stackedLabels">
     <ng-container *ngTemplateOutlet="inputFieldTpl;context:{property: property, singleField: true}">
     </ng-container>
+    <!--
+      Only when stacked. A row layout hangs its hint on the label element, which a stacked field
+      does not have; without this the hint would silently disappear rather than move. It stays an
+      icon and not prose because these hints are schema descriptions, written for whoever generates
+      a client, not for whoever fills the form in.
+    -->
+    <div *ngIf="stackedLabels && property.hint" [tb-hint-tooltip-icon]="property.hint | customTranslate"
+         tooltipPosition="left"></div>
   </div>
 </ng-template>
 

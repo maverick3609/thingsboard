@@ -270,7 +270,8 @@ export interface FormPropertyGroup {
 export const toPropertyGroups = (properties: FormProperty[],
                                  isArrayItem: boolean,
                                  customTranslate: CustomTranslatePipe,
-                                 sanitizer: DomSanitizer): FormPropertyGroup[] => {
+                                 sanitizer: DomSanitizer,
+                                 stackedLabels = false): FormPropertyGroup[] => {
   const groups: {title: string, properties: FormProperty[]}[] = [];
   for (const property of properties) {
     if (!property.group) {
@@ -297,7 +298,7 @@ export const toPropertyGroups = (properties: FormProperty[],
   }
   return groups.map(g => ({
     title: g.title,
-    containers: toPropertyContainers(g.properties, isArrayItem, customTranslate, sanitizer),
+    containers: toPropertyContainers(g.properties, isArrayItem, customTranslate, sanitizer, stackedLabels),
     visible: true
   }));
 };
@@ -305,7 +306,8 @@ export const toPropertyGroups = (properties: FormProperty[],
 const toPropertyContainers = (properties: FormProperty[],
                               isArrayItem: boolean,
                               customTranslate: CustomTranslatePipe,
-                              sanitizer: DomSanitizer): FormPropertyContainer[] => {
+                              sanitizer: DomSanitizer,
+                              stackedLabels = false): FormPropertyContainer[] => {
   const result: FormPropertyContainer[] = [];
   for (const property of properties) {
     if (property.type === FormPropertyType.array) {
@@ -384,7 +386,11 @@ const toPropertyContainers = (properties: FormProperty[],
     const property = container.properties[0];
     if (isInputFieldPropertyType(property.type)) {
       const labelText = customTranslate.transform(property.name);
-      if (property.type !== FormPropertyType.number && labelText.length > 40) {
+      // A widget settings panel puts the label beside its control, which is why the default keeps
+      // the row unless the label is too long to sit there. An entity edit form wants the opposite
+      // -- label above a full-width control -- so `stackedLabels` takes that same branch for every
+      // field instead of only the long ones.
+      if (stackedLabels || (property.type !== FormPropertyType.number && labelText.length > 40)) {
         container.type = FormPropertyContainerType.field;
         container.property = property;
         delete container.properties;

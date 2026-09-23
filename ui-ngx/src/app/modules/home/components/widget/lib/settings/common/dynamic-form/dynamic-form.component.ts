@@ -97,6 +97,14 @@ export class DynamicFormComponent implements OnInit, OnChanges, ControlValueAcce
   @coerceBoolean()
   trimDefaults = false;
 
+  /**
+   * Render every field with its label above a full-width control, instead of beside it. The
+   * beside-it layout is a settings panel; an entity edit form is not one.
+   */
+  @Input()
+  @coerceBoolean()
+  stackedLabels = false;
+
   private modelValue: {[id: string]: any};
 
   private propagateChange = null;
@@ -190,7 +198,8 @@ export class DynamicFormComponent implements OnInit, OnChanges, ControlValueAcce
           }
         }
       }
-      this.propertyGroups = toPropertyGroups(this.properties, this.isArrayItem, this.customTranslate, this.sanitizer);
+      this.propertyGroups = toPropertyGroups(this.properties, this.isArrayItem, this.customTranslate, this.sanitizer,
+        this.stackedLabels);
       for (const property of this.properties) {
         if (property.type !== FormPropertyType.htmlSection) {
           if (property.disableOnProperty) {

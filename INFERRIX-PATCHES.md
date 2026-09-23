@@ -643,7 +643,7 @@ Bakes Inferrix branding into the default build (every `yarn build:prod` output i
   frontend `ui-ngx/src/app/modules/home/pages/inferrix/gateway*`,
   `pending-gateways-table-config.resolver.ts`, `adopt-gateway-dialog.component.*`,
   `shared/models/inferrix-gateway.models.ts`, `core/http/inferrix-gateway.service.ts`.
-  Only IG1-IG4 below are TB-core.
+  Only IG1-IG7 below are TB-core.
 - **Security decisions that are easy to undo by accident** (each has a test; several were found by
   adversarial review after the first implementation):
   - `devicePath` must be fed `getRequestURI()` and **nothing else** — that is the raw, non-decoded
@@ -885,6 +885,10 @@ Bakes Inferrix branding into the default build (every `yarn build:prod` output i
 | IG3 | `ui-ngx/src/app/core/services/menu.models.ts` | One line: `{id: MenuId.gateways},` added to the **CUSTOMER_USER** section's `MenuId.entities.pages`, immediately before `{id: MenuId.controllers}`. The TENANT_ADMIN entry and the `MenuId.gateways` definition itself (`path: '/entities/gateways'`) are **unchanged** | The route and the table resolver both handle a customer user read-only — `gatewayTableAccess` scopes the filter to their customer — but the menu only listed gateways for tenant admins, so they had access with no way in. Controllers were already listed in both sections; this makes gateways match |
 | IG4 | `ui-ngx/src/assets/locale/locale.constant-en_US.json` | `inferrix.gateway` block added (186 keys: 43 in G2, 28 in G4 for the data-source and data-point panels, 50 in G5 for events, handlers, alert routing and detectors, 62 in G6 for schedules, rule sets and the system tab, 3 added since) immediately after the `"inferrix": {` line. **Splice raw, take-ours, do not reformat** — a JSON round-trip rewrites all ~11 400 lines of this file | Every string the gateway section renders. The reachability reasons are the bulk of it, and each maps one backend `reason` to a sentence that says where to go and fix it |
 
+| IG5 | `ui-ngx/src/app/shared/models/dynamic-form.models.ts` | `toPropertyGroups` and `toPropertyContainers` take a trailing `stackedLabels = false`; the single-property-row post-pass takes the existing full-width branch when it is set (`if (stackedLabels || (property.type !== number && labelText.length > 40))`) | TB lays a form property out as label-left / control-right, which is a settings panel. In a 900px dialog that left a ~200px label beside a ~110px control and clipped every stored value. The flag makes the gateway's model forms match the gateway's own editor — label above a full-width control, two columns — without changing any widget settings panel |
+| IG6 | `ui-ngx/src/app/modules/home/components/widget/lib/settings/common/dynamic-form/dynamic-form.component.ts` | `@Input() @coerceBoolean() stackedLabels = false;` passed through to `toPropertyGroups` | The opt-in switch for IG5 |
+| IG7 | `ui-ngx/src/app/modules/home/components/widget/lib/settings/common/dynamic-form/dynamic-form.component.html` | (a) nested fieldset `tb-dynamic-form` gains `[stackedLabels]="stackedLabels"`; (b) `propertyFieldTpl`'s row gains `[class.tb-stacked-field]="stackedLabels"` and, when stacked and the property has a hint, a `tb-hint-tooltip-icon` div | Without (a) a fieldset reverts to rows halfway down the form. Without (b) the hint disappears: a row hangs it on the label element, and a stacked field has none. It stays an icon rather than prose because these hints are OpenAPI descriptions written for client generators |
+
 ### Merge recovery
 
 After `git merge upstream/<ref>`:
@@ -894,7 +898,10 @@ After `git merge upstream/<ref>`:
 3. `menu.models.ts` — confirm `MenuId.gateways` is still in the CUSTOMER_USER entities pages.
 4. `locale.constant-en_US.json` — confirm the `inferrix.gateway` block survived; if the file
    conflicts, take ours for that block and splice by hand rather than resolving with a formatter.
-5. Rebuild: `ng build` plus `Inferrix*Test` in `application`.
+5. `dynamic-form*` (IG5-IG7) — re-apply the three `stackedLabels` touches if upstream rewrote them.
+   `src/app/shared/models/dynamic-form.stacked-labels.spec.ts` fails if IG5 is lost and, more
+   usefully, if it is re-applied in a way that changes the default.
+6. Rebuild: `ng build` plus `Inferrix*Test` in `application`.
 
 ---
 

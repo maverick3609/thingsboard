@@ -1,0 +1,56 @@
+// SPDX-FileCopyrightText: Copyright The Inferrix Authors
+// SPDX-License-Identifier: Apache-2.0
+@import "../../../../../../scss/constants";
+
+/* The gateway's own editor is a full-height panel with its fields in two columns, each label above
+ * its control. This dialog matches that, because an operator moves between the two UIs on the same
+ * device and a form that rearranges itself between them is a form they have to re-read.
+ *
+ * `display` is not decorative: Material styles every dialog component host `display: contents`, so
+ * a width on a host without one is ignored. */
+:host {
+  display: block;
+
+  @media #{$mat-gt-sm} {
+    width: 900px;
+  }
+}
+
+/* The xid hint ends exactly where the schema form's first row begins, which reads as a collision
+ * even though nothing overlaps. */
+.tb-gateway-identity {
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+:host ::ng-deep {
+  /* Two columns of real width. The default one-per-row layout gave a ~200px label a ~110px control
+   * beside it, which clipped every value the gateway actually stores ("Sensor Nam", "superadmin,"). */
+  tb-dynamic-form > .tb-form-panel {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    box-shadow: none;
+    padding: 0;
+
+    @media #{$mat-xs} {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* A fieldset, a title and a switch row each describe more than one field, so they take the
+     * full width rather than half of it. */
+    > .tb-form-panel-title,
+    > tb-dynamic-form,
+    > tb-dynamic-form-array,
+    > .tb-form-row:not(.tb-stacked-field) {
+      grid-column: 1 / -1;
+    }
+  }
+
+  /* The field already carries its own label above its control; all this row holds beside it is the
+   * hint icon, which belongs against the field rather than 16px away from it. */
+  .tb-stacked-field {
+    height: auto;
+    gap: 4px;
+  }
+}

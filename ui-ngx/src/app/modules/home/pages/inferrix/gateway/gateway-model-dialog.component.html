@@ -16,7 +16,7 @@
     @if (data.readonlyNote) {
       <div class="tb-error-message">{{ data.readonlyNote }}</div>
     }
-    <div class="flex flex-row gap-2 xs:flex-col" [formGroup]="identityForm">
+    <div class="tb-gateway-identity flex flex-row gap-2 xs:flex-col" [formGroup]="identityForm">
       <mat-form-field class="flex-1">
         <mat-label translate>inferrix.gateway.model-name</mat-label>
         <input matInput formControlName="name" required>
@@ -24,10 +24,13 @@
           <mat-error translate>inferrix.gateway.model-name-required</mat-error>
         }
       </mat-form-field>
-      <mat-form-field class="flex-1">
+      <!-- `subscriptSizing` is an input of the field, not of the hint: set on the hint it parses as
+           a plain attribute and does nothing, so the default one-line subscript stays and this
+           hint paints over whatever the form renders next. -->
+      <mat-form-field class="flex-1" subscriptSizing="dynamic">
         <mat-label translate>inferrix.gateway.model-xid</mat-label>
         <input matInput formControlName="xid">
-        <mat-hint subscriptSizing="dynamic">
+        <mat-hint>
           {{ (isAdd ? 'inferrix.gateway.model-xid-hint' : 'inferrix.gateway.model-xid-fixed') | translate }}
         </mat-hint>
         @if (identityForm.get('xid').hasError('pattern')) {
@@ -42,7 +45,7 @@
       renderer compiles `condition` to executable JavaScript.
     -->
     @if (data.properties?.length) {
-      <tb-dynamic-form [properties]="data.properties" [disabled]="data.readonly"
+      <tb-dynamic-form [properties]="data.properties" [disabled]="data.readonly" stackedLabels
                        [(ngModel)]="values" [ngModelOptions]="{standalone: true}"></tb-dynamic-form>
     } @else {
       <div class="tb-form-hint" translate>inferrix.gateway.no-schema-for-type</div>
@@ -65,7 +68,7 @@
 
     @if (data.locatorProperties?.length) {
       <tb-dynamic-form [properties]="data.locatorProperties" [title]="data.locatorTitle"
-                       [disabled]="data.readonly" [(ngModel)]="locatorValues"
+                       [disabled]="data.readonly" [(ngModel)]="locatorValues" stackedLabels
                        [ngModelOptions]="{standalone: true}"></tb-dynamic-form>
     } @else if (data.locatorMissing) {
       <div class="tb-form-hint" translate>inferrix.gateway.no-locator-schema</div>

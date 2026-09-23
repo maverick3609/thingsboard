@@ -50,7 +50,7 @@ export interface GatewayModelDialogData {
 @Component({
   selector: 'tb-gateway-model-dialog',
   templateUrl: './gateway-model-dialog.component.html',
-  styleUrls: [],
+  styleUrls: ['./gateway-model-dialog.component.scss'],
   standalone: false
 })
 export class GatewayModelDialogComponent

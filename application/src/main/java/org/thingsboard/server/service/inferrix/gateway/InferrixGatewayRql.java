@@ -144,8 +144,10 @@ public final class InferrixGatewayRql {
      * gateway's {@code RQLToCondition} casts the argument to {@code String} outright, so an
      * auto-typed value is a {@code ClassCastException} there.
      *
-     * <p>The cost is that an equality filter on a numeric column compares a string to it. No list
-     * in this feature filters on one, and a wrong answer that is loud beats one that is silent.
+     * <p>The cost is that an equality filter on a numeric column compares a string to it. The
+     * detector list does exactly that ({@code dataPointId}), and the gateway's own query layer
+     * coerces the argument, so it matches -- verified against a live gateway. A wrong answer that
+     * is loud still beats one that is silent, so the cast stays.
      */
     private static String value(String value) {
         return "string:" + encode(value);

@@ -1,10 +1,10 @@
 // SPDX-FileCopyrightText: Copyright The Inferrix Authors
 // SPDX-License-Identifier: Apache-2.0
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { catchError, shareReplay } from 'rxjs/operators';
-import { defaultHttpOptionsFromConfig, RequestConfig } from '@core/http/http-utils';
+import { defaultHttpOptionsFromConfig, QueryParams, RequestConfig } from '@core/http/http-utils';
 import { Device } from '@shared/models/device.models';
 import { AdoptGatewayRequest, GatewayReachability,
   PendingGateway } from '@shared/models/inferrix-gateway.models';
@@ -113,12 +113,21 @@ export class InferrixGatewayService {
    * `path` is a resource path with no `/rest` prefix and **no query string**. The gateway parses a
    * raw query string as RQL on every verb, so the platform refuses to forward one: paging, sorting
    * and filtering travel as the typed `query` fields below, and the platform builds the RQL.
+   *
+   * Errors default to `ignoreErrors`, because every caller of this method renders the failure in
+   * the panel or dialog that asked for it. The global toast would be a second report of the same
+   * thing, and a worse one: the platform relays the gateway's own error body verbatim, which has
+   * no `message` field, so the toast falls through to the status line and reads "500: OK".
    */
   public proxy<T>(deviceId: string, method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
                   path: string, body?: any, config?: RequestConfig,
                   params?: GatewayProxyParams): Observable<T> {
     const url = `/api/inferrix/gateways/${deviceId}/proxy${path}`;
-    const options = {...defaultHttpOptionsFromConfig(config), params: httpParams(params)};
+    // The query goes through `queryParams` rather than over the returned options, because the
+    // options carry an InterceptorHttpParams holding `ignoreLoading` and `ignoreErrors` -- a
+    // plain HttpParams assigned over it would drop both on the floor.
+    const options = defaultHttpOptionsFromConfig(
+      {ignoreErrors: true, ...config, queryParams: httpParams(params)});
     switch (method) {
       case 'GET':
         return this.http.get<T>(url, options);
@@ -230,14 +239,19 @@ export class InferrixGatewayService {
   /**
    * The detectors watching one data point.
    *
-   * Always scoped to a point: `sourceId` is a point xid, and a detector that watches nothing is
-   * not a thing the gateway can store. The scoping is an RQL `eq` term the platform builds, so it
-   * costs one page rather than a filter over every detector on the device.
+   * Always scoped to a point, because a detector that watches nothing is not a thing the gateway
+   * can store. The scoping is an RQL `eq` term the platform builds, so it costs one page rather
+   * than a filter over every detector on the device.
+   *
+   * The term is `dataPointId`, the point's surrogate id, NOT the `sourceId` the detector body
+   * carries: the query runs against the gateway's `event_detectors` table, whose only source
+   * column is `dataPointId`, and the model's string `sourceId` exists solely because the model
+   * maps that column to and from the point's xid. Asking for `sourceId` is a 500.
    */
-  public getDetectorsForPoint(deviceId: string, pointXid: string, query: GatewayListQuery,
+  public getDetectorsForPoint(deviceId: string, pointId: number, query: GatewayListQuery,
                               config?: RequestConfig): Observable<GatewayPage<GatewayEventDetector>> {
     return this.proxy<GatewayPage<GatewayEventDetector>>(deviceId, 'GET', '/v2/event-detector',
-      null, config, {...query, filterField: 'sourceId', filterValue: pointXid});
+      null, config, {...query, filterField: 'dataPointId', filterValue: String(pointId)});
   }
 
   /** Which detector types suit a point of this data type. The gateway decides, not this code. */
@@ -439,11 +453,11 @@ export class InferrixGatewayService {
  * An `undefined` left in would be serialised as the string "undefined" and the platform would then
  * try to parse it as a page size.
  */
-const httpParams = (query?: GatewayProxyParams): HttpParams => {
-  let params = new HttpParams();
+const httpParams = (query?: GatewayProxyParams): QueryParams => {
+  const params: QueryParams = {};
   Object.entries(query ?? {}).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') {
-      params = params.set(key, String(value));
+      params[key] = String(value);
     }
   });
   return params;

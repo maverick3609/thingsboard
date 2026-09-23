@@ -32,9 +32,10 @@ const DETECTORS_PER_POINT = 100;
 /**
  * The event detectors watching one data point.
  *
- * Reached from the point rather than from a list of its own, because a detector's `sourceId` is a
- * point xid — a detector with no point is not a thing the gateway can store, and a flat list would
- * make the operator type one.
+ * Reached from the point rather than from a list of its own, because a detector always names one
+ * — a detector with no point is not a thing the gateway can store, and a flat list would make the
+ * operator type one. The list is scoped by the point's numeric id, which is what the gateway's
+ * detector table stores; the string `sourceId` on the detector body is that same point's xid.
  *
  * Which detector types are offered is two questions with two different answers. The **gateway**
  * decides which suit the point's data type (`/v2/event-detector-type/{dataType}`, backed by each
@@ -84,11 +85,16 @@ export class GatewayDetectorsDialogComponent
   reload(): void {
     this.loading = true;
     this.error = null;
-    this.gatewayService.getDetectorsForPoint(this.data.deviceId, this.data.point.xid,
-      {pageSize: DETECTORS_PER_POINT, page: 0, sortProperty: 'name', sortOrder: 'ASC'},
+    // Ordered here, not by the gateway. A detector's name lives inside its JSON blob, and the
+    // gateway can only sort by a real column of `event_detectors` -- `id`, `xid` or `dataPointId`;
+    // asking it for `name` is a 500. One point's detectors always fit in a single page, so the
+    // order the name column promises is ours to deliver.
+    this.gatewayService.getDetectorsForPoint(this.data.deviceId, this.data.point.id,
+      {pageSize: DETECTORS_PER_POINT, page: 0},
       {ignoreLoading: true}).subscribe({
       next: page => {
-        this.detectors = page?.items ?? [];
+        this.detectors = (page?.items ?? [])
+          .sort((left, right) => (left.name ?? '').localeCompare(right.name ?? ''));
         this.loading = false;
       },
       error: error => {

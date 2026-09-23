@@ -3,6 +3,7 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { InferrixGatewayService } from '@core/http/inferrix-gateway.service';
+import { InterceptorHttpParams } from '@core/interceptors/interceptor-http-params';
 import { buildRecipient, gatewayAlarmTone, gatewayDetectorTypes, gatewayHandlerRunsCommands,
   gatewayHandlerTypes, recipientValue } from '@shared/models/inferrix-gateway-event.models';
 import { GatewaySchemaDocument } from '@shared/models/inferrix-gateway-schema.models';
@@ -37,13 +38,15 @@ describe('InferrixGatewayService events', () => {
   afterEach(() => httpMock.verify());
 
   it('scopes a detector list to its point on the device', () => {
-    service.getDetectorsForPoint(DEVICE, 'DP_1', {pageSize: 20, page: 0}).subscribe();
+    service.getDetectorsForPoint(DEVICE, 42, {pageSize: 20, page: 0}).subscribe();
 
     const request = httpMock.expectOne(r => r.url === proxy('/v2/event-detector'));
-    // sourceId is the point's xid. A detector watching nothing is not a thing the gateway stores,
-    // so this filter is the list's identity, not a convenience.
-    expect(request.request.params.get('filterField')).toBe('sourceId');
-    expect(request.request.params.get('filterValue')).toBe('DP_1');
+    // The query runs against the gateway's detector table, whose source column is dataPointId --
+    // the point's surrogate id. The detector BODY's `sourceId` is that point's xid instead, and
+    // asking the query for it is a 500. A detector watching nothing is not a thing the gateway
+    // stores, so this filter is the list's identity, not a convenience.
+    expect(request.request.params.get('filterField')).toBe('dataPointId');
+    expect(request.request.params.get('filterValue')).toBe('42');
     expect(request.request.params.get('pageSize')).toBe('20');
     request.flush({items: [], total: 0});
   });
@@ -51,11 +54,25 @@ describe('InferrixGatewayService events', () => {
   it('will not let a caller override the detector scope', () => {
     // The scope is applied after the caller's query, so a filter passed in cannot widen the list
     // to every detector on the gateway.
-    service.getDetectorsForPoint(DEVICE, 'DP_1',
+    service.getDetectorsForPoint(DEVICE, 42,
       {pageSize: 20, page: 0, filterField: 'alarmLevel', filterValue: 'NONE'} as any).subscribe();
     const request = httpMock.expectOne(r => r.url === proxy('/v2/event-detector'));
-    expect(request.request.params.get('filterField')).toBe('sourceId');
-    expect(request.request.params.get('filterValue')).toBe('DP_1');
+    expect(request.request.params.get('filterField')).toBe('dataPointId');
+    expect(request.request.params.get('filterValue')).toBe('42');
+    request.flush({items: [], total: 0});
+  });
+
+  it('keeps the interceptor config on a proxied call', () => {
+    // The query parameters and the interceptor config share one HttpParams object. Building the
+    // query separately and assigning it over the options silently dropped both flags, which is
+    // how a gateway failure ended up reported twice -- once inline, once as a "500: OK" toast.
+    service.getDetectorsForPoint(DEVICE, 42, {pageSize: 20, page: 0},
+      {ignoreLoading: true}).subscribe();
+    const request = httpMock.expectOne(r => r.url === proxy('/v2/event-detector'));
+    const config = (request.request.params as InterceptorHttpParams).interceptorConfig;
+    expect(config.ignoreLoading).toBe(true);
+    expect(config.ignoreErrors).toBe(true);
+    expect(request.request.params.get('pageSize')).toBe('20');
     request.flush({items: [], total: 0});
   });
 

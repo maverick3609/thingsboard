@@ -2185,12 +2185,27 @@ licence device cap all apply as they do to any other device.</p>
 alarm rule and telemetry series on that device then reflects different physical plant. Replacing
 failed hardware is a legitimate reason to do it, so the platform asks rather than refuses — but it
 asks for a reason.</p>
+</aside>
+<p><strong>A gateway can be moved without being re-adopted.</strong> The address belongs to the network, not to the
+box: a renumbered subnet, a new VPN or a moved cabinet changes where a gateway answers while its
+hardware, certificate and API token stay exactly as they were. <strong>Details → Connection → Change
+address</strong> records the new one, and the platform spends the credential it already holds — nothing has
+to be pasted again, which matters because the sealed <code>client_secret</code> is never handed back and
+re-adoption would demand it.</p>
+<p>The same ordering is load-bearing here too. The certificate is captured and judged first, the token
+is exchanged against the new address second, and only a success writes anything: a typo that lands
+on another host fails at the certificate, a host that is not this gateway fails at the token, and in
+both cases the previous address is still in force. A gateway with <strong>no</strong> pinned certificate is
+refused outright rather than pinned afresh — adoption may trust on first use because the operator is
+typing the credential as they do it, but this would be posting a secret the platform already holds
+to whatever answers.</p>
+<aside class="callout">
 <p>[!IMPORTANT]
 Set <code>TB_GATEWAY_DASHBOARD_SYNC_ENABLED=false</code> in <code>/etc/thingsboard/conf/thingsboard.yml</code>, or
 <code>DashboardSyncService</code> git-pulls ThingsBoard's stock gateways dashboard back every 24 hours.</p>
 </aside>
 <h3 id="113-what-the-tabs-do">11.3 What the tabs do</h3>
-<p>A gateway's details page carries eight tabs. Each one talks to the device only once its tab is
+<p>A gateway's details page carries ten tabs. Each one talks to the device only once its tab is
 opened — every panel is a real call across a LAN to a small box behind a per-device connection
 limiter, so a panel that loaded on construction would spend one on every details drawer an operator
 happens to open.</p>
@@ -2202,6 +2217,10 @@ happens to open.</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td><strong>Details</strong></td>
+<td>The device record — name, label, description — and where the platform reaches this gateway</td>
+</tr>
 <tr>
 <td><strong>Health</strong></td>
 <td>Whether the platform can reach this gateway, and if not, <em>why</em></td>

@@ -1451,19 +1451,35 @@ licence device cap all apply as they do to any other device.
 > failed hardware is a legitimate reason to do it, so the platform asks rather than refuses — but it
 > asks for a reason.
 
+**A gateway can be moved without being re-adopted.** The address belongs to the network, not to the
+box: a renumbered subnet, a new VPN or a moved cabinet changes where a gateway answers while its
+hardware, certificate and API token stay exactly as they were. **Details → Connection → Change
+address** records the new one, and the platform spends the credential it already holds — nothing has
+to be pasted again, which matters because the sealed `client_secret` is never handed back and
+re-adoption would demand it.
+
+The same ordering is load-bearing here too. The certificate is captured and judged first, the token
+is exchanged against the new address second, and only a success writes anything: a typo that lands
+on another host fails at the certificate, a host that is not this gateway fails at the token, and in
+both cases the previous address is still in force. A gateway with **no** pinned certificate is
+refused outright rather than pinned afresh — adoption may trust on first use because the operator is
+typing the credential as they do it, but this would be posting a secret the platform already holds
+to whatever answers.
+
 > [!IMPORTANT]
 > Set `TB_GATEWAY_DASHBOARD_SYNC_ENABLED=false` in `/etc/thingsboard/conf/thingsboard.yml`, or
 > `DashboardSyncService` git-pulls ThingsBoard's stock gateways dashboard back every 24 hours.
 
 ### 11.3 What the tabs do
 
-A gateway's details page carries eight tabs. Each one talks to the device only once its tab is
+A gateway's details page carries ten tabs. Each one talks to the device only once its tab is
 opened — every panel is a real call across a LAN to a small box behind a per-device connection
 limiter, so a panel that loaded on construction would spend one on every details drawer an operator
 happens to open.
 
 | Tab | What it is for |
 |---|---|
+| **Details** | The device record — name, label, description — and where the platform reaches this gateway |
 | **Health** | Whether the platform can reach this gateway, and if not, *why* |
 | **Data sources** | The protocol connections — a Modbus device, a BACnet network, an MQTT broker |
 | **Data points** | The individual measured and controlled values of one data source |

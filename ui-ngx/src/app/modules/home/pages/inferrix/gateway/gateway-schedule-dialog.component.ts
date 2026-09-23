@@ -10,7 +10,7 @@ import { AppState } from '@core/core.state';
 import { DialogComponent } from '@shared/components/dialog.component';
 import { GATEWAY_ALARM_LEVELS } from '@shared/models/inferrix-gateway-event.models';
 import { GATEWAY_SCHEDULE_DAYS, GatewayCalendarRuleSet, GatewaySchedule,
-  gatewayDayText, gatewayDayTimes, gatewayScheduleDayValid,
+  gatewayDayText, gatewayDayTimes, gatewayScheduleDayValid, gatewayScheduleHasOffsets,
   gatewayWeek } from '@shared/models/inferrix-gateway-schedule.models';
 
 export interface GatewayScheduleDialogData {
@@ -29,6 +29,22 @@ export interface GatewayScheduleDialogData {
  */
 const dayTimes = (control: AbstractControl): ValidationErrors | null =>
   gatewayScheduleDayValid(gatewayDayTimes(control.value)) ? null : {dayTimes: true};
+
+/**
+ * Whether the schedule has at least one change time anywhere.
+ *
+ * The gateway refuses a schedule with none -- *"A schedule needs at least one time offset, in the
+ * weekly schedule or in an exception."*, HTTP 422 -- because a schedule that never changes state is
+ * one nothing can ever fire from. Caught here so an operator sees why before pressing Save rather
+ * than after.
+ */
+const scheduleOffsets = (control: AbstractControl): ValidationErrors | null => {
+  const value = control.value ?? {};
+  const week = ((value.week ?? []) as string[]).map(day => gatewayDayTimes(day));
+  const exceptions = ((value.exceptions ?? []) as {times: string}[])
+    .map(exception => gatewayDayTimes(exception?.times));
+  return gatewayScheduleHasOffsets(week, exceptions) ? null : {scheduleOffsets: true};
+};
 
 /**
  * One schedule, hand-written rather than schema-driven.
@@ -87,7 +103,7 @@ export class GatewayScheduleDialogComponent
         .map(day => this.fb.control(gatewayDayText(day), [dayTimes]))),
       exceptions: this.fb.array((schedule.exceptions ?? []).map(exception => this.exceptionGroup(
         exception.ruleSet?.xid ?? '', gatewayDayText(exception.schedule))))
-    });
+    }, {validators: [scheduleOffsets]});
     if (data.readonly) {
       this.form.disable();
     }

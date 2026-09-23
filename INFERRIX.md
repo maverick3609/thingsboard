@@ -1536,10 +1536,15 @@ dates — "public holidays" — written once and pointed at by every schedule th
 a date with any part left open meaning "any", so 25 December of every year is a rule with no year,
 month 12, day 25. Rule sets live on their own tab because they are shared.
 
-> [!NOTE]
-> Creating a schedule or a rule set requires a **gateway administrator** credential. The platform
-> connects with a narrower one by design, so with the default service account these tabs can list and
-> edit but not create. Tracked as **D11** in the stack findings document and still open.
+> [!IMPORTANT]
+> **With a non-administrator gateway credential, creating works and changing does not.** Verified
+> against stack 5.1.0 on 2026-09-23: an account holding only the gateway-configuration permission can
+> create a data source, a schedule and a rule set, and is refused when it tries to edit or delete any
+> of them — the gateway checks each object's own edit permission, which is empty on everything
+> created over REST. The same account cannot create a data point, an event detector or an event
+> handler at all. Tracked as **D15** and **D16** in
+> `Inferrix-stack/docs/specs/2026-09-23-cortex-gateway-open-items.md`. Until they land, those actions
+> need a gateway administrator credential; everything read-only works as documented.
 
 ### 11.6 The System tab is read-only, deliberately
 
@@ -1584,8 +1589,11 @@ Scripts remain editable in the gateway's own interface. That is the intended out
 | Symptom | Cause |
 |---|---|
 | Every form is empty | The gateway's `/v2/model-schemas` is returning an empty document. Hand-written tabs still work. Fixed in the stack on 2026-09-23 (finding D8); an older gateway will still do this |
+| Adding a data source fails with a server error | The gateway rejects a polling data source with no polling interval by throwing, and nothing in its schema marks the field required (stack findings D18, A13). Set the update period before saving |
 | Health says the certificate changed | The gateway is presenting a different certificate than at adoption. Either the box was rebuilt, or something else is answering on that address. Re-adopt only once you know which |
 | Health says forbidden | Expected on the administrator-only routes: the service account is not a gateway administrator by design |
+| Save worked once, then every edit is denied | The gateway grants *create* to the gateway-configuration permission but checks each object's own edit permission — which is empty on anything created over REST — for edit and delete (stack finding D15). A gateway administrator credential is the workaround |
+| Adding a point, a detector or a handler is denied | Those three are still administrator-only on the gateway (stack finding D16), even on a data source the same account just created |
 | "Add point" is disabled | The gateway did not publish a `pointLocatorType` for this data source type *and* it has no points to learn one from. One real type does this (`BACNET_MSTP.DS`); create its first point in the gateway's own interface |
 | A schedule will not enable | It was saved with fewer than seven days by something other than Cortex. Newer gateways refuse this at save time (finding D9) |
 | Stray `???some.key(i18n_en)???` text | An untranslated key rendered by the gateway and passed through unchanged. Fixed in the stack (finding D14); Cortex shows such text as sent rather than hiding a gateway-side gap |

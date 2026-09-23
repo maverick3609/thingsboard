@@ -64,6 +64,9 @@
     <fieldset class="min-w-0">
       <legend class="tb-small">{{ 'inferrix.gateway.weekly-schedule' | translate }}</legend>
       <div class="tb-form-hint" translate>inferrix.gateway.weekly-schedule-hint</div>
+      @if (form.hasError('scheduleOffsets')) {
+        <div class="tb-error-message" translate>inferrix.gateway.schedule-needs-offset</div>
+      }
       <div formArrayName="week">
         @for (day of days; track day; let index = $index) {
           <mat-form-field class="w-full">

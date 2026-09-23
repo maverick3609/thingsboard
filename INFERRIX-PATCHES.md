@@ -818,8 +818,19 @@ Bakes Inferrix branding into the default build (every `yarn build:prod` output i
   now refused at save time rather than breaking on enable; a wrong point locator answers 422 with a
   message naming the fix rather than 500 with two internal class names; 500s carry a correlation
   reference instead of exception text; and the untranslated `???key(i18n_en)???` strings are gone
-  (0 of 90 monitor rows, down from 7, with 24 unsubstituted `{0}` placeholders also fixed). Two
-  remain open and neither blocks anything — see the findings document.
+  (0 of 90 monitor rows, down from 7, with 24 unsubstituted `{0}` placeholders also fixed). D11
+  followed the same afternoon, so schedules and rule sets can now be created with the narrow
+  credential.
+- **What the same afternoon's probing found instead, and it is larger.** Driving the gateway with an
+  account holding only the gateway-configuration permission — the credential this feature is designed
+  around — shows that **create was widened and edit and delete were not**: a data source, schedule or
+  rule set created that way answers 403 on every later `PUT` and `DELETE`, because the gateway checks
+  each object's own edit-permission string and nothing sets one. Data points, event detectors and
+  event handlers are still administrator-only outright. Separately, a gateway user with *no*
+  permissions can list every data source and point with full configuration, while the single-object
+  read correctly refuses. All of it is written up with reproductions in
+  `Inferrix-stack/docs/specs/2026-09-23-cortex-gateway-open-items.md` (D15-D19, A13) — nothing in
+  this repo changes for it, but those tabs need a gateway administrator credential until it lands.
 - **Still operator-pending:** nothing has been verified visually in a browser. The mapper is now
   exercised against a verbatim slice of a real 5.1.0 document
   (`inferrix-gateway-schema.live.json` — six data source types, four locators, three detectors, all

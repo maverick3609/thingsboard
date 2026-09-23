@@ -135,6 +135,17 @@ export const gatewayCalendarRuleDayKey = (rule: GatewayCalendarRule): string | n
   rule?.dayOfWeek != null ? GATEWAY_SCHEDULE_DAYS[rule.dayOfWeek - 1] ?? null : null;
 
 /**
+ * Whether a schedule carries at least one change time anywhere.
+ *
+ * The gateway refuses one that does not -- HTTP 422, *"A schedule needs at least one time offset, in
+ * the weekly schedule or in an exception."* -- because a schedule that never changes state is one
+ * nothing can ever fire from. Both halves count: a week of empty days is valid as long as an
+ * exception carries a time.
+ */
+export const gatewayScheduleHasOffsets = (week: string[][], exceptions: string[][]): boolean =>
+  [...(week ?? []), ...(exceptions ?? [])].some(times => (times ?? []).length > 0);
+
+/**
  * A day's change times as one line of text, and back.
  *
  * A day is a short ordered list of times, which a comma-separated field expresses exactly — so

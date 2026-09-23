@@ -5,6 +5,7 @@ import { HttpClientTestingModule, HttpTestingController } from '@angular/common/
 import { InferrixGatewayService } from '@core/http/inferrix-gateway.service';
 import { GATEWAY_WILDCARD_DATE, GATEWAY_WILDCARD_DATE_RANGE, gatewayCalendarRuleDayKey,
   gatewayCalendarRuleLabel, gatewayDayText, gatewayDayTimes, gatewayScheduleDayValid,
+  gatewayScheduleHasOffsets,
   gatewayWeek } from '@shared/models/inferrix-gateway-schedule.models';
 import { gatewaySettingRows, gatewaySettingValue,
   gatewaySettingWithheld } from '@shared/models/inferrix-gateway-system.models';
@@ -172,6 +173,23 @@ describe('gateway schedule model', () => {
     expect(gatewayCalendarRuleDayKey({type: GATEWAY_WILDCARD_DATE, dayOfWeek: 7})).toBe('saturday');
     expect(gatewayCalendarRuleDayKey({type: GATEWAY_WILDCARD_DATE})).toBeNull();
     expect(gatewayCalendarRuleDayKey({type: GATEWAY_WILDCARD_DATE, dayOfWeek: 99})).toBeNull();
+  });
+});
+
+describe('a schedule the gateway will accept', () => {
+
+  // The gateway answers 422 "A schedule needs at least one time offset, in the weekly schedule or
+  // in an exception." Verified against stack 5.1.0 -- a schedule with an empty week and no
+  // exceptions is refused, the same payload with one day filled is created.
+  it('refuses a schedule with no change time anywhere', () => {
+    expect(gatewayScheduleHasOffsets([[], [], [], [], [], [], []], [])).toBe(false);
+    expect(gatewayScheduleHasOffsets([], [])).toBe(false);
+    expect(gatewayScheduleHasOffsets(null, null)).toBe(false);
+  });
+
+  it('accepts a time in the week or in an exception', () => {
+    expect(gatewayScheduleHasOffsets([[], ['08:00', '17:00'], [], [], [], [], []], [])).toBe(true);
+    expect(gatewayScheduleHasOffsets([[], [], [], [], [], [], []], [['09:00']])).toBe(true);
   });
 });
 

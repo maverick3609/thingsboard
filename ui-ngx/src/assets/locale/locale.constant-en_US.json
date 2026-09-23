@@ -4331,6 +4331,7 @@
       "schedule-error-alarm-level": "Alarm on failure",
       "weekly-schedule": "Weekly schedule",
       "weekly-schedule-hint": "Change times, comma-separated, earliest first. Each time switches the schedule between active and inactive, and the state carries over from the previous day \u2014 so 08:00, 17:00 is an active window only if the day began inactive. Leave a day empty for no change that day.",
+      "schedule-needs-offset": "A schedule needs at least one change time, in the week above or in an exception. The gateway refuses one that never changes state.",
       "day-times-invalid": "Times must be HH:mm and in increasing order",
       "day-sunday": "Sunday",
       "day-monday": "Monday",

@@ -11,3 +11,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `ed5240a62a` fix(gateway): lay the schema forms out like the gateway's own editor
 - [ ] `e59ab8f82e` fix(gateway): make the detector list load at all
 - [ ] `af724e12d0` fix(gateway): stop the forms nagging before they are touched
+- [ ] `ccb8071b18` feat(gateway): name a detector's type the way the gateway names it

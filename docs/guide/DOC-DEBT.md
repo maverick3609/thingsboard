@@ -9,3 +9,5 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [x] `e21455f4a8` fix(gateway): read the version the gateway actually reports
 - [ ] `36db410f6a` fix(controllers): stop the Draft/Active toggle being truncated
 - [ ] `ed5240a62a` fix(gateway): lay the schema forms out like the gateway's own editor
+- [ ] `e59ab8f82e` fix(gateway): make the detector list load at all
+- [ ] `af724e12d0` fix(gateway): stop the forms nagging before they are touched

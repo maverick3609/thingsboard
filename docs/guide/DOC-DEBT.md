@@ -15,3 +15,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `b5ea073a0f` fix(gateway): switch a schedule the same way its list does
 - [x] `68a03db4fb` feat(gateway): let an operator move a gateway to a new address
 - [ ] `9450fc6ae1` fix(gateway): let the broker address be repaired from Cortex
+- [ ] `254a310113` feat(gateway): provision a gateway's data sources onto the platform

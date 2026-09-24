@@ -4257,7 +4257,7 @@
       "sync-profiles": "Sync device profiles from the platform",
       "provisioning-hint": "Each data source becomes one device on the platform. Choose a device profile, then provision. The gateway queues the work and provisions one data source per minute, so a row moves to Provisioned shortly after — a profile cannot be changed later without deleting the device.",
       "provisioned-hint": "These data sources publish to the platform as devices. Unprovisioning deletes the publisher feeding a device, so its telemetry stops; the device itself may remain on the platform and have to be removed there.",
-      "unprovision-title": "Unprovision {name}?",
+      "unprovision-title": "Unprovision '{{name}}'?",
       "unprovision-text": "The publisher feeding this device will be deleted and its telemetry will stop. The device may remain on the platform and have to be removed there by hand.",
       "data-sources": "Data sources",
       "data-source": "Data source",

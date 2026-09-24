@@ -24,7 +24,7 @@
             {{ 'inferrix.gateway.provisioned' | translate }}
           </mat-button-toggle>
         </mat-button-toggle-group>
-        <mat-form-field class="tb-inline-field" subscriptSizing="dynamic">
+        <mat-form-field class="tb-inline-field tb-provisioning-search" subscriptSizing="dynamic">
           <mat-label translate>action.search</mat-label>
           <input matInput [ngModel]="textSearch" (ngModelChange)="search($event)">
         </mat-form-field>
@@ -35,7 +35,7 @@
             <mat-icon>sync</mat-icon>
           </button>
         }
-        <button mat-icon-button [disabled]="loading" (click)="reload()"
+        <button mat-icon-button [disabled]="loading" (click)="refresh()"
                 matTooltip="{{ 'action.refresh' | translate }}" matTooltipPosition="above">
           <mat-icon>refresh</mat-icon>
         </button>
@@ -97,7 +97,7 @@
               @if (isQueued(row)) {
                 <span class="tb-queued-label">{{ 'inferrix.gateway.queued' | translate }}</span>
               } @else if (!readonly) {
-                <button mat-stroked-button class="tb-mat-32" [disabled]="!canProvision(row)"
+                <button mat-stroked-button [disabled]="!canProvision(row)"
                         (click)="$event.stopPropagation(); provision(row)">
                   {{ 'inferrix.gateway.provision' | translate }}
                 </button>

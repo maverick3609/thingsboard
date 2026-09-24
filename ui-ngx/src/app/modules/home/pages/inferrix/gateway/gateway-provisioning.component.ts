@@ -84,6 +84,16 @@ export class GatewayProvisioningComponent extends GatewayListPanelComponent<Gate
   }
 
   /**
+   * The gateway answers 200 for a *queued* data source and never reports the outcome, so a row that
+   * failed on the gateway would go on reading "Queued" for as long as the tab stayed open. An
+   * explicit refresh forgets what this session queued: anything still listed here can be tried again.
+   */
+  refresh(): void {
+    this.queued.clear();
+    this.reload();
+  }
+
+  /**
    * @param sync re-read the platform's profiles into the gateway's copy first. That write is
    *             admin-only, so it is an explicit action and never part of opening the tab.
    */

@@ -56,3 +56,30 @@
   font-style: italic;
   opacity: 0.7;
 }
+
+/* The view switch shares the drawer toolbar with a title, a row count, a search field and two icon
+   buttons, and at Material's default size it does not fit in the ~730px a details drawer gives it.
+   The toggle group is what flex chose to shrink, so its second option came out clipped mid-word.
+   Size the group to the toolbar's own 32px controls and make the search field the thing that gives
+   way — the search box reads fine narrow, a half-printed option label does not. */
+:host ::ng-deep .tb-inline-toggle {
+  flex-shrink: 0;
+  height: 32px;
+
+  .mat-button-toggle-button {
+    height: 32px;
+  }
+
+  .mat-button-toggle-label-content {
+    padding: 0 10px;
+    font-size: 12px;
+    line-height: 30px;
+  }
+}
+
+/* Scoped to this tab's own search: the same stylesheet dresses the Data points toolbar, whose
+   inline field is a data source selector that has to stay wide enough to read a name in. */
+:host ::ng-deep .tb-provisioning-search {
+  min-width: 0;
+  max-width: 130px;
+}

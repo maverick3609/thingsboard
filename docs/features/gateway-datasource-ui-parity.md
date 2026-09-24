@@ -143,6 +143,32 @@ dictionary is a label source, not a mapping. The mapping has to come from the st
 which pair each `[(ngModel)]="model.<prop>"` with the exact `UIDICTIONARY.get('<key>')` in the
 same form field.
 
+### The point form is worse than the data source form
+
+This was measured last and should have been measured first. Opening one data point of a
+`VIRTUAL.DS` source on the live gateway renders **about thirty controls**. The stack's own form
+for the same point is **thirteen**, and they are not a subset — the stack leads with what the
+point is (name, xid, data type) and then the eight fields specific to a virtual point.
+
+`DataPointModel` carries ten configurable fields beyond identity: `enabled`, `deviceName`,
+`purgeOverride`, `purgePeriod`, `textRenderer`, `loggingPropertiesModel`, `readPermission`,
+`setPermission`, `settable`, `extendedName`. The stack's virtual point form shows **none** of
+them. Two — `textRenderer` and `loggingPropertiesModel` — are nested objects that expand into
+panels of their own, which is how ten fields become thirty controls: "Logging properties model"
+appears as a panel heading, which is a Java class name, above Tolerance, Discard extreme values,
+Discard low limit, Discard high limit and Cache size.
+
+One is a defect rather than noise. **`settable` is declared on both `DataPointModel` and on the
+locator**, so the form renders two switches with the same label writing two different fields, and
+the operator has no way to tell which one the gateway honours. Across all 100 points on the live
+gateway the two **always agree** — 56 false/false, 44 true/true, no mismatch — so the gateway
+derives one from the other and has never produced the disagreeing state the form allows an
+operator to save. The stack's own point form binds the locator's, so that is the one to keep and
+the model's is the one to drop.
+
+Locator sizes themselves are modest: `MODBUS.PL` 19 properties, `META.PL` 17, `VIRTUAL.PL` 15,
+median across all 61 is **6**. The point form's bulk is the shared model, not the protocol.
+
 ## Approach
 
 **Add a presentation layer over the existing schema-driven form. Do not write 50 components.**
@@ -191,8 +217,11 @@ the stack's own form for the same type, on the live gateway, before the phase cl
 - **G7.3 — the ten rich protocol layouts** Modbus IP and serial, SNMP, MQTT, BACnet IP and MSTP,
   OPC, scripting, HTTP JSON retriever, PoE lighting.
 - **G7.4 — the remaining small layouts** ~20 types, mostly four to eight fields.
-- **G7.5 — point locators** Same descriptor, same extractor, 61 types. Held until the data source
-  side is proven, because it is the same machinery and a mistake would be made twice.
+- **G7.5 — the point form** Raised in priority: it is further from the stack than any data source
+  form. Resolve the duplicate `settable` first, then group the shared `DataPointModel` machinery
+  (purge, text renderer, logging properties) the way G7.1 groups `alarmLevels`, so a point opens
+  on what it is rather than on how it is logged. The 61 locator layouts follow, same descriptor
+  and same extractor as the data source side.
 - **G7.6 — labels** Proxy allowlist for the dictionary route; per-field label key from the
   extractor; fall back to `humanise()` when the gateway has no entry. Labels then track the
   gateway's own build and language rather than a snapshot.

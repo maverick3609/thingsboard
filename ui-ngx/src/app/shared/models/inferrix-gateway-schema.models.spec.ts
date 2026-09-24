@@ -573,3 +573,70 @@ describe('saving a model built from a live gateway schema', () => {
     expect(cleared.clientId).toBe('');
   });
 });
+
+/**
+ * What the stack's own forms show first, and what they never show at all.
+ *
+ * Measured against stack 5.1.0: `alarmLevels` is declared on all 63 data source types and shown on
+ * none of them, `quantize` on 18 and likewise none. Both sort ahead of anything protocol-specific,
+ * so a form built straight from the schema opens on fields the gateway's own operator has never
+ * been shown. See docs/features/gateway-datasource-ui-parity.md.
+ */
+describe('stack presentation rules', () => {
+
+  const live = liveFixture as unknown as GatewaySchemaDocument;
+
+  it('moves the fields the stack never shows below the ones it does', () => {
+    const properties = schemaToFormProperties(live, 'dataSource', 'MODBUS_IP.DS');
+    const advanced = properties.filter(p => p.group);
+
+    expect(advanced.map(p => p.id)).toEqual(['alarmLevels', 'quantize']);
+    expect(new Set(advanced.map(p => p.group))).toEqual(new Set(['Advanced']));
+    // A group renders as its own panel wherever its first member appears, so tagging alone would
+    // still have put the panel at the top of the form.
+    const firstGrouped = properties.findIndex(p => p.group);
+    const lastPlain = properties.map(p => !!p.group).lastIndexOf(false);
+    expect(firstGrouped).toBeGreaterThan(lastPlain);
+  });
+
+  it('leaves a type with none of them ungrouped', () => {
+    const properties = schemaToFormProperties(live, 'pointLocator', 'MODBUS.PL');
+    expect(properties.some(p => p.group)).toBe(false);
+  });
+
+  it('names a period for what it is for, and its parts for what they are', () => {
+    const period = schemaToFormProperties(live, 'dataSource', 'MODBUS_IP.DS')
+      .find(p => p.id === 'timePeriod');
+
+    // The stack calls this "Polling Interval"; the schema calls it timePeriod.
+    expect(period.name).toBe('Polling interval');
+    // The same component is reached as maxBackOffPeriod too, so the child cannot say "polling".
+    expect((period as any).properties.map((p: FormProperty) => p.name))
+      .toEqual(['Period', 'Unit']);
+  });
+
+  it('carries the unit the property name leaves out', () => {
+    const properties = schemaToFormProperties(live, 'dataSource', 'MODBUS_IP.DS');
+    expect(properties.find(p => p.id === 'timeout').name).toBe('Timeout (ms)');
+    expect(properties.find(p => p.id === 'logIO').name).toBe('Log I/O');
+    // Not in the table: still derived from the property name.
+    expect(properties.find(p => p.id === 'retries').name).toBe('Retries');
+  });
+
+  it('does not answer a label lookup out of Object.prototype', () => {
+    // `PROPERTY_NAME` admits `constructor` and `toString`, and a plain object literal answers both
+    // from its prototype with a function -- which would be assigned as the field's label.
+    const hostile = {
+      families: {dataSource: {EVIL: {type: 'object', properties: {
+        constructor: {type: 'string'},
+        toString: {type: 'string'},
+        hasOwnProperty: {type: 'string'}
+      }}}},
+      components: {schemas: {}}
+    } as unknown as GatewaySchemaDocument;
+
+    for (const property of schemaToFormProperties(hostile, 'dataSource', 'EVIL')) {
+      expect(typeof property.name).toBe('string');
+    }
+  });
+});

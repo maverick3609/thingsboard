@@ -102,6 +102,9 @@ expect -f $D/ssh-run.exp $U $H "$PASS" '
 - **Never gate the restart on a `sudo` verify that can itself fail auth.** A false-negative check must not leave the service stopped. If a post-swap verify errors, still start the service, then diagnose.
 - **`psql` input vs sudo password.** `sudo -S` consumes stdin for the password; `psql < file` also wants stdin. Use `psql -f <file>` (copied to a `644` `/tmp` path readable by the `postgres` user) so they never collide.
 - **Checksum every upload** before swapping; a stalled/short scp is silent otherwise.
+- **scp does NOT truncate an existing larger file.** Uploading over a same-named file left from an earlier deploy writes the new bytes over the front and leaves the old file's tail attached. The result is a jar of the wrong length that java will load and fail on in ways that look like anything but a bad upload. Seen in production: a 637,634,046-byte jar under a 632,965,028-byte one, caught only by the md5 step. **Always scp to a name nothing occupies** (`tb-<sha>-boot.jar`), or `rm -f` the destination first. The tell while it runs: the destination size never starts at 0 and never changes.
+- **A stalled transfer is resumable, and resuming beats restarting** on a slow VPN. Verify the partial is a byte-exact prefix (`head -c N | md5sum` on both sides), then append the remainder in chunks, each chunk md5-verified remotely before `cat >>` and gated on `stat -c %s` equalling the expected offset so a retry cannot double-append.
+- **`rx_bytes` is not a progress signal** on a live server; its own traffic swamps the transfer. Poll the destination file's size instead.
 - **`expect -f <script>`**, not `./script` — avoids the executable-bit dependency (a missing `chmod +x` silently fails the transfer).
 
 ## Quick reference

@@ -31,6 +31,81 @@ export const SCHEMA_MAX_PROPERTIES = 200;
 const REF_PREFIX = '#/components/schemas/';
 
 /**
+ * Fields the stack's own forms never show, moved into their own section instead of dropped.
+ *
+ * `alarmLevels` is declared on all 63 data source types and `quantize` on 18, and both sort ahead
+ * of everything protocol-specific -- so every form in Cortex opened on one or two fields the
+ * gateway's own operator has never been shown. They are not dropped, because a gateway is not
+ * always reachable through its own UI and these are real settings; they are grouped, which puts
+ * them in a titled panel below the fields the operator came for.
+ */
+export const GATEWAY_ADVANCED_FIELDS = new Set(['alarmLevels', 'quantize']);
+
+/** Title of the panel {@link GATEWAY_ADVANCED_FIELDS} are collected into. */
+export const GATEWAY_ADVANCED_GROUP = 'Advanced';
+
+/**
+ * Where the stack's own label says more than the property name does.
+ *
+ * Measured, not guessed: of the 117 property names that appear in the gateway's own label
+ * dictionary, {@link humanise} already produces the stack's exact wording for 101. These are the
+ * rest. Most carry a unit or a base that the name omits and the operator cannot infer -- a
+ * Modbus `offset` typed 1-based silently reads the wrong register.
+ *
+ * Two are deliberately not the stack's string. Its `enabled` reads "Profile Push Enabled", which
+ * belongs to one platform-integration form and would be wrong on every data source, and it has no
+ * label at all for a nested period, which {@link NESTED_FIELD_LABELS} covers instead.
+ */
+const FIELD_LABELS: {[property: string]: string} = {
+  timePeriod: 'Polling interval',
+  timeout: 'Timeout (ms)',
+  offset: 'Offset (0-based)',
+  discardDataDelay: 'Discard data delay (ms)',
+  registerCount: 'Number of registers',
+  charset: 'Character encoding',
+  createSlaveMonitorPoints: 'Create device monitor points',
+  multipleWritesOnly: 'Use multiple write commands only',
+  contiguousBatches: 'Contiguous batches only',
+  maxRequestVars: 'Maximum vars per request',
+  privPassphrase: 'Privacy passphrase',
+  privProtocol: 'Privacy protocol',
+  brokerUri: 'Broker Url',
+  logIO: 'Log I/O',
+  maxHistoricalIOLogs: 'Max Historical IO Logs',
+  binary0Value: 'Binary 0 Value'
+};
+
+/**
+ * The same two names one level down, where they mean something narrower.
+ *
+ * `TimePeriod` is `{timePeriod, timePeriodType}` and is reached through more than one parent: as a
+ * data source's polling period, and as `maxBackOffPeriod`. Labelling the child "Polling interval"
+ * would read correctly under the first parent and wrongly under the second, so the child says what
+ * it is and the parent says what it is for.
+ */
+const NESTED_FIELD_LABELS: {[property: string]: string} = {
+  timePeriod: 'Period',
+  timePeriodType: 'Unit'
+};
+
+/**
+ * A label override, or null.
+ *
+ * Read through `hasOwnProperty` rather than indexed directly: `PROPERTY_NAME` admits `constructor`
+ * and `toString`, and a plain object literal answers both from its prototype with a function. That
+ * function would be assigned as the field's label, which is neither a string nor anything the
+ * escaping downstream expects.
+ */
+const overriddenLabel = (key: string, depth: number): string | null => {
+  const table = depth > 0 ? NESTED_FIELD_LABELS : FIELD_LABELS;
+  if (Object.prototype.hasOwnProperty.call(table, key)) {
+    return table[key];
+  }
+  return depth > 0 && Object.prototype.hasOwnProperty.call(FIELD_LABELS, key)
+    ? FIELD_LABELS[key] : null;
+};
+
+/**
  * A property name this mapper will render.
  *
  * The gateway's models are Java classes serialised by Jackson, so every real field name is plain
@@ -134,10 +209,21 @@ const propertiesOf = (schema: any, doc: GatewaySchemaDocument, depth: number,
   const properties = merged.properties ?? {};
   const required: string[] = Array.isArray(merged.required) ? merged.required : [];
 
-  return Object.keys(properties)
+  const mapped = Object.keys(properties)
     .filter(key => PROPERTY_NAME.test(key))
     .slice(0, SCHEMA_MAX_PROPERTIES)
     .map(key => toProperty(key, properties[key], required.includes(key), doc, depth, seen));
+  if (depth > 0) {
+    return mapped;
+  }
+  // A group renders as its own panel wherever its first member appears, so the advanced fields
+  // have to move to the end of the list and not merely be tagged. Only the top level is grouped:
+  // inside a fieldset a panel within a panel says nothing.
+  const advanced = mapped.filter(property => GATEWAY_ADVANCED_FIELDS.has(property.id));
+  return advanced.length
+    ? [...mapped.filter(property => !GATEWAY_ADVANCED_FIELDS.has(property.id)),
+       ...advanced.map(property => ({...property, group: GATEWAY_ADVANCED_GROUP}))]
+    : mapped;
 };
 
 /**
@@ -196,7 +282,7 @@ const toProperty = (key: string, raw: any, required: boolean, doc: GatewaySchema
                     depth: number, seen: Set<string>): FormProperty => {
   const base: FormProperty = {
     id: escapeCell(key),
-    name: humanise(key),
+    name: overriddenLabel(key, depth) ?? humanise(key),
     type: FormPropertyType.text,
     default: null,
     required

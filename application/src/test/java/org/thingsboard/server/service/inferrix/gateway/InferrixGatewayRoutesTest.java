@@ -422,6 +422,10 @@ class InferrixGatewayRoutesTest {
     @Test
     void thePlatformLinkIsReadableAndItsBrokerSettingsWritable() {
         assertTrue(InferrixGatewayRoutes.isAllowed("GET", "/v2/platform-integration/mqtt-configuration"));
+        // POST is the settings save and PUT only the on/off switch, so the broker address is
+        // repairable from Cortex only if both are here. A gateway whose platform moved dials a host
+        // that no longer answers, and PUT cannot say where to dial instead.
+        assertTrue(InferrixGatewayRoutes.isAllowed("POST", "/v2/platform-integration/mqtt-configuration"));
         assertTrue(InferrixGatewayRoutes.isAllowed("PUT", "/v2/platform-integration/mqtt-configuration"));
         assertTrue(InferrixGatewayRoutes.isAllowed("GET", "/v2/platform-integration/unprovisioned"));
         assertTrue(InferrixGatewayRoutes.isAllowed("GET", "/v2/platform-integration/provisioned"));

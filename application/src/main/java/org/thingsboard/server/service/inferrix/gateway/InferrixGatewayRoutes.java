@@ -195,7 +195,15 @@ public final class InferrixGatewayRoutes {
             // tenant-admin credential that stack recommendation R1 exists to remove, and the
             // device-profile writes create platform entities with it -- Cortex is the last place
             // that should make either easier to reach.
-            route("/v2/platform-integration/mqtt-configuration", "GET", "PUT"),
+            //
+            // POST /mqtt-configuration is the broker settings save, and PUT is only its on/off
+            // switch. Both are here because where the broker is reached is a property of the
+            // network rather than of the gateway -- the same reason a gateway's own management
+            // address is editable. A moved or renumbered platform leaves a gateway dialling a host
+            // that no longer answers, and without this the only repair is a hand-typed call on the
+            // gateway itself. The body carries no platform credential: the ThingsBoard tenant-admin
+            // login lives on /server-details, which stays excluded.
+            route("/v2/platform-integration/mqtt-configuration", "GET", "POST", "PUT"),
             route("/v2/platform-integration/server-details", "GET"),
             route("/v2/platform-integration/device-profile", "GET"),
             route("/v2/platform-integration/device-profile/sync", "GET"),

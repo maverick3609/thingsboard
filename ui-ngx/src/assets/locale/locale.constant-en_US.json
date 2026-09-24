@@ -4584,6 +4584,7 @@
         "trigger-on-poll": "On every poll",
         "trigger-retained": "Retained",
         "qos": "QoS",
+    "qos-hint": "How hard the broker tries to deliver: at most once is fire-and-forget, at least once is acknowledged and may repeat.",
         "publish-interval": "Publish interval (s)",
         "publish-interval-hint": "At least 1 when the interval trigger is set, otherwise 0.",
         "deadband": "Deadband",

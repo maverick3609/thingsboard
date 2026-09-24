@@ -328,10 +328,41 @@ export const POINT_SOURCES = [
   {value: 7, label: 'Peer controller'}
 ];
 
-/** The on-board DI, DO, AI and AO sources: no float format, and DI/DO take no scaling (firmware 0.1.16). */
 /** `POINT_SOURCES` value for a point read over Modbus RTU, the one source that names a query. */
 export const RTU_POINT_SOURCE = 4;
+
+/** The on-board DI, DO, AI and AO sources: no float format, and DI/DO take no scaling (firmware 0.1.16). */
 export const LOCAL_POINT_SOURCES = [0, 1, 2, 3];
+
+/** `POINT_SOURCES` value for a point read from another controller. Its `offset` is the peer id. */
+export const PEER_POINT_SOURCE = 7;
+
+/** The highest peer id `check_peers` accepts, and so the highest `offset` a peer point may carry. */
+export const MAX_PEER_ID = 3;
+
+/**
+ * The most local channels of one kind a channel picker will build a list for.
+ *
+ * The board reports its own `io` counts and the real ones are single digits, so this is not a
+ * product limit -- it is the bound on a number that arrives from the device. Without it a board
+ * answering `"di": 1000000000` would have the browser allocate a billion-entry option list.
+ */
+export const MAX_LOCAL_CHANNELS = 256;
+
+/**
+ * Which key of the controller's reported `io` object bounds each local source's channel index.
+ *
+ * `icc_verify` refuses a local point whose `source_ref` is `>= io->di` (or `dout`, `ai`, `ao` for
+ * the other three), so these are the counts that decide what the channel picker may offer. The
+ * names are the firmware's own, which is why `do` rather than `dout` — that is the key `/api/v1/info`
+ * reports, and `InferrixProvisionService.KIND_KEYS` reads the same four.
+ */
+export const LOCAL_SOURCE_IO_KEY: {[source: number]: string} = {0: 'di', 1: 'do', 2: 'ai', 3: 'ao'};
+
+/** What a channel of each local source is called on the board's own silkscreen. */
+export const LOCAL_SOURCE_CHANNEL_PREFIX: {[source: number]: string} =
+  {0: 'DI', 1: 'DO', 2: 'AI', 3: 'AO'};
+
 export const FLOAT_DATA_FORMATS = [4, 5];
 export const NO_SCALING = 65535;
 
@@ -383,6 +414,18 @@ export const BUS_FRAMINGS = [
  * Two of them are read-only on the wire, which is a rule the operator cannot see from the number:
  * a writable point may only sit on FC1 or FC3, and one on FC2 or FC4 fails the whole draft.
  */
+/**
+ * The two QoS levels the controller accepts.
+ *
+ * `icc_verify` rejects a policy with `qos > 1`, so QoS 2 is not offered: the firmware has no
+ * exactly-once path. The number stays in the label because it is what every MQTT tool shows, but
+ * the words are what say which one an operator wants.
+ */
+export const MQTT_QOS_LEVELS = [
+  {value: 0, label: 'At most once (QoS 0)'},
+  {value: 1, label: 'At least once (QoS 1)'}
+];
+
 export const MODBUS_FUNCTIONS = [
   {value: 3, label: 'FC3 \u2014 Read holding registers'},
   {value: 4, label: 'FC4 \u2014 Read input registers'},
@@ -753,7 +796,7 @@ export const CONTROLLER_CONFIG_SECTIONS: ControllerConfigSection[] = [
           {value: 8, label: 'inferrix.trigger-retained'}
         ]},
       {key: 'qos', label: 'inferrix.qos', type: 'select', required: true, defaultValue: 0,
-        options: [{value: 0, label: '0'}, {value: 1, label: '1'}]},
+        options: MQTT_QOS_LEVELS, hint: 'inferrix.qos-hint'},
       {key: 'interval_s', label: 'inferrix.publish-interval', type: 'number', min: 0, max: 65535,
         required: true, defaultValue: 0, hint: 'inferrix.publish-interval-hint'},
       {key: 'deadband_bits', label: 'inferrix.deadband', type: 'number', min: 0,

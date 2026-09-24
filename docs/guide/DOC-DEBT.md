@@ -17,3 +17,7 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `9450fc6ae1` fix(gateway): let the broker address be repaired from Cortex
 - [ ] `254a310113` feat(gateway): provision a gateway's data sources onto the platform
 - [ ] `4d0a10e54e` fix(gateway): make the provisioning tab readable and its dialog name the device
+- [ ] `392d2ccfd5` feat(inferrix): page the two dialog tables that could outgrow their dialog
+- [ ] `bc80c34043` feat(gateway): configure points inside their parent, and add publishers
+- [ ] `0a20f55230` feat(gateway): let the broker address be changed from Cortex
+- [ ] `5da7be3e66` feat(controller): choose every enumerated config value, and say why Apply failed

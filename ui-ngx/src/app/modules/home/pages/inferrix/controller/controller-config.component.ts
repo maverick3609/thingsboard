@@ -3,8 +3,8 @@
 import { ChangeDetectorRef, Component, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { PageEvent } from '@angular/material/paginator';
-import { forkJoin, from, of, Subscription, timer } from 'rxjs';
-import { catchError, concatMap, switchMap, takeUntil, takeWhile, tap } from 'rxjs/operators';
+import { forkJoin, from, Observable, of, Subscription, timer } from 'rxjs';
+import { catchError, concatMap, map, switchMap, takeUntil, takeWhile, tap } from 'rxjs/operators';
 import { TranslateService } from '@ngx-translate/core';
 import { DialogService } from '@core/services/dialog.service';
 import { InferrixControllerService } from '@core/http/inferrix-controller.service';
@@ -19,6 +19,7 @@ import {
   DATA_FORMATS,
   ICC_VERIFY_ERRORS,
   IccVerifyError,
+  LOCAL_SOURCE_IO_KEY,
   POINT_SOURCES
 } from '@shared/models/inferrix-controller.models';
 import { ControllerConfigRecordDialogComponent } from './controller-config-record-dialog.component';
@@ -64,6 +65,15 @@ export class ControllerConfigComponent extends ControllerPanelComponent implemen
   applyResult: string;
   /** What the verifier refused, and what to change about it. Null unless the last Apply failed. */
   applyFailure: {name: string; detail: IccVerifyError};
+  /**
+   * The board's own channel counts, from `/api/v1/info`, or null while unread.
+   *
+   * What bounds the channel picker on a local point: `icc_verify` refuses a local point whose
+   * `source_ref` is past the count for its kind, and the count is a property of the board rather
+   * than of the draft. Read once per visit to this tab, not per dialog -- a board does not grow
+   * channels between two edits.
+   */
+  ioCounts: {[kind: string]: number};
   /** Progress of a template read or write, both of which are one device call per step. */
   templateProgress: string;
   /** The local I/O provisioning job this tab started or found running, until the operator leaves. */
@@ -465,31 +475,63 @@ export class ControllerConfigComponent extends ControllerPanelComponent implemen
    * its field as the plain number input it has always been, rather than costing the operator the
    * whole dialog.
    */
+  /**
+   * The board's channel counts, read once and then reused.
+   *
+   * Best-effort on purpose: a controller that is unreachable, or old enough not to report `io`,
+   * leaves the channel field the plain number input it has always been rather than costing the
+   * operator the dialog.
+   */
+  private readIoCounts(): Observable<{[kind: string]: number}> {
+    if (this.ioCounts) {
+      return of(this.ioCounts);
+    }
+    return this.controllerService.proxy<any>(this.deviceId, 'GET', '/api/v1/info', null,
+      {ignoreErrors: true, ignoreLoading: true}).pipe(
+        map(info => {
+          const io = info?.io;
+          // Only a shape that actually carries the four counts is believed. A firmware that
+          // reports no `io` gets no picker, rather than a picker built on a guess.
+          this.ioCounts = io && LOCAL_SOURCE_IO_KEY[0] in io ? io : null;
+          return this.ioCounts;
+        }),
+        catchError(() => of(null)));
+  }
+
   private openRecord(record: any): void {
     const kinds = Array.from(new Set(this.section.fields
       .map(field => field.optionsFrom).filter(kind => !!kind)));
-    if (!kinds.length) {
+    // A local point names a channel on the board rather than a record in another section, so the
+    // points editor needs the board's counts as well as the sections it points at.
+    const needsIo = this.section.key === 'points';
+    if (!kinds.length && !needsIo) {
       this.showRecord(record, null);
       return;
     }
     this.loading = true;
-    forkJoin(Object.fromEntries(kinds.map(kind => {
+    const reads: {[key: string]: Observable<any>} = Object.fromEntries(kinds.map(kind => {
       const refSection = CONTROLLER_CONFIG_SECTIONS.find(candidate => candidate.key === kind);
       return [kind, refSection
         ? this.controllerService.readConfigSection(this.deviceId, refSection, this.showDraft)
             .pipe(catchError(() => of(null)))
         : of(null)];
-    }))).subscribe(refRecords => {
+    }));
+    if (needsIo) {
+      reads.__io = this.readIoCounts();
+    }
+    forkJoin(reads).subscribe(results => {
       this.loading = false;
-      this.showRecord(record, refRecords as {[section: string]: any[]});
+      const {__io: io, ...refRecords} = results as {[key: string]: any};
+      this.showRecord(record, refRecords as {[section: string]: any[]}, io);
     });
   }
 
-  private showRecord(record: any, refRecords: {[section: string]: any[]}): void {
+  private showRecord(record: any, refRecords: {[section: string]: any[]},
+                     ioCounts?: {[kind: string]: number}): void {
     this.dialog.open(ControllerConfigRecordDialogComponent, {
       disableClose: true,
       panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
-      data: {deviceId: this.deviceId, section: this.section, record, refRecords,
+      data: {deviceId: this.deviceId, section: this.section, record, refRecords, ioCounts,
              takenKeys: this.records.map(existing => Number(existing[this.section.idField]))}
     }).afterClosed().subscribe(saved => {
       if (saved) {

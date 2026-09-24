@@ -11,8 +11,10 @@ import { DialogComponent } from '@shared/components/dialog.component';
 import { InferrixControllerService } from '@core/http/inferrix-controller.service';
 import { bitsToFloat, COIL_FUNCTIONS, ControllerConfigSection, controllerRecordError,
   ControllerRefSection, ControllerSettingField, FLOAT_DATA_FORMATS, floatToBits,
-  FORMAT_WIDTH_REGISTERS, LOCAL_POINT_SOURCES, MAX_COUNT_BITS, MAX_COUNT_REGISTERS, nextFreeId,
-  NO_SCALING, READ_ONLY_FUNCTIONS, REF_SECTION_ID_FIELD, refOptionLabel,
+  FORMAT_WIDTH_REGISTERS, LOCAL_POINT_SOURCES, LOCAL_SOURCE_CHANNEL_PREFIX, LOCAL_SOURCE_IO_KEY,
+  MAX_COUNT_BITS, MAX_COUNT_REGISTERS, MAX_LOCAL_CHANNELS, MAX_PEER_ID, nextFreeId,
+  NO_SCALING, PEER_POINT_SOURCE,
+  READ_ONLY_FUNCTIONS, REF_SECTION_ID_FIELD, refOptionLabel,
   RTU_POINT_SOURCE } from '@shared/models/inferrix-controller.models';
 
 export interface ControllerConfigRecordDialogData {
@@ -24,6 +26,8 @@ export interface ControllerConfigRecordDialogData {
   refRecords?: {[section: string]: any[]};
   /** Keys already used in this section: what the id picker must not offer, and what autoId skips. */
   takenKeys?: number[];
+  /** The board's own channel counts, for a local point's channel picker. Absent if unread. */
+  ioCounts?: {[kind: string]: number};
 }
 
 /**
@@ -179,6 +183,38 @@ export class ControllerConfigRecordDialogComponent
       }
       this.refOptionsByKey[field.key] = options;
     });
+    this.addChannelOptions();
+  }
+
+  /**
+   * The channel picker for a local point.
+   *
+   * `source_ref` is a different quantity for every source: a query id on a Modbus point, a channel
+   * index on a local one, a remote point id on a peer one. For the four local sources the firmware
+   * bounds it by the board's own channel count -- `source_ref >= io->di` is `ICC_BAD_POINT` -- so
+   * the legal values are known exactly and there is nothing for the operator to type.
+   *
+   * Only offered when the board itself reported its counts. A board that did not answer keeps the
+   * number box: guessing its channel count from the platform's default profile would offer channels
+   * that may not exist, and hide ones that do. A count past {@link MAX_LOCAL_CHANNELS} is treated
+   * the same way -- it is the device's own number, and building a list from it unchecked is how a
+   * board that answers `"di": 1e9` locks the browser.
+   */
+  private addChannelOptions(): void {
+    if (!this.isPointSection) {
+      return;
+    }
+    const source = Number(this.recordForm.get('source')?.value);
+    const kind = LOCAL_SOURCE_IO_KEY[source];
+    const count = kind ? Number(this.data.ioCounts?.[kind]) : 0;
+    if (!kind || !Number.isInteger(count) || count <= 0 || count > MAX_LOCAL_CHANNELS) {
+      return;
+    }
+    const prefix = LOCAL_SOURCE_CHANNEL_PREFIX[source];
+    this.refOptionsByKey.source_ref = Array.from({length: count}, (unused, channel) =>
+      // The board is silkscreened from 1 and the wire format counts from 0, so both are shown:
+      // the operator is looking at a terminal marked DI1 while the record has to say 0.
+      ({value: channel, label: `${prefix}${channel + 1} (channel ${channel})`}));
   }
 
   /**
@@ -355,6 +391,13 @@ export class ControllerConfigRecordDialogComponent
    * while editing the record rather than when the whole draft is rejected.
    */
   private applySourceRules(source: number): void {
+    // On a peer point `offset` is not an offset at all -- it is the peer id, and `check_peers`
+    // refuses anything past 3. On every other source it addresses the query window and keeps its
+    // own much larger range.
+    const offset = this.recordForm.get('offset');
+    offset.setValidators([Validators.required, Validators.min(0),
+      Validators.max(source === PEER_POINT_SOURCE ? MAX_PEER_ID : 65535)]);
+    offset.updateValueAndValidity({emitEvent: false});
     const scaling = this.recordForm.get('scaling_idx');
     if (source === 0 || source === 1) {
       scaling.setValue(NO_SCALING);

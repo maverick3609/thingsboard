@@ -3,8 +3,8 @@
 import { ChangeDetectorRef, Component, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { PageEvent } from '@angular/material/paginator';
-import { from, Subscription, timer } from 'rxjs';
-import { concatMap, switchMap, takeUntil, takeWhile, tap } from 'rxjs/operators';
+import { forkJoin, from, of, Subscription, timer } from 'rxjs';
+import { catchError, concatMap, switchMap, takeUntil, takeWhile, tap } from 'rxjs/operators';
 import { TranslateService } from '@ngx-translate/core';
 import { DialogService } from '@core/services/dialog.service';
 import { InferrixControllerService } from '@core/http/inferrix-controller.service';
@@ -18,6 +18,7 @@ import {
   ControllerSettingField,
   DATA_FORMATS,
   ICC_VERIFY_ERRORS,
+  IccVerifyError,
   POINT_SOURCES
 } from '@shared/models/inferrix-controller.models';
 import { ControllerConfigRecordDialogComponent } from './controller-config-record-dialog.component';
@@ -61,6 +62,8 @@ export class ControllerConfigComponent extends ControllerPanelComponent implemen
   loading = false;
   error: string;
   applyResult: string;
+  /** What the verifier refused, and what to change about it. Null unless the last Apply failed. */
+  applyFailure: {name: string; detail: IccVerifyError};
   /** Progress of a template read or write, both of which are one device call per step. */
   templateProgress: string;
   /** The local I/O provisioning job this tab started or found running, until the operator leaves. */
@@ -110,6 +113,7 @@ export class ControllerConfigComponent extends ControllerPanelComponent implemen
   provisionLocalIo(): void {
     this.error = null;
     this.applyResult = null;
+    this.applyFailure = null;
     this.controllerService.provisionLocalIo(this.deviceId, {ignoreErrors: true}).subscribe({
       next: status => this.watchProvision(status),
       error: error => this.error = this.messageOf(error)
@@ -120,6 +124,7 @@ export class ControllerConfigComponent extends ControllerPanelComponent implemen
     this.section = section;
     this.columns = [...section.columns, 'actions'];
     this.applyResult = null;
+    this.applyFailure = null;
     this.reload();
   }
 
@@ -215,6 +220,7 @@ export class ControllerConfigComponent extends ControllerPanelComponent implemen
       this.loading = true;
       this.error = null;
       this.applyResult = null;
+      this.applyFailure = null;
       this.controllerService.applyConfig(this.deviceId).subscribe({
         next: result => {
           this.loading = false;
@@ -224,7 +230,7 @@ export class ControllerConfigComponent extends ControllerPanelComponent implemen
         },
         error: error => {
           this.loading = false;
-          this.error = this.applyError(error);
+          this.applyError(error);
         }
       });
     });
@@ -240,6 +246,7 @@ export class ControllerConfigComponent extends ControllerPanelComponent implemen
   saveAsTemplate(): void {
     this.error = null;
     this.applyResult = null;
+    this.applyFailure = null;
     const snapshot: {[sectionKey: string]: any[]} = {};
     let read = 0;
     this.templateProgress = this.translate.instant('inferrix.template-reading',
@@ -268,6 +275,7 @@ export class ControllerConfigComponent extends ControllerPanelComponent implemen
   applyTemplate(): void {
     this.error = null;
     this.applyResult = null;
+    this.applyFailure = null;
     this.openTemplateDialog('apply');
   }
 
@@ -387,7 +395,11 @@ export class ControllerConfigComponent extends ControllerPanelComponent implemen
       return this.flagsLabel(field, Number(value));
     }
     if (field?.type === 'select') {
-      return field.options?.find(option => option.value === value)?.label ?? String(value);
+      const label = field.options?.find(option => option.value === value)?.label;
+      // A column gets the mnemonic, not the explanation: "FC3", "8E1". The full label -- "FC3 —
+      // Read holding registers" -- is what the record dialog shows, where there is room for it
+      // and where the operator is choosing rather than scanning.
+      return label ? label.split(' \u2014 ')[0] : String(value);
     }
     if (key === 'source') {
       return POINT_SOURCES.find(option => option.value === value)?.label ?? String(value);
@@ -440,34 +452,40 @@ export class ControllerConfigComponent extends ControllerPanelComponent implemen
   }
 
   /**
-   * Opens the record editor, first fetching whatever section this one points at.
+   * Opens the record editor, first fetching every section this one points at.
    *
-   * A policy names a point and an RTU point names a query, and both are stored as a bare id. Typed
-   * by hand, a wrong one is only caught when the whole draft is applied — so the field is a picker,
-   * and the picker needs the other section's records. The read is best-effort: if it fails the
-   * dialog still opens and the field falls back to the plain number input it has always been.
+   * A query names a bus, a point names a query and a scaling, a policy names a point — all stored
+   * as bare ids. Typed by hand, a wrong one is only caught when the whole draft is applied, and
+   * the verifier answers with a class of record rather than a field. So each is a picker, and a
+   * picker needs the other section's records.
+   *
+   * Read together rather than in sequence: a points record pulls two sections, and the device
+   * answers one request at a time regardless — `forkJoin` at least does not add a round trip's
+   * latency per section on top. Each read is separately best-effort: a section that fails leaves
+   * its field as the plain number input it has always been, rather than costing the operator the
+   * whole dialog.
    */
   private openRecord(record: any): void {
-    const refKind = this.section.fields.find(field => field.optionsFrom)?.optionsFrom;
-    const refSection = refKind && CONTROLLER_CONFIG_SECTIONS.find(candidate => candidate.key === refKind);
-    if (!refSection) {
+    const kinds = Array.from(new Set(this.section.fields
+      .map(field => field.optionsFrom).filter(kind => !!kind)));
+    if (!kinds.length) {
       this.showRecord(record, null);
       return;
     }
     this.loading = true;
-    this.controllerService.readConfigSection(this.deviceId, refSection, this.showDraft).subscribe({
-      next: refRecords => {
-        this.loading = false;
-        this.showRecord(record, refRecords);
-      },
-      error: () => {
-        this.loading = false;
-        this.showRecord(record, null);
-      }
+    forkJoin(Object.fromEntries(kinds.map(kind => {
+      const refSection = CONTROLLER_CONFIG_SECTIONS.find(candidate => candidate.key === kind);
+      return [kind, refSection
+        ? this.controllerService.readConfigSection(this.deviceId, refSection, this.showDraft)
+            .pipe(catchError(() => of(null)))
+        : of(null)];
+    }))).subscribe(refRecords => {
+      this.loading = false;
+      this.showRecord(record, refRecords as {[section: string]: any[]});
     });
   }
 
-  private showRecord(record: any, refRecords: any[]): void {
+  private showRecord(record: any, refRecords: {[section: string]: any[]}): void {
     this.dialog.open(ControllerConfigRecordDialogComponent, {
       disableClose: true,
       panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
@@ -481,18 +499,26 @@ export class ControllerConfigComponent extends ControllerPanelComponent implemen
   }
 
   /**
-   * An apply rejection carries the verifier's own error name, which is the only thing that says
-   * what is actually wrong with the draft; the HTTP status alone says nothing useful.
+   * An apply rejection carries the verifier's own error name and nothing else.
+   *
+   * That name is the only thing that says what is wrong with the draft — the HTTP status says
+   * nothing, and the device names neither the record nor the field, because `icc_verify()` returns
+   * the first violated rule and stops. So the name is expanded into what it means and what to go
+   * and change, and the two are kept apart rather than run into one string: the fix is a list, and
+   * an operator reads down a list and stops at the line that describes their draft.
    */
-  private applyError(error: any): string {
+  private applyError(error: any): void {
     const name = error?.error?.error;
     if (name === 'swap_in_progress') {
-      return this.translate.instant('inferrix.apply-swap-in-progress');
+      this.error = this.translate.instant('inferrix.apply-swap-in-progress');
+      return;
     }
-    if (name && ICC_VERIFY_ERRORS[name]) {
-      return `${name} — ${ICC_VERIFY_ERRORS[name]}`;
+    const detail = name && ICC_VERIFY_ERRORS[name];
+    if (detail) {
+      this.applyFailure = {name, detail};
+      return;
     }
-    return name ? `${name}` : this.messageOf(error);
+    this.error = name ? `${name}` : this.messageOf(error);
   }
 
 }

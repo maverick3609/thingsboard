@@ -21,8 +21,18 @@
   <div mat-dialog-content>
     <fieldset class="tb-form-panel no-border no-padding" [disabled]="isLoading$ | async">
       <div class="tb-error-message" *ngIf="errorMessage">{{ errorMessage }}</div>
-      <ng-container *ngFor="let field of section.fields">
-        <div class="tb-form-row column-xs">
+      <div class="tb-error-message" *ngIf="sectionFull">
+        {{ 'inferrix.section-full' | translate: {limit: section.limit} }}
+      </div>
+      <ng-container *ngFor="let field of visibleFields">
+        <!-- An allocated id is shown, not offered. The operator has nothing to decide here and
+             every number they could type is either taken or out of range. -->
+        <div class="tb-form-row space-between" *ngIf="field.autoId && isAdd">
+          <div class="fixed-title-width"
+               tb-hint-tooltip-icon="{{ field.hint ? (field.hint | translate) : '' }}">{{ field.label | translate }}</div>
+          <div>{{ allocatedId ?? '—' }}</div>
+        </div>
+        <div class="tb-form-row column-xs" *ngIf="!(field.autoId && isAdd)">
           <div class="fixed-title-width" [class.tb-required]="field.required"
                tb-hint-tooltip-icon="{{ field.hint ? (field.hint | translate) : '' }}">{{ field.label | translate }}</div>
           <div *ngIf="field.type === 'flags'" class="flex flex-1 flex-row flex-wrap items-center gap-4">
@@ -46,8 +56,7 @@
             <mat-select [formControlName]="field.key">
               <mat-option *ngFor="let option of refs" [value]="option.value">{{ option.label }}</mat-option>
             </mat-select>
-            <mat-hint *ngIf="!refs.length">{{ (field.optionsFrom === 'points'
-              ? 'inferrix.no-free-points' : 'inferrix.no-queries') | translate }}</mat-hint>
+            <mat-hint *ngIf="!refs.length">{{ emptyRefHint(field) | translate }}</mat-hint>
           </mat-form-field>
           <mat-form-field *ngIf="!refOptions(field) && (field.type === 'text' || field.type === 'number')"
                           class="flex-1" appearance="outline" subscriptSizing="dynamic">
@@ -70,6 +79,15 @@
           <mat-icon>warning</mat-icon>
           <span>{{ writableOutputWarning | translate }}</span>
         </div>
+        <!-- Both of these are draft-wide verifier rules that Apply reports only as
+             ICC_BAD_POINT, naming neither the field nor the query. Said here, where the operator
+             can still see what they picked. -->
+        <div *ngIf="field.key === 'flags' && writableQueryWarning" class="tb-error-message">
+          {{ writableQueryWarning | translate }}
+        </div>
+        <div *ngIf="field.key === 'offset' && offsetOverrun" class="tb-error-message">
+          {{ 'inferrix.offset-overruns-query' | translate: {over: offsetOverrun} }}
+        </div>
       </ng-container>
     </fieldset>
   </div>
@@ -82,7 +100,7 @@
     </button>
     <button mat-raised-button color="primary"
             type="submit"
-            [disabled]="(isLoading$ | async) || recordForm.invalid">
+            [disabled]="(isLoading$ | async) || recordForm.invalid || sectionFull">
       {{ 'action.save' | translate }}
     </button>
   </div>

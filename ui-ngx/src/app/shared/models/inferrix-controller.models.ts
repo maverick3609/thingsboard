@@ -185,7 +185,23 @@ export interface ControllerSettingField {
    * The field holds another section's key, so it is picked from that section's records rather than
    * typed. A wrong id here is only caught at Apply, by which point the operator has left the field.
    */
-  optionsFrom?: 'points' | 'queries';
+  optionsFrom?: ControllerRefSection;
+  /**
+   * The platform picks this record's id: the lowest free one in the section.
+   *
+   * Only ever on a `keyField`. An id is a number with no meaning of its own — nothing reads it but
+   * the records that point at it — so typing one is a chance to collide with an existing record
+   * (which silently overwrites it, since a write is an upsert) or to pick one that is over the
+   * section's range. Neither mistake tells the operator anything at the time it is made.
+   */
+  autoId?: boolean;
+  /**
+   * Sent with its default and never shown.
+   *
+   * For a field the firmware stores and never reads. It cannot be dropped — a record write is a
+   * full record — but an input for it is an input whose only possible effect is to be wrong.
+   */
+  hidden?: boolean;
   /**
    * Prefilled when adding a record. Every config field is required on a full-record write, so a
    * field with an obvious value (no flags, no scaling, QoS 0) needs one or the operator has to type
@@ -290,6 +306,16 @@ export interface ControllerConfigSection {
   limit: number;
 }
 
+/**
+ * The sections a field can pick an id out of.
+ *
+ * Every one of these is a number the operator used to type. The firmware resolves each against the
+ * named section at Apply and rejects the whole draft when one does not resolve, so a typo here
+ * costs a round trip to the device and a verifier error that names a class of record rather than a
+ * field.
+ */
+export type ControllerRefSection = 'buses' | 'queries' | 'points' | 'scalings';
+
 /** §5.1 source classes. */
 export const POINT_SOURCES = [
   {value: 0, label: 'Local DI'},
@@ -316,6 +342,73 @@ export const NO_SCALING = 65535;
 export const isRealPoint = (point: {scaling_idx?: number; data_format?: number}): boolean =>
   Number(point.scaling_idx) !== NO_SCALING || FLOAT_DATA_FORMATS.includes(Number(point.data_format));
 
+/**
+ * Baud rates offered for an RS-485 bus.
+ *
+ * The firmware imposes no list — it passes `baud` straight to the UART — so this is the standard
+ * ladder rather than a constraint, and it exists because a mistyped rate is a bus that never
+ * answers and reports nothing more specific than a timeout. 19200 is the devicetree default the
+ * board falls back to when a bus record carries no baud.
+ */
+/**
+ * The only five the verifier accepts.
+ *
+ * `check_referential_integrity()` switches on `b.baud` and returns `ICC_BAD_BUS` for anything else,
+ * so the slower standard rates — 1200, 2400, 4800 — are not "unusual but allowed", they are a draft
+ * the controller refuses without naming the field.
+ */
+export const BUS_BAUD_RATES = [9600, 19200, 38400, 57600, 115200]
+  .map(baud => ({value: baud, label: String(baud)}));
+
+/**
+ * The `framing` byte: low nibble parity, high nibble stop bits (`rtu_poller.c`).
+ *
+ * The verifier treats the byte as opaque and the poller maps anything it does not recognise onto
+ * 8E1, so a wrong value here is not rejected — it silently runs at the Modbus default and the bus
+ * either works or does not. These six are every combination the poller actually decodes.
+ */
+export const BUS_FRAMINGS = [
+  {value: 0x01, label: '8E1 \u2014 even parity, 1 stop bit (Modbus default)'},
+  {value: 0x00, label: '8N1 \u2014 no parity, 1 stop bit'},
+  {value: 0x02, label: '8O1 \u2014 odd parity, 1 stop bit'},
+  {value: 0x11, label: '8E2 \u2014 even parity, 2 stop bits'},
+  {value: 0x10, label: '8N2 \u2014 no parity, 2 stop bits'},
+  {value: 0x12, label: '8O2 \u2014 odd parity, 2 stop bits'}
+];
+
+/**
+ * The four function codes the RTU poller implements; the verifier rejects anything else outright
+ * (`icc_verify.c`: `q.function < 1 || q.function > 4`).
+ *
+ * Two of them are read-only on the wire, which is a rule the operator cannot see from the number:
+ * a writable point may only sit on FC1 or FC3, and one on FC2 or FC4 fails the whole draft.
+ */
+export const MODBUS_FUNCTIONS = [
+  {value: 3, label: 'FC3 \u2014 Read holding registers'},
+  {value: 4, label: 'FC4 \u2014 Read input registers'},
+  {value: 1, label: 'FC1 \u2014 Read coils'},
+  {value: 2, label: 'FC2 \u2014 Read discrete inputs'}
+];
+
+/** Function codes whose objects are bits rather than registers, and whose points must be `Bit`. */
+export const COIL_FUNCTIONS = [1, 2];
+
+/** Function codes that are read-only on the wire: a writable point on one fails the draft. */
+export const READ_ONLY_FUNCTIONS = [2, 4];
+
+/** Modbus's own per-request ceilings, which the verifier enforces as `count`'s maximum. */
+export const MAX_COUNT_BITS = 2000;
+export const MAX_COUNT_REGISTERS = 125;
+
+/** The verifier's floors for a query's timing (`icc_verify.c` rule 2). */
+export const MIN_POLL_INTERVAL_MS = 100;
+export const MIN_QUERY_TIMEOUT_MS = 10;
+
+/** How many registers one data format occupies inside a query window. */
+export const FORMAT_WIDTH_REGISTERS: {[format: number]: number} = {
+  0: 1, 1: 1, 2: 2, 3: 2, 4: 2, 5: 2, 6: 1
+};
+
 /** §5.2 data formats. */
 export const DATA_FORMATS = [
   {value: 0, label: 'U16'},
@@ -327,27 +420,143 @@ export const DATA_FORMATS = [
   {value: 6, label: 'Bit'}
 ];
 
-/** §6.4 verifier rejections, so an apply failure reads as something other than a number. */
-export const ICC_VERIFY_ERRORS: {[name: string]: string} = {
-  ICC_LIMITS: 'The draft is over a count or size limit.',
-  ICC_TOO_SHORT: 'The compiled config is malformed.',
-  ICC_BAD_MAGIC: 'The compiled config is malformed.',
-  ICC_BAD_FORMAT_VER: 'The controller firmware is too old for this config format.',
-  ICC_BAD_FLAGS: 'A record carries a flag the firmware does not know.',
-  ICC_BAD_CRC: 'The compiled config failed its checksum.',
-  ICC_RUNTIME_TOO_OLD: 'The controller firmware is too old for this config.',
-  ICC_WRONG_PROFILE: 'This config was built for a different device profile.',
-  ICC_BAD_SECTIONS: 'The compiled config is malformed.',
-  ICC_BAD_BUS: 'A query references a bus that does not exist.',
-  ICC_BAD_QUERY: 'A point references a query that does not exist, or a query is invalid.',
-  ICC_BAD_POINT: 'A point record is invalid for its source class.',
-  ICC_BAD_EXPORT: 'A point is exported in a way the firmware cannot serve.',
-  ICC_BAD_SCALING: 'A point references a scaling that does not exist.',
-  ICC_BUS_OVERSUBSCRIBED: 'The queries on one bus ask for more traffic than its baud rate allows.',
-  ICC_BAD_POLICY: 'A publish policy is invalid — check the trigger bits against interval_s.',
-  ICC_BAD_PEER: 'A peer-source point references a peer_id that is not in the peer table.',
-  ICC_BAD_LOCAL_POINT: 'A local I/O point is invalid: DI and DO points take no scaling, no local point takes a '
-    + 'float format, and an AO scaling needs a non-zero multiplier.'
+/**
+ * What one verifier rejection means, and what to go and change.
+ *
+ * The device answers an Apply with a single enum name and nothing else — not the record, not the
+ * field, not the rule. That is all the firmware has: `icc_verify()` returns the first violation it
+ * finds and the REST layer hands the name straight back. So the name has to be turned into
+ * something actionable here, and `fix` is the part that matters: every line is a rule from
+ * `lib/icc/icc_verify.c`, written as the thing to check rather than the thing that is wrong.
+ *
+ * Kept as data rather than one long translated paragraph per error so the list renders as a list —
+ * an operator reads down it and stops at the line that describes their draft.
+ */
+export interface IccVerifyError {
+  /** One sentence naming the defect. */
+  what: string;
+  /** What to check, most likely cause first. */
+  fix: string[];
+}
+
+export const ICC_VERIFY_ERRORS: {[name: string]: IccVerifyError} = {
+  ICC_LIMITS: {
+    what: 'The draft holds more records than the controller can store.',
+    fix: ['Each section shows its own limit beside its record count: 2 buses, 64 queries, '
+      + '1024 points, 64 scalings, 1024 publish policies, 4 peers.',
+      'Delete what the draft no longer uses, then apply again.']
+  },
+  ICC_TOO_SHORT: {
+    what: 'The compiled configuration is malformed.',
+    fix: ['Nothing in the draft causes this. Discard the draft and rebuild it, and report it if '
+      + 'a rebuilt draft fails the same way.']
+  },
+  ICC_BAD_MAGIC: {
+    what: 'The compiled configuration is malformed.',
+    fix: ['Nothing in the draft causes this. Discard the draft and rebuild it, and report it if '
+      + 'a rebuilt draft fails the same way.']
+  },
+  ICC_BAD_SECTIONS: {
+    what: 'The compiled configuration is malformed.',
+    fix: ['Nothing in the draft causes this. Discard the draft and rebuild it, and report it if '
+      + 'a rebuilt draft fails the same way.']
+  },
+  ICC_BAD_CRC: {
+    what: 'The compiled configuration failed its own checksum.',
+    fix: ['Apply again — a single corrupted transfer fails this way and the next one usually '
+      + 'succeeds.',
+      'If it keeps failing, discard the draft and rebuild it.']
+  },
+  ICC_BAD_FORMAT_VER: {
+    what: 'The controller\'s firmware is older than the configuration format this draft needs.',
+    fix: ['Update the firmware from the Software tab.',
+      'Peer records and publish policies are the two features that raise the format version; a '
+      + 'draft without them will apply to older firmware.']
+  },
+  ICC_RUNTIME_TOO_OLD: {
+    what: 'The controller\'s firmware is too old for something in this configuration.',
+    fix: ['Update the firmware from the Software tab.']
+  },
+  ICC_WRONG_PROFILE: {
+    what: 'This configuration was built for a different kind of device.',
+    fix: ['A configuration saved from another controller model does not fit this one. Apply a '
+      + 'template taken from a controller of the same model, or build the draft here.']
+  },
+  ICC_BAD_FLAGS: {
+    what: 'A record carries a flag this firmware does not know.',
+    fix: ['Update the firmware from the Software tab: the draft uses a flag a newer release added.']
+  },
+  ICC_BAD_BUS: {
+    what: 'A bus record is invalid, or two buses share an id.',
+    fix: ['Baud rate must be one of 9600, 19200, 38400, 57600 or 115200. No other rate is '
+      + 'accepted, including the slower standard ones.',
+      'Open Buses and check that no two rows have the same Bus id.',
+      'This board has one RS-485 port, which is bus 0. A second bus record compiles but has no '
+      + 'hardware behind it, and every query on it will time out.']
+  },
+  ICC_BAD_QUERY: {
+    what: 'A query is invalid, or names a bus that is not in the draft.',
+    fix: ['Bus: every query\'s bus must exist in the Buses section.',
+      'Function code: only FC1, FC2, FC3 and FC4 are supported.',
+      'Count: 1 to 125 registers for FC3 and FC4, 1 to 2000 bits for FC1 and FC2.',
+      'Window: first register + count must not pass 65536.',
+      'Poll interval: at least 100 ms. Timeout: at least 10 ms.',
+      'Query id: no two queries may share one.']
+  },
+  ICC_BAD_POINT: {
+    what: 'A point is invalid for the source it reads from.',
+    fix: ['Modbus points: the data format must match the query\'s function code — Bit on FC1 and '
+      + 'FC2, a register format on FC3 and FC4.',
+      'Modbus points: Offset plus the format\'s width must fit inside the query\'s count. A '
+      + '32-bit or float format occupies two registers.',
+      'Writable Modbus points must sit on FC1 or FC3. FC2 and FC4 are read-only on the wire.',
+      'Writable is only valid on a local DO, a local AO, a Modbus point or a peer point.',
+      'Local points: the channel number must exist on this board.',
+      'Point id: no two points may share one.']
+  },
+  ICC_BAD_SCALING: {
+    what: 'A point names a scaling that is not in the draft.',
+    fix: ['Open Scalings and check the scaling ids that exist, then reopen the point and pick one '
+      + 'of them.',
+      'A point that needs no conversion should be set to No scaling, not to a spare id.']
+  },
+  ICC_BAD_EXPORT: {
+    what: 'A point is exported in a way the firmware cannot serve.',
+    fix: ['Two exports claim overlapping registers, or an export is marked writable on a point '
+      + 'that is not writable.']
+  },
+  ICC_BUS_OVERSUBSCRIBED: {
+    what: 'The queries on one bus ask for more time than its slowest poll interval allows.',
+    fix: ['The budget is the SMALLEST poll interval on the bus, not each query\'s own. Raising '
+      + 'one query\'s interval changes nothing while a faster query is still on the bus.',
+      'Cost per query is (frame time + timeout) x (1 + retries), summed over every query on the '
+      + 'bus. The timeout dominates: at 9600 baud a 2-register read is about 24 ms of frame '
+      + 'against a 200 ms timeout.',
+      'Cheapest fixes in order: cut the timeouts, drop retries on tolerant points, raise every '
+      + 'interval on the bus, merge adjacent registers into one query.',
+      'The full arithmetic is in docs/features/controller-modbus-bus-budget.md.']
+  },
+  ICC_BAD_POLICY: {
+    what: 'A publish policy is invalid.',
+    fix: ['Trigger: at least one of Interval, On change or On poll must be ticked. Retained on its '
+      + 'own is a modifier, not a trigger.',
+      'Publish interval must be 1 or more when Interval is ticked, and exactly 0 when it is not.',
+      'On poll only works on a Modbus point.',
+      'Deadband must be zero or positive, and a real number.',
+      'At most one policy per point.']
+  },
+  ICC_BAD_PEER: {
+    what: 'A peer point names a peer that is not in the peer table.',
+    fix: ['Open Peers and check which peer ids exist, then reopen the point.',
+      'A peer id must be 0 to 3, and its UID must be the peer controller\'s own 24-character '
+      + 'hex UID.']
+  },
+  ICC_BAD_LOCAL_POINT: {
+    what: 'A point on this board\'s own inputs or outputs is invalid.',
+    fix: ['Local DI and DO points take no scaling — set Scaling to No scaling.',
+      'No local point may use a float format; those are for Modbus registers.',
+      'A scaling used by a local AO needs a non-zero multiplier.']
+  }
 };
 
 /**
@@ -401,17 +610,43 @@ export const bitsToFloat = (bits: number): number => {
 
 const HEX_24 = /^[0-9a-f]{24}$/;
 
+/** The id field each referenced section is keyed by. */
+export const REF_SECTION_ID_FIELD: {[section: string]: string} = {
+  buses: 'bus_id', queries: 'query_id', points: 'point_id', scalings: 'idx'
+};
+
 /**
- * How one referenced record reads in a picker. A query has no name of its own, so it is described by
- * what it polls; a point has one, and the id still shows because that is what the device stores.
+ * How one referenced record reads in a picker.
+ *
+ * Each is described by what it *is* rather than by its number, because the number is the thing the
+ * operator cannot check. A query has no name of its own, so it is described by what it polls; a
+ * scaling by the arithmetic it performs; a point has a name and the id still shows, because that
+ * is what the device stores and what the other sections refer to it by.
  */
-export function refOptionLabel(kind: 'points' | 'queries', record: any): string {
-  if (kind === 'queries') {
-    const from = Number(record.start_reg);
-    const to = from + Number(record.count) - 1;
-    return `#${record.query_id} \u00b7 unit ${record.unit_id} \u00b7 FC${record.function} \u00b7 reg ${from}-${to}`;
+export function refOptionLabel(kind: ControllerRefSection, record: any): string {
+  switch (kind) {
+    case 'buses': {
+      const framing = BUS_FRAMINGS.find(option => option.value === Number(record.framing));
+      // Just the mnemonic: the picker is a line, not a legend.
+      const shape = framing ? framing.label.split(' ')[0] : `framing ${record.framing}`;
+      return `#${record.bus_id} \u00b7 ${record.baud} baud \u00b7 ${shape}`;
+    }
+    case 'queries': {
+      const from = Number(record.start_reg);
+      const to = from + Number(record.count) - 1;
+      const fc = MODBUS_FUNCTIONS.find(option => option.value === Number(record.function));
+      const code = fc ? fc.label.split(' ')[0] : `FC${record.function}`;
+      return `#${record.query_id} \u00b7 unit ${record.unit_id} \u00b7 ${code} \u00b7 reg ${from}-${to}`;
+    }
+    case 'scalings': {
+      const offset = Number(record.offset);
+      const sign = offset < 0 ? '\u2212' : '+';
+      return `#${record.idx} \u00b7 \u00d7${record.multiplier} \u00f7${record.divisor} `
+        + `${sign}${Math.abs(offset)}`;
+    }
+    default:
+      return `#${record.point_id} \u00b7 ${record.name ?? ''}`.trim();
   }
-  return `#${record.point_id} \u00b7 ${record.name ?? ''}`.trim();
 }
 
 export const CONTROLLER_CONFIG_SECTIONS: ControllerConfigSection[] = [
@@ -421,13 +656,13 @@ export const CONTROLLER_CONFIG_SECTIONS: ControllerConfigSection[] = [
     columns: ['bus_id', 'mode', 'baud', 'framing'],
     fields: [
       {key: 'bus_id', label: 'inferrix.bus-id', type: 'number', min: 0, max: 255,
-        required: true, keyField: true},
+        required: true, keyField: true, autoId: true, hint: 'inferrix.bus-id-hint'},
       {key: 'mode', label: 'inferrix.bus-mode', type: 'select', required: true,
         defaultValue: 0, options: [{value: 0, label: 'Modbus RTU'}]},
-      {key: 'baud', label: 'inferrix.bus-baud', type: 'number', min: 0, max: 4294967295,
-        required: true},
-      {key: 'framing', label: 'inferrix.bus-framing', type: 'number', min: 0, max: 255,
-        required: true, hint: 'inferrix.bus-framing-hint'}
+      {key: 'baud', label: 'inferrix.bus-baud', type: 'select', required: true,
+        defaultValue: 9600, options: BUS_BAUD_RATES},
+      {key: 'framing', label: 'inferrix.bus-framing', type: 'select', required: true,
+        defaultValue: 1, options: BUS_FRAMINGS, hint: 'inferrix.bus-framing-hint'}
     ]
   },
   {
@@ -436,22 +671,27 @@ export const CONTROLLER_CONFIG_SECTIONS: ControllerConfigSection[] = [
     columns: ['query_id', 'bus_id', 'unit_id', 'function', 'start_reg', 'count', 'interval_ms'],
     fields: [
       {key: 'query_id', label: 'inferrix.query-id', type: 'number', min: 0, max: 65535,
-        required: true, keyField: true},
-      {key: 'bus_id', label: 'inferrix.bus-id', type: 'number', min: 0, max: 255, required: true},
-      {key: 'unit_id', label: 'inferrix.unit-id', type: 'number', min: 0, max: 255, required: true},
-      {key: 'function', label: 'inferrix.function-code', type: 'number', min: 0, max: 255,
-        required: true},
+        required: true, keyField: true, autoId: true},
+      {key: 'bus_id', label: 'inferrix.bus-id', type: 'number', min: 0, max: 255, required: true,
+        optionsFrom: 'buses'},
+      {key: 'unit_id', label: 'inferrix.unit-id', type: 'number', min: 0, max: 255, required: true,
+        hint: 'inferrix.unit-id-hint'},
+      {key: 'function', label: 'inferrix.function-code', type: 'select', required: true,
+        defaultValue: 3, options: MODBUS_FUNCTIONS, hint: 'inferrix.function-code-hint'},
+      // Stored and never read: `icc_build` writes the byte, nothing in the firmware looks at it
+      // and the verifier does not check it. Sent as 0 rather than typed.
       {key: 'flags', label: 'inferrix.flags', type: 'number', min: 0, max: 255, required: true,
-        defaultValue: 0},
+        defaultValue: 0, hidden: true},
       {key: 'start_reg', label: 'inferrix.start-register', type: 'number', min: 0, max: 65535,
-        required: true},
-      {key: 'count', label: 'inferrix.register-count', type: 'number', min: 0, max: 65535,
-        required: true},
-      {key: 'interval_ms', label: 'inferrix.poll-interval', type: 'number', min: 0,
-        max: 4294967295, required: true},
-      {key: 'timeout_ms', label: 'inferrix.timeout', type: 'number', min: 0, max: 65535,
-        required: true},
-      {key: 'retries', label: 'inferrix.retries', type: 'number', min: 0, max: 255, required: true}
+        required: true, hint: 'inferrix.start-register-hint'},
+      {key: 'count', label: 'inferrix.register-count', type: 'number', min: 1, max: 2000,
+        required: true, defaultValue: 1, hint: 'inferrix.register-count-hint'},
+      {key: 'interval_ms', label: 'inferrix.poll-interval', type: 'number', min: 100,
+        max: 4294967295, required: true, defaultValue: 2000, hint: 'inferrix.poll-interval-hint'},
+      {key: 'timeout_ms', label: 'inferrix.timeout', type: 'number', min: 10, max: 65535,
+        required: true, defaultValue: 200, hint: 'inferrix.timeout-hint'},
+      {key: 'retries', label: 'inferrix.retries', type: 'number', min: 0, max: 255, required: true,
+        defaultValue: 1, hint: 'inferrix.retries-hint'}
     ]
   },
   {
@@ -460,18 +700,19 @@ export const CONTROLLER_CONFIG_SECTIONS: ControllerConfigSection[] = [
     columns: ['point_id', 'name', 'source', 'data_format', 'source_ref', 'offset', 'scaling_idx'],
     fields: [
       {key: 'point_id', label: 'inferrix.point-id', type: 'number', min: 0, max: 65535,
-        required: true, keyField: true, hint: 'inferrix.point-id-hint'},
+        required: true, keyField: true, autoId: true, hint: 'inferrix.point-id-hint'},
       {key: 'name', label: 'inferrix.point-name', type: 'text', maxLength: 15, required: true},
       {key: 'source', label: 'inferrix.point-source', type: 'select', options: POINT_SOURCES,
         required: true},
-      {key: 'data_format', label: 'inferrix.data-format', type: 'select', options: DATA_FORMATS,
-        required: true},
       {key: 'source_ref', label: 'inferrix.source-ref', type: 'number', min: 0, max: 65535,
         required: true, hint: 'inferrix.source-ref-hint', optionsFrom: 'queries'},
+      {key: 'data_format', label: 'inferrix.data-format', type: 'select', options: DATA_FORMATS,
+        required: true, hint: 'inferrix.data-format-hint'},
       {key: 'offset', label: 'inferrix.point-offset', type: 'number', min: 0, max: 65535,
         required: true, hint: 'inferrix.point-offset-hint'},
       {key: 'scaling_idx', label: 'inferrix.scaling-idx', type: 'number', min: 0, max: 65535,
-        required: true, defaultValue: 65535, hint: 'inferrix.scaling-idx-hint'},
+        required: true, defaultValue: NO_SCALING, hint: 'inferrix.scaling-idx-hint',
+        optionsFrom: 'scalings'},
       {key: 'flags', label: 'inferrix.flags', type: 'flags', required: true, defaultValue: 0,
         bits: [{value: 1, label: 'inferrix.flag-writable'}, {value: 2, label: 'inferrix.flag-refresh'}]},
       {key: 'refresh_s', label: 'inferrix.refresh-interval', type: 'number', min: 0, max: 65535,
@@ -484,10 +725,11 @@ export const CONTROLLER_CONFIG_SECTIONS: ControllerConfigSection[] = [
     columns: ['idx', 'multiplier', 'divisor', 'offset'],
     fields: [
       {key: 'idx', label: 'inferrix.scaling-id', type: 'number', min: 0, max: 65534,
-        required: true, keyField: true, hint: 'inferrix.scaling-id-hint'},
-      {key: 'multiplier', label: 'inferrix.multiplier', type: 'number', required: true},
+        required: true, keyField: true, autoId: true, hint: 'inferrix.scaling-id-hint'},
+      {key: 'multiplier', label: 'inferrix.multiplier', type: 'number', required: true,
+        defaultValue: 1},
       {key: 'divisor', label: 'inferrix.divisor', type: 'number', required: true,
-        hint: 'inferrix.divisor-hint'},
+        defaultValue: 1, hint: 'inferrix.divisor-hint'},
       {key: 'offset', label: 'inferrix.scaling-offset', type: 'number', required: true,
         defaultValue: 0}
     ]
@@ -497,9 +739,13 @@ export const CONTROLLER_CONFIG_SECTIONS: ControllerConfigSection[] = [
     crudPath: 'mqtt-policies', idField: 'point_id', limit: 1024,
     columns: ['point_id', 'trigger', 'qos', 'interval_s', 'deadband_bits'],
     fields: [
+      // Not autoId: a policy's key is the point it publishes, so it is chosen rather than
+      // allocated. The picker offers only points that have no policy yet -- the device allows one
+      // each, and a second would be refused at Apply as ICC_BAD_POLICY.
       {key: 'point_id', label: 'inferrix.point-id', type: 'number', min: 0, max: 65535,
         required: true, keyField: true, optionsFrom: 'points'},
-      {key: 'trigger', label: 'inferrix.trigger', type: 'flags', required: true, defaultValue: 0,
+      {key: 'trigger', label: 'inferrix.trigger', type: 'flags', required: true, defaultValue: 2,
+        hint: 'inferrix.trigger-hint',
         bits: [
           {value: 1, label: 'inferrix.trigger-interval'},
           {value: 2, label: 'inferrix.trigger-on-change'},
@@ -520,12 +766,35 @@ export const CONTROLLER_CONFIG_SECTIONS: ControllerConfigSection[] = [
     columns: ['peer_id', 'uid'],
     fields: [
       {key: 'peer_id', label: 'inferrix.peer-id', type: 'number', min: 0, max: 3,
-        required: true, keyField: true},
+        required: true, keyField: true, autoId: true},
       {key: 'uid', label: 'inferrix.peer-uid', type: 'text', maxLength: 24, required: true,
         pattern: HEX_24, hint: 'inferrix.peer-uid-hint'}
     ]
   }
 ];
+
+/**
+ * The id the platform gives a new record: the lowest the section does not already hold.
+ *
+ * Lowest free rather than one past the highest, so ids stay dense and reusable after a delete —
+ * which matters for buses (two) and peers (four), where "one past the highest" would run out with
+ * free slots still in the table. Points need no ordering help: the device inserts a point into its
+ * sorted position, so the verifier's strictly-ascending rule holds whichever free id is used.
+ *
+ * Returns null when the section is full, which is the caller's signal to refuse the add rather
+ * than send a record the device would reject with a 409.
+ */
+export const nextFreeId = (section: ControllerConfigSection, taken: number[]): number => {
+  const used = new Set((taken ?? []).map(Number));
+  const field = section.fields.find(candidate => candidate.key === section.idField);
+  const ceiling = field?.max ?? 65535;
+  for (let id = field?.min ?? 0; id <= ceiling; id++) {
+    if (!used.has(id)) {
+      return id;
+    }
+  }
+  return null;
+};
 
 /**
  * A saved controller configuration, as the picker lists it.

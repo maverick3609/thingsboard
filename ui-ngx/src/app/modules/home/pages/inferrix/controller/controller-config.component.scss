@@ -31,3 +31,33 @@
   white-space: nowrap;
   text-align: right;
 }
+
+/* An apply rejection is the one message on this screen the operator has to act on, so it gets a
+   panel rather than the single red line every other failure shares. */
+.tb-apply-failure {
+  margin-bottom: 8px;
+
+  .tb-apply-failure-what {
+    font-weight: 500;
+    padding: 4px 0;
+  }
+
+  .tb-apply-failure-fixes {
+    margin: 0;
+    padding-inline-start: 20px;
+
+    li {
+      padding: 2px 0;
+      line-height: 1.4;
+    }
+  }
+
+  /* The verifier's own name for the rejection. Last and quiet: it is what a bug report quotes,
+     not what an operator reads. */
+  .tb-apply-failure-code {
+    padding-top: 6px;
+    font-family: monospace;
+    font-size: 11px;
+    opacity: 0.6;
+  }
+}

@@ -66,6 +66,24 @@
     <mat-progress-bar color="warn" mode="indeterminate" *ngIf="loading || templateProgress"></mat-progress-bar>
     <div class="tb-form-panel-hint" *ngIf="templateProgress">{{ templateProgress }}</div>
     <div class="tb-error-message" *ngIf="error">{{ error }}</div>
+    <!--
+      An apply rejection, expanded. The device sends one enum name and no record, so the panel has
+      to carry the whole explanation: what the verifier refused, and the rules to check the draft
+      against. The list is the useful half -- it is read until a line matches, which is faster than
+      re-deriving the rule from the name.
+    -->
+    <div class="tb-form-panel stroked tb-apply-failure" *ngIf="applyFailure">
+      <div class="tb-form-panel-title flex items-center gap-2">
+        <mat-icon color="warn">error_outline</mat-icon>
+        <span>{{ 'inferrix.apply-failed' | translate }}</span>
+      </div>
+      <div class="tb-apply-failure-what">{{ applyFailure.detail.what }}</div>
+      <div class="tb-form-panel-hint" translate>inferrix.apply-failed-check</div>
+      <ul class="tb-apply-failure-fixes">
+        <li *ngFor="let line of applyFailure.detail.fix">{{ line }}</li>
+      </ul>
+      <div class="tb-apply-failure-code">{{ applyFailure.name }}</div>
+    </div>
     <div class="tb-form-panel-hint" *ngIf="applyResult">{{ applyResult }}</div>
     <ng-container *ngIf="provision" [ngSwitch]="provision.state">
       <div class="tb-form-panel-hint" *ngSwitchCase="'RUNNING'">

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Component, Inject } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { PageEvent } from '@angular/material/paginator';
 import { Router } from '@angular/router';
 import { Store } from '@ngrx/store';
 import { TranslateService } from '@ngx-translate/core';
@@ -42,6 +43,12 @@ export class ControllerTemplateDialogComponent extends DialogComponent<Controlle
   readonly columns = ['name', 'holds', 'createdTime', 'actions'];
 
   templates: ControllerTemplateSummary[] = [];
+  /** What this picker offers, and the slice of it on screen. Both follow the list, in `load`. */
+  offered: ControllerTemplateSummary[] = [];
+  pagedOffered: ControllerTemplateSummary[] = [];
+  readonly pageSizeOptions = [10, 20, 50, 100];
+  pageSize = 10;
+  pageIndex = 0;
   name = '';
   loading = false;
   errorMessage: string;
@@ -61,13 +68,6 @@ export class ControllerTemplateDialogComponent extends DialogComponent<Controlle
     return this.data.mode === 'save';
   }
 
-  /** A logic picker offers only templates that hold a program, and a config picker only those with records. */
-  get offered(): ControllerTemplateSummary[] {
-    return this.data.kind === 'logic'
-      ? this.templates.filter(template => template.hasLogic)
-      : this.templates.filter(template => template.recordCount > 0);
-  }
-
   /** Saving over an existing name replaces it, so the operator is told before it happens. */
   get replaces(): boolean {
     const name = this.name.trim();
@@ -79,6 +79,12 @@ export class ControllerTemplateDialogComponent extends DialogComponent<Controlle
     this.controllerService.getControllerTemplates({ignoreErrors: true}).subscribe({
       next: templates => {
         this.templates = templates || [];
+        // A logic picker offers only templates that hold a program, a config picker only those
+        // with records.
+        this.offered = this.data.kind === 'logic'
+          ? this.templates.filter(template => template.hasLogic)
+          : this.templates.filter(template => template.recordCount > 0);
+        this.slicePage();
         this.loading = false;
       },
       error: error => {
@@ -135,8 +141,25 @@ export class ControllerTemplateDialogComponent extends DialogComponent<Controlle
     });
   }
 
+  pageChanged(event: PageEvent): void {
+    this.pageIndex = event.pageIndex;
+    this.pageSize = event.pageSize;
+    this.slicePage();
+  }
+
   cancel(): void {
     this.dialogRef.close(null);
+  }
+
+  /**
+   * Deleting the last template on the last page would otherwise leave the operator looking at an
+   * empty table with no way back, so the index comes down with the list.
+   */
+  private slicePage(): void {
+    const lastPage = Math.max(0, Math.ceil(this.offered.length / this.pageSize) - 1);
+    this.pageIndex = Math.min(this.pageIndex, lastPage);
+    const start = this.pageIndex * this.pageSize;
+    this.pagedOffered = this.offered.slice(start, start + this.pageSize);
   }
 
   private messageOf(error: any): string {

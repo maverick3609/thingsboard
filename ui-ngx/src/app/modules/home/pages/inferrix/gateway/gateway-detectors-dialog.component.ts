@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Component, Inject } from '@angular/core';
 import { MatDialog, MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { PageEvent } from '@angular/material/paginator';
 import { Router } from '@angular/router';
 import { Store } from '@ngrx/store';
 import { forkJoin, of } from 'rxjs';
@@ -26,7 +27,11 @@ export interface GatewayDetectorsDialogData {
   readonly: boolean;
 }
 
-/** More detectors than any one point has; a page control here would be furniture. */
+/**
+ * One read, then paged here. More detectors than any one point has, so the gateway is asked once
+ * and the page control works on what came back -- which is also what lets the name column sort,
+ * since the gateway cannot order by a field that lives inside the detector's JSON blob.
+ */
 const DETECTORS_PER_POINT = 100;
 
 /**
@@ -52,12 +57,17 @@ export class GatewayDetectorsDialogComponent
   extends DialogComponent<GatewayDetectorsDialogComponent, boolean> {
 
   detectors: GatewayEventDetector[] = [];
+  /** The slice on screen. */
+  pagedDetectors: GatewayEventDetector[] = [];
   types: GatewayTypeOption[] = [];
   loading = false;
   error: string;
   changed = false;
 
   readonly displayedColumns = ['name', 'detectorType', 'alarmLevel', 'handlers', 'actions'];
+  readonly pageSizeOptions = [10, 20, 50, 100];
+  pageSize = 10;
+  pageIndex = 0;
 
   private schemas: GatewaySchemaDocument;
 
@@ -105,14 +115,22 @@ export class GatewayDetectorsDialogComponent
       next: page => {
         this.detectors = (page?.items ?? [])
           .sort((left, right) => (left.name ?? '').localeCompare(right.name ?? ''));
+        this.slicePage();
         this.loading = false;
       },
       error: error => {
         this.error = gatewayErrorMessage(error);
         this.detectors = [];
+        this.pagedDetectors = [];
         this.loading = false;
       }
     });
+  }
+
+  pageChanged(event: PageEvent): void {
+    this.pageIndex = event.pageIndex;
+    this.pageSize = event.pageSize;
+    this.slicePage();
   }
 
   add(type: GatewayTypeOption): void {
@@ -149,6 +167,17 @@ export class GatewayDetectorsDialogComponent
 
   close(): void {
     this.dialogRef.close(this.changed);
+  }
+
+  /**
+   * Deleting the last detector on the last page would otherwise leave the operator looking at an
+   * empty table with no way back, so the index comes down with the list.
+   */
+  private slicePage(): void {
+    const lastPage = Math.max(0, Math.ceil(this.detectors.length / this.pageSize) - 1);
+    this.pageIndex = Math.min(this.pageIndex, lastPage);
+    const start = this.pageIndex * this.pageSize;
+    this.pagedDetectors = this.detectors.slice(start, start + this.pageSize);
   }
 
   private load(): void {

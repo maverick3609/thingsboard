@@ -16,3 +16,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [x] `68a03db4fb` feat(gateway): let an operator move a gateway to a new address
 - [ ] `9450fc6ae1` fix(gateway): let the broker address be repaired from Cortex
 - [ ] `254a310113` feat(gateway): provision a gateway's data sources onto the platform
+- [ ] `4d0a10e54e` fix(gateway): make the provisioning tab readable and its dialog name the device

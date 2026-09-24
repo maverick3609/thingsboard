@@ -8,21 +8,9 @@
   <div class="tb-entity-table-content tb-outlined-border flex flex-1 flex-col">
     <mat-toolbar class="mat-mdc-table-toolbar">
       <div class="mat-toolbar-tools">
-        <!--
-          The scope, not a filter. A gateway carries thousands of points; the list is always the
-          points of one data source, so the device pages a few dozen rows instead of all of them.
-        -->
-        <mat-form-field class="tb-inline-field" subscriptSizing="dynamic">
-          <mat-label translate>inferrix.gateway.data-source</mat-label>
-          <mat-select [ngModel]="selectedDataSource"
-                      (ngModelChange)="dataSourceChanged($event)">
-            @for (dataSource of dataSources; track dataSource.xid) {
-              <mat-option [value]="dataSource">{{ dataSource.name }}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
+        <span class="tb-entity-table-title pr-5">{{ 'inferrix.gateway.publishers' | translate }}</span>
         @if (!loading) {
-          <span class="tb-entity-table-info pl-3">
+          <span class="tb-entity-table-info">
             {{ 'inferrix.gateway.rows-count' | translate: {total: total} }}
           </span>
         }
@@ -31,14 +19,17 @@
           <mat-label translate>action.search</mat-label>
           <input matInput [ngModel]="textSearch" (ngModelChange)="search($event)">
         </mat-form-field>
-        @if (!readonly && selectedDataSource) {
-          <button mat-icon-button (click)="add()" [disabled]="!locatorType"
-                  matTooltip="{{ (locatorType ? 'inferrix.gateway.add-data-point'
-                                              : 'inferrix.gateway.add-data-point-needs-sibling')
-                                 | translate }}"
+        @if (!readonly && addableTypes.length) {
+          <button mat-icon-button [matMenuTriggerFor]="typeMenu"
+                  matTooltip="{{ 'inferrix.gateway.add-publisher' | translate }}"
                   matTooltipPosition="above">
             <mat-icon>add</mat-icon>
           </button>
+          <mat-menu #typeMenu="matMenu">
+            @for (type of addableTypes; track type.type) {
+              <button mat-menu-item (click)="add(type)">{{ type.name || type.type }}</button>
+            }
+          </mat-menu>
         }
         <button mat-icon-button [disabled]="loading" (click)="reload()"
                 matTooltip="{{ 'action.refresh' | translate }}" matTooltipPosition="above">
@@ -63,9 +54,9 @@
           </th>
           <td mat-cell *matCellDef="let row">{{ row.name }}</td>
         </ng-container>
-        <ng-container matColumnDef="dataType">
-          <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.gateway.point-data-type' | translate }}</th>
-          <td mat-cell *matCellDef="let row">{{ row.pointLocator?.dataType }}</td>
+        <ng-container matColumnDef="modelType">
+          <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.gateway.model-kind' | translate }}</th>
+          <td mat-cell *matCellDef="let row">{{ row.modelType }}</td>
         </ng-container>
         <ng-container matColumnDef="xid">
           <th mat-header-cell mat-sort-header="xid" *matHeaderCellDef>
@@ -73,27 +64,13 @@
           </th>
           <td mat-cell *matCellDef="let row">{{ row.xid }}</td>
         </ng-container>
-        <!--
-          Filled only when asked. The gateway has no bulk point-value endpoint, so a column that
-          populated itself would be one call per visible row to a small edge box.
-        -->
-        <ng-container matColumnDef="value">
-          <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.gateway.point-value' | translate }}</th>
-          <td mat-cell *matCellDef="let row">
-            @if (values[row.xid]?.loading) {
-              <mat-spinner diameter="16" strokeWidth="2"></mat-spinner>
-            } @else if (values[row.xid]) {
-              <span [matTooltip]="values[row.xid].timestamp | date: 'yyyy-MM-dd HH:mm:ss'"
-                    matTooltipPosition="above">{{ values[row.xid].text }}</span>
-            } @else {
-              <button mat-icon-button class="tb-mat-32"
-                      (click)="$event.stopPropagation(); readValue(row)"
-                      matTooltip="{{ 'inferrix.gateway.read-point-value' | translate }}"
-                      matTooltipPosition="above">
-                <mat-icon>speed</mat-icon>
-              </button>
-            }
-          </td>
+        <!-- The publisher read carries its points inline, so this count costs nothing extra and
+             tells the operator which publishers are actually wired to anything. -->
+        <ng-container matColumnDef="points">
+          <th mat-header-cell *matHeaderCellDef>
+            {{ 'inferrix.gateway.published-points' | translate }}
+          </th>
+          <td mat-cell *matCellDef="let row">{{ row.points?.length || 0 }}</td>
         </ng-container>
         <ng-container matColumnDef="enabled">
           <th mat-header-cell *matHeaderCellDef>{{ 'inferrix.gateway.enabled' | translate }}</th>
@@ -106,15 +83,8 @@
         <ng-container matColumnDef="actions">
           <th mat-header-cell *matHeaderCellDef></th>
           <td mat-cell *matCellDef="let row">
-            <button mat-icon-button class="tb-mat-32"
-                    (click)="$event.stopPropagation(); detectors(row)"
-                    matTooltip="{{ 'inferrix.gateway.detectors' | translate }}"
-                    matTooltipPosition="above">
-              <mat-icon>notifications_active</mat-icon>
-            </button>
             @if (!readonly) {
-              <button mat-icon-button class="tb-mat-32"
-                      (click)="$event.stopPropagation(); delete(row)"
+              <button mat-icon-button class="tb-mat-32" (click)="$event.stopPropagation(); delete(row)"
                       matTooltip="{{ 'action.delete' | translate }}" matTooltipPosition="above">
                 <mat-icon>delete</mat-icon>
               </button>
@@ -126,10 +96,8 @@
             class="tb-pointer" (click)="edit(row)"></tr>
       </table>
       @if (!loading && !error && rows.length === 0) {
-        <span class="no-data-found flex items-center justify-center">
-          {{ (selectedDataSource ? 'inferrix.gateway.no-data-points'
-                                 : 'inferrix.gateway.no-data-sources') | translate }}
-        </span>
+        <span class="no-data-found flex items-center justify-center"
+              translate>inferrix.gateway.no-publishers</span>
       }
     </div>
     @if (total > 0) {

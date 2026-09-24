@@ -73,6 +73,101 @@
     } @else if (data.locatorMissing) {
       <div class="tb-form-hint" translate>inferrix.gateway.no-locator-schema</div>
     }
+
+    <!--
+      The points of this model, edited here rather than in a list of their own. A child write goes
+      straight to the gateway -- there is no route that saves a parent and its points together --
+      so the hint is not decoration: Cancel below does not undo anything done in this table.
+    -->
+    @if (data.children) {
+      <div class="tb-gateway-children tb-controller-table">
+        <div class="mat-toolbar-tools tb-gateway-children-toolbar">
+          <span class="tb-entity-table-title pr-5">{{ data.children.title }}</span>
+          <span class="tb-entity-table-info">
+            {{ 'inferrix.gateway.rows-count' | translate: {total: data.children.rows.length} }}
+          </span>
+          <span class="flex-1"></span>
+          @if (!data.children.readonly && !data.children.needsSaveFirst) {
+            <button mat-stroked-button type="button" (click)="data.children.add()">
+              <mat-icon>add</mat-icon>
+              {{ 'inferrix.gateway.add-point' | translate }}
+            </button>
+          }
+        </div>
+        @if (data.children.needsSaveFirst) {
+          <div class="tb-form-hint" translate>inferrix.gateway.points-after-save</div>
+        } @else {
+          <div class="tb-form-hint" translate>inferrix.gateway.points-save-immediately</div>
+          <table mat-table [dataSource]="data.children.rows">
+            <ng-container matColumnDef="name">
+              <th mat-header-cell *matHeaderCellDef>
+                {{ 'inferrix.gateway.model-name' | translate }}
+              </th>
+              <td mat-cell *matCellDef="let row">{{ row.name }}</td>
+            </ng-container>
+            <ng-container matColumnDef="detail">
+              <th mat-header-cell *matHeaderCellDef>
+                {{ data.children.detailHeader }}
+              </th>
+              <td mat-cell *matCellDef="let row">{{ data.children.detail(row) }}</td>
+            </ng-container>
+            <ng-container matColumnDef="value">
+              <th mat-header-cell *matHeaderCellDef>
+                {{ 'inferrix.gateway.point-value' | translate }}
+              </th>
+              <td mat-cell *matCellDef="let row">
+                <span>{{ data.children.value(row) }}</span>
+                <button mat-icon-button type="button" class="tb-mat-32"
+                        (click)="$event.stopPropagation(); data.children.readValue(row)"
+                        matTooltip="{{ 'inferrix.gateway.read-point-value' | translate }}"
+                        matTooltipPosition="above">
+                  <mat-icon>refresh</mat-icon>
+                </button>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="enabled">
+              <th mat-header-cell *matHeaderCellDef>
+                {{ 'inferrix.gateway.enabled' | translate }}
+              </th>
+              <td mat-cell *matCellDef="let row">
+                <mat-slide-toggle class="mat-slide" [checked]="row.enabled"
+                                  [disabled]="data.children.readonly"
+                                  (click)="$event.stopPropagation()"
+                                  (change)="data.children.toggle(row, $event.checked)">
+                </mat-slide-toggle>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef></th>
+              <td mat-cell *matCellDef="let row">
+                @for (action of data.children.rowActions; track action.icon) {
+                  <button mat-icon-button type="button" class="tb-mat-32"
+                          (click)="$event.stopPropagation(); action.run(row)"
+                          matTooltip="{{ action.tooltip }}" matTooltipPosition="above">
+                    <mat-icon>{{ action.icon }}</mat-icon>
+                  </button>
+                }
+                @if (!data.children.readonly) {
+                  <button mat-icon-button type="button" class="tb-mat-32"
+                          (click)="$event.stopPropagation(); data.children.delete(row)"
+                          matTooltip="{{ 'action.delete' | translate }}"
+                          matTooltipPosition="above">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                }
+              </td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="childColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: childColumns"
+                class="tb-pointer" (click)="data.children.edit(row)"></tr>
+          </table>
+          @if (!data.children.rows.length) {
+            <span class="no-data-found flex items-center justify-center"
+                  translate>inferrix.gateway.no-data-points</span>
+          }
+        }
+      </div>
+    }
   </div>
   <div mat-dialog-actions class="flex flex-row items-center justify-end">
     <button mat-button type="button" (click)="cancel()">

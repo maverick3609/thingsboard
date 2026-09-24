@@ -10,6 +10,53 @@ import { DialogComponent } from '@shared/components/dialog.component';
 import { FormProperty, FormPropertyType } from '@shared/models/dynamic-form.models';
 import { GatewayRecipient } from '@shared/models/inferrix-gateway-event.models';
 
+
+/**
+ * A table of child rows rendered under the model's own form.
+ *
+ * This is what replaces the points tab. A data source's points and a publisher's published points
+ * both arrive with their parent and are meaningless without it, so they are edited where they
+ * live rather than in a flat list the operator has to filter back down to one parent.
+ *
+ * **Children are written the moment they are edited, not when the parent form is saved.** The
+ * gateway has no route that saves a parent and its children together -- points go to their own
+ * endpoint, and a parent save that carried them would have them ignored. So `rows` is owned by the
+ * caller and mutated in place as each child write returns, and the dialog says as much on screen:
+ * cancelling the parent form does not undo a point that was already changed.
+ */
+export interface GatewayModelChildren {
+  title: string;
+  /** The rows on screen. Owned and kept current by the component that opened this dialog. */
+  rows: any[];
+  /** What a row's second column shows -- the point it reads, or its data type -- and its header. */
+  detail: (row: any) => string;
+  detailHeader: string;
+  readonly: boolean;
+  /** Shown instead of the table until the parent exists, since a child needs its parent's xid. */
+  needsSaveFirst: boolean;
+  add: () => void;
+  edit: (row: any) => void;
+  delete: (row: any) => void;
+  toggle: (row: any, enabled: boolean) => void;
+  /**
+   * Reads one row's live value, when the rows have one.
+   *
+   * Set for a data source's points and left unset for a publisher's, which have no value of their
+   * own. The column appears only when this does: the gateway has no bulk point-value endpoint, so
+   * a column that filled itself would be one request per visible row against a small edge box.
+   */
+  readValue?: (row: any) => void;
+  /** What the value column shows for a row that has been read. */
+  value?: (row: any) => string;
+  /**
+   * Extra per-row buttons, beside delete.
+   *
+   * A data point's event detectors are the case that needs it: they hang off the point rather than
+   * off the data source, so they are reached from the point's row and nowhere else.
+   */
+  rowActions?: {icon: string; tooltip: string; run: (row: any) => void}[];
+}
+
 export interface GatewayModelDialogData {
   title: string;
   /** The model as the gateway serialised it, or a bare `{modelType}` when adding. */
@@ -32,6 +79,8 @@ export interface GatewayModelDialogData {
   carriedFields?: {id: string; note: string}[];
   /** Why this dialog is read-only, when the reason is the model rather than the user's authority. */
   readonlyNote?: string;
+  /** Rows belonging to this model, edited inline. See {@link GatewayModelChildren}. */
+  children?: GatewayModelChildren;
 }
 
 /**
@@ -57,6 +106,13 @@ export class GatewayModelDialogComponent
   extends DialogComponent<GatewayModelDialogComponent, any> {
 
   readonly isAdd: boolean;
+
+  /** The value column is offered only for rows that have a value to read. */
+  get childColumns(): string[] {
+    return this.data.children?.readValue
+      ? ['name', 'detail', 'value', 'enabled', 'actions']
+      : ['name', 'detail', 'enabled', 'actions'];
+  }
 
   identityForm: UntypedFormGroup;
   values: {[id: string]: any};

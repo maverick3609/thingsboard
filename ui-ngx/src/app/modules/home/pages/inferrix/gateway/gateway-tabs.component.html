@@ -25,12 +25,12 @@
                                [deviceId]="gateway.id.id"></tb-gateway-data-sources>
     }
   </mat-tab>
-  <mat-tab label="{{ 'inferrix.gateway.tab-data-points' | translate }}" #dataPointsTab="matTab">
+  <mat-tab label="{{ 'inferrix.gateway.tab-publishers' | translate }}" #publishersTab="matTab">
     @for (gateway of [entity]; track gateway.id.id) {
-      <tb-gateway-data-points class="flex min-h-full flex-col"
-                              [active]="dataPointsTab.isActive"
-                              [readonly]="readonly"
-                              [deviceId]="gateway.id.id"></tb-gateway-data-points>
+      <tb-gateway-publishers class="flex min-h-full flex-col"
+                             [active]="publishersTab.isActive"
+                             [readonly]="readonly"
+                             [deviceId]="gateway.id.id"></tb-gateway-publishers>
     }
   </mat-tab>
   <mat-tab label="{{ 'inferrix.gateway.tab-provisioning' | translate }}" #provisioningTab="matTab">

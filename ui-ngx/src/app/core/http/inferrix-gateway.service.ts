@@ -12,6 +12,8 @@ import { GatewaySchemaDocument } from '@shared/models/inferrix-gateway-schema.mo
 import { GatewayDataPoint, GatewayDataSource, GatewayDataSourceType, GatewayDeviceProfile,
   GatewayListQuery, GatewayPage, GatewayPointValue,
   GatewayProxyParams } from '@shared/models/inferrix-gateway-data.models';
+import { GatewayPublishedPoint, GatewayPublisher,
+  GatewayPublisherType } from '@shared/models/inferrix-gateway-publisher.models';
 import { GatewayAlertList, GatewayEventDetector, GatewayEventHandler, GatewayEventInstance,
   GatewayTypeOption } from '@shared/models/inferrix-gateway-event.models';
 import { GatewayCalendarRuleSet, GatewaySchedule,
@@ -315,6 +317,82 @@ export class InferrixGatewayService {
                              config?: RequestConfig): Observable<GatewayPointValue[]> {
     return this.proxy<GatewayPointValue[]>(deviceId, 'GET',
       `/v2/point-value/latest/${encodeURIComponent(xid)}`, null, config);
+  }
+
+  // --- Publishers ---------------------------------------------------------------------------
+
+  public getPublishers(deviceId: string, query: GatewayListQuery,
+                       config?: RequestConfig): Observable<GatewayPage<GatewayPublisher>> {
+    return this.proxy<GatewayPage<GatewayPublisher>>(deviceId, 'GET', '/v2/publisher',
+      null, config, query);
+  }
+
+  /**
+   * One publisher, with its published points inline.
+   *
+   * The list read already carries them, but a row that was paged minutes ago has a stale point
+   * list, and the points are what the operator is about to edit -- so an open re-reads.
+   */
+  public getPublisher(deviceId: string, xid: string,
+                      config?: RequestConfig): Observable<GatewayPublisher> {
+    return this.proxy<GatewayPublisher>(deviceId, 'GET', `/v2/publisher/${encodeURIComponent(xid)}`,
+      null, config);
+  }
+
+  /** Keeps its `xid` for the same reason a data source does: its points refer to it by that. */
+  public savePublisher(deviceId: string, publisher: GatewayPublisher,
+                       config?: RequestConfig): Observable<GatewayPublisher> {
+    return publisher.xid
+      ? this.proxy<GatewayPublisher>(deviceId, 'PUT',
+          `/v2/publisher/${encodeURIComponent(publisher.xid)}`, publisher, config)
+      : this.proxy<GatewayPublisher>(deviceId, 'POST', '/v2/publisher', publisher, config);
+  }
+
+  public deletePublisher(deviceId: string, xid: string, config?: RequestConfig): Observable<any> {
+    return this.proxy<any>(deviceId, 'DELETE', `/v2/publisher/${encodeURIComponent(xid)}`,
+      null, config);
+  }
+
+  public setPublisherEnabled(deviceId: string, xid: string, enabled: boolean,
+                             config?: RequestConfig): Observable<any> {
+    return this.proxy<any>(deviceId, 'PATCH',
+      `/v2/publisher/enable-disable/${encodeURIComponent(xid)}`, null, config, {enabled});
+  }
+
+  public getPublisherTypes(deviceId: string,
+                           config?: RequestConfig): Observable<GatewayPage<GatewayPublisherType>> {
+    return this.proxy<GatewayPage<GatewayPublisherType>>(deviceId, 'GET',
+      '/v2/publisher-types', null, config);
+  }
+
+  // --- Published points ---------------------------------------------------------------------
+
+  /**
+   * A published point is written on its own, never as part of its publisher.
+   *
+   * The publisher read carries `points` inline and a publisher save ignores them, which is how the
+   * gateway's own webapp works too -- so the inline table edits rows through here while the
+   * publisher form above it edits only the connection.
+   */
+  public savePublishedPoint(deviceId: string, point: GatewayPublishedPoint,
+                            config?: RequestConfig): Observable<GatewayPublishedPoint> {
+    return point.xid
+      ? this.proxy<GatewayPublishedPoint>(deviceId, 'PUT',
+          `/v2/published-points/${encodeURIComponent(point.xid)}`, point, config)
+      : this.proxy<GatewayPublishedPoint>(deviceId, 'POST', '/v2/published-points', point, config);
+  }
+
+  public deletePublishedPoint(deviceId: string, xid: string,
+                              config?: RequestConfig): Observable<any> {
+    return this.proxy<any>(deviceId, 'DELETE',
+      `/v2/published-points/${encodeURIComponent(xid)}`, null, config);
+  }
+
+  /** PUT, not PATCH -- the published-point route is the one enable-disable that differs. */
+  public setPublishedPointEnabled(deviceId: string, xid: string, enabled: boolean,
+                                  config?: RequestConfig): Observable<any> {
+    return this.proxy<any>(deviceId, 'PUT',
+      `/v2/published-points/enable-disable/${encodeURIComponent(xid)}`, null, config, {enabled});
   }
 
   // --- Event detectors ------------------------------------------------------------------------

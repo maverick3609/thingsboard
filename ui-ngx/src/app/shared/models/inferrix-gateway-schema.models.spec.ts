@@ -508,7 +508,7 @@ describe('inferrix-gateway-schema.models against a live gateway document', () =>
     // Stack ask A11 shipped, but on the type endpoint rather than here: a data source's schema
     // entry says nothing about which locator its points take. So a reader looking for the pairing
     // must go to `pointLocatorType` on /v2/data-source-types, which is what
-    // GatewayDataPointsComponent.locatorType does.
+    // GatewayDataSourcesComponent.locatorType does.
     const modbus = JSON.stringify(live.families.dataSource['MODBUS_IP.DS']);
     expect(modbus).not.toContain('.PL');
   });

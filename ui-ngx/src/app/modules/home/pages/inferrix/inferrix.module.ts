@@ -32,8 +32,8 @@ import { GatewayTabsComponent } from '@home/pages/inferrix/gateway/gateway-tabs.
 import { GatewayHealthComponent } from '@home/pages/inferrix/gateway/gateway-health.component';
 import { GatewayDataSourcesComponent }
   from '@home/pages/inferrix/gateway/gateway-data-sources.component';
-import { GatewayDataPointsComponent }
-  from '@home/pages/inferrix/gateway/gateway-data-points.component';
+import { GatewayPublishersComponent }
+  from '@home/pages/inferrix/gateway/gateway-publishers.component';
 import { GatewayProvisioningComponent }
   from '@home/pages/inferrix/gateway/gateway-provisioning.component';
 import { GatewayModelDialogComponent }
@@ -83,7 +83,7 @@ import { WidgetSettingsCommonModule }
     GatewayTabsComponent,
     GatewayHealthComponent,
     GatewayDataSourcesComponent,
-    GatewayDataPointsComponent,
+    GatewayPublishersComponent,
     GatewayProvisioningComponent,
     GatewayModelDialogComponent,
     GatewayRecipientsComponent,

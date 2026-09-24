@@ -175,3 +175,57 @@ export const gatewayQueryFromPageLink = (pageLink: PageLink): GatewayListQuery =
   sortProperty: pageLink?.sortOrder?.property,
   sortOrder: pageLink?.sortOrder?.direction as 'ASC' | 'DESC'
 });
+
+/**
+ * Data source fields the gateway's own webapp does not put on the form, and neither do we.
+ *
+ * Not cosmetic trimming: each one is edited somewhere else, and rendering it twice is how an
+ * operator ends up with two controls disagreeing about one value.
+ *
+ * `enabled` is the list's toggle, which calls `/v2/data-source/enable-disable` — a dedicated
+ * endpoint, not part of a save. `purgePeriod` and `purgeOverride` are the *point's* retention
+ * settings on this stack; the webapp shows them on the data point form, and a data source form
+ * that also offered them would suggest a per-source retention that does not exist.
+ * `editPermission` is a gateway-local permission string with no meaning to a platform operator,
+ * who reaches the gateway only through the platform's own authority.
+ *
+ * Checked against the gateway's shipped webapp across the 40 data source types whose form
+ * components could be read out of it: all four are absent from every one. Checked against the
+ * schema across all 148 model types: none of them is ever `required`, so dropping one can never
+ * make a model impossible to save.
+ */
+export const GATEWAY_DATA_SOURCE_HIDDEN_FIELDS =
+  ['enabled', 'purgePeriod', 'purgeOverride', 'editPermission'];
+
+/**
+ * Fields a publisher form drops for one publisher type only.
+ *
+ * `publishType` and `sendSnapshot` are real fields on every other sender, so there is no blanket
+ * rule to write here — the integration sender is the one type whose form omits them, because it
+ * publishes to the platform on the platform's terms and neither knob applies.
+ */
+export const GATEWAY_PUBLISHER_HIDDEN_FIELDS: {[modelType: string]: string[]} = {
+  'INTEGRATION_MQTT_SENDER.PUB': ['publishType', 'sendSnapshot']
+};
+
+/**
+ * Fields the gateway reports and will not take back.
+ *
+ * These are display strings the gateway has already translated for its own UI — a publisher whose
+ * `description` reads `ui.platformIntegration.mqtt` is showing a translation key, not a value an
+ * operator can do anything with. `StackRestJacksonModule` registers a serializer and no
+ * deserializer for them, so writing one is not meaningful either.
+ *
+ * The schema mapper renders them disabled rather than dropping them, which is right for a form
+ * whose job is to show everything the model carries. It is wrong for these two tabs, whose job is
+ * to match the gateway's own editor: a greyed-out box containing a translation key is exactly the
+ * "extra field" this pass exists to remove.
+ *
+ * Named rather than detected. `disabled` is not the signal — the mapper also sets it for a `$ref`
+ * the gateway sent but did not include, and those must stay visible so a missing field looks
+ * missing. Naming is safe because these are all of them: of 178 `readOnly` properties in a real
+ * 5.1.0 document, every one is `description`, `connectionDescription` or
+ * `configurationDescription`, and each appears in every type of its family.
+ */
+export const GATEWAY_REPORTED_FIELDS =
+  ['description', 'connectionDescription', 'configurationDescription'];

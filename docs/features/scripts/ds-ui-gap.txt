@@ -1,0 +1,62 @@
+type                                   schema  shown  hidden  template
+4DI_2DO_CARD.DS                             4      1       3  datasource/components/di-do-card-sensor/di-do-card-sensor.component.html
+BACNET_IP.DS                                5      3       2  datasource/components/banet-ip/banet-ip.component.html
+BACNET_IP_MESH_NODE.DS                      3      2       1  datasource/components/mesh-node/bacnet-ip-node/bacnet-ip-node.component.html
+BACNET_MSTP.DS                              5      3       2  datasource/components/banet-mstp/banet-mstp.component.html
+BACNET_MSTP_MESH_NODE.DS                    3      2       1  datasource/components/mesh-node/bacnet-serial-node/bacnet-serial-node.component.html
+CURRENT_SENSOR.DS                           4      3       1  datasource/components/current-sensor/current-sensor.component.html
+DISTANCE_SENSOR.DS                          4      3       1  datasource/components/distance-sensor/distance-sensor.component.html
+DOOR_SENSOR.DS                              -      -       -  (type not in this schema)
+DUSTBIN_LEVEL_SENSOR.DS                     4      0       4  datasource/components/mesh-node/dustbin-level/dustbin-level.component.html
+HTTP_JSON_RETRIEVER.DS                      9      5       4  datasource/components/http-json-retriever/http-json-retriever.component.html
+HTTP_RECEIVER.DS                            3      2       1  datasource/components/http-receiver-datasource/http-receiver-datasource.component.html
+INTERNAL.DS                                 4      0       4  datasource/components/internal-datasource/internal-datasource.component.html
+LIGHT_CONTROLLER_V4.DS                      6      3       3  datasource/components/light-controller-v4/light-controller-v4.component.html
+LIGHT_RELAY_CONTROLLER.DS                   6      3       3  datasource/components/light-di-controller/light-di-controller.component.html
+MESH_CONTROLLER.DS                          4      3       1  datasource/components/mesh-controller/mesh-controller.component.html
+MESH_EXTENDER.DS                            4      3       1  datasource/components/mesh-extender/mesh-extender.component.html
+MESH_UART.DS                                1      0       1  datasource/components/mesh-uart-controller/mesh-uart-controller.component.html
+META.DS                                     1      0       1  datasource/components/meta-data-source/meta-data-source.component.html
+META_MESH_NODE.DS                           3      2       1  datasource/components/mesh-node/meta-datasource-node/meta-datasource-node.component.html
+MODBUS_CONTROLLER.DS                        4      3       1  datasource/components/mesh-modbus-controller/mesh-modbus-controller.component.html
+MODBUS_IP.DS                               23     19       4  datasource/components/modbus-ip/modbus-ip.component.html
+MODBUS_IP_MESH_NODE.DS                      3      2       1  datasource/components/mesh-node/modbus-ip-node/modbus-ip-node.component.html
+MODBUS_SERIAL.DS                           24     20       4  datasource/components/modbus-serial/modbus-serial.component.html
+MODBUS_SERIAL_MESH_NODE.DS                  3      2       1  datasource/components/mesh-node/modbus-serial-node/modbus-serial-node.component.html
+MODBUS_SLAVE_DEVICE.DS                      4      3       1  datasource/components/mesh-modbus-controller-slave/mesh-modbus-controller-slave.component.html
+MODBUS_SLAVE_DEVICE_POLLING.DS              6      3       3  datasource/components/mesh-modbus-controller-slave-polling-device/mesh-modbus-controller-slave-polling-device.component.html
+MQTT.DS                                    15     14       1  datasource/components/mqtt-datasource/mqtt-datasource.component.html
+OPC.DS                                      8      5       3  datasource/components/opc-da/opc-da.component.html
+PAPER_TOWEL_LEVEL_SENSOR.DS                 4      0       4  datasource/components/mesh-node/paper-towel-level/paper-towel-level.component.html
+PEOPLE_COUNTER.DS                           4      3       1  datasource/components/people-counter/people-counter.component.html
+PEOPLE_COUNT_CAMERA.DS                      4      3       1  datasource/components/people-count-camera/people-count-camera.component.html
+PING.DS                                     3      1       2  datasource/components/ping-datasource/ping-datasource.component.html
+POE_LIGHTING.DS                             7      4       3  datasource/components/poe-lighting/poe-lighting.component.html
+SCRIPTING.DS                               13      9       4  datasource/components/scripting/scripting.component.html
+SENSOR_TAG_DOOR_SENSOR.DS                   4      3       1  datasource/components/door-sensor/door-sensor.component.html
+SENSOR_TAG_IAQ_V.DS                         -      -       -  (type not in this schema)
+SENSOR_TAG_IAQ_V2.DS                        4      3       1  datasource/components/iaq-sensor-v2/iaq-sensor-v2.component.html
+SENSOR_TAG_INJECTION_MOULD_COUNT.DS         4      1       3  datasource/components/injection-mould-count-sensor/injection-mould-count.component.html
+SENSOR_TAG_PIR.DS                           4      3       1  datasource/components/sensor-tag-pir/sensor-tag-pir.component.html
+SENSOR_TAG_PM.DS                            4      0       4  datasource/components/sensor-tag-pm/sensor-tag-pm.component.html
+SENSOR_TAG_TH_SHT45.DS                      4      3       1  datasource/components/sht45/sht45.component.html
+SL_BUS.DS                                   -      -       -  (type not in this schema)
+SNMP.DS                                    21     19       2  datasource/components/snmp/snmp.component.html
+SNMP_MESH_NODE.DS                           3      2       1  datasource/components/mesh-node/snmp-node/snmp-node.component.html
+SOAP_DISPENSER_SENSOR.DS                    4      0       4  datasource/components/mesh-node/soap-dispenser/soap-dispenser.component.html
+STUDENT_ASSET_TAG.DS                        2      1       1  datasource/components/asset-tag/asset-tag.component.html
+SYSTEM_ATTRIBUTES.DS                        1      0       1  datasource/components/system-attributes/system-attributes.component.html
+THERMOSTAT.DS                               4      1       3  datasource/components/thermostat/thermostat.component.html
+VAV_CONTROLLER.DS                           4      0       4  datasource/components/mesh-node/vav-controller/vav-controller.component.html
+VIRTUAL.DS                                  3      1       2  datasource/components/virtual-datasource/virtual-datasource.component.html
+VIRTUAL_MESH_NODE.DS                        3      2       1  datasource/components/mesh-node/virtual-node/virtual-node.component.html
+VIRTUAL_SWITCH.DS                           6      0       6  datasource/components/virtual-switch/virtual-switch.component.html
+WATER_LEAKAGE_DETECTOR.DS                   4      3       1  datasource/components/leakage-detector/leakage-detector.component.html
+
+types the gateway declares:        63
+types with a stack form:           50
+types with no stack form:          13
+stack entries this gateway lacks:  3
+schema properties (configurable):  277
+  shown by the stack:              171
+  hidden by the stack:             106

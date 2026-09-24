@@ -6,8 +6,8 @@ import { Observable, throwError } from 'rxjs';
 import { catchError, shareReplay } from 'rxjs/operators';
 import { defaultHttpOptionsFromConfig, QueryParams, RequestConfig } from '@core/http/http-utils';
 import { Device } from '@shared/models/device.models';
-import { AdoptGatewayRequest, ChangeGatewayConnectionRequest, GatewayReachability,
-  PendingGateway } from '@shared/models/inferrix-gateway.models';
+import { AdoptGatewayRequest, ChangeGatewayConnectionRequest, GatewayMqttConfiguration,
+  GatewayReachability, PendingGateway } from '@shared/models/inferrix-gateway.models';
 import { GatewaySchemaDocument } from '@shared/models/inferrix-gateway-schema.models';
 import { GatewayDataPoint, GatewayDataSource, GatewayDataSourceType, GatewayDeviceProfile,
   GatewayListQuery, GatewayPage, GatewayPointValue,
@@ -259,6 +259,34 @@ export class InferrixGatewayService {
                                config?: RequestConfig): Observable<GatewayDataSource> {
     return this.proxy<GatewayDataSource>(deviceId, 'DELETE',
       `/v2/platform-integration/provisioned/${encodeURIComponent(dataSourceId)}`, null, config);
+  }
+
+  /**
+   * Where the gateway dials this platform's MQTT broker.
+   *
+   * The write-only fields come back absent, not blank — the gateway omits them — so a caller
+   * cannot tell a stored password from no password, and must not try.
+   */
+  public getMqttConfiguration(deviceId: string,
+                              config?: RequestConfig): Observable<GatewayMqttConfiguration> {
+    return this.proxy<GatewayMqttConfiguration>(deviceId, 'GET',
+      '/v2/platform-integration/mqtt-configuration', null, config);
+  }
+
+  /**
+   * Saves it, which reconnects the gateway's MQTT client in place.
+   *
+   * No stack restart: the gateway listens for this settings row changing and rebuilds its client
+   * against the new row. So a save takes effect within seconds, and a wrong broker URI takes the
+   * gateway's telemetry offline just as quickly.
+   *
+   * Send the whole object. The gateway stores what it is given — there is no field-level merge
+   * beyond the two write-only secrets — so a partial body would reset everything it omitted.
+   */
+  public saveMqttConfiguration(deviceId: string, configuration: GatewayMqttConfiguration,
+                               config?: RequestConfig): Observable<GatewayMqttConfiguration> {
+    return this.proxy<GatewayMqttConfiguration>(deviceId, 'POST',
+      '/v2/platform-integration/mqtt-configuration', configuration, config);
   }
 
   public getGatewayDeviceProfiles(deviceId: string, query: GatewayListQuery,

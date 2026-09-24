@@ -1,0 +1,79 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Inferrix Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<form [formGroup]="brokerForm" (ngSubmit)="save()">
+  <mat-toolbar color="primary">
+    <h2 translate>inferrix.gateway.change-broker</h2>
+    <span class="flex-1"></span>
+    <button mat-icon-button type="button" (click)="cancel()">
+      <mat-icon class="material-icons">close</mat-icon>
+    </button>
+  </mat-toolbar>
+  <mat-progress-bar color="warn" mode="indeterminate" *ngIf="saving"></mat-progress-bar>
+  <div mat-dialog-content class="flex flex-col">
+    <div class="tb-form-panel-hint" translate>inferrix.gateway.change-broker-hint</div>
+
+    <!-- `subscriptSizing` is an input of the FIELD, not of the hint: set on the hint it parses as
+         a plain attribute and does nothing, so the default one-line subscript stays and a hint
+         that wraps paints over the label of whatever the form renders next. Both hints here wrap
+         at this dialog's width. -->
+    <mat-form-field class="mat-block" subscriptSizing="dynamic">
+      <mat-label translate>inferrix.gateway.broker-uri</mat-label>
+      <input matInput formControlName="brokerUri" required/>
+      <mat-hint translate>inferrix.gateway.broker-uri-hint</mat-hint>
+      <mat-error *ngIf="brokerForm.get('brokerUri').hasError('required')">
+        {{ 'inferrix.gateway.broker-uri-required' | translate }}
+      </mat-error>
+      <mat-error *ngIf="brokerForm.get('brokerUri').hasError('pattern')">
+        {{ 'inferrix.gateway.broker-uri-invalid' | translate }}
+      </mat-error>
+    </mat-form-field>
+
+    <mat-form-field class="mat-block" subscriptSizing="dynamic">
+      <mat-label translate>inferrix.gateway.topic-filters</mat-label>
+      <textarea matInput formControlName="topicFilters" rows="2"></textarea>
+      <mat-hint translate>inferrix.gateway.topic-filters-hint</mat-hint>
+    </mat-form-field>
+
+    <div class="flex flex-row flex-wrap items-baseline gap-2">
+      <mat-form-field class="gateway-broker-number">
+        <mat-label translate>inferrix.gateway.keep-alive</mat-label>
+        <!-- Plain type="number", never a bound [type]: a bound one skips NumberValueAccessor and
+             the control ends up holding a string, which the gateway rejects. -->
+        <input matInput type="number" formControlName="keepAliveInterval"/>
+      </mat-form-field>
+      <mat-form-field class="gateway-broker-number">
+        <mat-label translate>inferrix.gateway.connect-timeout</mat-label>
+        <input matInput type="number" formControlName="connectionTimeout"/>
+      </mat-form-field>
+    </div>
+
+    <mat-slide-toggle class="mat-slide" formControlName="autoReconnect">
+      {{ 'inferrix.gateway.auto-reconnect' | translate }}
+    </mat-slide-toggle>
+    <mat-slide-toggle class="mat-slide" formControlName="cleanSession">
+      {{ 'inferrix.gateway.clean-session' | translate }}
+    </mat-slide-toggle>
+
+    <!--
+      Not editable here, and carried through the save untouched. The client id and the user name
+      are half of the gateway's ThingsBoard device credential -- changing either from this side
+      would leave the device record naming the old one and the broker refusing the connect.
+    -->
+    <div class="tb-form-hint" translate>inferrix.gateway.broker-carried-hint</div>
+
+    <div class="tb-error-message" *ngIf="error">{{ error }}</div>
+  </div>
+  <div mat-dialog-actions class="flex flex-row items-center justify-end gap-2">
+    <button mat-button type="button" [disabled]="saving" (click)="cancel()">
+      {{ 'action.cancel' | translate }}
+    </button>
+    <button mat-raised-button color="primary" type="submit"
+            [disabled]="saving || brokerForm.invalid">
+      {{ 'action.save' | translate }}
+    </button>
+  </div>
+</form>

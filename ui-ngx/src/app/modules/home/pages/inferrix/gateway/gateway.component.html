@@ -94,5 +94,46 @@
         <div>{{ connection.reportedAddress }}</div>
       </div>
     </div>
+
+    <!--
+      The other direction. The panel above is how this platform reaches the gateway; this is how
+      the gateway reaches this platform's broker, and a renumbered network breaks the two
+      independently -- a gateway can be perfectly reachable here and still be dialling a broker
+      address that no longer answers, which looks like a dead gateway and is not one.
+
+      Read through the proxy, so it needs the gateway to be up. A gateway that is down shows the
+      hint rather than an error: what its broker setting says is not knowable from here, and the
+      panel above is the one that answers why it is down.
+    -->
+    <div class="tb-form-panel stroked">
+      <div class="flex flex-row items-center">
+        <div class="tb-form-panel-title flex-1" translate>inferrix.gateway.platform-broker</div>
+        <button mat-stroked-button class="shrink-0" *ngIf="!readonly && mqtt?.brokerUri"
+                [disabled]="mqttLoading" (click)="changeBroker()">
+          {{ 'inferrix.gateway.change-broker' | translate }}
+        </button>
+      </div>
+      <div class="tb-form-panel-hint" translate>inferrix.gateway.platform-broker-hint</div>
+      <mat-progress-bar color="primary" mode="indeterminate" *ngIf="mqttLoading"></mat-progress-bar>
+      @if (mqtt?.brokerUri) {
+        <div class="tb-form-row space-between">
+          <div translate>inferrix.gateway.broker-uri</div>
+          <!-- Truncated with the full value on hover, like the fingerprint above. Nothing caps
+               the length of what the gateway stores here -- the form's 255 is this form's rule,
+               not the gateway's -- so an unclamped row is one the device can stretch. -->
+          <div class="tb-gateway-fingerprint" [matTooltip]="mqtt.brokerUri"
+               matTooltipPosition="above">{{ mqtt.brokerUri }}</div>
+        </div>
+        <div class="tb-form-row space-between">
+          <div translate>inferrix.gateway.client-id</div>
+          <!-- Half of the gateway's MQTT_BASIC device credential, which is why it is shown here
+               and editable nowhere: the broker matches on it. -->
+          <div class="tb-gateway-fingerprint" [matTooltip]="mqtt.clientId"
+               matTooltipPosition="above">{{ mqtt.clientId || '—' }}</div>
+        </div>
+      } @else if (!mqttLoading) {
+        <div class="tb-form-hint" translate>inferrix.gateway.platform-broker-unknown</div>
+      }
+    </div>
   </div>
 </div>

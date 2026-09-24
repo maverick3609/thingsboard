@@ -58,6 +58,51 @@ export interface GatewayConnection {
 }
 
 /**
+ * The other direction: where the gateway dials the platform's MQTT broker.
+ *
+ * {@link GatewayConnection} is how the platform reaches the gateway; this is how the gateway
+ * reaches the platform, and the two move for the same reasons — a renumbered subnet or a new VPN
+ * breaks both. Held by the gateway rather than by the platform, so it is read and written through
+ * the proxy at `/v2/platform-integration/mqtt-configuration`.
+ *
+ * `userPassword` and `privateKey` are write-only on the gateway and never come back from a read,
+ * so an empty one has to mean "unchanged" — see {@link GATEWAY_MQTT_SECRET_FIELDS}.
+ */
+export interface GatewayMqttConfiguration {
+  brokerUri?: string;
+  clientId?: string;
+  userName?: string;
+  userPassword?: string;
+  topicFilters?: string;
+  autoReconnect?: boolean;
+  cleanSession?: boolean;
+  keepAliveInterval?: number;
+  connectionTimeout?: number;
+  /**
+   * Carried through a save untouched, and deliberately not offered.
+   *
+   * The gateway forces `ATLEAST_ONCE` on the running client whatever this says — ThingsBoard caps
+   * at QoS 1 — so a control here would be one that changes nothing. It still has to be *sent*:
+   * the gateway resolves it with `QosType.valueOf`, which throws on a missing value.
+   */
+  qosType?: string;
+  x509CaCrt?: string;
+  awsIot?: boolean;
+  privateKey?: string;
+  x509ClientCrt?: string;
+}
+
+/**
+ * Fields the gateway accepts and never returns.
+ *
+ * Sending an empty one would erase the stored credential, so they are dropped from a save instead.
+ * The gateway carries the stored value forward for exactly these two (`SecretFields.merge`), which
+ * also means there is no way to *clear* one from here — the same trade the schema-driven forms
+ * make for every other gateway secret.
+ */
+export const GATEWAY_MQTT_SECRET_FIELDS = ['userPassword', 'privateKey'];
+
+/**
  * Read through ThingsBoard's own attribute API rather than an endpoint of ours.
  *
  * These three are already served to anyone holding READ_ATTRIBUTES on the device — the adoption

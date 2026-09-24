@@ -13,9 +13,12 @@ import { EntityTableConfig } from '@home/models/entity/entities-table-config.mod
 import { EntityType } from '@shared/models/entity-type.models';
 import { AttributeScope } from '@shared/models/telemetry/telemetry.models';
 import { GATEWAY_CONNECTION_KEYS, GATEWAY_REPORTED_KEYS, GatewayConnection, GatewayInfo,
-  gatewayConnectionOf } from '@shared/models/inferrix-gateway.models';
+  GatewayMqttConfiguration, gatewayConnectionOf } from '@shared/models/inferrix-gateway.models';
 import { GatewayConnectionDialogComponent,
   GatewayConnectionDialogData } from '@home/pages/inferrix/gateway/gateway-connection-dialog.component';
+import { GatewayBrokerDialogComponent,
+  GatewayBrokerDialogData } from '@home/pages/inferrix/gateway/gateway-broker-dialog.component';
+import { InferrixGatewayService } from '@core/http/inferrix-gateway.service';
 
 /**
  * The Details tab of an adopted gateway.
@@ -47,6 +50,10 @@ export class GatewayComponent extends EntityComponent<GatewayInfo> {
   connection: GatewayConnection;
   connectionLoading = false;
 
+  /** Where the gateway dials this platform's broker, read from the gateway itself. */
+  mqtt: GatewayMqttConfiguration;
+  mqttLoading = false;
+
   /** The gateway the connection block currently describes. */
   private connectionDeviceId: string;
 
@@ -56,6 +63,7 @@ export class GatewayComponent extends EntityComponent<GatewayInfo> {
               public fb: UntypedFormBuilder,
               protected cd: ChangeDetectorRef,
               private attributeService: AttributeService,
+              private gatewayService: InferrixGatewayService,
               private dialog: MatDialog) {
     super(store, fb, entityValue, entitiesTableConfigValue, cd);
   }
@@ -86,7 +94,9 @@ export class GatewayComponent extends EntityComponent<GatewayInfo> {
     if (entity?.id?.id !== this.connectionDeviceId) {
       this.connectionDeviceId = entity?.id?.id;
       this.connection = null;
+      this.mqtt = null;
       this.loadConnection();
+      this.loadMqtt();
     }
   }
 
@@ -103,6 +113,51 @@ export class GatewayComponent extends EntityComponent<GatewayInfo> {
       }).afterClosed().subscribe(changed => {
       if (changed) {
         this.loadConnection();
+      }
+    });
+  }
+
+  changeBroker(): void {
+    this.dialog.open<GatewayBrokerDialogComponent, GatewayBrokerDialogData, boolean>(
+      GatewayBrokerDialogComponent, {
+        disableClose: true,
+        panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
+        data: {deviceId: this.entity.id.id, configuration: this.mqtt ?? {}}
+      }).afterClosed().subscribe(changed => {
+      if (changed) {
+        this.loadMqtt();
+      }
+    });
+  }
+
+  /**
+   * A live read through the proxy, unlike the connection block above.
+   *
+   * There is no attribute mirroring the broker setting, and there should not be: the gateway is
+   * the only thing that knows where it is dialling. So this fails whenever the gateway is
+   * unreachable, and a failure is left as an empty panel rather than an error -- "the gateway is
+   * down" is the connection block's answer, not this one's, and saying it twice in two different
+   * words helps nobody.
+   *
+   * Refused outright for a customer user: the whole `/v2/platform-integration` family is
+   * administrator-only in the proxy's allowlist. That is the same empty panel.
+   */
+  private loadMqtt(): void {
+    if (!this.connectionDeviceId) {
+      return;
+    }
+    this.mqttLoading = true;
+    this.gatewayService.getMqttConfiguration(this.connectionDeviceId,
+      {ignoreLoading: true, ignoreErrors: true}).subscribe({
+      next: configuration => {
+        this.mqtt = configuration;
+        this.mqttLoading = false;
+        this.cd.markForCheck();
+      },
+      error: () => {
+        this.mqtt = null;
+        this.mqttLoading = false;
+        this.cd.markForCheck();
       }
     });
   }

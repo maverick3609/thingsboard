@@ -28,6 +28,8 @@ import { AdoptGatewayDialogComponent } from '@home/pages/inferrix/adopt-gateway-
 import { GatewayComponent } from '@home/pages/inferrix/gateway/gateway.component';
 import { GatewayConnectionDialogComponent }
   from '@home/pages/inferrix/gateway/gateway-connection-dialog.component';
+import { GatewayBrokerDialogComponent }
+  from '@home/pages/inferrix/gateway/gateway-broker-dialog.component';
 import { GatewayTabsComponent } from '@home/pages/inferrix/gateway/gateway-tabs.component';
 import { GatewayHealthComponent } from '@home/pages/inferrix/gateway/gateway-health.component';
 import { GatewayDataSourcesComponent }
@@ -80,6 +82,7 @@ import { WidgetSettingsCommonModule }
     AdoptGatewayDialogComponent,
     GatewayComponent,
     GatewayConnectionDialogComponent,
+    GatewayBrokerDialogComponent,
     GatewayTabsComponent,
     GatewayHealthComponent,
     GatewayDataSourcesComponent,

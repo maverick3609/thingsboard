@@ -33,6 +33,14 @@
                               [deviceId]="gateway.id.id"></tb-gateway-data-points>
     }
   </mat-tab>
+  <mat-tab label="{{ 'inferrix.gateway.tab-provisioning' | translate }}" #provisioningTab="matTab">
+    @for (gateway of [entity]; track gateway.id.id) {
+      <tb-gateway-provisioning class="flex min-h-full flex-col"
+                               [active]="provisioningTab.isActive"
+                               [readonly]="readonly"
+                               [deviceId]="gateway.id.id"></tb-gateway-provisioning>
+    }
+  </mat-tab>
   <mat-tab label="{{ 'inferrix.gateway.tab-events' | translate }}" #eventsTab="matTab">
     @for (gateway of [entity]; track gateway.id.id) {
       <tb-gateway-events class="flex min-h-full flex-col"

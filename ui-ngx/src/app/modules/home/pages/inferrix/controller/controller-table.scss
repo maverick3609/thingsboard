@@ -37,3 +37,22 @@
     height: 43px;
   }
 }
+
+/* Platform provisioning: the profile picker sits inside a 44px row, and the hint sits between the
+   toolbar and the table rather than under a field, so neither inherits a usable size from Material. */
+:host ::ng-deep .tb-provisioning-hint {
+  padding: 4px 16px 8px;
+  font-size: 12px;
+  line-height: 16px;
+  opacity: 0.7;
+}
+
+:host ::ng-deep .tb-profile-field {
+  min-width: 180px;
+}
+
+:host ::ng-deep .tb-queued-label {
+  font-size: 12px;
+  font-style: italic;
+  opacity: 0.7;
+}

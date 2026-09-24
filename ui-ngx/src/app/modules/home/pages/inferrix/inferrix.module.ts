@@ -34,6 +34,8 @@ import { GatewayDataSourcesComponent }
   from '@home/pages/inferrix/gateway/gateway-data-sources.component';
 import { GatewayDataPointsComponent }
   from '@home/pages/inferrix/gateway/gateway-data-points.component';
+import { GatewayProvisioningComponent }
+  from '@home/pages/inferrix/gateway/gateway-provisioning.component';
 import { GatewayModelDialogComponent }
   from '@home/pages/inferrix/gateway/gateway-model-dialog.component';
 import { GatewayRecipientsComponent }
@@ -82,6 +84,7 @@ import { WidgetSettingsCommonModule }
     GatewayHealthComponent,
     GatewayDataSourcesComponent,
     GatewayDataPointsComponent,
+    GatewayProvisioningComponent,
     GatewayModelDialogComponent,
     GatewayRecipientsComponent,
     GatewayDetectorsDialogComponent,

@@ -9,8 +9,9 @@ import { Device } from '@shared/models/device.models';
 import { AdoptGatewayRequest, ChangeGatewayConnectionRequest, GatewayReachability,
   PendingGateway } from '@shared/models/inferrix-gateway.models';
 import { GatewaySchemaDocument } from '@shared/models/inferrix-gateway-schema.models';
-import { GatewayDataPoint, GatewayDataSource, GatewayDataSourceType, GatewayListQuery,
-  GatewayPage, GatewayPointValue, GatewayProxyParams } from '@shared/models/inferrix-gateway-data.models';
+import { GatewayDataPoint, GatewayDataSource, GatewayDataSourceType, GatewayDeviceProfile,
+  GatewayListQuery, GatewayPage, GatewayPointValue,
+  GatewayProxyParams } from '@shared/models/inferrix-gateway-data.models';
 import { GatewayAlertList, GatewayEventDetector, GatewayEventHandler, GatewayEventInstance,
   GatewayTypeOption } from '@shared/models/inferrix-gateway-event.models';
 import { GatewayCalendarRuleSet, GatewaySchedule,
@@ -200,6 +201,75 @@ export class InferrixGatewayService {
                             config?: RequestConfig): Observable<GatewayPage<GatewayDataSourceType>> {
     return this.proxy<GatewayPage<GatewayDataSourceType>>(deviceId, 'GET',
       '/v2/data-source-types', null, config);
+  }
+
+  // --- Platform provisioning ----------------------------------------------------------------
+
+  /**
+   * Data sources the gateway does not yet publish to the platform.
+   *
+   * "Unprovisioned" is the gateway's own bookkeeping, not an inference: it means no
+   * `IntegrationMappingData` row links this data source to a publisher and a device. A data source
+   * can therefore be publishing — a publisher built by hand does flow telemetry — and still be
+   * listed here, because nothing recorded the link.
+   */
+  public getUnprovisionedDataSources(deviceId: string, query: GatewayListQuery,
+                                     config?: RequestConfig): Observable<GatewayPage<GatewayDataSource>> {
+    return this.proxy<GatewayPage<GatewayDataSource>>(deviceId, 'GET',
+      '/v2/platform-integration/unprovisioned', null, config, query);
+  }
+
+  public getProvisionedDataSources(deviceId: string, query: GatewayListQuery,
+                                   config?: RequestConfig): Observable<GatewayPage<GatewayDataSource>> {
+    return this.proxy<GatewayPage<GatewayDataSource>>(deviceId, 'GET',
+      '/v2/platform-integration/provisioned', null, config, query);
+  }
+
+  /**
+   * Queue a data source to become a device on the platform.
+   *
+   * Returns as soon as the gateway has queued the work, not when the device exists. The gateway
+   * drains that queue on a timer and takes **one data source per minute**, so a caller that
+   * provisions several must expect them to appear one a minute and must not read the result back
+   * as confirmation.
+   *
+   * `profileId` is the gateway's own device-profile row id, not the platform's UUID — see
+   * {@link GatewayDeviceProfile}.
+   */
+  public provisionDataSource(deviceId: string, xid: string, profileId: number,
+                             config?: RequestConfig): Observable<GatewayDataSource> {
+    // Both segments are escaped, the numeric one included. The platform's allowlist would refuse a
+    // path that did not match `[0-9]{1,10}` anyway, but these ids come off a gateway row typed
+    // `[property: string]: any` — so the type is not the thing keeping them numeric.
+    return this.proxy<GatewayDataSource>(deviceId, 'PUT',
+      `/v2/platform-integration/provision/${encodeURIComponent(xid)}`
+        + `/${encodeURIComponent(profileId)}`, null, config);
+  }
+
+  /**
+   * Drop the mapping and delete the publisher that fed one device.
+   *
+   * Keyed by the data source's numeric id, unlike every other write in this service. The device
+   * itself may be left behind on the platform — the gateway records no platform device id, so it
+   * cannot always delete it and says so in its log rather than failing.
+   */
+  public unprovisionDataSource(deviceId: string, dataSourceId: number,
+                               config?: RequestConfig): Observable<GatewayDataSource> {
+    return this.proxy<GatewayDataSource>(deviceId, 'DELETE',
+      `/v2/platform-integration/provisioned/${encodeURIComponent(dataSourceId)}`, null, config);
+  }
+
+  public getGatewayDeviceProfiles(deviceId: string, query: GatewayListQuery,
+                                  config?: RequestConfig): Observable<GatewayPage<GatewayDeviceProfile>> {
+    return this.proxy<GatewayPage<GatewayDeviceProfile>>(deviceId, 'GET',
+      '/v2/platform-integration/device-profile', null, config, query);
+  }
+
+  /** Re-reads the platform's profiles into the gateway's copy, then answers the refreshed list. */
+  public syncGatewayDeviceProfiles(deviceId: string, query: GatewayListQuery,
+                                   config?: RequestConfig): Observable<GatewayPage<GatewayDeviceProfile>> {
+    return this.proxy<GatewayPage<GatewayDeviceProfile>>(deviceId, 'GET',
+      '/v2/platform-integration/device-profile/sync', null, config, query);
   }
 
   // --- Data points --------------------------------------------------------------------------

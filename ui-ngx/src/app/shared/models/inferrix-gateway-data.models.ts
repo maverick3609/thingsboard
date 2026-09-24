@@ -113,6 +113,20 @@ export interface GatewayDataSourceType {
 }
 
 /**
+ * A device profile as the *gateway* knows it.
+ *
+ * Two identifiers, and they are not interchangeable. `id` is the gateway's own row key and is what
+ * the provision route takes; `deviceProfileId` is the platform's UUID for the same profile. The
+ * gateway learns these by syncing from the platform, so its copy can be stale — that is what
+ * {@link InferrixGatewayService.syncGatewayDeviceProfiles} is for.
+ */
+export interface GatewayDeviceProfile {
+  id?: number;
+  name?: string;
+  deviceProfileId?: string;
+}
+
+/**
  * Turns a gateway page into the page shape TB's tables expect.
  *
  * `hasNext` is computed from `total`, which is why the gateway's total mattering more than the page

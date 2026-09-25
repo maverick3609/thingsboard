@@ -17,6 +17,7 @@ import { GATEWAY_DATA_SOURCE_HIDDEN_FIELDS, GATEWAY_IDENTITY_FIELDS, GATEWAY_REP
   GatewayPage } from '@shared/models/inferrix-gateway-data.models';
 import { componentToFormProperties, GatewaySchemaDocument,
   schemaToFormProperties } from '@shared/models/inferrix-gateway-schema.models';
+import { gatewayFormLayout } from '@shared/models/inferrix-gateway-layout.models';
 import { FormProperty } from '@shared/models/dynamic-form.models';
 
 /**
@@ -184,10 +185,16 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
       // A point carries its data source's xid, so there is nothing to attach one to until the
       // source has been saved once and the gateway has given it one.
       needsSaveFirst: !model.xid,
-      add: () => this.editPoint(model, {
-        dataSourceXid: model.xid, enabled: false,
-        pointLocator: {modelType: this.locatorType(model, rows)}
-      }, rows),
+      add: () => {
+        // A new locator starts on what the gateway's own VO starts on, where its layout records
+        // one. Seeded onto the model rather than defaulted in the form: a value the form shows but
+        // never puts in the payload is a value the two ends can disagree about.
+        const locator = this.locatorType(model, rows);
+        this.editPoint(model, {
+          dataSourceXid: model.xid, enabled: false,
+          pointLocator: {...(gatewayFormLayout(locator)?.defaults ?? {}), modelType: locator}
+        }, rows);
+      },
       edit: row => this.editPoint(model, row, rows),
       delete: row => this.deletePoint(row, rows),
       toggle: (row, enabled) => this.togglePoint(row, enabled, rows),
@@ -204,6 +211,7 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
         disableClose: true,
         panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
         data: {title, model, properties: this.propertiesFor(model.modelType),
+          layout: gatewayFormLayout(model.modelType),
           readonly: this.readonly, children}
       }).afterClosed().subscribe(saved => {
       if (saved) {
@@ -229,6 +237,7 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
       ? this.withoutStructuralFields(
           schemaToFormProperties(this.schemas, 'pointLocator', locatorType))
       : [];
+    const locatorLayout = locatorType ? gatewayFormLayout(locatorType) : undefined;
     this.dialog.open<GatewayModelDialogComponent, GatewayModelDialogData, GatewayDataPoint>(
       GatewayModelDialogComponent, {
         disableClose: true,
@@ -237,7 +246,12 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
           title: point.xid ? point.name : this.translate.instant('inferrix.gateway.add-data-point'),
           model: point,
           properties: this.pointProperties(),
+          // Both layouts hang off the locator's type. A point's own fields are the same for every
+          // protocol, so laying them out before its locator has been worked through would change
+          // every point form in the product for the sake of one.
+          layout: locatorLayout ? gatewayFormLayout('DataPointModel') : undefined,
           locatorProperties,
+          locatorLayout,
           locatorTitle: this.translate.instant('inferrix.gateway.point-locator'),
           locatorMissing: !locatorProperties.length,
           readonly: this.readonly

@@ -1,0 +1,117 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Inferrix Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<div class="tb-gateway-form tb-form-panel no-gap" [class.stroked]="stroked"
+     [class.no-border]="!stroked" [formGroup]="form">
+  @if (title) {
+    <div class="tb-form-panel-title">{{ title }}</div>
+  }
+  <ng-container *ngTemplateOutlet="rowsTpl; context: {rows: rows}"></ng-container>
+  <!--
+    ThingsBoard's own entity forms put their optional settings behind this panel rather than in a
+    `tb-settings` one, which belongs to a widget settings pane. Collapsed: these are the fields the
+    gateway's own UI does not show at all, so an operator opening a form should see what they came
+    for and nothing else.
+  -->
+  @if (advancedRows.length) {
+    <mat-expansion-panel class="configuration-panel mat-elevation-z0">
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          <div class="tb-form-panel-title">{{ advancedTitle }}</div>
+        </mat-panel-title>
+      </mat-expansion-panel-header>
+      <ng-template matExpansionPanelContent>
+        <ng-container *ngTemplateOutlet="rowsTpl; context: {rows: advancedRows}"></ng-container>
+      </ng-template>
+    </mat-expansion-panel>
+  }
+</div>
+
+<!--
+  The hint icon is repeated in each branch rather than pulled into a template of its own.
+  `mat-form-field` finds its suffixes with a content query, and a suffix reaching it through
+  `ngTemplateOutlet` is not seen: the icon then renders as an ordinary child, under the value,
+  and the field stands a row taller than the one beside it.
+-->
+<ng-template #rowsTpl let-rows="rows">
+  @for (row of rows; track trackRow($index, row)) {
+    <div class="tb-form-row tb-standard-fields no-border no-padding column-xs" [formGroup]="form">
+      @for (item of row.items; track trackItem($index, item)) {
+        @if (item.delegated) {
+          <!--
+            An array, a nested object, a date, an image. Handed to the renderer the rest of the
+            product uses for them, as a form of one property: `tb-dynamic-form` takes the whole
+            value object for the properties it is given, which is why each one gets its own slice.
+          -->
+          <tb-dynamic-form class="flex-1" noBorder noPadding stackedLabels
+                           [properties]="delegatedProperties[item.property.id]"
+                           [disabled]="disabled"
+                           [ngModel]="slices[item.property.id]"
+                           (ngModelChange)="sliceChanged(item.property.id, $event)"
+                           [ngModelOptions]="{standalone: true}"></tb-dynamic-form>
+        } @else if (item.property.type === FormPropertyType.switch) {
+          <mat-slide-toggle class="mat-slide" [formControlName]="item.property.id">
+            <div [tb-hint-tooltip-icon]="item.property.hint">{{ item.property.name }}</div>
+          </mat-slide-toggle>
+        } @else if (item.property.type === FormPropertyType.textarea) {
+          <mat-form-field class="flex" appearance="outline" subscriptSizing="dynamic">
+            <mat-label>{{ item.property.name }}</mat-label>
+            <textarea matInput [rows]="item.property.rows || 2" [required]="item.property.required"
+                      [formControlName]="item.property.id"></textarea>
+            @if (item.property.hint) {
+              <mat-icon matIconSuffix class="tb-gateway-form-hint"
+                        matTooltip="{{ item.property.hint }}"
+                        matTooltipPosition="above">info</mat-icon>
+            }
+          </mat-form-field>
+        } @else if (item.property.type === FormPropertyType.select) {
+          <mat-form-field class="flex" appearance="outline" subscriptSizing="dynamic">
+            <mat-label>{{ item.property.name }}</mat-label>
+            <mat-select [required]="item.property.required" [formControlName]="item.property.id">
+              @for (option of item.property.items; track option.value) {
+                <mat-option [value]="option.value">{{ option.label }}</mat-option>
+              }
+            </mat-select>
+            @if (item.property.hint) {
+              <mat-icon matIconSuffix class="tb-gateway-form-hint"
+                        matTooltip="{{ item.property.hint }}"
+                        matTooltipPosition="above">info</mat-icon>
+            }
+          </mat-form-field>
+        } @else if (item.property.type === FormPropertyType.number) {
+          <mat-form-field class="flex" appearance="outline" subscriptSizing="dynamic">
+            <mat-label>{{ item.property.name }}</mat-label>
+            <!--
+              A literal `type`, never a binding. A bound `[type]` skips Angular's own
+              NumberValueAccessor, so the control would hold the string the operator typed and
+              every write of it would be refused.
+            -->
+            <input matInput type="number" [required]="item.property.required"
+                   [min]="item.property.min" [max]="item.property.max"
+                   [formControlName]="item.property.id">
+            @if (item.property.hint) {
+              <mat-icon matIconSuffix class="tb-gateway-form-hint"
+                        matTooltip="{{ item.property.hint }}"
+                        matTooltipPosition="above">info</mat-icon>
+            }
+          </mat-form-field>
+        } @else {
+          <mat-form-field class="flex" appearance="outline" subscriptSizing="dynamic">
+            <mat-label>{{ item.property.name }}</mat-label>
+            <input matInput [required]="item.property.required"
+                   [type]="item.property.type === FormPropertyType.password ? 'password' : 'text'"
+                   [formControlName]="item.property.id">
+            @if (item.property.hint) {
+              <mat-icon matIconSuffix class="tb-gateway-form-hint"
+                        matTooltip="{{ item.property.hint }}"
+                        matTooltipPosition="above">info</mat-icon>
+            }
+          </mat-form-field>
+        }
+      }
+    </div>
+  }
+</ng-template>

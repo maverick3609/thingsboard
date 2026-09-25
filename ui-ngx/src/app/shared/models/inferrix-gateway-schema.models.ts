@@ -72,7 +72,15 @@ const FIELD_LABELS: {[property: string]: string} = {
   brokerUri: 'Broker Url',
   logIO: 'Log I/O',
   maxHistoricalIOLogs: 'Max Historical IO Logs',
-  binary0Value: 'Binary 0 Value'
+  binary0Value: 'Binary 0 Value',
+  // A virtual point's simulator settings. All five are declared on `VIRTUAL.PL` and on no other
+  // model in the document, so naming them here cannot reach a field that means something else.
+  // The gateway's own labels, except that it calls `maxChange` "Minimum Change" on the attractor
+  // form and "Maximum Change" on the brownian one for the same field -- the second is right.
+  min: 'Minimum',
+  max: 'Maximum',
+  maxChange: 'Maximum change',
+  attractionPointXid: 'Attraction point'
 };
 
 /**

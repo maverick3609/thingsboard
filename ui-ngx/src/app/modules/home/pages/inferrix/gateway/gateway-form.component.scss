@@ -1,0 +1,30 @@
+// SPDX-FileCopyrightText: Copyright The Inferrix Authors
+// SPDX-License-Identifier: Apache-2.0
+:host {
+  display: block;
+}
+
+.tb-gateway-form {
+  /* A row of two fields, and a row of one: the single field fills the line rather than sitting at
+     half width beside nothing, which is how ThingsBoard's own entity forms read. */
+  .tb-form-row > .mat-mdc-form-field {
+    min-width: 0;
+  }
+
+  /* The schema's own description, as an icon inside the field -- the same grey ThingsBoard uses
+     for a hint icon beside a settings row. */
+  .tb-gateway-form-hint {
+    color: #e0e0e0;
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+
+    &:hover {
+      color: #9e9e9e;
+    }
+  }
+
+  .configuration-panel {
+    margin-top: 8px;
+  }
+}

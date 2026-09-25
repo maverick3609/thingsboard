@@ -16,8 +16,14 @@
     @if (data.readonlyNote) {
       <div class="tb-error-message">{{ data.readonlyNote }}</div>
     }
-    <div class="tb-gateway-identity flex flex-row gap-2 xs:flex-col" [formGroup]="identityForm">
-      <mat-form-field class="flex-1">
+    <!--
+      The row every ThingsBoard entity form opens with: two fields of equal width, each label above
+      its control, stacking on a narrow screen. `tb-standard-fields` is what keeps them full-size
+      fields rather than the compact inline ones a settings row uses.
+    -->
+    <div class="tb-gateway-identity tb-form-row tb-standard-fields no-border no-padding column-xs"
+         [formGroup]="identityForm">
+      <mat-form-field class="flex" appearance="outline" subscriptSizing="dynamic">
         <mat-label translate>inferrix.gateway.model-name</mat-label>
         <input matInput formControlName="name" required>
         @if (identityForm.get('name').hasError('required')) {
@@ -27,7 +33,7 @@
       <!-- `subscriptSizing` is an input of the field, not of the hint: set on the hint it parses as
            a plain attribute and does nothing, so the default one-line subscript stays and this
            hint paints over whatever the form renders next. -->
-      <mat-form-field class="flex-1" subscriptSizing="dynamic">
+      <mat-form-field class="flex" appearance="outline" subscriptSizing="dynamic">
         <mat-label translate>inferrix.gateway.model-xid</mat-label>
         <input matInput formControlName="xid">
         <mat-hint>
@@ -40,11 +46,26 @@
     </div>
 
     <!--
+      A point's locator comes first, above the point's own fields. It is what the operator opened
+      the row for -- which register, which simulator -- while everything `DataPointModel` carries
+      is retention and rendering, which the gateway's own point form does not show at all.
+    -->
+    @if (data.locatorProperties?.length && data.locatorLayout) {
+      <tb-gateway-form [properties]="data.locatorProperties" [layout]="data.locatorLayout"
+                       [disabled]="data.readonly" [(ngModel)]="locatorValues"
+                       [ngModelOptions]="{standalone: true}"></tb-gateway-form>
+    }
+
+    <!--
       The form the gateway described. Every property here was constructed by the schema mapper from
       a fixed table of types -- nothing from the device is copied into a FormProperty, because the
       renderer compiles `condition` to executable JavaScript.
     -->
-    @if (data.properties?.length) {
+    @if (data.properties?.length && data.layout) {
+      <tb-gateway-form [properties]="data.properties" [layout]="data.layout"
+                       [disabled]="data.readonly" [(ngModel)]="values"
+                       [ngModelOptions]="{standalone: true}"></tb-gateway-form>
+    } @else if (data.properties?.length) {
       <tb-dynamic-form [properties]="data.properties" [disabled]="data.readonly" stackedLabels
                        [(ngModel)]="values" [ngModelOptions]="{standalone: true}"></tb-dynamic-form>
     } @else {
@@ -66,7 +87,7 @@
       <div class="tb-form-hint">{{ carried.note }}</div>
     }
 
-    @if (data.locatorProperties?.length) {
+    @if (data.locatorProperties?.length && !data.locatorLayout) {
       <tb-dynamic-form [properties]="data.locatorProperties" [title]="data.locatorTitle"
                        [disabled]="data.readonly" [(ngModel)]="locatorValues" stackedLabels
                        [ngModelOptions]="{standalone: true}"></tb-dynamic-form>

@@ -171,70 +171,159 @@ median across all 61 is **6**. The point form's bulk is the shared model, not th
 
 ## Approach
 
-**Add a presentation layer over the existing schema-driven form. Do not write 50 components.**
+**One renderer plus a layout descriptor per model type. Do not write 50 components, and do not
+extend `tb-dynamic-form`.**
 
-Fifty hand-written components is what the stack did, and it is why 13 of its own types have no
-form and 3 of its dispatch entries point at types that no longer exist. Transcribing that into
+Three things were settled by measurement before any code was written.
+
+**Fifty hand-written components is what the stack did**, and it is why 13 of its own types have
+no form and 3 of its dispatch entries point at types that no longer exist. Transcribing that into
 Cortex buys a copy of a maintenance problem: every field the stack adds is a field our copy
 silently lacks, with nothing to detect it.
 
-What the schema already gives us and must keep giving us: types, ranges, enums, `readOnly`,
-`writeOnly`, nesting, and the guarantee that a field Cortex renders is a field the gateway
-declared. That is the security boundary — `inferrix-gateway-schema.models.ts` documents it as
-such — and a hand-written form bypasses it.
+**The schema is not the problem — presentation is.** It already carries types, ranges, enums,
+`readOnly`, `writeOnly`, nesting, and the guarantee that a field Cortex renders is a field the
+gateway declared. That is the security boundary; `inferrix-gateway-schema.models.ts` documents it
+as such and a hand-written form bypasses it. A layout may therefore only *hide* a field, *narrow*
+a free string to a fixed option list, or *move* a field down the page. It never invents one.
 
-So: a **layout descriptor** per model type, holding only presentation, merged with the schema at
-render time. Per type it carries an ordered field list, section grouping, a hidden set, a label
-key per field, and conditional-visibility rules. A type with no descriptor renders exactly as it
-does today, which is what keeps the 13 orphan types working.
+**`tb-dynamic-form` cannot produce a ThingsBoard entity form**, which is the second half of what
+this pass is for. Its `toPropertyGroups` packs two fields into one row only when they share a
+label, and the result is the label-left row of a *widget settings panel*. A ThingsBoard entity
+form — `oauth2/clients/client.component.html` is the canonical one — pairs two independently
+labelled fields inside `tb-form-row tb-standard-fields` and puts its optional settings behind a
+`configuration-panel`. So: a new `tb-gateway-form`, which lays out the scalar types itself in that
+markup and hands arrays, nested objects, dates and images back to `tb-dynamic-form` so there is
+one implementation of each of those editors.
 
-The descriptor is **extracted, not transcribed**. A script reads the stack webapp source
-(`~/Office/Product/inferrixstack-webapp/src/app/datasource/`), walks each component template in
-document order, and emits a generated TypeScript file. Re-run it per stack release and diff the
-output — that is how a new stack field gets noticed instead of silently missing.
+**Where the two UIs disagree:** fields, order and labels come from the stack; components and
+layout come from ThingsBoard.
 
-The stack webapp is read-only to us, same as the stack itself. Nothing here changes stack code.
-The one Cortex-side backend change is adding `/v2/dictionary/ui/*` to the proxy allowlist in
-`InferrixGatewayController` — a read-only route, and ours to add.
+The stack webapp is read-only to us, same as the stack itself. Defects found in it while matching
+a form are written up as open items in `inferrixstack-webapp/docs/` and handed over — see
+**Handed over** below. The one Cortex-side backend change still outstanding is adding
+`/v2/dictionary/ui/*` to the proxy allowlist in `InferrixGatewayController`, a read-only route and
+ours to add.
 
-## Phases
+### What a layout can say
 
-Each phase ends with a working, deployable UI. Field order and hidden sets are verified against
-the stack's own form for the same type, on the live gateway, before the phase closes.
+`GatewayFormLayout` in `shared/models/inferrix-gateway-layout.models.ts`:
 
-- **G7.1 — the rules that apply to every type** No descriptor and no extractor yet. Hide
-  `alarmLevels` and `quantize`; render `timePeriod` and `maxBackOffPeriod` as paired inline
-  fields labelled from their parent ("Polling interval", "Polling interval type") rather than as
-  a fieldset called "Time period". Three rules, a few lines each, and they change the first rows
-  of all 63 data source forms and all 61 locator forms. Do this before building any machinery:
-  it is most of the visible difference, and it tells us how much of the rest is really left.
-- **G7.2 — pipeline** Extractor + descriptor format + renderer merge. Scope: the shared mesh-node
-  layout and the four types actually running on the bench gateway (`VIRTUAL`, `VIRTUAL_MESH_NODE`,
-  `INTERNAL`, `MESH_CONTROLLER`). Proves the whole path end to end against something real.
-- **G7.2b — conditional fields** The `*ngIf` rules the templates carry: `host`/`port`/
-  `encapsulated` against `transportType`, `ioLogFileSizeMBytes`/`maxHistoricalIOLogs` against
-  `logIO`.
-- **G7.3 — the ten rich protocol layouts** Modbus IP and serial, SNMP, MQTT, BACnet IP and MSTP,
-  OPC, scripting, HTTP JSON retriever, PoE lighting.
-- **G7.4 — the remaining small layouts** ~20 types, mostly four to eight fields.
-- **G7.5 — the point form** Raised in priority: it is further from the stack than any data source
-  form. Resolve the duplicate `settable` first, then group the shared `DataPointModel` machinery
-  (purge, text renderer, logging properties) the way G7.1 groups `alarmLevels`, so a point opens
-  on what it is rather than on how it is logged. The 61 locator layouts follow, same descriptor
-  and same extractor as the data source side.
-- **G7.6 — labels** Proxy allowlist for the dictionary route; per-field label key from the
-  extractor; fall back to `humanise()` when the gateway has no entry. Labels then track the
-  gateway's own build and language rather than a snapshot.
+| Key | Meaning |
+|---|---|
+| `hidden` | Never rendered — edited elsewhere, or has no effect |
+| `advanced` | Moved into the collapsed **Advanced** panel |
+| `options` | A fixed option list for a property the schema declares as a bare string |
+| `gatedOptions` | An option list chosen by another control's value, with a fallback type |
+| `visibleWhen` | Rendered only while another control holds one of these values |
+| `rows` | Explicit pairing, placed where its first field would have fallen anyway |
+
+Everything else falls out of one default: **scalars pair two to a row in schema order, and
+anything else takes a row of its own.** `VIRTUAL.DS` needed no keys at all because of it.
+
+**A model type with no layout renders exactly as it did before**, through `tb-dynamic-form`. That
+is what makes this sequence safe to do one type at a time — and it is why a type that needs no
+overrides still gets an empty `{}` entry, to mark it as worked through.
+
+## Sequence
+
+One data source at a time. A type is done when its **data source form and its data point form**
+both match the stack's fields, order and labels, are laid out the ThingsBoard way, and have been
+opened against the live gateway and read.
+
+Before a type is started, its rules are read out of the gateway's **Java**, not out of the stack
+webapp — the webapp is a second opinion, and W11/W13 below are what happens when only it is
+consulted.
+
+| # | Type | Locator | Status |
+|---|---|---|---|
+| 1 | `VIRTUAL.DS` | `VIRTUAL.PL` | **done** — 2026-09-25 |
+| 2 | `VIRTUAL_MESH_NODE.DS` | `VirtualMeshNodePointLocatorModel` | next; 3 live on the bench gateway |
+| 3 | `INTERNAL.DS` | `INTERNAL.PL` | 1 live |
+| 4 | `MESH_CONTROLLER.DS` | — | 1 live |
+| 5 | `MODBUS_IP.DS` | `MODBUS.PL` | largest locator (19 fields); needs an instance created on the gateway first |
+| 6 | `MODBUS_SERIAL.DS` | `MODBUS.PL` | locator shared with 5 |
+| 7 | `BACNET_IP.DS` | `BACNET_IP.PL` | needs an instance first |
+| 8 | `BACNET_MSTP.DS` | `BACNET_MSTP.PL` | `pointLocatorType` is null on 5.1.0 — falls back to a sibling point |
+| 9 | `SNMP.DS` | `SNMP.PL` | |
+| 10 | `MQTT.DS` | `MQTT.PL` | `writeOnly` secrets; empty must mean "unchanged" |
+| … | the remaining ~40 | | mostly four to eight fields |
+| last | the 13 types with no stack form | | left on the generic schema form — see Open decisions |
+
+### 1 — `VIRTUAL.DS` / `VIRTUAL.PL` (done, 2026-09-25)
+
+**Data source.** Already at field parity; only the layout was wrong. No layout keys needed.
+Cortex shows one field the stack does not (`xid`, as identity) and keeps `alarmLevels` and
+`quantize` behind Advanced, where the stack shows neither.
+
+**Data point.** The large one: ~30 controls before, 5 after.
+
+- `changeType` is `{"type": "string"}` in the schema, so it was a free text box. It is now a
+  select whose ten values and four per-`dataType` lists come from
+  `ChangeTypeVO.getChangeTypes(int)`.
+- Each change-specific field is tied to the change types whose `*ChangeVO` declares it, so a
+  brownian point shows `min`/`max`/`maxChange` and an attractor shows
+  `maxChange`/`volatility`/`attractionPointXid`.
+- `startValue` is a True/False list for a `BINARY` point and free text otherwise, matching
+  `VirtualPointLocatorVO.getStartValue()`.
+- The nine `DataPointModel` fields the stack's own form never shows moved to **Advanced**, except
+  four that are hidden: `enabled` (the table toggle owns it), `readPermission`/`setPermission`
+  (gateway-local permission strings), and `settable` — **`DataPointDao:184` writes
+  `vo.getPointLocator().isSettable()` into the column and every runtime check reads the locator,
+  so the model-level flag is dead** and showing both was two controls with one effect.
+- `relinquishable` and `configurationDescription` are hidden on the locator: a virtual point is
+  generated on the gateway, so there is nothing to relinquish to, and the description is a
+  translation key the gateway will not take back.
+
+**Verified.** Every `dataType`/`changeType` pair opened against `Inferrix Gateway 155` and its
+visible fields compared to the VO. A save round trip created a throwaway point
+(`NUMERIC`/`BROWNIAN`, min 0, max 100, maxChange 5, start 50), the gateway answered **201** and
+echoed `dsEdit.virtual.changeType.brownian`, and the point was deleted again. Editing an existing
+point through the form and changing nothing leaves its locator byte-identical, including the
+hidden fields.
+
+**Left for later, deliberately.** `attractionPointXid` is still a text box. The stack fills it
+from `getDatapointsByTypeId(3)` — every numeric point on the gateway, not just this data source's
+— and Cortex has no such call yet. It affects one field of one change type.
+
+## Handed over
+
+Defects found in the gateway's own webapp while matching its forms. Written up in
+`inferrixstack-webapp/docs/2026-09-25-webapp-open-items.md`; nothing in that repository was
+changed.
+
+- **W11 (P1)** — a multistate virtual point cannot be configured at all. The template switches on
+  `'MULTISTATE'`, a case its own dropdown can never emit (it emits `INCREMENT_MULTISTATE`), so the
+  value list and roll flag never render and the point saves with an empty value set. Cortex uses
+  the value the device defines, so this combination works here.
+- **W12 (P3)** — `app-datapoint-properties` is referenced by no template; every point's retention,
+  logging and text-renderer settings are unreachable from any data source form.
+- **W13 (P3)** — the attractor form labels `maxChange` "Minimum Change" while the brownian form
+  labels the same field "Maximum Change". `AnalogAttractorChangeRT:52` clamps to ±`maxChange`, so
+  it is a ceiling and the brownian wording is right.
 
 ## Open decisions
 
-Two calls that change the work and cannot be read out of the code.
+Two calls that change the work and cannot be read out of the code. Both have been taken the way
+the recommendation says, and both are reversible.
 
 1. **The 106 fields the stack hides.** Hide them too — exact parity, and Cortex can no longer
-   configure things the stack's UI cannot reach — or keep them behind an "Advanced" expander,
-   where the common case is clean but nothing is lost? *Recommendation: expander.* Several of
-   those fields are real (`alarmLevels`, `ioLogFileSizeMBytes`), and a gateway is not always
-   reachable through its own UI.
+   configure things the stack's UI cannot reach — or keep them behind an **Advanced** expander,
+   where the common case is clean but nothing is lost? *Taken: expander.* Several of those fields
+   are real (`alarmLevels`, `ioLogFileSizeMBytes`), and a gateway is not always reachable through
+   its own UI.
 2. **The 13 types with no stack form.** Leave them on today's generic schema form, or hide them
-   from the type picker for parity? *Recommendation: leave them.* Removing a working form to
-   match a UI that never had one is a loss.
+   from the type picker for parity? *Taken: leave them.* Removing a working form to match a UI
+   that never had one is a loss.
+
+## Superseded
+
+The original phase list (G7.2 pipeline, G7.2b conditional fields, G7.3–G7.4 layouts by protocol
+family, G7.5 the point form, G7.6 labels) cut the work by theme across all 63 types at once. It is
+replaced by the per-type **Sequence** above, which finishes one data source and its points before
+starting the next. Two pieces of it survive as cross-cutting work with no natural home in a single
+type: the dictionary proxy allowlist (was G7.6) and an extractor that diffs the stack webapp per
+release to catch fields it has gained (was G7.2). Neither is started.
+
+**G7.1 shipped as planned** (`da58696668`): `alarmLevels` and `quantize` grouped under Advanced,
+`timePeriod` labelled "Polling interval" with "Period"/"Unit" children, and 16 label overrides.

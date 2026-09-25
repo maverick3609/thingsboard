@@ -9,6 +9,7 @@ import { AppState } from '@core/core.state';
 import { DialogComponent } from '@shared/components/dialog.component';
 import { FormProperty, FormPropertyType } from '@shared/models/dynamic-form.models';
 import { GatewayRecipient } from '@shared/models/inferrix-gateway-event.models';
+import { GatewayFormLayout } from '@shared/models/inferrix-gateway-layout.models';
 
 
 /**
@@ -63,8 +64,16 @@ export interface GatewayModelDialogData {
   model: any;
   /** The model's own fields, mapped from the gateway's schema. */
   properties: FormProperty[];
+  /**
+   * How to lay those fields out, for a model type that has been worked through.
+   *
+   * Its absence is what keeps this rollout one protocol at a time: a type with no layout renders
+   * exactly as it did before, through `tb-dynamic-form`. See {@link GATEWAY_FORM_LAYOUTS}.
+   */
+  layout?: GatewayFormLayout;
   /** A data point's nested locator, whose concrete type follows its data source's protocol. */
   locatorProperties?: FormProperty[];
+  locatorLayout?: GatewayFormLayout;
   locatorTitle?: string;
   readonly: boolean;
   /** Shown instead of a locator form when the gateway published no schema for that protocol. */

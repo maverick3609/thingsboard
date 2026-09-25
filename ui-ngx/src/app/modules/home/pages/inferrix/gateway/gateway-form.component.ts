@@ -6,7 +6,7 @@ import { ControlValueAccessor, NG_VALIDATORS, NG_VALUE_ACCESSOR, UntypedFormBuil
   UntypedFormControl, UntypedFormGroup, ValidatorFn, Validators } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { coerceBoolean } from '@shared/decorators/coercion';
-import { FormProperty, FormPropertyType } from '@shared/models/dynamic-form.models';
+import { FormProperty, FormPropertyType, FormSelectItem } from '@shared/models/dynamic-form.models';
 import { GATEWAY_ADVANCED_GROUP } from '@shared/models/inferrix-gateway-schema.models';
 import { GatewayFormLayout } from '@shared/models/inferrix-gateway-layout.models';
 
@@ -37,6 +37,9 @@ const PAIRABLE_TYPES = [FormPropertyType.text, FormPropertyType.password, FormPr
  */
 const own = <T>(table: {[key: string]: T} | undefined, key: string): T | undefined =>
   table && Object.prototype.hasOwnProperty.call(table, key) ? table[key] : undefined;
+
+/** What {@link GatewayFormComponent.runtimeOptions} answers when a form looks nothing up. */
+const NO_RUNTIME_OPTIONS: {[id: string]: FormSelectItem[]} = Object.create(null);
 
 /** Fields on one line. One or two when they pair; always one when they do not. */
 export interface GatewayFormRow {
@@ -104,13 +107,13 @@ export class GatewayFormComponent implements ControlValueAccessor, OnChanges {
   /** The same, for the `properties` input: a new array each pass would reset the form it built. */
   delegatedProperties: {[id: string]: FormProperty[]} = Object.create(null);
 
-  private value: {[id: string]: any} = {};
-  private shown: FormProperty[] = [];
+  protected value: {[id: string]: any} = {};
+  protected shown: FormProperty[] = [];
   private propagateChange: (value: any) => void = () => {};
 
   constructor(private fb: UntypedFormBuilder,
-              private destroyRef: DestroyRef,
-              private cd: ChangeDetectorRef) {
+              protected destroyRef: DestroyRef,
+              protected cd: ChangeDetectorRef) {
     this.form = this.fb.group({});
     this.form.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
       this.value = {...this.value, ...this.form.getRawValue()};
@@ -259,7 +262,32 @@ export class GatewayFormComponent implements ControlValueAccessor, OnChanges {
     return RENDERED_TYPES.includes(property.type);
   }
 
+  /**
+   * Option lists a subclass has fetched from the gateway, by property id.
+   *
+   * The generic renderer has none: a layout is a constant, and a list that has to be *looked up* is
+   * the one thing it cannot describe. `VIRTUAL.PL.attractionPointXid` is the first -- the choices
+   * are every numeric point on the gateway, which is an HTTP call, so the type gets a component.
+   *
+   * Consulted on every layout pass rather than when controls are built, so a list arriving after
+   * the form is on screen turns the field from a text box into a select without disturbing what the
+   * operator has already typed elsewhere.
+   */
+  protected runtimeOptions(): {[id: string]: FormSelectItem[]} {
+    return NO_RUNTIME_OPTIONS;
+  }
+
+  /** Re-reads {@link runtimeOptions}. A subclass calls this when a lookup returns. */
+  protected refresh(): void {
+    this.layoutRows();
+    this.cd.markForCheck();
+  }
+
   private gatedProperty(property: FormProperty): FormProperty {
+    const runtime = own(this.runtimeOptions(), property.id);
+    if (runtime && this.narrowable(property)) {
+      return {...property, type: FormPropertyType.select, items: runtime};
+    }
     const gate = own(this.layout?.gatedOptions, property.id);
     if (!gate || !this.narrowable(property)) {
       return property;
@@ -306,7 +334,7 @@ export class GatewayFormComponent implements ControlValueAccessor, OnChanges {
    * labelled box and giving a row of its own to anything that does not. Visibility is applied
    * before pairing, so a hidden field does not leave a gap beside its neighbour.
    */
-  private layoutRows(): void {
+  protected layoutRows(): void {
     const advanced = new Set([...(this.layout?.advanced ?? []),
       ...this.shown.filter(property => property.group === GATEWAY_ADVANCED_GROUP)
         .map(property => property.id)]);

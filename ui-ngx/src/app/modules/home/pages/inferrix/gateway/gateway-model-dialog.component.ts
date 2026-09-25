@@ -79,6 +79,20 @@ export interface GatewayModelDialogData {
   /** A data point's nested locator, whose concrete type follows its data source's protocol. */
   locatorProperties?: FormProperty[];
   locatorLayout?: GatewayFormLayout;
+  /**
+   * The locator's model type, which is how a protocol that needs a **component** rather than a
+   * layout gets one.
+   *
+   * A layout is a constant, and some types need a list looked up instead -- `VIRTUAL.PL` offers
+   * every numeric point on the gateway as an attraction target. Those types get a component
+   * extending `GatewayFormComponent`, chosen by this value in the template. A `@switch` rather
+   * than a registry on purpose: there is one entry, and a component created through
+   * `ngComponentOutlet` would need its value binding wired by hand. Worth revisiting if the list
+   * ever outgrows a screenful.
+   */
+  locatorType?: string;
+  /** The gateway a per-type locator component queries. Unused by the generic renderer. */
+  deviceId?: string;
   locatorTitle?: string;
   readonly: boolean;
   /** Shown instead of a locator form when the gateway published no schema for that protocol. */

@@ -51,9 +51,23 @@
       is retention and rendering, which the gateway's own point form does not show at all.
     -->
     @if (data.locatorProperties?.length && data.locatorLayout) {
-      <tb-gateway-form [properties]="data.locatorProperties" [layout]="data.locatorLayout"
-                       [disabled]="data.readonly" [(ngModel)]="locatorValues"
-                       [ngModelOptions]="{standalone: true}"></tb-gateway-form>
+      @switch (data.locatorType) {
+        <!--
+          A protocol whose form needs more than a layout can say. `VIRTUAL.PL` offers every numeric
+          point on the gateway as an attraction target, which is a lookup rather than a constant.
+        -->
+        @case ('VIRTUAL.PL') {
+          <tb-virtual-point-form [properties]="data.locatorProperties"
+                                 [layout]="data.locatorLayout" [deviceId]="data.deviceId"
+                                 [disabled]="data.readonly" [(ngModel)]="locatorValues"
+                                 [ngModelOptions]="{standalone: true}"></tb-virtual-point-form>
+        }
+        @default {
+          <tb-gateway-form [properties]="data.locatorProperties" [layout]="data.locatorLayout"
+                           [disabled]="data.readonly" [(ngModel)]="locatorValues"
+                           [ngModelOptions]="{standalone: true}"></tb-gateway-form>
+        }
+      }
     }
 
     <!--

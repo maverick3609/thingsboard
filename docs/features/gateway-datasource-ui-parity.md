@@ -284,11 +284,9 @@ echoed `dsEdit.virtual.changeType.brownian`, and the point was deleted again. Ed
 point through the form and changing nothing leaves its locator byte-identical, including the
 hidden fields.
 
-**Left for later, deliberately.** `attractionPointXid` is still a text box. The stack fills it
-from `getDatapointsByTypeId(3)` — every numeric point on the gateway, not just this data source's
-— and Cortex has no such call yet. It affects one field of one change type, and it is the first
-thing the **per-type component** hatch below is for: a picker has to query the gateway, which a
-descriptor cannot express.
+**`attractionPointXid` closed 2026-09-25**, by the per-type component described below — it is a
+picker over every numeric point on the gateway, which is a lookup rather than a constant and so
+could never have been a layout key.
 
 ### 2 — `VIRTUAL_MESH_NODE.DS` / `VIRTUAL_MESH_NODE.PL` (done, 2026-09-25)
 
@@ -351,9 +349,32 @@ to query the gateway for numeric points and offer them. So the shape is ThingsBo
 and `settingsDirective?: string` (a named per-type component), with 95 hand-written settings
 components sitting beside the generic form. A widget opts into one only when it needs one.
 
-**Decision.** Generic renderer stays the default. `GatewayFormLayout` gains a `component` key that
-replaces the renderer for that type entirely, resolved through the same `gatewayFormLayout()`
-lookup. It is built when the first type needs it — `attractionPointXid` — not before.
+**Decision.** Generic renderer stays the default. A type that needs behaviour gets a component
+extending `GatewayFormComponent`, which inherits its template, its form group and its layout
+handling and adds only what the descriptor cannot say.
+
+**Built 2026-09-25, with the one consumer that justified it.**
+`VirtualPointFormComponent extends GatewayFormComponent` is 60 lines: it asks the gateway for
+every numeric point and supplies them as the option list for `attractionPointXid`, which was a
+text box an operator had to paste an xid into. The base gained one hook —
+`protected runtimeOptions()`, consulted on every layout pass beside the existing `gatedOptions`,
+so a list arriving after the form is on screen turns a text box into a select without disturbing
+anything the operator has typed.
+
+The dialog chooses the component with a `@switch` on the locator's model type rather than a
+registry: there is one entry, and a component created through `ngComponentOutlet` would need its
+value binding wired by hand. That becomes a registry if the list outgrows a screenful.
+
+**Verified.** Numeric / Attractor on a `VIRTUAL.PL` point offers 27 options on gateway 155 —
+exactly what `GET /v2/data-point?eq(dataType,NUMERIC)` returns — sorted by name, and the payload
+carries the **xid** (`internal_num_mailing_lists`), not the label. The save was captured at the
+wire and blocked; a REST read confirms the point is still `BINARY`/`NO_CHANGE` with
+`attractionPointXid: null`.
+
+The gateway's own picker is worse than it looks, and W14 records it: its query is
+`'?eq(dataTypeId,' + typeId` with no closing paren, so it returns *every* point on the gateway.
+Closing the paren would return none — `dataTypeId` is not a filterable property; `dataType` is,
+by name.
 
 ## Handed over
 
@@ -370,6 +391,10 @@ changed.
 - **W13 (P3)** — the attractor form labels `maxChange` "Minimum Change" while the brownian form
   labels the same field "Maximum Change". `AnalogAttractorChangeRT:52` clamps to ±`maxChange`, so
   it is a ceiling and the brownian wording is right.
+- **W14 (P2)** — the attraction point picker offers every point on the gateway. Its query is
+  `'?eq(dataTypeId,' + typeId` with no closing paren, so the gateway ignores it; closing it would
+  return nothing, because `dataTypeId` is not filterable and `dataType` is. Measured live: 100
+  unfiltered, 0 well-formed, 27 with `eq(dataType,NUMERIC)`.
 
 Stack-side findings go to `Inferrix-stack/docs/specs/` instead. From type 2, in
 `2026-09-25-mesh-node-provisioned-rows.md`:

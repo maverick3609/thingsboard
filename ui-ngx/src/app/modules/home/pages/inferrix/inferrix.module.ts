@@ -39,6 +39,7 @@ import { GatewayPublishersComponent }
 import { GatewayProvisioningComponent }
   from '@home/pages/inferrix/gateway/gateway-provisioning.component';
 import { GatewayFormComponent } from '@home/pages/inferrix/gateway/gateway-form.component';
+import { VirtualPointFormComponent } from '@home/pages/inferrix/gateway/virtual-point-form.component';
 import { GatewayModelDialogComponent }
   from '@home/pages/inferrix/gateway/gateway-model-dialog.component';
 import { GatewayRecipientsComponent }
@@ -90,6 +91,7 @@ import { WidgetSettingsCommonModule }
     GatewayPublishersComponent,
     GatewayProvisioningComponent,
     GatewayFormComponent,
+    VirtualPointFormComponent,
     GatewayModelDialogComponent,
     GatewayRecipientsComponent,
     GatewayDetectorsDialogComponent,

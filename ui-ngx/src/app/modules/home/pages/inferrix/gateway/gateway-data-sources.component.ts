@@ -253,6 +253,8 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
           layout: locatorLayout ? gatewayFormLayout('DataPointModel') : undefined,
           locatorProperties,
           locatorLayout,
+          locatorType,
+          deviceId: this.deviceId,
           locatorTitle: this.translate.instant('inferrix.gateway.point-locator'),
           locatorMissing: !locatorProperties.length,
           readonly: this.readonly

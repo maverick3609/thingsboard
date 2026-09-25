@@ -62,6 +62,9 @@ const FIELD_LABELS: {[property: string]: string} = {
   offset: 'Offset (0-based)',
   discardDataDelay: 'Discard data delay (ms)',
   registerCount: 'Number of registers',
+  // The stack calls it "Device id" wherever an operator types one, and keeps "Slave Monitor" for
+  // the toggle beside it. Both are its words; the inconsistency is the stack's.
+  slaveId: 'Device id',
   charset: 'Character encoding',
   createSlaveMonitorPoints: 'Create device monitor points',
   multipleWritesOnly: 'Use multiple write commands only',
@@ -71,6 +74,7 @@ const FIELD_LABELS: {[property: string]: string} = {
   privProtocol: 'Privacy protocol',
   brokerUri: 'Broker Url',
   logIO: 'Log I/O',
+  ioLogFileSizeMBytes: 'I/O log file size (MB)',
   maxHistoricalIOLogs: 'Max Historical IO Logs',
   binary0Value: 'Binary 0 Value',
   // A virtual point's simulator settings. All five are declared on `VIRTUAL.PL` and on no other
@@ -384,6 +388,23 @@ const toProperty = (key: string, raw: any, required: boolean, doc: GatewaySchema
 };
 
 /**
+ * `userPassword` becomes "User password".
+ *
+ * Stack ask A1 ships no i18n labels and no help text, and will not: the schema is generated from
+ * Java classes. Blocking on a dictionary lookup that never answers would leave every form showing
+ * raw identifiers, so the field name is derived from the property name and escaped like any other
+ * device-supplied string.
+ */
+const humanise = (key: string): string => {
+  const words = escapeCell(key)
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+};
+
+/**
  * A select option's **value** is submitted back to the gateway verbatim, so it must not be escaped
  * — a legitimate value containing `&` would be sent as `&amp;` and rejected. That leaves it as the
  * one string in this mapper that reaches the form model unescaped, so instead of sanitising it,
@@ -400,21 +421,9 @@ const selectItems = (values: any[]): FormSelectItem[] =>
     .slice(0, SCHEMA_MAX_PROPERTIES)
     .filter(value => typeof value === 'number'
       || (typeof value === 'string' && ENUM_VALUE.test(value)))
-    .map(value => ({value, label: escapeCell(value)}));
+    // Labelled the way the rest of ThingsBoard labels a dropdown. The raw value is a Java enum
+    // constant -- `COIL_STATUS`, `NOT_SETTABLE` -- because the gateway's translated names for them
+    // live behind `/v2/<module>/attributes/*`, which the proxy does not carry. A layout's `options`
+    // overrides this where humanising is wrong, which is acronyms: `TCP` would become "Tcp".
+    .map(value => ({value, label: humanise(String(value))}));
 
-/**
- * `userPassword` becomes "User password".
- *
- * Stack ask A1 ships no i18n labels and no help text, and will not: the schema is generated from
- * Java classes. Blocking on a dictionary lookup that never answers would leave every form showing
- * raw identifiers, so the field name is derived from the property name and escaped like any other
- * device-supplied string.
- */
-const humanise = (key: string): string => {
-  const words = escapeCell(key)
-    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-    .replace(/[_-]+/g, ' ')
-    .trim()
-    .toLowerCase();
-  return words.charAt(0).toUpperCase() + words.slice(1);
-};

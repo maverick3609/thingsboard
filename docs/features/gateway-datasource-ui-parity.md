@@ -213,7 +213,7 @@ ours to add.
 |---|---|
 | `hidden` | Never rendered — edited elsewhere, or has no effect |
 | `advanced` | Moved into the collapsed **Advanced** panel |
-| `options` | A fixed option list for a property the schema declares as a bare string |
+| `options` | A fixed option list, for a bare string or to relabel an enum the schema already declares |
 | `gatedOptions` | An option list chosen by another control's value, with a fallback type |
 | `visibleWhen` | Rendered only while another control holds one of these values |
 | `rows` | Explicit pairing, placed where its first field would have fallen anyway |
@@ -241,16 +241,22 @@ consulted.
 |---|---|---|---|
 | 1 | `VIRTUAL.DS` | `VIRTUAL.PL` | **done** — 2026-09-25 |
 | 2 | `VIRTUAL_MESH_NODE.DS` | `VIRTUAL_MESH_NODE.PL` | **done** — 2026-09-25 |
-| 3 | `INTERNAL.DS` | `INTERNAL.PL` | next; 1 live |
-| 4 | `MESH_CONTROLLER.DS` | — | 1 live |
-| 5 | `MODBUS_IP.DS` | `MODBUS.PL` | largest locator (19 fields); needs an instance created on the gateway first |
-| 6 | `MODBUS_SERIAL.DS` | `MODBUS.PL` | locator shared with 5 |
-| 7 | `BACNET_IP.DS` | `BACNET_IP.PL` | needs an instance first |
-| 8 | `BACNET_MSTP.DS` | `BACNET_MSTP.PL` | `pointLocatorType` is null on 5.1.0 — falls back to a sibling point |
-| 9 | `SNMP.DS` | `SNMP.PL` | |
-| 10 | `MQTT.DS` | `MQTT.PL` | `writeOnly` secrets; empty must mean "unchanged" |
+| 3 | `MODBUS_IP.DS` | `MODBUS.PL` | **done** — 2026-09-25 |
+| 4 | `MODBUS_SERIAL.DS` | `MODBUS.PL` | next; locator already done with 3 — only the serial transport fields are new |
+| 5 | `BACNET_IP.DS` | `BACNET_IP.PL` | needs an instance first |
+| 6 | `BACNET_MSTP.DS` | `BACNET_MSTP.PL` | `pointLocatorType` is null on 5.1.0 — falls back to a sibling point |
+| 7 | `META.DS` | `META.PL` | |
+| 8 | `SNMP.DS` | `SNMP.PL` | |
+| 9 | `MQTT.DS` | `MQTT.PL` | `writeOnly` secrets; empty must mean "unchanged" |
+| 10 | `HTTP_RECEIVER.DS` | `HTTP_RECEIVER.PL` | "HTTP" is two types on this stack; both are in scope |
+| 11 | `HTTP_JSON_RETRIEVER.DS` | `HTTP_JSON_RETRIEVER.PL` | the other half of 10 |
+| 12 | `INTERNAL.DS` | `INTERNAL.PL` | 1 live; deferred behind the protocols above |
+| 13 | `MESH_CONTROLLER.DS` | — | 1 live |
 | … | the remaining ~40 | | mostly four to eight fields |
 | last | the 13 types with no stack form | | left on the generic schema form — see Open decisions |
+
+Order 3–11 set by the user on 2026-09-25: the protocols a real installation is wired with come
+before the two that happen to be live on the bench gateway.
 
 ### 1 — `VIRTUAL.DS` / `VIRTUAL.PL` (done, 2026-09-25)
 
@@ -331,6 +337,85 @@ direct REST read afterwards confirms the gateway is untouched. `VIRTUAL.DS` and 
 re-checked for regression — unchanged, all controls still editable, Add still offered. Console
 clean.
 
+### 3 — `MODBUS_IP.DS` / `MODBUS.PL` (done, 2026-09-25)
+
+The first real protocol, and the first locator whose fields depend on each other. Every rule below
+came out of `ModbusPointLocatorVO`, `ModbusPointLocatorModel` and modbus4j 3.1.1's own locator
+classes; the stack webapp agreed field for field, which made it a second opinion rather than the
+source, and disagreed in three places that became W15–W17.
+
+**Data source.** 23 fields: the 21 the stack shows, plus `alarmLevels` and `quantize`, which it
+does not — kept behind Advanced under decision 1 below. Eight stay on the form: the poll
+(`timePeriod`, `timeout`, `retries`), `createSlaveMonitorPoints`, and the connection
+(`transportType`, `host`, `port`, `encapsulated`). The other fifteen move to **Advanced** —
+register limits, I/O logging, socket and back-off tuning — of which thirteen are named by the
+layout and two arrive already grouped by the mapper. The stack puts all 21 on one page, which is
+why finding the host there takes a scroll.
+
+`transportType` is the one enum given an explicit option list, and only to keep its labels: the
+schema already declares it, and humanising a Java constant is right for `COIL_STATUS` and wrong
+for `TCP`.
+
+**Data point.** Six of the nineteen locator fields are hidden because nothing an operator types
+into them reaches the device: `dataType` and `settable` are computed by the VO from the fields
+above them, `rangeId` and `modbusDataTypeId` are derived getters no setter reads, and `toVO()`
+never touches `relinquishable`. The other thirteen follow the register range:
+
+| Range | Data types | Extra fields |
+|---|---|---|
+| COIL_STATUS | `BINARY` only | `writeType` |
+| INPUT_STATUS | `BINARY` only | — |
+| HOLDING_REGISTER | all 32 | `bit` \| `registerCount`+`charset` \| `multiplier`+`additive`+`multistateNumeric`, and `writeType` |
+| INPUT_REGISTER | all 32 | the same, without `writeType` |
+
+`writeType` follows `settableRange()` exactly — `range == 1 \|\| range == 3`, a coil or a holding
+register, the two a master may write. `bit` is gated on the data type rather than the range, which
+is the field that decides it; the cost is that it shows on a coil point, where the range has
+already forced the type to `BINARY` and modbus4j ignores it.
+
+**Three lists hardcoded rather than fetched.** The gateway serves its ranges, data types and write
+types at `/v2/modbus/attributes/*` with translated names, and that route is **not** in the proxy
+allowlist — confirmed live today, 403, the same answer as a route that does not exist. It does not
+earn an entry the way `/v2/bacnet/object-types` does: those are per-install rows and these are a
+compile-time `ExportCodes` table. So the 32 codes sit in the layout with a unit test asserting
+they still match the Java, and `charset` gets `StandardCharsets` names instead of the stack's
+"ASCII or RTU" (W15 — `Charset.forName("RTU")` throws). No backend change, no deploy.
+
+**Gating the data type rather than greying it out.** The stack disables the picker on a coil range
+but keeps whatever was selected, so a 4-byte float point switched to COIL_STATUS is stored as
+NUMERIC and then throws `IllegalDataTypeException` when its locator is built — after the row
+exists. Cortex clears it instead: one extra click on a range switch, and no way to save a locator
+the device refuses to construct. W16 and D39.
+
+**Two renderer bugs this type found, both fixed at the root.**
+
+*The Advanced panel rendered blank.* TB's `.tb-form-row` carries `height: 100%`, and Material gives
+an expanded panel body a definite height to animate to — so every row resolved that percentage to
+the whole panel and only the first was on screen. Invisible with two advanced fields, obvious with
+thirteen. The fix is the `<section class="tb-form-panel">` that ThingsBoard's own advanced panels
+wrap their rows in, which this form had on its main body and not on its panel.
+
+*An add posted `null` for every untouched field.* The form builds a control per schema property, so
+an add sent `timeout: null`, and the gateway's defaults are Java field initialisers that Jackson
+applies only when the key is **absent** — a null lands on a primitive `int` as 0. The first save
+came back `422`: *"Must be greater than zero"* on four fields the operator never saw. Empty is now
+dropped on an add and kept on an edit, which is the same rule `writeOnly` secrets already used and
+fixes every protocol's add rather than this one's.
+
+**Verified.** A throwaway `ZZ Modbus probe` created through the form on `Inferrix Gateway 155` and
+deleted afterwards; the gateway is back at 12 data sources and 100 points. The source came back
+with every gateway default applied (`timeout 500`, `retries 2`, `maxReadBitCount 2000`,
+`maxReadRegisterCount 125`, `maxWriteRegisterCount 120`, `scaleFactor 1.5`, `lingerTime -1`) and
+`enabled: false`, so it never polled. A point saved as HOLDING_REGISTER / FOUR_BYTE_FLOAT / device
+3 / offset 40 / multiplier 0.1 / SETTABLE, and the gateway derived `dataType: NUMERIC`,
+`settable: true`, `rangeId: 3`, `modbusDataTypeId: 8` — its own `configurationDescription` reads
+"Device id 3, offset 40". Editing it wrote `additive: 2.5` and left `bit`, `registerCount` and
+`charset` untouched, which is the check that a gate-hidden field still round-trips. All four ranges
+and the three data-type families were stepped through on screen and showed exactly the fields in
+the table above. `VIRTUAL.DS`/`VIRTUAL.PL` and `VIRTUAL_MESH_NODE.DS`/`VIRTUAL_MESH_NODE.PL`
+re-checked for regression — unchanged, read-only still read-only, Add still suppressed. Console
+clean.
+
 ## Per-type components
 
 Settled 2026-09-25, after the question was raised directly: **is one renderer for 148 model types
@@ -396,6 +481,15 @@ changed.
   return nothing, because `dataTypeId` is not filterable and `dataType` is. Measured live: 100
   unfiltered, 0 well-formed, 27 with `eq(dataType,NUMERIC)`.
 
+- **W15 (P2)** — the Modbus character-encoding picker offers `ASCII` and `RTU`. `RTU` is a Modbus
+  *serial framing* mode, pasted in with its `modbusSerial.encoding.*` translation keys;
+  `Charset.forName("RTU")` throws, so the option cannot work.
+- **W16 (P1)** — switching a register point to a coil range greys the data-type picker out but
+  keeps its value, so the point is stored as NUMERIC and `createBaseLocator()` throws
+  `IllegalDataTypeException` afterwards. Cortex gates the list instead.
+- **W17 (P2)** — the two I/O log inputs on the Modbus/IP form carry no `[(ngModel)]` at all, so
+  `ioLogFileSizeMBytes` and `maxHistoricalIOLogs` are unsettable from that form.
+
 Stack-side findings go to `Inferrix-stack/docs/specs/` instead. From type 2, in
 `2026-09-25-mesh-node-provisioned-rows.md`:
 
@@ -407,6 +501,18 @@ Stack-side findings go to `Inferrix-stack/docs/specs/` instead. From type 2, in
 - **A14 (P3)** — `attributeId`, `type` and `settable` on `VIRTUAL_MESH_NODE.PL` carry no
   `description`, so a schema-driven client shows them unlabelled. `type` would be better as an
   `enum`: `AttributeDataType` declares all 42 values and `toVO` calls `valueOf` on it unguarded.
+
+From type 3, in `2026-09-25-modbus-locator-derivations.md`:
+
+- **D39 (P2)** — `ModbusPointLocatorVO.getDataTypeId()` reads `modbusDataType` without reading
+  `range`, so a coil point carrying a numeric type is stored as NUMERIC and then throws when
+  modbus4j builds its locator. `validate()` does not catch it: it only rejects `rangeId == -1` and
+  `modbusDataTypeId == -1`, and both resolve.
+- **A15 (P3)** — `MODBUS.PL.bit` is published as `{"type": "string", "format": "byte"}` — springdoc
+  rendering a Java `byte` as base64 — where the wire format is an integer, and with no
+  `minimum`/`maximum` although `ModbusUtils.validateBit` throws outside 0-15.
+- **A16 (P3)** — `modbusDataType` is a bare string with 32 legal values, while `range` and
+  `writeType` on the same model both carry `allowableValues`.
 
 ## Open decisions
 

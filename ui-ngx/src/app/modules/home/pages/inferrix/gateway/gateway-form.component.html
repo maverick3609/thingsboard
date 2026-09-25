@@ -24,7 +24,15 @@
         </mat-panel-title>
       </mat-expansion-panel-header>
       <ng-template matExpansionPanelContent>
-        <ng-container *ngTemplateOutlet="rowsTpl; context: {rows: advancedRows}"></ng-container>
+        <!--
+          The rows need a `tb-form-panel` over them, as they do in ThingsBoard's own advanced
+          panels. `.tb-form-row` carries `height: 100%`, and Material gives the expanded panel body
+          a definite height to animate to -- so without a flex column between them every row
+          resolves that percentage to the whole panel and only the first one is on screen.
+        -->
+        <section class="tb-form-panel no-gap no-border no-padding">
+          <ng-container *ngTemplateOutlet="rowsTpl; context: {rows: advancedRows}"></ng-container>
+        </section>
       </ng-template>
     </mat-expansion-panel>
   }

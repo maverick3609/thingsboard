@@ -205,7 +205,17 @@ export class GatewayModelDialogComponent
   }
 
   /**
-   * The form's values, minus the secrets the operator did not type into.
+   * The form's values, minus the ones that would overwrite a default with nothing.
+   *
+   * **On an add, an empty field is dropped rather than sent as null.** The form builds a control
+   * for every property the schema declares, so an untouched number posts `null` -- and the
+   * gateway's models carry their defaults as Java field initialisers, which Jackson applies only
+   * when the key is *absent*. A null lands on a primitive `int` as 0, and a Modbus/IP source is
+   * then refused with "Must be greater than zero" on four fields the operator never saw. Leaving
+   * them out is what lets `timeout = 500`, `maxReadBitCount = 2000` and the rest take effect.
+   *
+   * On an edit every key is sent, empty included: a field cleared on purpose is a real change and
+   * the model being spread underneath would otherwise put the old value straight back.
    *
    * A `writeOnly` field -- an MQTT broker password, an OPC password, a private key -- is accepted by
    * the gateway and never returned by it. So the form always starts empty for one, whether or not a
@@ -226,7 +236,8 @@ export class GatewayModelDialogComponent
     const kept: {[id: string]: any} = {};
     Object.keys(values ?? {}).forEach(id => {
       const value = values[id];
-      if (secrets.has(id) && (value === null || value === undefined || value === '')) {
+      const empty = value === null || value === undefined || value === '';
+      if (empty && (this.isAdd || secrets.has(id))) {
         return;
       }
       kept[id] = value;

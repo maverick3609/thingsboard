@@ -41,7 +41,13 @@ export interface GatewayFormLayout {
    * of a provisioned point is {@link readonly}.
    */
   provisionedPoints?: boolean;
-  /** A fixed option list for a property the schema declares as a bare string. */
+  /**
+   * A fixed option list for a property the schema declares as a bare string.
+   *
+   * Also used to *relabel* an enum the schema already declares, where humanising its constants
+   * reads wrongly -- `TCP_KEEP_ALIVE` would become "Tcp keep alive". Naming the same values is
+   * what makes that safe: a list that dropped one would hide a transport the gateway accepts.
+   */
   options?: {[id: string]: FormSelectItem[]};
   /** An option list chosen by another control's value. */
   gatedOptions?: {[id: string]: GatewayGatedOptions};
@@ -114,6 +120,107 @@ const RANGED = ['BROWNIAN', 'INCREMENT_ANALOG', 'DECREMENT_ANALOG', 'RANDOM_ANAL
 
 /** Change types that count and so can wrap: `roll` on the VO. */
 const ROLLING = ['INCREMENT_MULTISTATE', 'INCREMENT_ANALOG', 'DECREMENT_ANALOG'];
+
+/**
+ * Every Modbus data type the gateway decodes, in the order its own table declares them.
+ *
+ * From `ModbusPointLocatorVO.MODBUS_DATA_TYPE_CODES`, not from the gateway's webapp. The gateway
+ * serves the same list at `/v2/modbus/attributes/data-type` with translated names, and the proxy
+ * does not carry that route -- it is a compile-time `ExportCodes` table, not per-install rows, so
+ * unlike BACnet's object types there is nothing to look up. Hardcoding it costs a constant;
+ * allowlisting the route would cost a platform release.
+ *
+ * `modbusDataType` is declared a bare string, so without this an operator types `FOUR_BYTE_FLOAT`
+ * by hand and a typo is a 422 from the gateway's own `validate()`, which rejects anything the table
+ * does not name.
+ */
+const MODBUS_DATA_TYPES: FormSelectItem[] = [
+  {value: 'BINARY', label: 'Binary'},
+  {value: 'TWO_BYTE_INT_UNSIGNED', label: '2-byte integer, unsigned'},
+  {value: 'TWO_BYTE_INT_SIGNED', label: '2-byte integer, signed'},
+  {value: 'TWO_BYTE_INT_UNSIGNED_SWAPPED', label: '2-byte integer, unsigned, swapped'},
+  {value: 'TWO_BYTE_INT_SIGNED_SWAPPED', label: '2-byte integer, signed, swapped'},
+  {value: 'FOUR_BYTE_INT_UNSIGNED', label: '4-byte integer, unsigned'},
+  {value: 'FOUR_BYTE_INT_SIGNED', label: '4-byte integer, signed'},
+  {value: 'FOUR_BYTE_INT_UNSIGNED_SWAPPED', label: '4-byte integer, unsigned, swapped'},
+  {value: 'FOUR_BYTE_INT_SIGNED_SWAPPED', label: '4-byte integer, signed, swapped'},
+  {value: 'FOUR_BYTE_INT_UNSIGNED_SWAPPED_SWAPPED',
+    label: '4-byte integer, unsigned, swapped words and bytes'},
+  {value: 'FOUR_BYTE_INT_SIGNED_SWAPPED_SWAPPED',
+    label: '4-byte integer, signed, swapped words and bytes'},
+  {value: 'FOUR_BYTE_FLOAT', label: '4-byte floating point'},
+  {value: 'FOUR_BYTE_FLOAT_SWAPPED', label: '4-byte floating point, swapped'},
+  {value: 'FOUR_BYTE_MOD_10K', label: '4-byte mod 10k'},
+  {value: 'FOUR_BYTE_MOD_10K_SWAPPED', label: '4-byte mod 10k, swapped'},
+  {value: 'SIX_BYTE_MOD_10K', label: '6-byte mod 10k'},
+  {value: 'SIX_BYTE_MOD_10K_SWAPPED', label: '6-byte mod 10k, swapped'},
+  {value: 'EIGHT_BYTE_MOD_10K', label: '8-byte mod 10k'},
+  {value: 'EIGHT_BYTE_MOD_10K_SWAPPED', label: '8-byte mod 10k, swapped'},
+  {value: 'EIGHT_BYTE_INT_UNSIGNED', label: '8-byte integer, unsigned'},
+  {value: 'EIGHT_BYTE_INT_SIGNED', label: '8-byte integer, signed'},
+  {value: 'EIGHT_BYTE_INT_UNSIGNED_SWAPPED', label: '8-byte integer, unsigned, swapped'},
+  {value: 'EIGHT_BYTE_INT_SIGNED_SWAPPED', label: '8-byte integer, signed, swapped'},
+  {value: 'EIGHT_BYTE_FLOAT', label: '8-byte floating point'},
+  {value: 'EIGHT_BYTE_FLOAT_SWAPPED', label: '8-byte floating point, swapped'},
+  {value: 'TWO_BYTE_BCD', label: '2-byte BCD'},
+  {value: 'ONE_BYTE_INT_UNSIGNED_LOWER', label: '1-byte integer, unsigned, lower'},
+  {value: 'ONE_BYTE_INT_UNSIGNED_UPPER', label: '1-byte integer, unsigned, upper'},
+  {value: 'FOUR_BYTE_BCD', label: '4-byte BCD'},
+  {value: 'FOUR_BYTE_BCD_SWAPPED', label: '4-byte BCD, swapped'},
+  {value: 'CHAR', label: 'Char'},
+  {value: 'VARCHAR', label: 'Varchar'}
+];
+
+/** The one data type a coil or input-status point can hold. See {@link MODBUS_RANGE_TYPES}. */
+const MODBUS_BINARY_ONLY = MODBUS_DATA_TYPES.filter(item => item.value === 'BINARY');
+
+/** Data types decoded as a number, which are the only ones a scale and offset apply to. */
+const MODBUS_NUMERIC_TYPES = MODBUS_DATA_TYPES
+  .filter(item => !['BINARY', 'CHAR', 'VARCHAR'].includes(item.value))
+  .map(item => item.value);
+
+/**
+ * Which data types each register range admits.
+ *
+ * A coil and an input status are single bits on the wire, and modbus4j says so with an exception
+ * rather than a validation error: `NumericLocator.validate()` throws `IllegalDataTypeException`
+ * ("Only binary values can be read from Coil and Input ranges") the moment the gateway builds the
+ * locator. The gateway's own form greys the picker out for those two ranges but leaves whatever
+ * was selected before, so switching a 4-byte float point to COIL_STATUS there saves a point that
+ * throws on every poll. Gating the list instead clears it, which costs one click and cannot save
+ * a locator the device will refuse to construct.
+ */
+const MODBUS_RANGE_TYPES: {[range: string]: FormSelectItem[]} = {
+  COIL_STATUS: MODBUS_BINARY_ONLY,
+  INPUT_STATUS: MODBUS_BINARY_ONLY,
+  HOLDING_REGISTER: MODBUS_DATA_TYPES,
+  INPUT_REGISTER: MODBUS_DATA_TYPES
+};
+
+/**
+ * Bit index within a register, 0-15.
+ *
+ * `ModbusUtils.validateBit` throws outside that range and the schema is no help: springdoc types
+ * the Java `byte` as `{"type": "string", "format": "byte"}` -- base64 -- where the wire format is a
+ * plain number, so the mapper produces a free text box for a field with sixteen legal values.
+ */
+const MODBUS_BITS: FormSelectItem[] =
+  Array.from({length: 16}, (_unused, bit) => ({value: bit, label: String(bit)}));
+
+/**
+ * Encodings for a CHAR or VARCHAR point.
+ *
+ * Every one is in `StandardCharsets`, so `Charset.forName` resolves it on any JVM. The gateway's
+ * own form offers "ASCII" and "RTU" here, taken from the Modbus *serial* encoding picker by way of
+ * its translation keys -- `Charset.forName("RTU")` throws, so that second option cannot work.
+ */
+const MODBUS_CHARSETS: FormSelectItem[] = [
+  {value: 'ASCII', label: 'ASCII'},
+  {value: 'UTF-8', label: 'UTF-8'},
+  {value: 'ISO-8859-1', label: 'ISO-8859-1'},
+  {value: 'UTF-16BE', label: 'UTF-16 big-endian'},
+  {value: 'UTF-16LE', label: 'UTF-16 little-endian'}
+];
 
 /**
  * Layouts by model type, and by component name for the shared models that have no family.
@@ -216,6 +323,79 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
   'VIRTUAL_MESH_NODE.PL': {
     hidden: ['relinquishable', 'configurationDescription'],
     readonly: ['dataType', 'settable', 'attributeId', 'type']
+  },
+
+  /**
+   * A Modbus/IP data source: how to reach the device, and how hard to push it.
+   *
+   * Only the connection and the poll are on the front of the form. The rest are per-device limits
+   * an operator changes when a particular PLC misbehaves -- how many registers it will return in
+   * one request, whether it needs multi-register writes for a single value, how long to linger on
+   * the socket -- and the gateway's own form puts all twenty-one on one page, which is why finding
+   * the host takes a scroll there.
+   *
+   * `host` and `port` pair explicitly so `transportType` keeps a row of its own: the three read as
+   * one address and the schema does not order them that way.
+   */
+  'MODBUS_IP.DS': {
+    advanced: ['multipleWritesOnly', 'contiguousBatches', 'maxReadBitCount',
+      'maxReadRegisterCount', 'maxWriteRegisterCount', 'discardDataDelay', 'logIO',
+      'ioLogFileSizeMBytes', 'maxHistoricalIOLogs', 'lingerTime', 'scaleFactor',
+      'maxBackOffPeriod', 'maxConcurrentConnections'],
+    // The schema declares the three transports as an enum, so the mapper already builds the list.
+    // This only relabels it: humanising a Java constant is right for `COIL_STATUS` and wrong for
+    // an acronym, which would otherwise read "Tcp keep alive".
+    options: {
+      transportType: [
+        {value: 'TCP', label: 'TCP'},
+        {value: 'TCP_KEEP_ALIVE', label: 'TCP, keep alive'},
+        {value: 'UDP', label: 'UDP'}
+      ]
+    },
+    rows: [['host', 'port']]
+  },
+
+  /**
+   * A Modbus point: which register, decoded how.
+   *
+   * Six of the nineteen fields never reach the device. `dataType` and `settable` are computed by
+   * `ModbusPointLocatorVO` from `slaveMonitor`, `modbusDataType`, `multistateNumeric` and
+   * `writeType`, so a control for either would contradict the fields that decide it; `rangeId` and
+   * `modbusDataTypeId` are derived getters Jackson serialises and no setter reads; and
+   * `ModbusPointLocatorModel.toVO` never touches `relinquishable`. Hidden rather than read-only:
+   * there is nothing here for an operator to check, only a duplicate of what is above.
+   *
+   * The rest follow the register range, which is what decides the shape of a Modbus point. Taken
+   * from the VO and from modbus4j's own locator classes -- the gateway's form agrees field for
+   * field, which is two independent sources for every rule below, and disagrees only in greying a
+   * field out where this hides it.
+   */
+  'MODBUS.PL': {
+    hidden: ['dataType', 'settable', 'relinquishable', 'configurationDescription', 'rangeId',
+      'modbusDataTypeId'],
+    options: {bit: MODBUS_BITS, charset: MODBUS_CHARSETS},
+    gatedOptions: {modbusDataType: {by: 'range', table: MODBUS_RANGE_TYPES}},
+    visibleWhen: {
+      // A bit index is read from a register; on a coil range modbus4j ignores it, and the gateway's
+      // own form greys it out there. Gated on the data type rather than the range because that is
+      // the field that decides it -- which does leave it showing on a coil point, where the range
+      // has already forced the type to BINARY.
+      bit: {by: 'modbusDataType', values: ['BINARY']},
+      registerCount: {by: 'modbusDataType', values: ['CHAR', 'VARCHAR']},
+      charset: {by: 'modbusDataType', values: ['CHAR', 'VARCHAR']},
+      // `settableRange()`: a coil and a holding register are the two a master may write.
+      writeType: {by: 'range', values: ['COIL_STATUS', 'HOLDING_REGISTER']},
+      multiplier: {by: 'modbusDataType', values: MODBUS_NUMERIC_TYPES},
+      additive: {by: 'modbusDataType', values: MODBUS_NUMERIC_TYPES},
+      // The one field `getDataTypeId()` reads to choose between MULTISTATE and NUMERIC, and it
+      // reaches that branch only for a type that is neither binary nor a string.
+      multistateNumeric: {by: 'modbusDataType', values: MODBUS_NUMERIC_TYPES}
+    },
+    // What `ModbusPointLocatorVO` starts on (`range = 1`, `modbusDataType = 1`). The model's own
+    // fields are null until set, and `validate()` rejects both as "invalid value" -- so without
+    // these a new point cannot be saved until the operator has found the two fields that say so.
+    defaults: {range: 'COIL_STATUS', modbusDataType: 'BINARY'},
+    rows: [['slaveId', 'offset'], ['registerCount', 'charset'], ['multiplier', 'additive']]
   },
 
   /**

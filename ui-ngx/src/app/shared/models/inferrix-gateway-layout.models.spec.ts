@@ -90,7 +90,10 @@ describe('gateway form layouts', () => {
     // properties get a control from the schema's own type, so naming an array or a nested object
     // here would ask its template for a control that was never created.
     const scalars = new Set(['dataType', 'changeType', 'startValue', 'min', 'max', 'change',
-      'maxChange', 'volatility', 'attractionPointXid', 'roll', 'settable']);
+      'maxChange', 'volatility', 'attractionPointXid', 'roll', 'settable',
+      // Modbus. `bit` is a scalar despite the schema calling it `{string, format: byte}`: that is
+      // springdoc's rendering of the Java `byte`, and the wire format is a plain number.
+      'transportType', 'modbusDataType', 'bit', 'charset']);
     Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
       [...Object.keys(layout.options ?? {}), ...Object.keys(layout.gatedOptions ?? {})]
         .forEach(id => expect(scalars.has(id)).withContext(`${modelType}.${id}`).toBe(true));
@@ -134,6 +137,112 @@ describe('gateway form layouts', () => {
       .filter(id => !(layout.hidden ?? []).includes(id))
       .filter(id => !(layout.readonly ?? []).includes(id));
     expect(editable).toEqual([]);
+  });
+
+  const modbus = GATEWAY_FORM_LAYOUTS['MODBUS.PL'];
+
+  it('offers exactly the 32 codes ModbusPointLocatorVO.MODBUS_DATA_TYPE_CODES declares', () => {
+    // The gateway's `validate()` rejects anything its table does not name, so a value missing here
+    // is a type an operator cannot choose and a value invented here is a guaranteed 422.
+    const types = modbus.gatedOptions.modbusDataType.table.HOLDING_REGISTER.map(item => item.value);
+    expect(types.length).toBe(32);
+    expect(types).toContain('FOUR_BYTE_FLOAT');
+    expect(types).toContain('EIGHT_BYTE_MOD_10K_SWAPPED');
+    expect(types).toContain('ONE_BYTE_INT_UNSIGNED_UPPER');
+    expect(new Set(types).size).toBe(types.length);
+  });
+
+  it('admits only BINARY on the two ranges modbus4j refuses a numeric locator for', () => {
+    // `NumericLocator.validate()`: "Only binary values can be read from Coil and Input ranges".
+    const values = (range: string) =>
+      modbus.gatedOptions.modbusDataType.table[range].map(item => item.value);
+    expect(values('COIL_STATUS')).toEqual(['BINARY']);
+    expect(values('INPUT_STATUS')).toEqual(['BINARY']);
+    expect(values('HOLDING_REGISTER').length).toBe(32);
+    expect(values('INPUT_REGISTER').length).toBe(32);
+  });
+
+  it('shows writeType for exactly the ranges settableRange() admits', () => {
+    // `ModbusPointLocatorVO.settableRange()` is `range == 1 || range == 3`, which are COIL_STATUS
+    // and HOLDING_REGISTER -- the two a Modbus master may write.
+    expect(modbus.visibleWhen.writeType).toEqual({by: 'range',
+      values: ['COIL_STATUS', 'HOLDING_REGISTER']});
+  });
+
+  it('scales only the data types getDataTypeId() decodes as a number', () => {
+    const numeric = modbus.visibleWhen.multiplier.values;
+    expect(numeric).not.toContain('BINARY');
+    expect(numeric).not.toContain('CHAR');
+    expect(numeric).not.toContain('VARCHAR');
+    expect(numeric).toContain('FOUR_BYTE_FLOAT');
+    expect(modbus.visibleWhen.additive.values).toEqual(numeric);
+    expect(modbus.visibleWhen.multistateNumeric.values).toEqual(numeric);
+  });
+
+  it('shows the string fields for exactly the two types isString() names', () => {
+    expect(modbus.visibleWhen.registerCount).toEqual({by: 'modbusDataType',
+      values: ['CHAR', 'VARCHAR']});
+    expect(modbus.visibleWhen.charset).toEqual(modbus.visibleWhen.registerCount);
+  });
+
+  it('bounds bit to the range ModbusUtils.validateBit accepts, as numbers', () => {
+    // The schema types the Java `byte` as a base64 string, so the field arrives as free text; the
+    // device throws "Invalid bit" outside 0-15 and Jackson wants a number, not "3".
+    const bits = modbus.options.bit;
+    expect(bits.map(item => item.value)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
+      15]);
+    bits.forEach(item => expect(typeof item.value).toBe('number'));
+  });
+
+  it('offers only charsets Charset.forName can resolve, and not the gateway\'s RTU', () => {
+    const charsets = modbus.options.charset.map(item => item.value);
+    expect(charsets).toContain('ASCII');
+    expect(charsets).not.toContain('RTU');
+    charsets.forEach(name => expect(name).toMatch(/^(ASCII|UTF-8|UTF-16(BE|LE)|ISO-8859-1)$/));
+  });
+
+  it('hides every Modbus locator field the gateway derives or ignores', () => {
+    // `dataType`/`settable` are computed by the VO, `rangeId`/`modbusDataTypeId` are derived
+    // getters no setter reads, and `toVO()` never touches `relinquishable`. A control for any of
+    // them would be one the operator changes and the device discards.
+    ['dataType', 'settable', 'relinquishable', 'rangeId', 'modbusDataTypeId']
+      .forEach(id => expect(modbus.hidden).toContain(id));
+  });
+
+  it('starts a new Modbus locator on what ModbusPointLocatorVO starts on', () => {
+    // The model's own `range` and `modbusDataType` are null until set and `validate()` rejects
+    // both, so an add with no defaults cannot be saved at all.
+    expect(modbus.defaults).toEqual({range: 'COIL_STATUS', modbusDataType: 'BINARY'});
+    const admitted = modbus.gatedOptions.modbusDataType.table[modbus.defaults.range as string];
+    expect(admitted.map(item => item.value)).toContain(modbus.defaults.modbusDataType);
+  });
+
+  it('keeps the Modbus/IP connection on the form and the per-device limits under Advanced', () => {
+    const layout = GATEWAY_FORM_LAYOUTS['MODBUS_IP.DS'];
+    const advanced = new Set(layout.advanced);
+    ['transportType', 'host', 'port', 'encapsulated', 'timePeriod', 'timeout', 'retries',
+      'createSlaveMonitorPoints'].forEach(id => expect(advanced.has(id)).withContext(id).toBe(false));
+    ['maxReadBitCount', 'lingerTime', 'scaleFactor', 'maxConcurrentConnections', 'logIO']
+      .forEach(id => expect(advanced.has(id)).withContext(id).toBe(true));
+  });
+
+  it('keeps the transport acronyms rather than humanising them', () => {
+    const items = GATEWAY_FORM_LAYOUTS['MODBUS_IP.DS'].options.transportType;
+    expect(items.map(item => item.value)).toEqual(['TCP', 'TCP_KEEP_ALIVE', 'UDP']);
+    expect(items[0].label).toBe('TCP');
+    expect(items[2].label).toBe('UDP');
+  });
+
+  it('gates no field on one that is hidden', () => {
+    // A gate reads its control's value, and `build` only creates controls for shown fields. A rule
+    // naming a hidden one reads undefined and hides its field for good.
+    Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
+      const hidden = new Set(layout.hidden ?? []);
+      Object.values(layout.visibleWhen ?? {}).forEach(rule =>
+        expect(hidden.has(rule.by)).withContext(`${modelType} by ${rule.by}`).toBe(false));
+      Object.values(layout.gatedOptions ?? {}).forEach(gate =>
+        expect(hidden.has(gate.by)).withContext(`${modelType} by ${gate.by}`).toBe(false));
+    });
   });
 
   it('names no field in both hidden and advanced', () => {

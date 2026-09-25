@@ -1,6 +1,8 @@
-#!/usr/bin/env python3
+#
 # SPDX-FileCopyrightText: Copyright The Inferrix Authors
 # SPDX-License-Identifier: Apache-2.0
+#
+
 """Measure how far Cortex's schema-driven gateway forms are from the stack's own.
 
 Reads two things and compares them:
@@ -13,7 +15,7 @@ Reads two things and compares them:
 Neither is modified. The stack webapp is read-only to this repo.
 
 Usage:
-    ds-ui-gap.py <schemas.json> [<inferrixstack-webapp>/src/app]
+    python3 ds-ui-gap.py <schemas.json> [<inferrixstack-webapp>/src/app]
 
 Numbers this prints are the ones quoted in docs/features/gateway-datasource-ui-parity.md.
 """

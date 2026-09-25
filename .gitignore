@@ -52,3 +52,7 @@ docs/jars/
 docs/images/Screenshot*.png
 # Repo builds with yarn (yarn.lock is the tracked lockfile)
 package-lock.json
+
+# Python bytecode from the docs/features/scripts helpers
+__pycache__/
+*.pyc

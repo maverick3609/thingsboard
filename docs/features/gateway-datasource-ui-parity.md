@@ -242,7 +242,7 @@ consulted.
 | 1 | `VIRTUAL.DS` | `VIRTUAL.PL` | **done** — 2026-09-25 |
 | 2 | `VIRTUAL_MESH_NODE.DS` | `VIRTUAL_MESH_NODE.PL` | **done** — 2026-09-25 |
 | 3 | `MODBUS_IP.DS` | `MODBUS.PL` | **done** — 2026-09-25 |
-| 4 | `MODBUS_SERIAL.DS` | `MODBUS.PL` | next; locator already done with 3 — only the serial transport fields are new |
+| 4 | `MODBUS_SERIAL.DS` | `MODBUS.PL` | **done** — 2026-09-25; data source only, locator shared with 3 |
 | 5 | `BACNET_IP.DS` | `BACNET_IP.PL` | needs an instance first |
 | 6 | `BACNET_MSTP.DS` | `BACNET_MSTP.PL` | `pointLocatorType` is null on 5.1.0 — falls back to a sibling point |
 | 7 | `META.DS` | `META.PL` | |
@@ -416,6 +416,77 @@ the table above. `VIRTUAL.DS`/`VIRTUAL.PL` and `VIRTUAL_MESH_NODE.DS`/`VIRTUAL_M
 re-checked for regression — unchanged, read-only still read-only, Add still suppressed. Console
 clean.
 
+### 4 — `MODBUS_SERIAL.DS` (done, 2026-09-25)
+
+The same Modbus master over a serial line. Its points are `MODBUS.PL` — `/v2/data-source-types`
+answers that for both — so this type is the data source alone, and the locator work done with
+type 3 carries over untouched. Against `MODBUS_IP.DS` it drops eight socket fields (`host`,
+`port`, `transportType`, `encapsulated`, `lingerTime`, `scaleFactor`, `maxBackOffPeriod`,
+`maxConcurrentConnections`) and adds nine line settings.
+
+**The line settings are not a convenience.** Five of them — `flowControlIn`, `flowControlOut`,
+`dataBits`, `stopBits`, `parity` — are declared `{"type": "string"}` in the schema, and
+`ModbusSerialDataSourceModel.toVO` converts each with `Enum.valueOf`/`fromName` *before* anything
+validates. An absent one is therefore a null name, which is a `NullPointerException` on the
+gateway rather than the `validate.required` message its own `ModbusSerialDataSourceDefinition`
+was written to give. `encoding` is worse: `ModbusSerialDataSourceVO`'s constructor leaves it null
+while setting the other five, so it is the one a caller is most likely to omit.
+
+Measured live, posting a source with one field left out at a time:
+
+| omitted | gateway answers |
+|---|---|
+| `encoding` | **500** Internal Server Error |
+| `parity` | **500** Internal Server Error |
+| `dataBits` | **500** Internal Server Error |
+| `flowControlIn` | **500** Internal Server Error |
+| `dataBits: "DATA_BITS_9"` (bogus, not absent) | 400 Bad Request |
+
+So the layout's `defaults` are load-bearing, and they are seeded onto the model rather than shown
+by the form — the same rule a point locator already followed, extended to the data source in
+`GatewayDataSourcesComponent.add`. Every one is the value the VO's constructor starts on, except
+`encoding`, where RTU is the framing a Modbus serial device speaks unless told otherwise.
+
+**What goes where.** On the form: the poll (`timePeriod`, `timeout`, `retries`),
+`createSlaveMonitorPoints`, then the line — `commPortId`/`baudRate`, `dataBits`/`stopBits`,
+`parity`/`encoding`. Under **Advanced**: the same register limits and I/O logging as type 3, plus
+`flowControlIn`/`flowControlOut` and `echo`. Flow control is `NONE` on every RS-485 bus and `echo`
+is a property of the adapter rather than of the poll — real settings, but not why anyone opened
+the form.
+
+**Option lists.** Six of the seven come from the gateway's own `com.inferrix.serial` enums and
+from `ModbusSerialDataSourceVO.EncodingType`; the gateway serves the same six at
+`/v2/modbus/attributes/serial/*`, which the proxy does not carry for the reason type 3 gives —
+they return `Enum::name` over a compile-time enum, so there is nothing per-install to look up.
+What the layout adds is the labels: those routes return the constants raw, which is exactly what
+the gateway's own dropdowns show, so an operator there picks between `DATA_BITS_5` and
+`DATA_BITS_8` rather than between 5 and 8. `baudRate` is the one list taken from the stack's
+webapp instead — it is a plain `int` the stack never bounds, so there is no enum to read, and its
+`BAUD_RATES` constant is the thirteen rates an adapter is actually jumpered for.
+
+**`commPortId` is still a text box, and that is a gap.** The gateway does publish its ports, at
+`GET /v2/utilities/gw/serial-ports`, and the stack's own form fills a dropdown from it. That route
+is not in `InferrixGatewayRoutes`, and adding it is a platform release — so this type ships with
+the operator typing the port name their gateway reports. It is one allowlist line, one service
+method and a subclass of `GatewayFormComponent` in the shape `VirtualPointFormComponent` already
+has, and **BACnet MS/TP needs the same picker**, so it belongs with type 6 rather than with a
+release of its own. Recorded here rather than guessed at: a port name this platform invented
+would be worse than an empty box.
+
+**Verified.** A throwaway `ZZ Serial Probe` created through the form on `Inferrix Gateway 155`
+and deleted afterwards; the gateway is back at 12 data sources and 100 points, and nothing was
+enabled, so no port was ever opened. On add it came back carrying every gateway default
+(`timeout 500`, `retries 2`, `maxReadBitCount 2000`, `maxReadRegisterCount 125`,
+`maxWriteRegisterCount 120`, `ioLogFileSizeMBytes 1.0`) *and* all seven layout defaults
+(`baudRate 9600`, `flowControlIn`/`flowControlOut` `NONE`, `DATA_BITS_8`, `STOP_BITS_1`,
+`parity NONE`, `encoding RTU`). Reopening it showed each stored constant back as its label
+(8, 1, None, RTU). An edit to `ASCII` / 19200 / 7 bits / even parity / RTS-CTS wrote
+`encoding: ASCII`, `baudRate: 19200`, `dataBits: DATA_BITS_7`, `parity: EVEN`,
+`flowControlIn: RTSCTS` and left `flowControlOut`, `stopBits`, `echo` and every tuning field
+alone. All six dropdowns were opened and read on screen and carry exactly the values their enums
+declare. The Advanced panel renders all ten of its rows — the type 3 `tb-form-panel` fix holds
+for a second type. Console clean: no errors, no warnings.
+
 ## Per-type components
 
 Settled 2026-09-25, after the question was raised directly: **is one renderer for 148 model types
@@ -489,6 +560,12 @@ changed.
   `IllegalDataTypeException` afterwards. Cortex gates the list instead.
 - **W17 (P2)** — the two I/O log inputs on the Modbus/IP form carry no `[(ngModel)]` at all, so
   `ioLogFileSizeMBytes` and `maxHistoricalIOLogs` are unsettable from that form.
+- **W18 (P2)** — the Modbus **serial** form has the same two unbound I/O log inputs as W17, so the
+  defect is the pair of forms rather than one of them.
+- **W19 (P3)** — its six serial dropdowns render `Enum::name` straight from
+  `/v2/modbus/attributes/serial/*`, so the operator picks between `DATA_BITS_5` and `DATA_BITS_8`,
+  and between `RTSCTS` and `XONXOFF`. The enums carry `MessageTranslation` descriptions written
+  for exactly this, and nothing reads them.
 
 Stack-side findings go to `Inferrix-stack/docs/specs/` instead. From type 2, in
 `2026-09-25-mesh-node-provisioned-rows.md`:
@@ -513,6 +590,27 @@ From type 3, in `2026-09-25-modbus-locator-derivations.md`:
   `minimum`/`maximum` although `ModbusUtils.validateBit` throws outside 0-15.
 - **A16 (P3)** — `modbusDataType` is a bare string with 32 legal values, while `range` and
   `writeType` on the same model both carry `allowableValues`.
+
+From type 4, in `2026-09-25-modbus-serial-enum-nulls.md`:
+
+- **D40 (P1)** — omitting any of `encoding`, `parity`, `dataBits`, `stopBits`, `flowControlIn` or
+  `flowControlOut` on a `MODBUS_SERIAL.DS` POST answers **500**, not a validation error:
+  `toVO` calls `Enum.valueOf`/`fromName` on the null before `validate()` runs, which makes all six
+  `validate.required` branches in `ModbusSerialDataSourceDefinition` unreachable through REST.
+  Measured live on 5.1.0. A bogus *value* answers 400 correctly — only an absent one is a 500.
+- **D41 (P3)** — `ModbusSerialDataSourceVO`'s constructor defaults five of the six line settings
+  and leaves `encoding` null, so the field its own `validate()` asks for is the one the VO never
+  fills in.
+- **A17 (P3)** — `commPortId`, `baudRate` and the five enum-backed line settings carry no
+  `description` and no `allowableValues`, although `encoding` beside them declares both.
+  `/v2/utilities/gw/serial-ports` is what a client would need to fill the first of them.
+- **A18 (P3)** — that route's summary reads "Gets all the **unused** serial ports", while
+  `UtilityService.getSerialPorts` calls `getAllSerialPorts()`. The behaviour is the useful one —
+  a port already bound to a data source still appears, so an edit form can show it — and the
+  summary is what is wrong.
+- **A19 (P3)** — `FlowControl`, `DataBits`, `StopBits` and `Parity` each carry a
+  `MessageTranslation` (`dsEdit.serial.flow.rtsCts`, `dsEdit.serial.dataBits8`, …) for which no
+  `.properties` entry exists anywhere in the repository, so every one resolves to its own key.
 
 ## Open decisions
 

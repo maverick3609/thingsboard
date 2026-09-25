@@ -223,6 +223,67 @@ const MODBUS_CHARSETS: FormSelectItem[] = [
 ];
 
 /**
+ * Baud rates offered for a Modbus serial line.
+ *
+ * The one list here taken from the gateway's webapp rather than from its Java: `baudRate` is a
+ * plain `int` the stack never bounds, so there is no enum to read. Its `BAUD_RATES` constant is
+ * the thirteen an RS-232/RS-485 adapter is actually jumpered for, and a rate outside them is a
+ * rate no device on the bus speaks. A select rather than a number box because the schema's
+ * `{"type": "integer"}` would otherwise accept 9601.
+ */
+const MODBUS_BAUD_RATES: FormSelectItem[] =
+  [110, 300, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600]
+    .map(rate => ({value: rate, label: String(rate)}));
+
+/**
+ * Serial line settings, from the gateway's own `com.inferrix.serial` enums.
+ *
+ * All five are declared `{"type": "string"}` in the schema -- the REST model holds each as a
+ * `String` and converts with `Enum.valueOf` -- so without these an operator types `DATA_BITS_8`
+ * by hand, and `ModbusSerialDataSourceModel.toVO` answers a typo with an unhandled
+ * `IllegalArgumentException` rather than a validation message.
+ *
+ * The gateway serves the same five lists at `/v2/modbus/attributes/serial/*` and the proxy does
+ * not carry those routes, for the reason {@link MODBUS_DATA_TYPES} gives: they return
+ * `Enum::name` over a compile-time enum, so there is nothing per-install to look up. What is
+ * added here is the labels -- those routes return the constants raw, which is what the gateway's
+ * own dropdowns show.
+ */
+const MODBUS_FLOW_CONTROLS: FormSelectItem[] = [
+  {value: 'NONE', label: 'None'},
+  {value: 'RTSCTS', label: 'RTS/CTS'},
+  {value: 'XONXOFF', label: 'XON/XOFF'}
+];
+
+const MODBUS_DATA_BITS: FormSelectItem[] = [
+  {value: 'DATA_BITS_5', label: '5'},
+  {value: 'DATA_BITS_6', label: '6'},
+  {value: 'DATA_BITS_7', label: '7'},
+  {value: 'DATA_BITS_8', label: '8'}
+];
+
+/** Declared 1, 1.5, 2 -- the enum's own order, which is not its `value()` order (1, 3, 2). */
+const MODBUS_STOP_BITS: FormSelectItem[] = [
+  {value: 'STOP_BITS_1', label: '1'},
+  {value: 'STOP_BITS_1_5', label: '1.5'},
+  {value: 'STOP_BITS_2', label: '2'}
+];
+
+const MODBUS_PARITY: FormSelectItem[] = [
+  {value: 'NONE', label: 'None'},
+  {value: 'ODD', label: 'Odd'},
+  {value: 'EVEN', label: 'Even'},
+  {value: 'MARK', label: 'Mark'},
+  {value: 'SPACE', label: 'Space'}
+];
+
+/** Relabelled, not narrowed: the schema declares this one as an enum. Both values are acronyms. */
+const MODBUS_SERIAL_ENCODINGS: FormSelectItem[] = [
+  {value: 'RTU', label: 'RTU'},
+  {value: 'ASCII', label: 'ASCII'}
+];
+
+/**
  * Layouts by model type, and by component name for the shared models that have no family.
  *
  * Only the types worked through so far appear. A type with no entry renders exactly as before —
@@ -353,6 +414,53 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
       ]
     },
     rows: [['host', 'port']]
+  },
+
+  /**
+   * The same Modbus master over a serial line, which is nine fields the IP one does not have and
+   * four fewer of the socket ones it does.
+   *
+   * Its points are `MODBUS.PL` -- the same locator, gated the same way -- so this is the data
+   * source alone. What is new is the line settings, and they behave differently from the rest of
+   * this table: five of them are declared `{"type": "string"}` while the gateway converts each
+   * with `Enum.valueOf`, so a free text box here is not merely unhelpful. An empty one is worse
+   * than a wrong one: `ModbusSerialDataSourceModel.toVO` calls `FlowControl.fromName(null)`
+   * before anything validates, which is a null-pointer exception on the gateway rather than the
+   * "required" message its own `validate()` was written to give. Hence the defaults below: five
+   * of them are what the VO's constructor starts on, so a source saved without touching the line
+   * settings gets the line the gateway would have given it. `encoding` is the exception -- the
+   * constructor leaves it null, which is the one value it cannot be sent as -- so RTU is this
+   * layout's choice rather than the gateway's, taken because it is the framing a Modbus serial
+   * device speaks unless configured otherwise.
+   *
+   * `commPortId` stays free text. The gateway does publish its ports, at
+   * `/v2/utilities/gw/serial-ports`, but that route is not in the proxy allowlist and adding one
+   * is a platform release -- so an operator types the port name their gateway reports. Recorded
+   * as a gap rather than guessed at.
+   */
+  'MODBUS_SERIAL.DS': {
+    // The same tuning as MODBUS_IP.DS, minus the four socket fields a serial line has no use for,
+    // plus three of its own. Flow control is NONE on every RS-485 bus and `echo` is a property of
+    // the adapter, not of the poll -- real settings, rarely the reason anyone opened this form.
+    advanced: ['multipleWritesOnly', 'contiguousBatches', 'maxReadBitCount',
+      'maxReadRegisterCount', 'maxWriteRegisterCount', 'discardDataDelay', 'logIO',
+      'ioLogFileSizeMBytes', 'maxHistoricalIOLogs', 'flowControlIn', 'flowControlOut', 'echo'],
+    options: {
+      baudRate: MODBUS_BAUD_RATES,
+      flowControlIn: MODBUS_FLOW_CONTROLS,
+      flowControlOut: MODBUS_FLOW_CONTROLS,
+      dataBits: MODBUS_DATA_BITS,
+      stopBits: MODBUS_STOP_BITS,
+      parity: MODBUS_PARITY,
+      encoding: MODBUS_SERIAL_ENCODINGS
+    },
+    // `ModbusSerialDataSourceVO`'s constructor, field for field -- except `encoding`, which the
+    // constructor leaves null and `validate()` then asks for. RTU is the framing every Modbus
+    // serial device defaults to; ASCII is the opt-in.
+    defaults: {baudRate: 9600, flowControlIn: 'NONE', flowControlOut: 'NONE',
+      dataBits: 'DATA_BITS_8', stopBits: 'STOP_BITS_1', parity: 'NONE', encoding: 'RTU'},
+    rows: [['commPortId', 'baudRate'], ['dataBits', 'stopBits'], ['parity', 'encoding'],
+      ['flowControlIn', 'flowControlOut']]
   },
 
   /**

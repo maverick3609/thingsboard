@@ -105,7 +105,11 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
    * where appending one produced `MODBUS_IP.DS.DS` and a Jackson subtype that resolves to nothing.
    */
   add(type: GatewayDataSourceType): void {
-    this.open({modelType: type.type, enabled: false},
+    // Seeded onto the model for the reason a point's locator is, below: a serial source whose
+    // line settings the operator never opened must still post them, because the gateway converts
+    // each with `Enum.valueOf` and answers an absent one with a null-pointer exception.
+    this.open({...(gatewayFormLayout(type.type)?.defaults ?? {}),
+      modelType: type.type, enabled: false},
       this.translate.instant('inferrix.gateway.add-data-source'), []);
   }
 

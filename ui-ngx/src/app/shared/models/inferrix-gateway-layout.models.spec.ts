@@ -93,7 +93,10 @@ describe('gateway form layouts', () => {
       'maxChange', 'volatility', 'attractionPointXid', 'roll', 'settable',
       // Modbus. `bit` is a scalar despite the schema calling it `{string, format: byte}`: that is
       // springdoc's rendering of the Java `byte`, and the wire format is a plain number.
-      'transportType', 'modbusDataType', 'bit', 'charset']);
+      'transportType', 'modbusDataType', 'bit', 'charset',
+      // Modbus serial. Every one is a `String` on the REST model; `baudRate` is a plain `int`.
+      'baudRate', 'flowControlIn', 'flowControlOut', 'dataBits', 'stopBits', 'parity',
+      'encoding']);
     Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
       [...Object.keys(layout.options ?? {}), ...Object.keys(layout.gatedOptions ?? {})]
         .forEach(id => expect(scalars.has(id)).withContext(`${modelType}.${id}`).toBe(true));
@@ -231,6 +234,73 @@ describe('gateway form layouts', () => {
     expect(items.map(item => item.value)).toEqual(['TCP', 'TCP_KEEP_ALIVE', 'UDP']);
     expect(items[0].label).toBe('TCP');
     expect(items[2].label).toBe('UDP');
+  });
+
+  it('offers exactly the serial line values the com.inferrix.serial enums declare', () => {
+    const options = GATEWAY_FORM_LAYOUTS['MODBUS_SERIAL.DS'].options;
+    const values = (id: string) => options[id].map(item => item.value);
+    expect(values('flowControlIn')).toEqual(['NONE', 'RTSCTS', 'XONXOFF']);
+    expect(values('flowControlOut')).toEqual(values('flowControlIn'));
+    expect(values('dataBits'))
+      .toEqual(['DATA_BITS_5', 'DATA_BITS_6', 'DATA_BITS_7', 'DATA_BITS_8']);
+    expect(values('stopBits')).toEqual(['STOP_BITS_1', 'STOP_BITS_1_5', 'STOP_BITS_2']);
+    expect(values('parity')).toEqual(['NONE', 'ODD', 'EVEN', 'MARK', 'SPACE']);
+    expect(values('encoding')).toEqual(['RTU', 'ASCII']);
+  });
+
+  it('labels the line settings by what they are, not by their Java constants', () => {
+    const labels = (id: string) =>
+      GATEWAY_FORM_LAYOUTS['MODBUS_SERIAL.DS'].options[id].map(item => item.label);
+    // The two the gateway's own dropdowns show raw, and the two humanise would ruin.
+    expect(labels('dataBits')).toEqual(['5', '6', '7', '8']);
+    expect(labels('stopBits')).toEqual(['1', '1.5', '2']);
+    expect(labels('flowControlIn')).toEqual(['None', 'RTS/CTS', 'XON/XOFF']);
+    expect(labels('encoding')).toEqual(['RTU', 'ASCII']);
+  });
+
+  it('offers baud rates as numbers, since the model holds an int', () => {
+    const items = GATEWAY_FORM_LAYOUTS['MODBUS_SERIAL.DS'].options.baudRate;
+    expect(items.length).toBe(13);
+    items.forEach(item => expect(typeof item.value).toBe('number'));
+    expect(items[0].value).toBe(110);
+    expect(items[items.length - 1].value).toBe(921600);
+  });
+
+  it('defaults the line settings the VO does, and the one it leaves null', () => {
+    // Not a convenience. `toVO` converts each of these with `Enum.valueOf` before anything
+    // validates, so an absent one is a null-pointer exception on the gateway. Five are what
+    // `ModbusSerialDataSourceVO`'s constructor sets; `encoding` it leaves null, so RTU here is
+    // this layout's choice and the reason a serial source can be saved at all.
+    const layout = GATEWAY_FORM_LAYOUTS['MODBUS_SERIAL.DS'];
+    expect(layout.defaults).toEqual({baudRate: 9600, flowControlIn: 'NONE', flowControlOut: 'NONE',
+      dataBits: 'DATA_BITS_8', stopBits: 'STOP_BITS_1', parity: 'NONE', encoding: 'RTU'});
+    // And each one has to be a value its own list offers, or the select opens on nothing.
+    Object.entries(layout.defaults).forEach(([id, value]) =>
+      expect(layout.options[id].some(item => item.value === value))
+        .withContext(`${id} = ${value}`).toBe(true));
+  });
+
+  it('keeps the serial line on the form and the poll tuning under Advanced', () => {
+    const advanced = new Set(GATEWAY_FORM_LAYOUTS['MODBUS_SERIAL.DS'].advanced);
+    ['commPortId', 'baudRate', 'dataBits', 'stopBits', 'parity', 'encoding', 'timePeriod',
+      'timeout', 'retries'].forEach(id => expect(advanced.has(id)).withContext(id).toBe(false));
+    ['maxReadBitCount', 'logIO', 'discardDataDelay', 'flowControlIn', 'flowControlOut', 'echo']
+      .forEach(id => expect(advanced.has(id)).withContext(id).toBe(true));
+  });
+
+  it('carries none of the socket settings a serial line has no socket for', () => {
+    const named = new Set([...(GATEWAY_FORM_LAYOUTS['MODBUS_SERIAL.DS'].advanced ?? []),
+      ...Object.keys(GATEWAY_FORM_LAYOUTS['MODBUS_SERIAL.DS'].options ?? {})]);
+    ['host', 'port', 'transportType', 'encapsulated', 'lingerTime', 'scaleFactor',
+      'maxBackOffPeriod', 'maxConcurrentConnections']
+      .forEach(id => expect(named.has(id)).withContext(id).toBe(false));
+  });
+
+  it('shares MODBUS.PL with the IP source rather than restating its rules', () => {
+    // `/v2/data-source-types` answers MODBUS.PL for both, so a second locator layout here would
+    // be a copy that could drift. Its absence is the assertion.
+    expect(GATEWAY_FORM_LAYOUTS['MODBUS_SERIAL.PL']).toBeUndefined();
+    expect(GATEWAY_FORM_LAYOUTS['MODBUS.PL']).toBeDefined();
   });
 
   it('gates no field on one that is hidden', () => {

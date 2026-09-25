@@ -108,7 +108,8 @@
             {{ 'inferrix.gateway.rows-count' | translate: {total: data.children.rows.length} }}
           </span>
           <span class="flex-1"></span>
-          @if (!data.children.readonly && !data.children.needsSaveFirst) {
+          @if (!data.children.readonly && !data.children.needsSaveFirst
+            && !data.children.provisioned) {
             <button mat-stroked-button type="button" (click)="data.children.add()">
               <mat-icon>add</mat-icon>
               {{ 'inferrix.gateway.add-point' | translate }}

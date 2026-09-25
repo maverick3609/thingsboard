@@ -217,6 +217,8 @@ ours to add.
 | `gatedOptions` | An option list chosen by another control's value, with a fallback type |
 | `visibleWhen` | Rendered only while another control holds one of these values |
 | `rows` | Explicit pairing, placed where its first field would have fallen anyway |
+| `readonly` | Shown but not editable, for a field the gateway's own provisioning owns |
+| `provisionedPoints` | On a data source: the gateway creates its points, so no **Add** button |
 
 Everything else falls out of one default: **scalars pair two to a row in schema order, and
 anything else takes a row of its own.** `VIRTUAL.DS` needed no keys at all because of it.
@@ -238,8 +240,8 @@ consulted.
 | # | Type | Locator | Status |
 |---|---|---|---|
 | 1 | `VIRTUAL.DS` | `VIRTUAL.PL` | **done** — 2026-09-25 |
-| 2 | `VIRTUAL_MESH_NODE.DS` | `VirtualMeshNodePointLocatorModel` | next; 3 live on the bench gateway |
-| 3 | `INTERNAL.DS` | `INTERNAL.PL` | 1 live |
+| 2 | `VIRTUAL_MESH_NODE.DS` | `VIRTUAL_MESH_NODE.PL` | **done** — 2026-09-25 |
+| 3 | `INTERNAL.DS` | `INTERNAL.PL` | next; 1 live |
 | 4 | `MESH_CONTROLLER.DS` | — | 1 live |
 | 5 | `MODBUS_IP.DS` | `MODBUS.PL` | largest locator (19 fields); needs an instance created on the gateway first |
 | 6 | `MODBUS_SERIAL.DS` | `MODBUS.PL` | locator shared with 5 |
@@ -284,7 +286,74 @@ hidden fields.
 
 **Left for later, deliberately.** `attractionPointXid` is still a text box. The stack fills it
 from `getDatapointsByTypeId(3)` — every numeric point on the gateway, not just this data source's
-— and Cortex has no such call yet. It affects one field of one change type.
+— and Cortex has no such call yet. It affects one field of one change type, and it is the first
+thing the **per-type component** hatch below is for: a picker has to query the gateway, which a
+descriptor cannot express.
+
+### 2 — `VIRTUAL_MESH_NODE.DS` / `VIRTUAL_MESH_NODE.PL` (done, 2026-09-25)
+
+The opposite shape to 1. Nothing on a mesh node is a setting: the node joins the Wirepas mesh, a
+publisher provisions a row for it, and every field on both forms describes what the radio reports.
+The work was therefore not choosing fields but *refusing to offer* them.
+
+**Data source.** Two fields survive the existing strips — `controllerAddress` (the mesh address of
+the controller the node answers to) and `publisherId` (the publisher that created the row). Both
+are now **read-only**, which is what the gateway's own form does; it disables `editPermission`
+alongside them, which Cortex drops entirely. Their schema descriptions carry through as hint
+icons, so the form says why they cannot be changed.
+
+**Data point.** All four locator fields read-only: `dataType`, `settable`, `attributeId`, `type`.
+`relinquishable` and `configurationDescription` hidden, as on `VIRTUAL.PL` — the first because
+`VirtualMeshNodePointLocatorModel.toVO` never reads it, so a value typed there is discarded in the
+mapper before the gateway sees it.
+
+`settable` is the one an operator acts on, and it is shown although the gateway's own form omits
+it: it is what puts the set-value control on a point, and on this locator it is the live copy
+(`DataPointDao:184` again). A DO is writable because it is a DO — worth seeing, not worth typing.
+
+**No Add button.** With every locator field read-only there is nothing for an Add form to take,
+and `AttributeDataType.valueOf(null)` in the mapper makes an empty locator an exception rather
+than a validation error. `provisionedPoints` suppresses it. Edit, toggle and delete stay.
+
+**Two bugs the renderer had, found by this type.** `tb-gateway-form` ignored `FormProperty.disabled`
+entirely, so a `readOnly` field from the schema rendered as an editable control. It was
+unreachable while `VIRTUAL.PL` was the only layout — its one read-only field is hidden — and would
+have become reachable with the second. Fixed at the root: the renderer disables any property
+carrying the flag, `form.enable()` puts them back afterwards, and the delegated branch passes it
+down to `tb-dynamic-form`. The layout's `readonly` key sets the same flag rather than introducing
+a second way of saying it.
+
+**Verified.** Against `8 DDM Card - Slave 1` on `Inferrix Gateway 155`. Data source form: two
+fields, both disabled, correct values (`11`, `1`), no Add button. Point form (`nullDO 2 - Status`,
+attribute 10): four controls, all disabled, `BINARY` / settable / `10` / `BOOL` — matching what
+REST returns for that point. A save was captured at the wire and **blocked before it left the
+browser** (a provisioned point on live plant, and the question was whether a disabled control
+survives): the payload is byte-identical to the stored point, `settable: true` included, and a
+direct REST read afterwards confirms the gateway is untouched. `VIRTUAL.DS` and `VIRTUAL.PL`
+re-checked for regression — unchanged, all controls still editable, Add still offered. Console
+clean.
+
+## Per-type components
+
+Settled 2026-09-25, after the question was raised directly: **is one renderer for 148 model types
+the right shape?**
+
+Measured on the live schema document: 148 model types, of which 124 are data sources and point
+locators — and those 124 have only **40 distinct field sets** between them. 96 of the 124 share a
+field set with another type. A component per type would be ~296 files, ~190 of them duplicating a
+sibling, and it would move the field list out of the gateway's schema and into Cortex, where a
+gateway that adds a field silently disagrees with the form. `gateway-form.component.ts` has zero
+references to `modelType`: the per-type knowledge is a lookup table, not a switch.
+
+**But a descriptor cannot express behaviour**, and some types need it — `attractionPointXid` has
+to query the gateway for numeric points and offer them. So the shape is ThingsBoard's own:
+`WidgetTypeDescriptor` carries both `settingsForm?: FormProperty[]` (schema-driven, the default)
+and `settingsDirective?: string` (a named per-type component), with 95 hand-written settings
+components sitting beside the generic form. A widget opts into one only when it needs one.
+
+**Decision.** Generic renderer stays the default. `GatewayFormLayout` gains a `component` key that
+replaces the renderer for that type entirely, resolved through the same `gatewayFormLayout()`
+lookup. It is built when the first type needs it — `attractionPointXid` — not before.
 
 ## Handed over
 
@@ -301,6 +370,18 @@ changed.
 - **W13 (P3)** — the attractor form labels `maxChange` "Minimum Change" while the brownian form
   labels the same field "Maximum Change". `AnalogAttractorChangeRT:52` clamps to ±`maxChange`, so
   it is a ceiling and the brownian wording is right.
+
+Stack-side findings go to `Inferrix-stack/docs/specs/` instead. From type 2, in
+`2026-09-25-mesh-node-provisioned-rows.md`:
+
+- **D38 (P2)** — every provisioned mesh node point is named `nullDO 2 - Statusnull`. The
+  unguarded `prefix + name + suffix` was fixed in `c6d7d43d5`, but the rows written while it was
+  live were never repaired, and the name that is wrong is the *data point's* rather than the
+  *published point's* — so a third site assembles it the same way and that commit did not reach
+  it.
+- **A14 (P3)** — `attributeId`, `type` and `settable` on `VIRTUAL_MESH_NODE.PL` carry no
+  `description`, so a schema-driven client shows them unlabelled. `type` would be better as an
+  `enum`: `AttributeDataType` declares all 42 values and `toVO` calls `valueOf` on it unguarded.
 
 ## Open decisions
 

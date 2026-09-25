@@ -22,6 +22,25 @@ export interface GatewayFormLayout {
   hidden?: string[];
   /** Property ids moved into the Advanced panel: real settings the gateway's own UI omits. */
   advanced?: string[];
+  /**
+   * Property ids shown but not editable, for a field the gateway's own provisioning owns.
+   *
+   * Not a security control and not a substitute for one: the gateway decides what it accepts, and
+   * a field it will not take back is already `readOnly` in the schema. This is for the fields it
+   * *would* take and should not be asked to — a mesh node's radio address, the attribute a point
+   * reads — which describe hardware the platform cannot change by writing a number at it. Shown
+   * rather than hidden because they are the first thing an operator opens a provisioned row to
+   * check.
+   */
+  readonly?: string[];
+  /**
+   * The gateway creates this source's points, so Cortex does not offer to add one.
+   *
+   * Only the source's layout carries it. Its points still open, still toggle and still delete —
+   * what goes is the button whose form would have nothing to fill in, because every locator field
+   * of a provisioned point is {@link readonly}.
+   */
+  provisionedPoints?: boolean;
   /** A fixed option list for a property the schema declares as a bare string. */
   options?: {[id: string]: FormSelectItem[]};
   /** An option list chosen by another control's value. */
@@ -163,6 +182,41 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * so the type is marked as worked through -- a type with no entry keeps the old renderer.
    */
   'VIRTUAL.DS': {},
+
+  /**
+   * One node on the Wirepas mesh, as a data source.
+   *
+   * Nothing here is a setting. `controllerAddress` is the mesh address of the controller the node
+   * answers to and `publisherId` is the provisioning publisher that created the row — both written
+   * by the gateway when the node joined, and both the first thing an operator opens the row to
+   * read. The gateway's own form disables them for the same reason, along with `editPermission`,
+   * which Cortex drops entirely.
+   */
+  'VIRTUAL_MESH_NODE.DS': {
+    readonly: ['controllerAddress', 'publisherId'],
+    provisionedPoints: true
+  },
+
+  /**
+   * One attribute of a mesh node, as a point.
+   *
+   * Every field describes what the radio sends: `attributeId` is the attribute number on the node,
+   * `type` is its wire encoding (`AttributeDataType`) and `dataType` is how the gateway stores it.
+   * A mesh node does not take a new value for any of them — it reports them — so all four are
+   * shown and none is editable, which is what the gateway's own form does.
+   *
+   * `settable` is included although the gateway's form omits it, because it is the one field here
+   * an operator acts on: it is what puts the set-value control on a point, and on this locator it
+   * is the live copy (`DataPointDao` writes `getPointLocator().isSettable()` over the point's own).
+   * Read-only with the rest — a DO is writable because it is a DO.
+   *
+   * `relinquishable` is hidden because `VirtualMeshNodePointLocatorModel.toVO` never reads it: a
+   * value typed there is discarded in the mapper, before the gateway sees the point at all.
+   */
+  'VIRTUAL_MESH_NODE.PL': {
+    hidden: ['relinquishable', 'configurationDescription'],
+    readonly: ['dataType', 'settable', 'attributeId', 'type']
+  },
 
   /**
    * The fields every data point carries, whatever protocol it reads.

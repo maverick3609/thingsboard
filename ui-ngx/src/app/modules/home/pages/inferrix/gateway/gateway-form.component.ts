@@ -140,9 +140,14 @@ export class GatewayFormComponent implements ControlValueAccessor, OnChanges {
     this.disabled = isDisabled;
     if (isDisabled) {
       this.form.disable({emitEvent: false});
-    } else {
-      this.form.enable({emitEvent: false});
+      return;
     }
+    this.form.enable({emitEvent: false});
+    // `enable()` knows nothing of the individual fields, so they go back afterwards. A disabled
+    // control is left out of `form.value` but not of `getRawValue`, which is what the change
+    // subscription reads -- so a field the operator cannot edit still round-trips on a save.
+    this.shown.filter(property => property.disabled)
+      .forEach(property => this.form.get(property.id)?.disable({emitEvent: false}));
   }
 
   writeValue(value: {[id: string]: any}): void {
@@ -235,8 +240,11 @@ export class GatewayFormComponent implements ControlValueAccessor, OnChanges {
    */
   private withLayout(property: FormProperty): FormProperty {
     const items = own(this.layout?.options, property.id);
+    // `disabled` is already how the mapper marks a `readOnly` field, so a layout naming one adds
+    // to that set rather than introducing a second way of saying it.
+    const disabled = property.disabled || (this.layout?.readonly ?? []).includes(property.id);
     return items && this.narrowable(property)
-      ? {...property, type: FormPropertyType.select, items} : {...property};
+      ? {...property, disabled, type: FormPropertyType.select, items} : {...property, disabled};
   }
 
   /**

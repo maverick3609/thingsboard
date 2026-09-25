@@ -185,6 +185,7 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
       // A point carries its data source's xid, so there is nothing to attach one to until the
       // source has been saved once and the gateway has given it one.
       needsSaveFirst: !model.xid,
+      provisioned: gatewayFormLayout(model.modelType)?.provisionedPoints,
       add: () => {
         // A new locator starts on what the gateway's own VO starts on, where its layout records
         // one. Seeded onto the model rather than defaulted in the form: a value the form shows but

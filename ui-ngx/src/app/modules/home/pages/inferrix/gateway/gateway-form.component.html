@@ -48,7 +48,7 @@
           -->
           <tb-dynamic-form class="flex-1" noBorder noPadding stackedLabels
                            [properties]="delegatedProperties[item.property.id]"
-                           [disabled]="disabled"
+                           [disabled]="disabled || item.property.disabled"
                            [ngModel]="slices[item.property.id]"
                            (ngModelChange)="sliceChanged(item.property.id, $event)"
                            [ngModelOptions]="{standalone: true}"></tb-dynamic-form>

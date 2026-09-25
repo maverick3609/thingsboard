@@ -97,6 +97,45 @@ describe('gateway form layouts', () => {
     });
   });
 
+  it('leaves every mesh node locator field read-only, since the radio reports all of them', () => {
+    const meshPoint = GATEWAY_FORM_LAYOUTS['VIRTUAL_MESH_NODE.PL'];
+    // Everything `VirtualMeshNodePointLocatorModel.toVO` reads, and nothing else: `attributeId`
+    // and `type` are the node's own attribute and its wire encoding, `dataType` is how the gateway
+    // stores it, and `settable` is what makes a DO writable.
+    expect(meshPoint.readonly)
+      .toEqual(['dataType', 'settable', 'attributeId', 'type']);
+    expect(meshPoint.hidden).toContain('relinquishable');
+  });
+
+  it('offers no Add on a source whose points the gateway provisions', () => {
+    expect(GATEWAY_FORM_LAYOUTS['VIRTUAL_MESH_NODE.DS'].provisionedPoints).toBe(true);
+    expect(GATEWAY_FORM_LAYOUTS['VIRTUAL_MESH_NODE.DS'].readonly)
+      .toEqual(['controllerAddress', 'publisherId']);
+    // A virtual source's points are hand-made, so its Add button stays.
+    expect(GATEWAY_FORM_LAYOUTS['VIRTUAL.DS'].provisionedPoints).toBeUndefined();
+  });
+
+  it('never both reads a field back and hides it', () => {
+    // A hidden field has no control to disable, so naming it in both says one of the two is wrong.
+    Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
+      const hidden = new Set(layout.hidden ?? []);
+      (layout.readonly ?? []).forEach(id =>
+        expect(hidden.has(id)).withContext(`${modelType}.${id}`).toBe(false));
+    });
+  });
+
+  it('gives a provisioned source nothing for an operator to fill in', () => {
+    // What makes suppressing Add correct rather than merely tidy: the locator's every field is
+    // read-only, so the form an Add opened would take no input and post a locator the gateway
+    // rejects. If a field here ever becomes editable, the button has to come back.
+    const layout = GATEWAY_FORM_LAYOUTS['VIRTUAL_MESH_NODE.PL'];
+    const editable = ['dataType', 'settable', 'relinquishable', 'configurationDescription',
+      'attributeId', 'type']
+      .filter(id => !(layout.hidden ?? []).includes(id))
+      .filter(id => !(layout.readonly ?? []).includes(id));
+    expect(editable).toEqual([]);
+  });
+
   it('names no field in both hidden and advanced', () => {
     Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
       const hidden = new Set(layout.hidden ?? []);

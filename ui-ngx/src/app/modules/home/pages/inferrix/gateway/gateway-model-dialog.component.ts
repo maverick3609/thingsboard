@@ -35,6 +35,11 @@ export interface GatewayModelChildren {
   readonly: boolean;
   /** Shown instead of the table until the parent exists, since a child needs its parent's xid. */
   needsSaveFirst: boolean;
+  /**
+   * The gateway creates these rows, so no Add button. Editing, toggling and deleting stay: what
+   * goes is the one action whose form would open with nothing in it to fill in.
+   */
+  provisioned?: boolean;
   add: () => void;
   edit: (row: any) => void;
   delete: (row: any) => void;

@@ -65,6 +65,20 @@ export interface GatewayFormLayout {
    */
   rows?: string[][];
   /**
+   * Which point locator this data source's points take, for a type the gateway will not say.
+   *
+   * `/v2/data-source-types` publishes `pointLocatorType` per type and answers null for
+   * `BACNET_MSTP.DS` (measured on stack 5.1.0 and again on 5.1.1). Without it a source with no
+   * points yet has nothing to build a locator form from, so its *first* point cannot be added at
+   * all — the platform falls back to reading a sibling point's locator, and there is no sibling.
+   *
+   * Only ever a fallback: the gateway's own answer wins where it gives one, so this cannot
+   * contradict the device. Carried here rather than in a table of its own because it is the same
+   * kind of per-type knowledge as the rest of this descriptor, and inherits the same discipline —
+   * it exists only for a type that has been worked through.
+   */
+  pointLocatorType?: string;
+  /**
    * What a **new** model starts with, where the gateway's own VO has a default the schema does not
    * publish. Applied only where the key is absent, which is what an add looks like: a model read
    * back from the gateway carries every key, `null` included, so an explicit null is never
@@ -307,6 +321,60 @@ const BACNET_WRITE_PRIORITIES: FormSelectItem[] =
   }));
 
 /**
+ * A BACnet master's own fields, which are the same over IP and over MS/TP.
+ *
+ * Three editable fields, which is the whole type -- everything else on the model is shared with
+ * every other data source. `localDeviceConfig` is declared a bare string and is a key into
+ * `/v2/bacnet/local-devices`, so it cannot be a layout constant and both transports get a
+ * component; `validate` looks the value up and refuses one that resolves to nothing, which means a
+ * gateway with no local device configured cannot host a BACnet data source at all.
+ *
+ * `covSubscriptionTimeoutMinutes` is defaulted for the reason Modbus serial's line settings are:
+ * `BACnetDataSourceModel` declares a bare `int`, so an absent key is 0, `validate` rejects
+ * anything below 1, and the VO's own 60 never applies. The number here is that 60.
+ */
+const BACNET_DATA_SOURCE: GatewayFormLayout = {
+  defaults: {covSubscriptionTimeoutMinutes: 60},
+  rows: [['localDeviceConfig', 'covSubscriptionTimeoutMinutes']]
+};
+
+/**
+ * A BACnet point: which object on which device, read as what. The same over both transports.
+ *
+ * Two of its fields are lookups rather than constants -- the object types the gateway decodes,
+ * and the properties of whichever type is chosen -- so this layout carries what is declarative
+ * and {@link BacnetPointFormComponent} adds the rest. The property list is what makes the form
+ * worth having: each property reports the data types it can be read as, which is the list
+ * `BACnetDataSourceDefinition.validate` checks `dataTypeId` against.
+ *
+ * `configurationDescription` is the gateway's own rendering of the fields above it, and
+ * `relinquishable` is never read: `BACnetPointLocatorModel.toVO` sets ten fields and that is not
+ * one of them, so a control for it would change nothing.
+ *
+ * The defaults are a working point, not a guess at one. `propertyIdentifierId` has to be sent --
+ * `toVO` calls `PropertyIdentifier.forName(...)` on it before anything validates, so an absent
+ * one is a null-pointer exception rather than a message -- and `multiplier` has to be sent
+ * because the model declares a bare `double`, so an absent one is 0 and every reading is
+ * multiplied by it. That last one fails silently: the point saves, polls, and reports 0 forever.
+ */
+const BACNET_POINT: GatewayFormLayout = {
+  hidden: ['relinquishable', 'configurationDescription'],
+  options: {writePriority: BACNET_WRITE_PRIORITIES},
+  visibleWhen: {
+    // Validated 1-16 whatever the point is, so it is still sent while hidden -- what the gate
+    // removes is a field that decides nothing on a point nobody can write to.
+    writePriority: {by: 'settable', values: [true]},
+    // `encodableToValue` applies `raw * multiplier + additive` on the numeric branch alone.
+    multiplier: {by: 'dataType', values: ['NUMERIC']},
+    additive: {by: 'dataType', values: ['NUMERIC']}
+  },
+  defaults: {objectTypeId: 'ANALOG_INPUT', propertyIdentifierId: 'present-value',
+    dataType: 'NUMERIC', multiplier: 1, writePriority: 16},
+  rows: [['remoteDeviceInstanceNumber', 'objectInstanceNumber'],
+    ['objectTypeId', 'propertyIdentifierId'], ['multiplier', 'additive']]
+};
+
+/**
  * Layouts by model type, and by component name for the shared models that have no family.
  *
  * Only the types worked through so far appear. A type with no entry renders exactly as before —
@@ -529,59 +597,34 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     rows: [['slaveId', 'offset'], ['registerCount', 'charset'], ['multiplier', 'additive']]
   },
 
-  /**
-   * A BACnet/IP master: which local device it speaks through, and how often.
-   *
-   * Three editable fields, which is the whole type -- everything else on the model is shared with
-   * every other data source. `localDeviceConfig` is declared a bare string and is a key into
-   * `/v2/bacnet/local-devices`, so it cannot be a layout constant and the type gets a component;
-   * `validate` looks the value up and refuses one that resolves to nothing, which means a gateway
-   * with no local device configured cannot host a BACnet data source at all.
-   *
-   * `covSubscriptionTimeoutMinutes` is defaulted for the reason Modbus serial's line settings are:
-   * `BACnetDataSourceModel` declares a bare `int`, so an absent key is 0, `validate` rejects
-   * anything below 1, and the VO's own 60 never applies. The number here is that 60.
-   */
-  'BACNET_IP.DS': {
-    defaults: {covSubscriptionTimeoutMinutes: 60},
-    rows: [['localDeviceConfig', 'covSubscriptionTimeoutMinutes']]
-  },
+  /** A BACnet/IP master: which local device it speaks through, and how often. {@link BACNET_DATA_SOURCE} */
+  'BACNET_IP.DS': BACNET_DATA_SOURCE,
 
   /**
-   * A BACnet point: which object on which device, read as what.
+   * The same master over an MS/TP serial bus.
    *
-   * Two of its fields are lookups rather than constants -- the object types the gateway decodes,
-   * and the properties of whichever type is chosen -- so this layout carries what is declarative
-   * and {@link BacnetPointFormComponent} adds the rest. The property list is what makes the form
-   * worth having: each property reports the data types it can be read as, which is the list
-   * `BACnetDataSourceDefinition.validate` checks `dataTypeId` against.
+   * Field for field the same model as `BACNET_IP.DS` — the serial settings an operator expects
+   * here (`commPortId`, `baudRate`, `thisStation`, `maxMaster`) are on the **local device**, not
+   * on the data source, so choosing the right local device is the whole of choosing the bus. The
+   * picker is filtered to MS/TP local devices for that reason: nothing on the gateway checks that
+   * a source's transport matches the local device it names, and `LocalDeviceFactory` builds
+   * whatever the config says — so an MS/TP source pointing at an IP local device silently speaks
+   * BACnet/IP.
    *
-   * `configurationDescription` is the gateway's own rendering of the fields above it, and
-   * `relinquishable` is never read: `BACnetPointLocatorModel.toVO` sets ten fields and that is not
-   * one of them, so a control for it would change nothing.
-   *
-   * The defaults are a working point, not a guess at one. `propertyIdentifierId` has to be sent --
-   * `toVO` calls `PropertyIdentifier.forName(...)` on it before anything validates, so an absent
-   * one is a null-pointer exception rather than a message -- and `multiplier` has to be sent
-   * because the model declares a bare `double`, so an absent one is 0 and every reading is
-   * multiplied by it. That last one fails silently: the point saves, polls, and reports 0 forever.
+   * `pointLocatorType` is the one addition. The gateway answers null for this type, which leaves
+   * a source with no points unable to gain its first one.
    */
-  'BACNET_IP.PL': {
-    hidden: ['relinquishable', 'configurationDescription'],
-    options: {writePriority: BACNET_WRITE_PRIORITIES},
-    visibleWhen: {
-      // Validated 1-16 whatever the point is, so it is still sent while hidden -- what the gate
-      // removes is a field that decides nothing on a point nobody can write to.
-      writePriority: {by: 'settable', values: [true]},
-      // `encodableToValue` applies `raw * multiplier + additive` on the numeric branch alone.
-      multiplier: {by: 'dataType', values: ['NUMERIC']},
-      additive: {by: 'dataType', values: ['NUMERIC']}
-    },
-    defaults: {objectTypeId: 'ANALOG_INPUT', propertyIdentifierId: 'present-value',
-      dataType: 'NUMERIC', multiplier: 1, writePriority: 16},
-    rows: [['remoteDeviceInstanceNumber', 'objectInstanceNumber'],
-      ['objectTypeId', 'propertyIdentifierId'], ['multiplier', 'additive']]
-  },
+  'BACNET_MSTP.DS': {...BACNET_DATA_SOURCE, pointLocatorType: 'BACNET_MSTP.PL'},
+
+  /** A BACnet/IP point: which object on which device, read as what. {@link BACNET_POINT} */
+  'BACNET_IP.PL': BACNET_POINT,
+
+  /**
+   * An MS/TP point, which is a BACnet point: `BACnetMstpPointLocatorModel` adds nothing to
+   * `BACnetPointLocatorModel`, and the schema agrees field for field. Shared rather than copied,
+   * so the two cannot drift.
+   */
+  'BACNET_MSTP.PL': BACNET_POINT,
 
   /**
    * The fields every data point carries, whatever protocol it reads.

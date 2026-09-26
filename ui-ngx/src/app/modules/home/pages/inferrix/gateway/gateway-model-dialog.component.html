@@ -73,6 +73,14 @@
                                 [disabled]="data.readonly" [(ngModel)]="locatorValues"
                                 [ngModelOptions]="{standalone: true}"></tb-bacnet-point-form>
         }
+        <!-- The same locator. Object types and their properties are a property of BACnet, not of
+             the transport that carries it. -->
+        @case ('BACNET_MSTP.PL') {
+          <tb-bacnet-point-form [properties]="data.locatorProperties"
+                                [layout]="data.locatorLayout" [deviceId]="data.deviceId"
+                                [disabled]="data.readonly" [(ngModel)]="locatorValues"
+                                [ngModelOptions]="{standalone: true}"></tb-bacnet-point-form>
+        }
         @default {
           <tb-gateway-form [properties]="data.locatorProperties" [layout]="data.locatorLayout"
                            [disabled]="data.readonly" [(ngModel)]="locatorValues"
@@ -95,8 +103,15 @@
         -->
         @case ('BACNET_IP.DS') {
           <tb-bacnet-data-source-form [properties]="data.properties" [layout]="data.layout"
-                                      [deviceId]="data.deviceId" [disabled]="data.readonly"
-                                      [(ngModel)]="values"
+                                      [deviceId]="data.deviceId" transport="IP"
+                                      [disabled]="data.readonly" [(ngModel)]="values"
+                                      [ngModelOptions]="{standalone: true}">
+          </tb-bacnet-data-source-form>
+        }
+        @case ('BACNET_MSTP.DS') {
+          <tb-bacnet-data-source-form [properties]="data.properties" [layout]="data.layout"
+                                      [deviceId]="data.deviceId" transport="MSTP"
+                                      [disabled]="data.readonly" [(ngModel)]="values"
                                       [ngModelOptions]="{standalone: true}">
           </tb-bacnet-data-source-form>
         }

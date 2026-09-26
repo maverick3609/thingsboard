@@ -367,9 +367,26 @@ describe('gateway form layouts', () => {
     expect(GATEWAY_FORM_LAYOUTS['BACNET_IP.DS'].options).toBeUndefined();
   });
 
-  it('has no layout for a BACnet type whose turn has not come', () => {
-    expect(GATEWAY_FORM_LAYOUTS['BACNET_MSTP.DS']).toBeUndefined();
-    expect(GATEWAY_FORM_LAYOUTS['BACNET_MSTP.PL']).toBeUndefined();
+  it('gives MS/TP the same form as BACnet/IP, because it is the same model', () => {
+    // `BACnetMstpDataSourceModel` and `BACnetMstpPointLocatorModel` add nothing to their bases,
+    // and the live schema agrees field for field. The serial settings an operator looks for here
+    // are on the local device, not on the data source.
+    expect(GATEWAY_FORM_LAYOUTS['BACNET_MSTP.PL']).toBe(GATEWAY_FORM_LAYOUTS['BACNET_IP.PL']);
+    const mstp = GATEWAY_FORM_LAYOUTS['BACNET_MSTP.DS'];
+    const ip = GATEWAY_FORM_LAYOUTS['BACNET_IP.DS'];
+    expect(mstp.defaults).toEqual(ip.defaults);
+    expect(mstp.rows).toEqual(ip.rows);
+  });
+
+  it('names the locator type the gateway will not name for MS/TP', () => {
+    // `/v2/data-source-types` answers null for this one type, measured on 5.1.0 and 5.1.1. Without
+    // it a source with no points has nothing to build its first point's locator form from.
+    expect(GATEWAY_FORM_LAYOUTS['BACNET_MSTP.DS'].pointLocatorType).toBe('BACNET_MSTP.PL');
+    // And only for that one: everywhere else the gateway's own answer is the answer.
+    Object.entries(GATEWAY_FORM_LAYOUTS)
+      .filter(([modelType]) => modelType !== 'BACNET_MSTP.DS')
+      .forEach(([modelType, layout]) =>
+        expect(layout.pointLocatorType).withContext(modelType).toBeUndefined());
   });
 
   it('gates no field on one that is hidden', () => {

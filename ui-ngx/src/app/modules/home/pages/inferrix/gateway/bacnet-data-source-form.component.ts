@@ -16,8 +16,9 @@ import { GatewayFormComponent } from './gateway-form.component';
  * refuses a value that resolves to nothing. So this is not a convenience: without the list an
  * operator has to find the id by hand, and a BACnet data source cannot be saved without one.
  *
- * Used for BACnet/IP and, when its turn comes, BACnet MS/TP — `localDeviceConfig` is declared on
- * `BACnetDataSourceVO`, which both extend.
+ * Used for both BACnet/IP and BACnet MS/TP — `localDeviceConfig` is declared on
+ * `BACnetDataSourceVO`, which both extend — with {@link transport} deciding which local devices the
+ * list offers.
  */
 @Component({
   selector: 'tb-bacnet-data-source-form',
@@ -35,6 +36,16 @@ export class BacnetDataSourceFormComponent extends GatewayFormComponent implemen
 
   /** The gateway to ask. Without it the field stays the text box it was. */
   @Input() deviceId: string;
+
+  /**
+   * Which transport this data source speaks, so the picker offers only local devices that match.
+   *
+   * Not cosmetic. Nothing on the gateway checks that a source's transport agrees with the local
+   * device it names — `BACnetDataSourceDefinition.validate` only checks that the id resolves, and
+   * `LocalDeviceFactory` builds whatever the config says. So an MS/TP source naming an IP local
+   * device is accepted and then quietly speaks BACnet/IP, on a bus that is not there.
+   */
+  @Input() transport: 'IP' | 'MSTP';
 
   private localDevices: {[id: string]: FormSelectItem[]} = Object.create(null);
 
@@ -56,6 +67,9 @@ export class BacnetDataSourceFormComponent extends GatewayFormComponent implemen
         next: devices => {
           const items = (devices ?? [])
             .filter(device => !!device.id)
+            // A device with no type is kept: the gateway has always sent one, and dropping a row
+            // over a field this form does not otherwise read would hide a usable local device.
+            .filter(device => !this.transport || !device.type || device.type === this.transport)
             .map(device => ({
               value: device.id,
               // Both halves, because neither is enough on its own: two local devices on different

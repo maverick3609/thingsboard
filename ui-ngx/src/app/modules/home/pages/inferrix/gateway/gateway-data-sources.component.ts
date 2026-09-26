@@ -377,6 +377,11 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
   private locatorType(source: GatewayDataSource, rows: GatewayDataPoint[]): string | null {
     const published = this.types.find(type => type.type === source.modelType)?.pointLocatorType;
     return published
+      // The gateway's own answer first, then what a worked-through type knows about itself, and
+      // only then a sibling point. The middle one exists for `BACNET_MSTP.DS`, which publishes
+      // null: without it a source with no points yet cannot be given its first one, because there
+      // is no sibling to read the locator type off.
+      ?? gatewayFormLayout(source.modelType)?.pointLocatorType
       ?? rows.find(row => row.pointLocator?.modelType)?.pointLocator?.modelType
       ?? null;
   }

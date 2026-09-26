@@ -252,7 +252,15 @@ class InferrixGatewayRoutesTest {
         // route is narrow, never that a route exists. A typo in a literal -- "default-event-type"
         // for "default-event-types" -- leaves the invariant perfectly green while the route is
         // silently dead, and that surfaces as a broken form in the UI rather than as a red test.
-        assertTrue(InferrixGatewayRoutes.isAllowed("GET", "/v2/data-source/default-event-types/ModbusIp"));
+        // Spelled the way the gateway spells it. An invented name like "ModbusIp" passes a pattern
+        // that no real model type matches: every one carries a dot, which is what made this route
+        // 403 in practice while this assertion stayed green.
+        assertTrue(InferrixGatewayRoutes.isAllowed("GET",
+                "/v2/data-source/default-event-types/MODBUS_IP.DS"));
+        assertTrue(InferrixGatewayRoutes.isAllowed("GET",
+                "/v2/data-source/default-event-types/BACNET_MSTP.DS"));
+        assertFalse(InferrixGatewayRoutes.isAllowed("GET",
+                "/v2/data-source/default-event-types/../data-source"));
 
         assertTrue(InferrixGatewayRoutes.isAllowed("GET", "/v2/data-point"));
         assertTrue(InferrixGatewayRoutes.isAllowed("POST", "/v2/data-point"));

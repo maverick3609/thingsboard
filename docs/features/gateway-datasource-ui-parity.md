@@ -244,8 +244,8 @@ consulted.
 | 3 | `MODBUS_IP.DS` | `MODBUS.PL` | **done** — 2026-09-25 |
 | 4 | `MODBUS_SERIAL.DS` | `MODBUS.PL` | **done** — 2026-09-25; data source only, locator shared with 3 |
 | 5 | `BACNET_IP.DS` | `BACNET_IP.PL` | **done** — 2026-09-26; needs a local device on the gateway first |
-| 6 | `BACNET_MSTP.DS` | `BACNET_MSTP.PL` | next; `pointLocatorType` still null on 5.1.1 — falls back to a sibling point. Needs the serial-port picker deferred from 4 |
-| 7 | `META.DS` | `META.PL` | |
+| 6 | `BACNET_MSTP.DS` | `BACNET_MSTP.PL` | **done** — 2026-09-26; forms match 5, but the gateway 500s on every point (**D57**) |
+| 7 | `META.DS` | `META.PL` | next |
 | 8 | `SNMP.DS` | `SNMP.PL` | |
 | 9 | `MQTT.DS` | `MQTT.PL` | `writeOnly` secrets; empty must mean "unchanged" |
 | 10 | `HTTP_RECEIVER.DS` | `HTTP_RECEIVER.PL` | "HTTP" is two types on this stack; both are in scope |
@@ -469,9 +469,14 @@ webapp instead — it is a plain `int` the stack never bounds, so there is no en
 is not in `InferrixGatewayRoutes`, and adding it is a platform release — so this type ships with
 the operator typing the port name their gateway reports. It is one allowlist line, one service
 method and a subclass of `GatewayFormComponent` in the shape `VirtualPointFormComponent` already
-has, and **BACnet MS/TP needs the same picker**, so it belongs with type 6 rather than with a
-release of its own. Recorded here rather than guessed at: a port name this platform invented
-would be worse than an empty box.
+has. Recorded here rather than guessed at: a port name this platform invented would be worse than
+an empty box.
+
+> Corrected while doing type 6: this paragraph originally said BACnet MS/TP needed the same picker,
+> so the two could be done together. It does not. An MS/TP data source has no serial settings at
+> all — they are on `MstpLocalDeviceConfigModel`, which is a BACnet **local device**, a thing
+> Cortex has no form for. `commPortId` on `MODBUS_SERIAL.DS` is the only field in the product that
+> wants `/v2/utilities/gw/serial-ports`, so the picker is a release of its own after all.
 
 **Verified.** A throwaway `ZZ Serial Probe` created through the form on `Inferrix Gateway 155`
 and deleted afterwards; the gateway is back at 12 data sources and 100 points, and nothing was
@@ -557,6 +562,68 @@ measured 1, 40 and 60 entries against the routes that serve them. Switching the 
 `object-name` narrowed the data types to Alphanumeric alone and cleared the held Numeric. The
 gateway had been upgraded to stack 5.1.1 since type 4; the schemas of all seven previously laid-out
 types were re-read and are unchanged. Console clean.
+
+### 6 — `BACNET_MSTP.DS` / `BACNET_MSTP.PL` (done, 2026-09-26)
+
+**The same models, so the same forms.** Resolving both schemas through their `allOf` chains gives
+`BACNET_MSTP.DS` the fifteen fields of `BACNET_IP.DS` and `BACNET_MSTP.PL` the thirteen of
+`BACNET_IP.PL` — the same names, the same types, no field either way. BACnet object types and their
+properties are a property of BACnet, not of the transport that carries it, and what *is* per
+transport — the line settings — lives on `MstpLocalDeviceConfigModel` (`commPortId`, `baudRate`,
+`thisStation`, `retryCount`, `maxMaster`, `maxInfoFrames`, `usageTimeout`), which is a local device
+rather than a data source. So `BACNET_DATA_SOURCE` and `BACNET_POINT` became shared layout
+constants and both types point at them. No new layout, no new component.
+
+**One addition: the picker has to know the transport.** `localDeviceConfig` is declared on
+`BACnetDataSourceVO`, which both extend, and nothing on the gateway checks that a source's
+transport agrees with the local device it names — `validate` only checks that the id resolves, and
+`LocalDeviceFactory` builds whatever the config says. An MS/TP source naming an IP local device is
+accepted and then quietly speaks BACnet/IP on a bus that is not there. So
+`BacnetDataSourceFormComponent` took a `transport` input and filters the list; a row whose `type`
+the gateway did not send is kept, because dropping a usable local device over a field this form
+does not otherwise read would be worse than showing one row too many.
+
+**`pointLocatorType` in the layout.** `/v2/data-source-types` answers `null` for this one type
+alone, so `locatorType()` used to fall through to the type of a sibling point — which works for
+every source that already has one and fails for the case that matters, a source getting its first.
+The layout now names it, consulted between the gateway's published answer (still preferred, so a
+fixed gateway wins immediately) and the sibling scan.
+
+**And then the gateway refuses every point.** Any `POST /v2/data-point` on a `BACNET_MSTP.DS` row
+that carries a locator answers **500**, whatever the locator is. Isolated with five probes of one
+body: an MS/TP locator on an *IP* source gives a clean 422 naming the expected type, no locator at
+all on the MS/TP source gives a clean 422 "Required value", and both an MS/TP *and* an IP locator on
+the MS/TP source give the same 500 — which places the fault in the one step that needs the data
+source's declared locator type, the `null` above. One missing declaration, both symptoms. Filed as
+**D57 (P0)**, with **A22** asking whether MS/TP is meant to carry points at all; if the answer is
+no, Cortex should say so on the data source instead of offering an Add point button.
+
+Nothing conditional was added for it. A guard would have to come out again the moment D57 lands,
+and supplying the locator type Cortex already knows is as far as it should go before A22 is
+answered.
+
+**A second proxy bug of our own, same shape as type 5's.**
+`/v2/data-source/default-event-types/{type}` was allowlisted with `TYPE`, which forbids dots — and
+every model type has one (`MODBUS_IP.DS`). The route was 403 for every input it can ever be given.
+Its test asserted `default-event-types/ModbusIp`, a name the gateway does not use, which is why it
+stayed green; it now asserts the real spelling, the MS/TP one, and that `../data-source` is still
+refused. Fixed with a `MODEL_TYPE` pattern rather than by widening `TYPE`, which also serves
+`/v2/event-detector-type/NUMERIC` and `/v2/bacnet/object-properties/ANALOG_INPUT`, neither of which
+should admit a dot. Nothing in the UI calls the route yet, so this was latent rather than broken on
+screen — the same kind of latent the type 5 bug was not.
+
+**Verified.** A throwaway MS/TP local device (`ZZ Cortex MSTP probe`, `/dev/ttyUSB9`, a port that
+does not exist) and a `ZZ Cortex MSTP probe` data source created through the form on
+`Inferrix Gateway 155`, then deleted; the gateway is back at 12 data sources and 100 points. The
+local device picker offered **only** the MS/TP probe and not the BACnet/IP one created for type 5,
+which is the transport filter working. COV timeout prefilled 60, and the saved row came back with
+`localDeviceConfig` holding the MS/TP UUID, `covSubscriptionTimeoutMinutes: 60`, `enabled: false`,
+and the picker showing the device's label again on reopen. **Add point on a source with no points
+rendered the BACnet locator form** — the case that is impossible without the layout's
+`pointLocatorType`, since the gateway publishes `null` and there is no sibling to copy — with all
+nine fields in order, Analog input / present-value / Numeric / multiplier 1, `writePriority` hidden
+with Settable off, and 60 object types in the list. Saving it is what surfaced D57. Console clean
+apart from that 500.
 
 ## Per-type components
 
@@ -706,6 +773,15 @@ From type 4, in `2026-09-25-modbus-serial-enum-nulls.md`:
 - **A19 (P3)** — `FlowControl`, `DataBits`, `StopBits` and `Parity` each carry a
   `MessageTranslation` (`dsEdit.serial.flow.rtsCts`, `dsEdit.serial.dataBits8`, …) for which no
   `.properties` entry exists anywhere in the repository, so every one resolves to its own key.
+
+From type 6, in `2026-09-26-bacnet-mstp-has-no-point-locator-type.md`:
+
+- **D57 (P0)** — `BACNET_MSTP.DS` is the one type of sixteen whose `/v2/data-source-types` entry has
+  a null `pointLocatorType`, and any `POST /v2/data-point` on such a data source carrying a locator
+  answers **500** rather than a validation result. A BACnet MS/TP data source can be created and can
+  never be given a point. Isolated to the locator-type check by five probes of one body.
+- **A22** — is an MS/TP data source *meant* to carry points? If the null is deliberate the bug is
+  only the 500, and Cortex should say so on the data source rather than offer an Add point button.
 
 ## Open decisions
 

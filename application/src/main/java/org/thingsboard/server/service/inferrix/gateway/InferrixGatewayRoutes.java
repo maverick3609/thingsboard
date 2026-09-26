@@ -70,8 +70,18 @@ public final class InferrixGatewayRoutes {
     /** An HTTP verb: ASCII letters only, so case folding cannot widen it. */
     private static final Pattern ASCII_METHOD = Pattern.compile("[A-Za-z]{3,7}");
 
-    /** A model or event type name. Narrower than an xid: no dots, since none carry them. */
+    /**
+     * A data type or BACnet object type name — {@code NUMERIC}, {@code ANALOG_INPUT}. Narrower
+     * than an xid: no dots, since none of these carry them.
+     */
     private static final String TYPE = "[A-Za-z0-9_-]{1,64}";
+
+    /**
+     * A model type name: {@code MODBUS_IP.DS}, {@code BACNET_MSTP.PL}. Every one carries a dot, so
+     * {@link #TYPE} rejects all of them — the same leading-character guard as {@link #XID} is what
+     * keeps the dot from admitting {@code ..}.
+     */
+    private static final String MODEL_TYPE = "[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}";
 
     private static final List<Route> ROUTES = List.of(
             // --- Identity and health -------------------------------------------------------
@@ -106,7 +116,7 @@ public final class InferrixGatewayRoutes {
             route("/v2/data-source/" + XID, "GET", "PUT", "PATCH", "DELETE"),
             route("/v2/data-source/enable-disable/" + XID, "PATCH"),
             route("/v2/data-source/copy/" + XID, "PUT"),
-            route("/v2/data-source/default-event-types/" + TYPE, "GET"),
+            route("/v2/data-source/default-event-types/" + MODEL_TYPE, "GET"),
             route("/v2/data-source-types", "GET"),
             route("/v2/data-point", "GET", "POST"),
             route("/v2/data-point/" + XID, "GET", "PUT", "PATCH", "DELETE"),

@@ -51,8 +51,14 @@ export interface GatewayFormLayout {
   options?: {[id: string]: FormSelectItem[]};
   /** An option list chosen by another control's value. */
   gatedOptions?: {[id: string]: GatewayGatedOptions};
-  /** A property rendered only while another control holds one of these values. */
-  visibleWhen?: {[id: string]: {by: string; values: string[]}};
+  /**
+   * A property rendered only while another control holds one of these values.
+   *
+   * The values are compared with `includes`, so they are the control's own values rather than
+   * their labels: an enum constant for a select, and `true`/`false` for a toggle, which is why
+   * this is not `string[]`.
+   */
+  visibleWhen?: {[id: string]: {by: string; values: (string | number | boolean)[]}};
   /**
    * Explicit rows, by property id. Anything not named here follows the default: scalars pair up
    * two to a row in schema order, and everything else takes a row of its own.
@@ -284,6 +290,23 @@ const MODBUS_SERIAL_ENCODINGS: FormSelectItem[] = [
 ];
 
 /**
+ * BACnet write priority, 1 (highest) to 16 (lowest).
+ *
+ * `BACnetDataSourceDefinition.validate` rejects anything outside that range, and the REST model
+ * declares a bare `int` with no initialiser -- so an untouched field is 0 and the save is refused
+ * on a control the operator never saw. A select rather than a number box for the same reason the
+ * Modbus bit index is one: the legal set is small and the schema publishes no bounds.
+ *
+ * 16 is the default because it is the priority a supervisory system is expected to write at: it
+ * is the lowest, so anything else commanding the same object keeps precedence.
+ */
+const BACNET_WRITE_PRIORITIES: FormSelectItem[] =
+  Array.from({length: 16}, (_unused, index) => ({
+    value: index + 1,
+    label: index === 0 ? '1 (highest)' : (index === 15 ? '16 (lowest)' : String(index + 1))
+  }));
+
+/**
  * Layouts by model type, and by component name for the shared models that have no family.
  *
  * Only the types worked through so far appear. A type with no entry renders exactly as before —
@@ -504,6 +527,60 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     // these a new point cannot be saved until the operator has found the two fields that say so.
     defaults: {range: 'COIL_STATUS', modbusDataType: 'BINARY'},
     rows: [['slaveId', 'offset'], ['registerCount', 'charset'], ['multiplier', 'additive']]
+  },
+
+  /**
+   * A BACnet/IP master: which local device it speaks through, and how often.
+   *
+   * Three editable fields, which is the whole type -- everything else on the model is shared with
+   * every other data source. `localDeviceConfig` is declared a bare string and is a key into
+   * `/v2/bacnet/local-devices`, so it cannot be a layout constant and the type gets a component;
+   * `validate` looks the value up and refuses one that resolves to nothing, which means a gateway
+   * with no local device configured cannot host a BACnet data source at all.
+   *
+   * `covSubscriptionTimeoutMinutes` is defaulted for the reason Modbus serial's line settings are:
+   * `BACnetDataSourceModel` declares a bare `int`, so an absent key is 0, `validate` rejects
+   * anything below 1, and the VO's own 60 never applies. The number here is that 60.
+   */
+  'BACNET_IP.DS': {
+    defaults: {covSubscriptionTimeoutMinutes: 60},
+    rows: [['localDeviceConfig', 'covSubscriptionTimeoutMinutes']]
+  },
+
+  /**
+   * A BACnet point: which object on which device, read as what.
+   *
+   * Two of its fields are lookups rather than constants -- the object types the gateway decodes,
+   * and the properties of whichever type is chosen -- so this layout carries what is declarative
+   * and {@link BacnetPointFormComponent} adds the rest. The property list is what makes the form
+   * worth having: each property reports the data types it can be read as, which is the list
+   * `BACnetDataSourceDefinition.validate` checks `dataTypeId` against.
+   *
+   * `configurationDescription` is the gateway's own rendering of the fields above it, and
+   * `relinquishable` is never read: `BACnetPointLocatorModel.toVO` sets ten fields and that is not
+   * one of them, so a control for it would change nothing.
+   *
+   * The defaults are a working point, not a guess at one. `propertyIdentifierId` has to be sent --
+   * `toVO` calls `PropertyIdentifier.forName(...)` on it before anything validates, so an absent
+   * one is a null-pointer exception rather than a message -- and `multiplier` has to be sent
+   * because the model declares a bare `double`, so an absent one is 0 and every reading is
+   * multiplied by it. That last one fails silently: the point saves, polls, and reports 0 forever.
+   */
+  'BACNET_IP.PL': {
+    hidden: ['relinquishable', 'configurationDescription'],
+    options: {writePriority: BACNET_WRITE_PRIORITIES},
+    visibleWhen: {
+      // Validated 1-16 whatever the point is, so it is still sent while hidden -- what the gate
+      // removes is a field that decides nothing on a point nobody can write to.
+      writePriority: {by: 'settable', values: [true]},
+      // `encodableToValue` applies `raw * multiplier + additive` on the numeric branch alone.
+      multiplier: {by: 'dataType', values: ['NUMERIC']},
+      additive: {by: 'dataType', values: ['NUMERIC']}
+    },
+    defaults: {objectTypeId: 'ANALOG_INPUT', propertyIdentifierId: 'present-value',
+      dataType: 'NUMERIC', multiplier: 1, writePriority: 16},
+    rows: [['remoteDeviceInstanceNumber', 'objectInstanceNumber'],
+      ['objectTypeId', 'propertyIdentifierId'], ['multiplier', 'additive']]
   },
 
   /**

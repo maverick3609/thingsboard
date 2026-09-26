@@ -40,6 +40,10 @@ import { GatewayProvisioningComponent }
   from '@home/pages/inferrix/gateway/gateway-provisioning.component';
 import { GatewayFormComponent } from '@home/pages/inferrix/gateway/gateway-form.component';
 import { VirtualPointFormComponent } from '@home/pages/inferrix/gateway/virtual-point-form.component';
+import { BacnetDataSourceFormComponent }
+  from '@home/pages/inferrix/gateway/bacnet-data-source-form.component';
+import { BacnetPointFormComponent }
+  from '@home/pages/inferrix/gateway/bacnet-point-form.component';
 import { GatewayModelDialogComponent }
   from '@home/pages/inferrix/gateway/gateway-model-dialog.component';
 import { GatewayRecipientsComponent }
@@ -92,6 +96,8 @@ import { WidgetSettingsCommonModule }
     GatewayProvisioningComponent,
     GatewayFormComponent,
     VirtualPointFormComponent,
+    BacnetDataSourceFormComponent,
+    BacnetPointFormComponent,
     GatewayModelDialogComponent,
     GatewayRecipientsComponent,
     GatewayDetectorsDialogComponent,

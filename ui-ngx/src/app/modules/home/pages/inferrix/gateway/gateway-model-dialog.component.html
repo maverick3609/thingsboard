@@ -62,6 +62,17 @@
                                  [disabled]="data.readonly" [(ngModel)]="locatorValues"
                                  [ngModelOptions]="{standalone: true}"></tb-virtual-point-form>
         }
+        <!--
+          `BACNET_IP.PL` offers the gateway's object types, the properties of whichever type is
+          chosen, and the data types that property can be read as -- two lookups and a dependency
+          between them.
+        -->
+        @case ('BACNET_IP.PL') {
+          <tb-bacnet-point-form [properties]="data.locatorProperties"
+                                [layout]="data.locatorLayout" [deviceId]="data.deviceId"
+                                [disabled]="data.readonly" [(ngModel)]="locatorValues"
+                                [ngModelOptions]="{standalone: true}"></tb-bacnet-point-form>
+        }
         @default {
           <tb-gateway-form [properties]="data.locatorProperties" [layout]="data.locatorLayout"
                            [disabled]="data.readonly" [(ngModel)]="locatorValues"
@@ -76,9 +87,25 @@
       renderer compiles `condition` to executable JavaScript.
     -->
     @if (data.properties?.length && data.layout) {
-      <tb-gateway-form [properties]="data.properties" [layout]="data.layout"
-                       [disabled]="data.readonly" [(ngModel)]="values"
-                       [ngModelOptions]="{standalone: true}"></tb-gateway-form>
+      @switch (data.model?.modelType) {
+        <!--
+          A data source whose own form needs a lookup, for the same reason a locator can:
+          `localDeviceConfig` is a key into the gateway's BACnet local devices, and a data source
+          naming one that does not resolve is refused.
+        -->
+        @case ('BACNET_IP.DS') {
+          <tb-bacnet-data-source-form [properties]="data.properties" [layout]="data.layout"
+                                      [deviceId]="data.deviceId" [disabled]="data.readonly"
+                                      [(ngModel)]="values"
+                                      [ngModelOptions]="{standalone: true}">
+          </tb-bacnet-data-source-form>
+        }
+        @default {
+          <tb-gateway-form [properties]="data.properties" [layout]="data.layout"
+                           [disabled]="data.readonly" [(ngModel)]="values"
+                           [ngModelOptions]="{standalone: true}"></tb-gateway-form>
+        }
+      }
     } @else if (data.properties?.length) {
       <tb-dynamic-form [properties]="data.properties" [disabled]="data.readonly" stackedLabels
                        [(ngModel)]="values" [ngModelOptions]="{standalone: true}"></tb-dynamic-form>

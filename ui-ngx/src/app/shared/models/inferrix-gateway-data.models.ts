@@ -113,6 +113,52 @@ export interface GatewayDataSourceType {
 }
 
 /**
+ * A BACnet local device: the gateway's own side of a BACnet network.
+ *
+ * `id` is the key, not `deviceId`. `BACnetDataSourceVO.localDeviceConfig` holds this string and
+ * `LocalDeviceService.get(String)` matches on it, while `deviceId` is the BACnet instance number
+ * the gateway announces on the wire -- two devices on different networks can share one.
+ */
+export interface GatewayBacnetLocalDevice {
+  id: string;
+  deviceId?: number;
+  deviceName?: string;
+  /** `IP` or `MSTP`. A data source may only name a local device of its own transport. */
+  type?: string;
+}
+
+/**
+ * One BACnet object type, as `/v2/bacnet/object-types` reports it.
+ *
+ * `typeName` is the value a point locator carries -- `BACnetPointLocatorVO.OBJECT_TYPE_CODES`
+ * resolves it to the numeric type id -- and `translation` is the gateway's own wording for it,
+ * already translated. Unlike the Modbus tables this really is served, and the route is
+ * allowlisted, so the list comes from the device rather than from a constant here.
+ */
+export interface GatewayBacnetObjectType {
+  typeName: string;
+  translation?: string;
+}
+
+/**
+ * One property of a BACnet object type, and the data types it can be read as.
+ *
+ * `supportedDataTypes` is the list `BACnetDataSourceDefinition.validate` checks a point's data
+ * type against, so offering exactly it is what makes that check unreachable from the form.
+ */
+export interface GatewayBacnetObjectProperty {
+  propertyName: string;
+  propertyId?: number;
+  supportedDataTypes?: string[];
+}
+
+/** The properties of one object type. The route answers a single object, not a page. */
+export interface GatewayBacnetObjectProperties {
+  typeName?: string;
+  properties?: GatewayBacnetObjectProperty[];
+}
+
+/**
  * A device profile as the *gateway* knows it.
  *
  * Two identifiers, and they are not interchangeable. `id` is the gateway's own row key and is what

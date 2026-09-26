@@ -243,8 +243,8 @@ consulted.
 | 2 | `VIRTUAL_MESH_NODE.DS` | `VIRTUAL_MESH_NODE.PL` | **done** — 2026-09-25 |
 | 3 | `MODBUS_IP.DS` | `MODBUS.PL` | **done** — 2026-09-25 |
 | 4 | `MODBUS_SERIAL.DS` | `MODBUS.PL` | **done** — 2026-09-25; data source only, locator shared with 3 |
-| 5 | `BACNET_IP.DS` | `BACNET_IP.PL` | needs an instance first |
-| 6 | `BACNET_MSTP.DS` | `BACNET_MSTP.PL` | `pointLocatorType` is null on 5.1.0 — falls back to a sibling point |
+| 5 | `BACNET_IP.DS` | `BACNET_IP.PL` | **done** — 2026-09-26; needs a local device on the gateway first |
+| 6 | `BACNET_MSTP.DS` | `BACNET_MSTP.PL` | next; `pointLocatorType` still null on 5.1.1 — falls back to a sibling point. Needs the serial-port picker deferred from 4 |
 | 7 | `META.DS` | `META.PL` | |
 | 8 | `SNMP.DS` | `SNMP.PL` | |
 | 9 | `MQTT.DS` | `MQTT.PL` | `writeOnly` secrets; empty must mean "unchanged" |
@@ -487,6 +487,77 @@ alone. All six dropdowns were opened and read on screen and carry exactly the va
 declare. The Advanced panel renders all ten of its rows — the type 3 `tb-form-panel` fix holds
 for a second type. Console clean: no errors, no warnings.
 
+### 5 — `BACNET_IP.DS` / `BACNET_IP.PL` (done, 2026-09-26)
+
+The first type where the form is worth more than the gateway's own, and the first where a **data
+source** needed a component rather than a layout.
+
+**Three lookups, all already allowlisted.** `localDeviceConfig`, `objectTypeId` and
+`propertyIdentifierId` are declared bare strings, and each is a key into a route the proxy already
+carries — `/v2/bacnet/local-devices`, `/v2/bacnet/object-types`,
+`/v2/bacnet/object-properties/{type}`. None can be a layout constant: the first is per-install
+rows, and the third depends on the second. So `BacnetDataSourceFormComponent` and
+`BacnetPointFormComponent` extend `GatewayFormComponent` in the shape `VirtualPointFormComponent`
+established, and the layouts carry only what is declarative.
+
+**The third list is the point of the exercise.** `/v2/bacnet/object-properties/{type}` reports,
+per property, the data types it can be read as — which is the same list
+`BACnetDataSourceDefinition.validate` checks `dataTypeId` against. Narrowing the picker to it makes
+that rejection unreachable from the form. The gateway's own UI offers all five types for every
+property and leaves the operator to discover the mismatch on save (**W25**). Measured live:
+`present-value` on an analog input offers four, `object-name` offers one.
+
+**A held data type the new property cannot serve is cleared**, not left to submit silently — the
+same call taken for the Modbus range, and the opposite of what the gateway's form does. A held
+*property* the new object type does not have is **substituted** rather than cleared, because an
+empty one is not a validation message here: `toVO` calls `PropertyIdentifier.forName(...)` before
+anything validates, so an absent property identifier is a 500. `present-value` is the substitute
+where the type has one.
+
+| omitted from a `POST /v2/data-point` | gateway answers |
+|---|---|
+| `propertyIdentifierId` | **500** Internal Server Error |
+| `objectTypeId` | 400 Bad Request |
+| `multiplier` | **201 Created**, stored `0.0` |
+
+That last row is why `multiplier` is defaulted. `BACnetPointLocatorVO` starts at 1.0 and
+`BACnetPointLocatorModel` declares the same field with no initialiser, so an absent key is 0 and
+`BACnetDataSourceRT` applies `raw * 0 + additive` to every numeric read for the life of the point.
+No error, no warning. `ModbusPointLocatorModel` carries the initialiser on the model and is
+unaffected, which is how the difference was found. Filed as **D54 (P1)**.
+
+**What goes where.** The data source is three fields — the poll, the local device, the COV
+subscription timeout — and the point is the object address (`remoteDeviceInstanceNumber` /
+`objectInstanceNumber`, then `objectTypeId` / `propertyIdentifierId`), its data type, the two
+toggles and the scaling. `writePriority` appears only on a settable point: it is validated 1-16
+whatever the point is, so it is still *sent* while hidden, and what the gate removes is a field
+that decides nothing on a point nobody can write to. That gate is the first on a boolean, so
+`visibleWhen.values` widened from `string[]` to `(string | number | boolean)[]` — `visible()` has
+always compared against the control's own value rather than its label.
+
+**A proxy bug of our own, found by using it.** `/v2/bacnet/local-devices/{id}` was allowlisted with
+the numeric `ID` pattern, but a local device's key is a generated UUID. The list and the create
+worked; `GET`, `PUT` and `DELETE` on any real id answered 403 from our own allowlist — so a local
+device added through Cortex could never be read back, edited, or removed through it. Measured
+against the live gateway: a numeric id answered 404 *from the gateway*, the real UUID answered 403
+*from the proxy*. Changed to `XID`, which admits a UUID and still refuses a second path segment.
+The route test asserted `/v2/bacnet/local-devices/3`, which is why it passed — it now asserts the
+shape the gateway actually issues.
+
+**Verified.** A throwaway local device (`ZZ Cortex probe`, UDP 47899 so it could not collide with
+real BACnet traffic on 47808), a `ZZ BACnet Probe` data source and a `ZZ BACnet Point` created
+through the forms on `Inferrix Gateway 155`, then deleted; the gateway is back at 12 data sources
+and 100 points. The local device picker offered the one row, and the source came back holding its
+UUID with `covSubscriptionTimeoutMinutes: 60` — the VO's own default, which is unreachable through
+REST without the layout supplying it (**D56**). The point form opened on Analog input /
+present-value / Numeric / multiplier 1 with `writePriority` absent, showed it as "16 (lowest)" the
+moment Settable was turned on, and saved as `ANALOG_INPUT` / `present-value` / `NUMERIC` /
+instance 1001 / object 3 / multiplier 0.1 / additive 2.0 / writePriority 16. The three lists
+measured 1, 40 and 60 entries against the routes that serve them. Switching the property to
+`object-name` narrowed the data types to Alphanumeric alone and cleared the held Numeric. The
+gateway had been upgraded to stack 5.1.1 since type 4; the schemas of all seven previously laid-out
+types were re-read and are unchanged. Console clean.
+
 ## Per-type components
 
 Settled 2026-09-25, after the question was raised directly: **is one renderer for 148 model types
@@ -567,6 +638,14 @@ changed.
   and between `RTSCTS` and `XONXOFF`. The enums carry `MessageTranslation` descriptions written
   for exactly this, and nothing reads them.
 
+- **W23 (P2)** — the BACnet point form labels `remoteDeviceInstanceNumber` by concatenating
+  `substring()` slices of an HTTP-receiver key and an SNMP key. It reads correctly only by
+  coincidence of those two strings' current wording.
+- **W24 (P2)** — `writePriority` is labelled with the *write permission* key, so the BACnet point
+  form shows two fields called "Write Permission".
+- **W25 (P2)** — the BACnet data-type picker offers all five types for every property, although
+  the route it already calls reports which ones each property supports.
+
 Stack-side findings go to `Inferrix-stack/docs/specs/` instead. From type 2, in
 `2026-09-25-mesh-node-provisioned-rows.md`:
 
@@ -590,6 +669,22 @@ From type 3, in `2026-09-25-modbus-locator-derivations.md`:
   `minimum`/`maximum` although `ModbusUtils.validateBit` throws outside 0-15.
 - **A16 (P3)** — `modbusDataType` is a bare string with 32 legal values, while `range` and
   `writeType` on the same model both carry `allowableValues`.
+
+From type 5, in `2026-09-26-bacnet-locator-model-defaults.md`:
+
+- **D54 (P1)** — `BACnetPointLocatorModel.multiplier` has no initialiser where the VO starts at
+  1.0, so a point saved without one is stored with 0 and reports 0 for ever. 201 Created, no
+  warning. `ModbusPointLocatorModel` carries the initialiser on the model and is unaffected.
+- **D55 (P1)** — an absent `propertyIdentifierId` is a 500: `toVO` calls
+  `PropertyIdentifier.forName(null).intValue()` before `validate()` runs. Same defect class as
+  D40 on Modbus serial.
+- **D56 (P2)** — `covSubscriptionTimeoutMinutes` has the same missing initialiser, so the VO's 60
+  is unreachable through REST and a caller who never set the field is refused on it.
+- **A20 (P3)** — `LocalDeviceConfigModel` writes `"type"` twice into the same JSON object: the
+  `@JsonTypeInfo` discriminator and an explicit `@JsonProperty` field.
+- **A21 (P3)** — `objectTypeId`, `propertyIdentifierId` and `writePriority` carry no
+  `allowableValues` or bounds, although the first is a closed set the gateway itself serves and
+  the last is validated 1-16.
 
 From type 4, in `2026-09-25-modbus-serial-enum-nulls.md`:
 

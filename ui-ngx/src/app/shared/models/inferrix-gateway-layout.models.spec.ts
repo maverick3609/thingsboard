@@ -96,7 +96,9 @@ describe('gateway form layouts', () => {
       'transportType', 'modbusDataType', 'bit', 'charset',
       // Modbus serial. Every one is a `String` on the REST model; `baudRate` is a plain `int`.
       'baudRate', 'flowControlIn', 'flowControlOut', 'dataBits', 'stopBits', 'parity',
-      'encoding']);
+      'encoding',
+      // BACnet. The two lookups are narrowed by a component rather than by a layout.
+      'writePriority']);
     Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
       [...Object.keys(layout.options ?? {}), ...Object.keys(layout.gatedOptions ?? {})]
         .forEach(id => expect(scalars.has(id)).withContext(`${modelType}.${id}`).toBe(true));
@@ -301,6 +303,73 @@ describe('gateway form layouts', () => {
     // be a copy that could drift. Its absence is the assertion.
     expect(GATEWAY_FORM_LAYOUTS['MODBUS_SERIAL.PL']).toBeUndefined();
     expect(GATEWAY_FORM_LAYOUTS['MODBUS.PL']).toBeDefined();
+  });
+
+  it('hides the two BACnet locator fields the gateway derives or never reads', () => {
+    // `configurationDescription` is the gateway's own rendering of the fields above it, and
+    // `BACnetPointLocatorModel.toVO` sets ten fields, of which `relinquishable` is not one.
+    expect(GATEWAY_FORM_LAYOUTS['BACNET_IP.PL'].hidden)
+      .toEqual(['relinquishable', 'configurationDescription']);
+  });
+
+  it('bounds BACnet write priority to the 1-16 validate() accepts, as numbers', () => {
+    const items = GATEWAY_FORM_LAYOUTS['BACNET_IP.PL'].options.writePriority;
+    expect(items.length).toBe(16);
+    items.forEach(item => expect(typeof item.value).toBe('number'));
+    expect(items[0].value).toBe(1);
+    expect(items[15].value).toBe(16);
+    // Named, because which end is strongest is the one thing an operator cannot guess.
+    expect(items[0].label).toBe('1 (highest)');
+    expect(items[15].label).toBe('16 (lowest)');
+  });
+
+  it('shows write priority only on a point that can be written', () => {
+    const gate = GATEWAY_FORM_LAYOUTS['BACNET_IP.PL'].visibleWhen.writePriority;
+    expect(gate.by).toBe('settable');
+    // A toggle's value, not its label -- `visible()` compares with `includes` against the control.
+    expect(gate.values).toEqual([true]);
+  });
+
+  it('scales only a numeric BACnet point, which is the only branch that applies it', () => {
+    const shownFor = (id: string) => GATEWAY_FORM_LAYOUTS['BACNET_IP.PL'].visibleWhen[id];
+    expect(shownFor('multiplier').by).toBe('dataType');
+    expect(shownFor('multiplier').values).toEqual(['NUMERIC']);
+    expect(shownFor('additive')).toEqual(shownFor('multiplier'));
+  });
+
+  it('starts a BACnet point on a combination the gateway accepts', () => {
+    const defaults = GATEWAY_FORM_LAYOUTS['BACNET_IP.PL'].defaults;
+    expect(defaults).toEqual({objectTypeId: 'ANALOG_INPUT', propertyIdentifierId: 'present-value',
+      dataType: 'NUMERIC', multiplier: 1, writePriority: 16});
+    // The two that are not cosmetic. An absent `propertyIdentifierId` is a null-pointer exception
+    // in `toVO`; an absent `multiplier` is 0, and 0 multiplies every reading it ever takes.
+    expect(defaults.propertyIdentifierId).toBe('present-value');
+    expect(defaults.multiplier).toBe(1);
+    expect(GATEWAY_FORM_LAYOUTS['BACNET_IP.PL'].options.writePriority
+      .some(item => item.value === defaults.writePriority)).toBe(true);
+  });
+
+  it('starts a BACnet data source on the COV timeout its own VO starts on', () => {
+    // `BACnetDataSourceModel` declares a bare int, so an absent key is 0 and `validate` rejects
+    // anything below 1 -- the VO's own 60 is unreachable through REST without this.
+    expect(GATEWAY_FORM_LAYOUTS['BACNET_IP.DS'].defaults)
+      .toEqual({covSubscriptionTimeoutMinutes: 60});
+    expect(GATEWAY_FORM_LAYOUTS['BACNET_IP.DS'].rows)
+      .toEqual([['localDeviceConfig', 'covSubscriptionTimeoutMinutes']]);
+  });
+
+  it('leaves the two lookup fields to the component rather than listing them', () => {
+    // A layout is a constant; the object types and their properties are HTTP. Naming either here
+    // would be a list that goes stale against the gateway it is meant to describe.
+    const layout = GATEWAY_FORM_LAYOUTS['BACNET_IP.PL'];
+    expect(layout.options.objectTypeId).toBeUndefined();
+    expect(layout.options.propertyIdentifierId).toBeUndefined();
+    expect(GATEWAY_FORM_LAYOUTS['BACNET_IP.DS'].options).toBeUndefined();
+  });
+
+  it('has no layout for a BACnet type whose turn has not come', () => {
+    expect(GATEWAY_FORM_LAYOUTS['BACNET_MSTP.DS']).toBeUndefined();
+    expect(GATEWAY_FORM_LAYOUTS['BACNET_MSTP.PL']).toBeUndefined();
   });
 
   it('gates no field on one that is hidden', () => {

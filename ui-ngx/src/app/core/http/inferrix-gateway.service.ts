@@ -9,7 +9,8 @@ import { Device } from '@shared/models/device.models';
 import { AdoptGatewayRequest, ChangeGatewayConnectionRequest, GatewayMqttConfiguration,
   GatewayReachability, PendingGateway } from '@shared/models/inferrix-gateway.models';
 import { GatewaySchemaDocument } from '@shared/models/inferrix-gateway-schema.models';
-import { GatewayDataPoint, GatewayDataSource, GatewayDataSourceType, GatewayDeviceProfile,
+import { GatewayBacnetLocalDevice, GatewayBacnetObjectProperties, GatewayBacnetObjectType,
+  GatewayDataPoint, GatewayDataSource, GatewayDataSourceType, GatewayDeviceProfile,
   GatewayListQuery, GatewayPage, GatewayPointValue,
   GatewayProxyParams } from '@shared/models/inferrix-gateway-data.models';
 import { GatewayPublishedPoint, GatewayPublisher,
@@ -437,6 +438,40 @@ export class InferrixGatewayService {
    * column is `dataPointId`, and the model's string `sourceId` exists solely because the model
    * maps that column to and from the point's xid. Asking for `sourceId` is a 500.
    */
+  // --- BACnet lookups -----------------------------------------------------------------------
+
+  /**
+   * The gateway's own BACnet local devices.
+   *
+   * `BACNET_IP.DS.localDeviceConfig` is declared a bare string and is a key into these rows, so a
+   * data source cannot be created without one: `BACnetDataSourceDefinition.validate` looks it up
+   * and rejects a value that resolves to nothing. This is the route the allowlist carries it for.
+   */
+  public getBacnetLocalDevices(deviceId: string,
+                               config?: RequestConfig): Observable<GatewayBacnetLocalDevice[]> {
+    return this.proxy<GatewayBacnetLocalDevice[]>(deviceId, 'GET', '/v2/bacnet/local-devices',
+      null, config);
+  }
+
+  /** Every BACnet object type the gateway decodes, with its own translated name. */
+  public getBacnetObjectTypes(deviceId: string,
+                              config?: RequestConfig): Observable<GatewayBacnetObjectType[]> {
+    return this.proxy<GatewayBacnetObjectType[]>(deviceId, 'GET', '/v2/bacnet/object-types',
+      null, config);
+  }
+
+  /**
+   * The properties of one object type, each with the data types it can be read as.
+   *
+   * Answers a single object rather than a page, and `typeName` is a path segment -- the one place
+   * a gateway-supplied value is put back into a URL, so it is encoded.
+   */
+  public getBacnetObjectProperties(deviceId: string, objectType: string,
+                                   config?: RequestConfig): Observable<GatewayBacnetObjectProperties> {
+    return this.proxy<GatewayBacnetObjectProperties>(deviceId, 'GET',
+      `/v2/bacnet/object-properties/${encodeURIComponent(objectType)}`, null, config);
+  }
+
   public getDetectorsForPoint(deviceId: string, pointId: number, query: GatewayListQuery,
                               config?: RequestConfig): Observable<GatewayPage<GatewayEventDetector>> {
     return this.proxy<GatewayPage<GatewayEventDetector>>(deviceId, 'GET', '/v2/event-detector',

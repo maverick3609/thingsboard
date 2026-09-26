@@ -91,7 +91,13 @@ export interface GatewayModelDialogData {
    * ever outgrows a screenful.
    */
   locatorType?: string;
-  /** The gateway a per-type locator component queries. Unused by the generic renderer. */
+  /**
+   * The gateway a per-type component queries — a locator's, or the model's own.
+   *
+   * Unused by the generic renderer. Set for every data source dialog rather than only the types
+   * that need it: which types those are is decided by the template's `@switch`, and a component
+   * that arrives without it falls back to plain text boxes silently.
+   */
   deviceId?: string;
   locatorTitle?: string;
   readonly: boolean;

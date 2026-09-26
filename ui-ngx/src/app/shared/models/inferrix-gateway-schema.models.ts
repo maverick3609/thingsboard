@@ -66,6 +66,14 @@ const FIELD_LABELS: {[property: string]: string} = {
   // the toggle beside it. Both are its words; the inconsistency is the stack's.
   slaveId: 'Device id',
   charset: 'Character encoding',
+  // BACnet. The stack's own words, except that `covSubscriptionTimeout` omits the unit its field
+  // name carries, and `objectTypeId`/`propertyIdentifierId` would otherwise show the Java `Id`
+  // suffix for fields that hold a name rather than an id.
+  localDeviceConfig: 'Local device',
+  covSubscriptionTimeoutMinutes: 'COV subscription timeout (minutes)',
+  objectTypeId: 'Object type',
+  propertyIdentifierId: 'Property identifier',
+  useCovSubscription: 'Use COV subscription',
   // "Comm port id" otherwise, which is the Java field name showing through. The stack calls it
   // "Serial Port" and so does its BACnet MSTP form, which reads the same ports.
   commPortId: 'Serial port',

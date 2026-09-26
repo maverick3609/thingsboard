@@ -169,7 +169,13 @@ public final class InferrixGatewayRoutes {
             // String but used as a lookup key into this CRUD, so the schema-driven form needs a
             // picker backed by these rows or BACnet data sources cannot be created at all.
             route("/v2/bacnet/local-devices", "GET", "POST"),
-            route("/v2/bacnet/local-devices/" + ID, "GET", "PUT", "DELETE"),
+            // XID, not ID: a local device's key is a UUID the gateway generates
+            // (`5c77ea58-24ab-4311-8ed1-a94c82f7a84b`), not a row number. With the numeric
+            // pattern here the list and the create were reachable and the three item verbs were
+            // not, so a local device added through Cortex could never be read back, edited or
+            // removed through it. Measured against the live gateway: a numeric id answered 404
+            // from the gateway, the real UUID answered 403 from this allowlist.
+            route("/v2/bacnet/local-devices/" + XID, "GET", "PUT", "DELETE"),
             route("/v2/bacnet/object-types", "GET"),
             route("/v2/bacnet/object-properties/" + TYPE, "GET"),
 

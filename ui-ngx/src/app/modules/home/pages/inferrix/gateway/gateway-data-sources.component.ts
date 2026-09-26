@@ -217,6 +217,9 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
         panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
         data: {title, model, properties: this.propertiesFor(model.modelType),
           layout: gatewayFormLayout(model.modelType),
+          // A data source form can need a lookup of its own now, not just its points: a BACnet
+          // source names one of the gateway's local devices.
+          deviceId: this.deviceId,
           readonly: this.readonly, children}
       }).afterClosed().subscribe(saved => {
       if (saved) {

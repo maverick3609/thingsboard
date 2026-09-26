@@ -312,6 +312,18 @@ class InferrixGatewayRoutesTest {
         assertTrue(InferrixGatewayRoutes.isAllowed("GET", "/v2/bacnet/local-devices"));
         assertTrue(InferrixGatewayRoutes.isAllowed("POST", "/v2/bacnet/local-devices"));
         assertTrue(InferrixGatewayRoutes.isAllowed("PUT", "/v2/bacnet/local-devices/3"));
+        // The shape the gateway actually issues. `LocalDeviceConfigModel.id` is a generated UUID,
+        // not a row number, so the numeric pattern this route used to carry refused every real id:
+        // the list and the create worked and the three item verbs answered 403, which left a local
+        // device added through Cortex impossible to read back, edit or remove through it.
+        assertTrue(InferrixGatewayRoutes.isAllowed("GET",
+                "/v2/bacnet/local-devices/5c77ea58-24ab-4311-8ed1-a94c82f7a84b"));
+        assertTrue(InferrixGatewayRoutes.isAllowed("PUT",
+                "/v2/bacnet/local-devices/5c77ea58-24ab-4311-8ed1-a94c82f7a84b"));
+        assertTrue(InferrixGatewayRoutes.isAllowed("DELETE",
+                "/v2/bacnet/local-devices/5c77ea58-24ab-4311-8ed1-a94c82f7a84b"));
+        // Still one segment: widening the pattern must not open a path into the tools below.
+        assertFalse(InferrixGatewayRoutes.isAllowed("DELETE", "/v2/bacnet/local-devices/a/b"));
         assertTrue(InferrixGatewayRoutes.isAllowed("GET", "/v2/bacnet/object-types"));
         assertTrue(InferrixGatewayRoutes.isAllowed("GET", "/v2/bacnet/object-properties/analogInput"));
         // The BACnet tools drive network scans and arbitrary property writes: out of v1 scope.

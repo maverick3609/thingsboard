@@ -104,6 +104,18 @@ describe('InferrixGatewayService data sources and points', () => {
     request.flush({xid: 'DS_2', name: 'New'});
   });
 
+  it('creates against the collection when told to, even carrying an xid', () => {
+    // The add form offers the xid field so an operator can name the row, and the gateway accepts a
+    // caller-chosen xid on a create. Reading the verb off the xid alone made that a PUT against
+    // something that does not exist yet: 404, dialog closed, nothing saved.
+    service.saveDataSource(DEVICE, {xid: 'MY_OWN_XID', name: 'New', modelType: 'MODBUS_IP.DS'},
+      undefined, true).subscribe();
+    const request = httpMock.expectOne(proxy('/v2/data-source'));
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body.xid).toBe('MY_OWN_XID');
+    request.flush({xid: 'MY_OWN_XID', name: 'New'});
+  });
+
   it('escapes an xid into the path rather than pasting it in', () => {
     // An xid is [A-Za-z0-9_.-] on the platform's allowlist, so a slash or a space cannot reach the
     // device -- but it must fail as a refused route, not as a different route.

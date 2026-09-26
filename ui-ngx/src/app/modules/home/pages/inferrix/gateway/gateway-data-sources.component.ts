@@ -177,6 +177,9 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
   }
 
   private open(model: GatewayDataSource, title: string, points: GatewayDataPoint[]): void {
+    // Read before the dialog, because the dialog may give the model an xid: the add form offers the
+    // field so an operator can name the row themselves, and the gateway accepts that on a create.
+    const create = !model.xid;
     // The dialog renders this array and the point handlers below mutate it in place, so an edit
     // shows up in the table without closing and reopening the data source.
     const rows = [...points];
@@ -223,7 +226,8 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
           readonly: this.readonly, children}
       }).afterClosed().subscribe(saved => {
       if (saved) {
-        this.gatewayService.saveDataSource(this.deviceId, saved, {ignoreLoading: true}).subscribe({
+        this.gatewayService.saveDataSource(this.deviceId, saved, {ignoreLoading: true}, create)
+          .subscribe({
           next: () => this.reload(),
           error: error => this.fail(error)
         });
@@ -240,6 +244,9 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
    */
   private editPoint(source: GatewayDataSource, point: GatewayDataPoint,
                     rows: GatewayDataPoint[]): void {
+    // See `open`: the add form lets the operator name the point, so the verb cannot be read off the
+    // xid the dialog hands back.
+    const create = !point.xid;
     const locatorType = point.pointLocator?.modelType ?? this.locatorType(source, rows);
     const locatorProperties = locatorType
       ? this.withoutStructuralFields(
@@ -273,7 +280,8 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
       // Set here rather than left to the form: the link is what places the point, and an add
       // reaches the form before the operator has chosen anything.
       saved.dataSourceXid = source.xid;
-      this.gatewayService.saveDataPoint(this.deviceId, saved, {ignoreLoading: true}).subscribe({
+      this.gatewayService.saveDataPoint(this.deviceId, saved, {ignoreLoading: true}, create)
+        .subscribe({
         next: stored => {
           const at = rows.indexOf(point);
           if (at >= 0) {

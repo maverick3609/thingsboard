@@ -245,8 +245,8 @@ consulted.
 | 4 | `MODBUS_SERIAL.DS` | `MODBUS.PL` | **done** — 2026-09-25; data source only, locator shared with 3 |
 | 5 | `BACNET_IP.DS` | `BACNET_IP.PL` | **done** — 2026-09-26; needs a local device on the gateway first |
 | 6 | `BACNET_MSTP.DS` | `BACNET_MSTP.PL` | **done** — 2026-09-26; forms match 5, but the gateway 500s on every point (**D57**) |
-| 7 | `META.DS` | `META.PL` | next |
-| 8 | `SNMP.DS` | `SNMP.PL` | |
+| 7 | `META.DS` | `META.PL` | **parked** — 2026-09-26; scripting locator, security answer owed (**D58**, **A23**) |
+| 8 | `SNMP.DS` | `SNMP.PL` | **done** — 2026-09-26; v3 unreachable and the rows invisible, both gateway-side (**D61**, **D62**) |
 | 9 | `MQTT.DS` | `MQTT.PL` | `writeOnly` secrets; empty must mean "unchanged" |
 | 10 | `HTTP_RECEIVER.DS` | `HTTP_RECEIVER.PL` | "HTTP" is two types on this stack; both are in scope |
 | 11 | `HTTP_JSON_RETRIEVER.DS` | `HTTP_JSON_RETRIEVER.PL` | the other half of 10 |
@@ -625,6 +625,127 @@ nine fields in order, Analog input / present-value / Numeric / multiplier 1, `wr
 with Settable off, and 60 object types in the list. Saving it is what surfaced D57. Console clean
 apart from that 500.
 
+### 7 — `META.DS` / `META.PL` (parked, 2026-09-26)
+
+**Read before laid out, and then not laid out.** `META.PL` is a scripting locator: `script`,
+`scriptEngine`, a `context` of other points bound to variable names, `updateEvent` /
+`updateCronPattern`, and `scriptPermissions`. The data source itself is the emptiest in the product
+— eleven fields, every one of them shared with every other data source, no protocol fields at all —
+so the whole of this type is the point.
+
+Three facts, in the order they were established:
+
+1. `scriptPermissions` is a plain string on the REST model, `toVO()` turns it straight into the
+   permission holder the script runs as, and `MetaPointLocatorVO.validate` is an empty method. The
+   gateway stores what it is sent: measured live, a group name that exists nowhere came back
+   verbatim on a 201.
+2. That value is what decides how tightly the script engine is confined — the Nashorn definition
+   asks the *script's* holder for its role and only strips the Java-access bindings in the confined
+   branch.
+3. **Cortex forwards `/v2/data-point` with no body inspection.** `bodyIsAllowed` matches
+   `/v2/event-handler*` alone, because the one payload it was written for was the process handler.
+   Cortex's allowlist excludes the script and certificate families by name, and this walks past that
+   exclusion because from the outside it is a data point.
+
+So the surface is already open and already on screen: META renders today through the generic
+schema-driven form, `script` included. Nothing here opened it and nothing here has tightened it.
+
+Filed as **D58 (P0, security)** with **A23** — is `META.PL` meant to be writable through the v2
+data-point route at all? — and **D59** for three more bare-primitive defaults found on the way.
+
+**Why parked rather than laid out.** A layout would decide, in passing, whether Cortex offers a
+script editor for the gateway; that is not a layout decision. The three shapes a fix could take
+each imply a different form: if the gateway stamps the holder from the authenticated user, the field
+comes off the form entirely and META is an ordinary type; if it validates the field instead, the
+form needs a picker and Cortex needs to know the caller's groups; if scripting becomes
+administrator-only, Cortex should show a META point and refuse to author one. Guessing costs more
+than waiting.
+
+**Cortex's own gap, recorded here rather than in the stack docs, because it is ours:** the body
+guard is per-route and was written around one payload. A `/v2/data-point` body carrying a
+`META.PL`, `SCRIPTING.PL` or any other locator with a script in it is forwarded unread. Whether
+that becomes a field-level guard, a locator-type refusal, or nothing at all depends on A23, so it
+is not being fixed ahead of the answer — but it should not be discovered a second time.
+
+### 8 — `SNMP.DS` / `SNMP.PL` (done, 2026-09-26)
+
+**The version is the shape of the form.** `SnmpDataSourceDefinition.validate` branches on
+`snmpVersion` and asks for a different set either side: v1 and v2c authenticate with a community
+string, v3 with a security name, a context name and two protocols. Nineteen protocol fields on the
+data source, ten on the point, and eleven of the nineteen belong to exactly one side of that branch.
+So the whole type is one layout with `visibleWhen` doing the work — not two layouts, because it is
+one model and an operator changes their mind about the version while filling the form in.
+
+**A gate on a gated field reads a value nobody can see.** The two passphrases were first gated on
+their own protocol, which is the more precise condition: `NONE` means there is nothing for a
+passphrase to be, and it covered v1 and v2c for free since both protocols default to `NONE`. It was
+wrong on screen. A gate hides a row and **keeps its control**, which is what lets a version switch
+be reversible — so picking v3, then MD5, then going back to v2c left "Authentication passphrase" on
+a v2c form with the protocol that summoned it hidden. Both passphrases are now gated on the version
+like everything else in the v3 half, and a cross-cutting spec refuses any rule whose `by` is itself
+gated. What it costs is an inert passphrase box on a v3 source configured for no authentication,
+which is the rarer wrong thing; a compound condition would fix that too and has not been added for
+one field pair.
+
+**Both protocols are defaulted for every version, and that is the load-bearing default.** They are
+`ReverseEnum`-backed on the model and `ReverseEnumMap.get` calls `Objects.requireNonNull`, so the
+constructor that builds the response from the saved VO throws on a null. Measured: omitting either
+answers **500** on a v2c source where neither means anything — and the row is written first, so it
+then cannot be read (`GET` by xid 500s on the same path) and `DELETE` 500s while still deleting it.
+Filed **D60 (P1)**. `NONE` is both what an operator would pick and what keeps the row legible.
+
+**Relabelled, not narrowed, for the two protocols.** They are published enums, so the mapper already
+offers the right values — what it cannot do is spell them: its humaniser lower-cases all but the
+first letter, so `MD5` renders as "Md5" and `AES256` as "Aes256". An operator matches these against
+their agent's own configuration, so the layout supplies the labels and leaves the values alone.
+`snmpVersion` and `setType` are narrowed rather than relabelled: both are bare strings on the model,
+mapped through a code table rather than an enum.
+
+**`settable` is hidden on an SNMP point, because it is an answer.**
+`SnmpPointLocatorVO.isSettable()` returns `setType != 0`, and `SnmpPointLocatorModel.toVO` builds a
+fresh VO from seven fields — that is not one of them. A control for it would change nothing while
+appearing to. `Not settable` on the set type is the same statement and the one the gateway reads.
+
+| omitted from a `POST /v2/data-point` | gateway answers | stored |
+|---|---|---|
+| `multiplicand` | **201 Created** | `0.0` — every reading scaled to nothing |
+| `setType` | **201 Created** | `null`, and `settable` reads **true** |
+| `oid` | 422 `oid: Required value` | — |
+| `dataType` | 422 `dataTypeId: Invalid value` | — |
+
+`multiplicand` is BACnet's `multiplier` defect a third time. `setType` is worse:
+`ExportCodes.getId(null)` returns **-1**, not 0, so a point saved without one reports itself
+*writable* with a set type no SNMP type answers to. Both defaulted, both filed as **D63**.
+
+**Two gateway defects make this type half-usable whatever the form does.** `SNMPv3 cannot be
+configured through v2 REST at all` — `SnmpSettings.getSnmpVersionId("v3")` sets its local to 3 and
+then maps only 0, 1 and 2, so it returns -1 and `validate` rejects it (**D61**, live-confirmed 422).
+And `GET /v2/data-source` **omits every SNMP row**, although each is readable by xid (**D62**,
+measured three times, with and without query parameters). The second is why the point form could not
+be opened on screen: a data source Cortex cannot list is one no operator can click. v3 is still
+offered in the picker, for the reason MS/TP's Add point button is still offered — a workaround would
+come out again the moment the mapping is fixed, and the 422 at least names the field.
+
+**One Cortex bug of our own, found by using the form, and it was never SNMP-specific.**
+`saveDataSource` and `saveDataPoint` chose POST or PUT by whether the model carried an `xid`. The add
+dialog offers the XID field — its own hint says "Leave blank to let the gateway generate one" — and
+the gateway accepts a caller-chosen xid on a create, so an operator who typed one got a `PUT` to a
+row that does not exist yet: 404, dialog closed, nothing saved, for **every** model type. Both
+methods now take the intent from the caller, which reads it before the dialog can hand back an xid.
+Fixed here rather than filed because it is two call sites, and because D62 makes an SNMP row created
+without a chosen xid impossible to find again.
+
+**Verified.** `ZZ UI SNMP probe` created through the form on `Inferrix Gateway 155` with a
+hand-typed xid, read back and deleted; the gateway is at 12 listed data sources and 100 points. On
+add it came back on v2c, port 161, trap port 162, timeout 1000, retries 2, with the community pair
+shown and the eight v3 fields absent. Choosing v3 replaced the community pair with security name,
+context name and both protocol/passphrase pairs; choosing MD5 and AES256 read "MD5" and "AES256";
+going back to v2c restored exactly the community pair with no passphrase left behind. The Advanced
+panel carries retries, timeout, trap port, maximum vars and local address. The saved row round
+tripped with every default and both protocols at `NONE`, and the v3 fields null. The point form's
+fields and defaults were exercised against the live gateway by REST rather than on screen, for the
+D62 reason above. Console clean.
+
 ## Per-type components
 
 Settled 2026-09-25, after the question was raised directly: **is one renderer for 148 model types
@@ -782,6 +903,41 @@ From type 6, in `2026-09-26-bacnet-mstp-has-no-point-locator-type.md`:
   never be given a point. Isolated to the locator-type check by five probes of one body.
 - **A22** — is an MS/TP data source *meant* to carry points? If the null is deliberate the bug is
   only the 500, and Cortex should say so on the data source rather than offer an Add point button.
+
+From type 7, in `2026-09-26-meta-script-permissions-are-caller-supplied.md`:
+
+- **D58 (P0, security)** — `META.PL.scriptPermissions` is taken from the request body and becomes
+  the permission holder the script runs as, with no check that the caller holds it and an empty
+  `validate()`. That holder is what decides whether the script engine is confined. Reachable through
+  `/v2/data-point`, which is not a script route, so it is past every exclusion Cortex makes by name.
+  Measured with a group that exists nowhere, on a disabled point, so the probe could not escalate
+  anything.
+- **D59 (P2)** — `logSize`, `logCount` and `contextUpdateEvent` are the same bare-primitive defaults
+  as D54/D56; `context` and `variableName` cannot be defaulted by a client at all.
+- **A23** — is `META.PL` meant to be writable through the v2 data-point route, or is scripting an
+  administrator-only surface that needs a permission of its own?
+
+From type 8, in `2026-09-26-snmp-rest-surface.md`:
+
+- **D60 (P1)** — an absent `authProtocol` or `privProtocol` is a 500 on *every* version, thrown while
+  building the response from the already-written row: `ReverseEnumMap.get` calls
+  `Objects.requireNonNull`. The data source is created, then cannot be read back by any client, and
+  `DELETE` also 500s while still deleting it.
+- **D61 (P1)** — SNMPv3 cannot be configured at all. `SnmpSettings.getSnmpVersionId("v3")` sets its
+  local to 3 and the second switch maps only 0, 1 and 2, so it returns -1 and `validate` rejects the
+  version. `case 2: return v3` is dead code. Omitting `snmpVersion` NPEs in the same method.
+- **D62 (P1)** — `GET /v2/data-source` omits every `SNMP.DS` row, although each is readable by xid.
+  A client that enumerates data sources — every UI, including the stack's own — cannot see, edit or
+  delete one. The row still polls when enabled.
+- **D63 (P2)** — `multiplicand` and `setType` are silent-zero defaults on `SnmpPointLocatorModel`.
+  `getId(null)` returns **-1** rather than 0, so a point with no set type reports itself settable
+  with a type nothing answers to.
+- **D64 (P2, security)** — `readCommunity`, `writeCommunity`, `authPassphrase` and `privPassphrase`
+  carry no `writeOnly`, so they render in the clear and come back in full on read, while every other
+  credential in the document is marked. Marking them is the whole fix; Cortex's mapper already
+  password-types a `writeOnly` field and already treats empty as "unchanged".
+- **A24** — a locator's data type is validated under the property name `dataTypeId` while the model,
+  the schema and the body all call it `dataType`, so a per-field message cannot be attached.
 
 ## Open decisions
 

@@ -83,6 +83,14 @@ const FIELD_LABELS: {[property: string]: string} = {
   maxRequestVars: 'Maximum vars per request',
   privPassphrase: 'Privacy passphrase',
   privProtocol: 'Privacy protocol',
+  // SNMP. Spelled out to match `privProtocol`/`privPassphrase` beside them, which the stack
+  // already spells out, and to keep the two initialisms from reading as words.
+  authProtocol: 'Authentication protocol',
+  authPassphrase: 'Authentication passphrase',
+  snmpVersion: 'SNMP version',
+  oid: 'OID',
+  engineId: 'Engine ID',
+  contextEngineId: 'Context engine ID',
   brokerUri: 'Broker Url',
   logIO: 'Log I/O',
   ioLogFileSizeMBytes: 'I/O log file size (MB)',

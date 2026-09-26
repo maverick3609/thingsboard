@@ -177,13 +177,20 @@ export class InferrixGatewayService {
    * A saved data source keeps its `xid`: the gateway's own identifier is what every point, event
    * detector and publisher on the device refers to it by, so a create that invented a new one and
    * an update that changed it would both orphan everything pointing at it.
+   *
+   * `create` says which verb to use, because the xid cannot. The gateway accepts a caller-chosen
+   * xid on `POST`, and the add dialog offers the field for exactly that — so inferring the verb
+   * from the xid being present turned an operator who typed one into a `PUT` against something
+   * that does not exist yet, which answers 404 and saves nothing. Left inferred when not passed,
+   * for a caller that only ever edits.
    */
   public saveDataSource(deviceId: string, dataSource: GatewayDataSource,
-                        config?: RequestConfig): Observable<GatewayDataSource> {
-    return dataSource.xid
-      ? this.proxy<GatewayDataSource>(deviceId, 'PUT',
-          `/v2/data-source/${encodeURIComponent(dataSource.xid)}`, dataSource, config)
-      : this.proxy<GatewayDataSource>(deviceId, 'POST', '/v2/data-source', dataSource, config);
+                        config?: RequestConfig,
+                        create?: boolean): Observable<GatewayDataSource> {
+    return (create ?? !dataSource.xid)
+      ? this.proxy<GatewayDataSource>(deviceId, 'POST', '/v2/data-source', dataSource, config)
+      : this.proxy<GatewayDataSource>(deviceId, 'PUT',
+          `/v2/data-source/${encodeURIComponent(dataSource.xid)}`, dataSource, config);
   }
 
   public deleteDataSource(deviceId: string, xid: string, config?: RequestConfig): Observable<any> {
@@ -317,12 +324,13 @@ export class InferrixGatewayService {
       null, config);
   }
 
+  /** `create` for the reason {@link saveDataSource} takes one: a point's add form offers the xid too. */
   public saveDataPoint(deviceId: string, point: GatewayDataPoint,
-                       config?: RequestConfig): Observable<GatewayDataPoint> {
-    return point.xid
-      ? this.proxy<GatewayDataPoint>(deviceId, 'PUT',
-          `/v2/data-point/${encodeURIComponent(point.xid)}`, point, config)
-      : this.proxy<GatewayDataPoint>(deviceId, 'POST', '/v2/data-point', point, config);
+                       config?: RequestConfig, create?: boolean): Observable<GatewayDataPoint> {
+    return (create ?? !point.xid)
+      ? this.proxy<GatewayDataPoint>(deviceId, 'POST', '/v2/data-point', point, config)
+      : this.proxy<GatewayDataPoint>(deviceId, 'PUT',
+          `/v2/data-point/${encodeURIComponent(point.xid)}`, point, config);
   }
 
   public setDataPointEnabled(deviceId: string, xid: string, enabled: boolean,

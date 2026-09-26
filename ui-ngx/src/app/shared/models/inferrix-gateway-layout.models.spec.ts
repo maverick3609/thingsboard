@@ -98,7 +98,10 @@ describe('gateway form layouts', () => {
       'baudRate', 'flowControlIn', 'flowControlOut', 'dataBits', 'stopBits', 'parity',
       'encoding',
       // BACnet. The two lookups are narrowed by a component rather than by a layout.
-      'writePriority']);
+      'writePriority',
+      // SNMP. The first two are `String` on the REST model, mapped through a code table rather than
+      // an enum; the two protocols are real enums, relabelled rather than narrowed.
+      'snmpVersion', 'setType', 'authProtocol', 'privProtocol']);
     Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
       [...Object.keys(layout.options ?? {}), ...Object.keys(layout.gatedOptions ?? {})]
         .forEach(id => expect(scalars.has(id)).withContext(`${modelType}.${id}`).toBe(true));
@@ -387,6 +390,94 @@ describe('gateway form layouts', () => {
       .filter(([modelType]) => modelType !== 'BACNET_MSTP.DS')
       .forEach(([modelType, layout]) =>
         expect(layout.pointLocatorType).withContext(modelType).toBeUndefined());
+  });
+
+  const snmp = GATEWAY_FORM_LAYOUTS['SNMP.DS'];
+  const snmpPoint = GATEWAY_FORM_LAYOUTS['SNMP.PL'];
+
+  it('offers the three SNMP versions the definition accepts, and no fourth', () => {
+    // `SnmpVersion` declares v1(0), v2c(1), v3(3) and `SnmpDataSourceDefinition.validate` accepts
+    // those three ids alone. The spelling is what `SnmpSettings.getSnmpVersionId` matches on.
+    expect(snmp.options.snmpVersion.map(item => item.value)).toEqual(['v1', 'v2c', 'v3']);
+  });
+
+  it('asks for a community string on v1 and v2c, and for a user on v3', () => {
+    // The branch in `SnmpDataSourceDefinition.validate`: readCommunity either side of it, and
+    // securityName / contextName / the two protocols only under v3.
+    expect(snmp.visibleWhen.readCommunity).toEqual({by: 'snmpVersion', values: ['v1', 'v2c']});
+    expect(snmp.visibleWhen.writeCommunity).toEqual({by: 'snmpVersion', values: ['v1', 'v2c']});
+    ['securityName', 'contextName', 'engineId', 'contextEngineId', 'authProtocol', 'privProtocol',
+      'authPassphrase', 'privPassphrase']
+      .forEach(id => expect(snmp.visibleWhen[id]).withContext(id)
+        .toEqual({by: 'snmpVersion', values: ['v3']}));
+  });
+
+  it('gates no field on a field that is itself gated', () => {
+    // A gate hides a row and keeps its control, so a rule reading a gated field reads a value the
+    // operator can no longer see. Gating `authPassphrase` on `authProtocol` is the precise
+    // condition and was the first attempt: choosing v3 and MD5 and going back to v2c left the
+    // passphrase on a v2c form, with the protocol that summoned it hidden. Measured on screen.
+    Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
+      const gated = new Set(Object.keys(layout.visibleWhen ?? {}));
+      Object.values(layout.visibleWhen ?? {}).forEach(rule =>
+        expect(gated.has(rule.by)).withContext(`${modelType} by ${rule.by}`).toBe(false));
+    });
+  });
+
+  it('spells the v3 protocols the way an agent spells them', () => {
+    // Relabelled, not narrowed: the mapper already offers exactly these values from the published
+    // enums, but its humaniser writes "Md5" and "Aes256".
+    expect(snmp.options.authProtocol.map(item => item.label)).toEqual(['None', 'MD5', 'SHA']);
+    expect(snmp.options.privProtocol.map(item => item.value))
+      .toEqual(['NONE', 'DES', 'AES128', 'AES192', 'AES256']);
+    expect(snmp.options.privProtocol.map(item => item.label))
+      .toEqual(['None', 'DES', 'AES128', 'AES192', 'AES256']);
+  });
+
+  it('sends both SNMP protocols whatever the version, because a null is a 500', () => {
+    // `ReverseEnumMap.get` calls `Objects.requireNonNull`, and the model that builds the response
+    // from the saved VO goes through it -- so an absent protocol is a 500 on a v2c source where
+    // neither means anything, with the row already written. Measured on 5.1.1.
+    expect(snmp.defaults.authProtocol).toBe('NONE');
+    expect(snmp.defaults.privProtocol).toBe('NONE');
+    // The `int` family: what `SnmpDataSourceVO` starts on, where the model declares a bare int.
+    expect(snmp.defaults.port).toBe(161);
+    expect(snmp.defaults.trapPort).toBe(162);
+    expect(snmp.defaults.timeout).toBe(1000);
+    expect(snmp.defaults.retries).toBe(2);
+    // No VO default to take: `snmpVersion` is a bare int there too, so its 0 is Java's rather than
+    // a decision, and v2c has the same field set as v1.
+    expect(snmp.defaults.snmpVersion).toBe('v2c');
+  });
+
+  it('offers the ten set types SET_TYPE_CODES declares, in its own order', () => {
+    expect(snmpPoint.options.setType.map(item => item.value)).toEqual(
+      ['NONE', 'INTEGER_32', 'OCTET_STRING', 'OID', 'IP_ADDRESS', 'COUNTER_32', 'GAUGE_32',
+        'TIME_TICKS', 'OPAQUE', 'COUNTER_64']);
+    // Id 0 is not a type but the absence of one -- `isSettable()` is `setType != 0` -- so it reads
+    // as what it does rather than as "None".
+    expect(snmpPoint.options.setType[0].label).toBe('Not settable');
+  });
+
+  it('hides settable on an SNMP point, because the gateway derives it', () => {
+    // `SnmpPointLocatorVO.isSettable()` returns `setType != 0`, and
+    // `SnmpPointLocatorModel.toVO` builds a fresh VO from seven fields, none of them that one.
+    expect(snmpPoint.hidden).toContain('settable');
+    expect(snmpPoint.hidden).toContain('relinquishable');
+    // So nothing may gate on it either -- the cross-cutting spec below would catch that, but the
+    // reason it is hidden is this one rather than the usual "the gateway reports it".
+    expect(snmpPoint.visibleWhen.multiplicand).toEqual({by: 'dataType', values: ['NUMERIC']});
+  });
+
+  it('defaults the two SNMP point fields whose absence is silent', () => {
+    // `multiplicand` is 1.0D on the VO and a bare double on the model: absent stores 0 and scales
+    // every reading to nothing. `setType` is worse -- `ExportCodes.getId(null)` returns -1, which
+    // is not zero, so the point reports itself settable with a set type nothing answers to. Both
+    // were 201 Created with no warning.
+    expect(snmpPoint.defaults.multiplicand).toBe(1);
+    expect(snmpPoint.defaults.setType).toBe('NONE');
+    expect(snmpPoint.defaults.binary0Value).toBe('0');
+    expect(snmpPoint.defaults.dataType).toBe('NUMERIC');
   });
 
   it('gates no field on one that is hidden', () => {

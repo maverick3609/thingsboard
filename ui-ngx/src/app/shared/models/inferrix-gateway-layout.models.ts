@@ -375,6 +375,72 @@ const BACNET_POINT: GatewayFormLayout = {
 };
 
 /**
+ * The three SNMP versions, which the schema declares as a bare string.
+ *
+ * `SnmpVersion` declares exactly these -- `v1(0)`, `v2c(1)`, `v3(3)` -- and
+ * `SnmpDataSourceDefinition.validate` accepts those three ids and nothing else. Spelled the way
+ * SNMP spells them, which is also the spelling `SnmpSettings.getSnmpVersionId` matches on.
+ */
+const SNMP_VERSIONS: FormSelectItem[] = [
+  {value: 'v1', label: 'v1'},
+  {value: 'v2c', label: 'v2c'},
+  {value: 'v3', label: 'v3'}
+];
+
+/**
+ * The SNMP types a settable point can be written as.
+ *
+ * `SnmpPointLocatorVO.SET_TYPE_CODES`, in its declared order, which is also its id order.
+ * `NONE` is not a type but the absence of one: `isSettable()` is `setType != 0`, so this list is
+ * how a point is made writable at all.
+ */
+const SNMP_SET_TYPES: FormSelectItem[] = [
+  {value: 'NONE', label: 'Not settable'},
+  {value: 'INTEGER_32', label: 'Integer (32-bit)'},
+  {value: 'OCTET_STRING', label: 'Octet string'},
+  {value: 'OID', label: 'OID'},
+  {value: 'IP_ADDRESS', label: 'IP address'},
+  {value: 'COUNTER_32', label: 'Counter (32-bit)'},
+  {value: 'GAUGE_32', label: 'Gauge (32-bit)'},
+  {value: 'TIME_TICKS', label: 'Time ticks'},
+  {value: 'OPAQUE', label: 'Opaque'},
+  {value: 'COUNTER_64', label: 'Counter (64-bit)'}
+];
+
+/**
+ * The v3 authentication and privacy protocols, relabelled rather than narrowed.
+ *
+ * `AuthProtocols` and `PrivProtocols` are published as enums, so the mapper already offers exactly
+ * these values -- what it cannot do is spell them. Its humaniser lower-cases all but the first
+ * letter of a constant, which turns `MD5` into "Md5" and `AES256` into "Aes256": names an operator
+ * has to match against their agent's own configuration, where they are written the way they are
+ * written here.
+ */
+const SNMP_AUTH_PROTOCOLS: FormSelectItem[] = [
+  {value: 'NONE', label: 'None'},
+  {value: 'MD5', label: 'MD5'},
+  {value: 'SHA', label: 'SHA'}
+];
+
+const SNMP_PRIV_PROTOCOLS: FormSelectItem[] = [
+  {value: 'NONE', label: 'None'},
+  {value: 'DES', label: 'DES'},
+  {value: 'AES128', label: 'AES128'},
+  {value: 'AES192', label: 'AES192'},
+  {value: 'AES256', label: 'AES256'}
+];
+
+/**
+ * Which SNMP version a field belongs to.
+ *
+ * `SnmpDataSourceDefinition.validate` branches on the version and asks for a different set either
+ * side of it: v1 and v2c authenticate with a community string, v3 with a user, an authentication
+ * protocol and a privacy protocol. A gate rather than two layouts, because it is one model and the
+ * operator changes their mind about the version inside one form.
+ */
+const SNMP_COMMUNITY_VERSIONS: (string | number | boolean)[] = ['v1', 'v2c'];
+
+/**
  * Layouts by model type, and by component name for the shared models that have no family.
  *
  * Only the types worked through so far appear. A type with no entry renders exactly as before —
@@ -625,6 +691,99 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * so the two cannot drift.
    */
   'BACNET_MSTP.PL': BACNET_POINT,
+
+  /**
+   * An SNMP manager: which agent, over which version, with which credential.
+   *
+   * The version is the whole shape of this form. `SnmpDataSourceDefinition.validate` branches on
+   * it and asks for a different set either side: v1 and v2c authenticate with a community string,
+   * v3 with a security name, a context name and two protocols. Both sets are gated on it rather
+   * than split into two layouts, because it is one model and an operator changes their mind about
+   * the version while filling the form in — and a gated field keeps its control, so switching back
+   * does not lose what was typed.
+   *
+   * Every v3 field is gated on the version and on nothing else, the two passphrases included. They
+   * were first gated on their own protocol, which is the more precise condition — `NONE` means
+   * there is nothing for a passphrase to be — and that was wrong for a reason worth keeping: a
+   * gate hides a row but keeps its control, so a field gated on a *gated* field reads a value the
+   * operator can no longer see. Choosing v3 and MD5 and then going back to v2c left
+   * "Authentication passphrase" on a v2c form with the protocol that summoned it hidden.
+   *
+   * `authProtocol` and `privProtocol` are defaulted **for every version**, not only for v3, and
+   * that is the load-bearing one. Both are `ReverseEnum`-backed on the model, and
+   * `ReverseEnumMap.get` calls `Objects.requireNonNull` — so the constructor that builds the
+   * response from the saved VO throws on a null. Measured on 5.1.1: omitting either answers 500
+   * on a v2c source where neither protocol means anything, and the row is saved anyway and can no
+   * longer be read (**D60**). `NONE` is what the operator would pick and what keeps the row
+   * legible.
+   *
+   * The ports and the poll are the `int` family again — `SnmpDataSourceVO` starts on 161, 162,
+   * 1000 and 2 while the model declares bare `int`s, so an absent key is 0 and `validate` refuses
+   * it. `snmpVersion` has no VO default to take: the field is a bare `int` there too, so its 0 is
+   * Java's rather than a decision, and v2c is the version a current agent speaks with the same
+   * field set as v1.
+   */
+  'SNMP.DS': {
+    advanced: ['retries', 'timeout', 'trapPort', 'maxRequestVars', 'localAddress',
+      'engineId', 'contextEngineId'],
+    options: {snmpVersion: SNMP_VERSIONS, authProtocol: SNMP_AUTH_PROTOCOLS,
+      privProtocol: SNMP_PRIV_PROTOCOLS},
+    visibleWhen: {
+      readCommunity: {by: 'snmpVersion', values: SNMP_COMMUNITY_VERSIONS},
+      writeCommunity: {by: 'snmpVersion', values: SNMP_COMMUNITY_VERSIONS},
+      securityName: {by: 'snmpVersion', values: ['v3']},
+      contextName: {by: 'snmpVersion', values: ['v3']},
+      engineId: {by: 'snmpVersion', values: ['v3']},
+      contextEngineId: {by: 'snmpVersion', values: ['v3']},
+      authProtocol: {by: 'snmpVersion', values: ['v3']},
+      privProtocol: {by: 'snmpVersion', values: ['v3']},
+      // On the version, not on the protocol beside them, although the protocol is the more precise
+      // condition. A gate keeps its control's value when it closes, so gating one gated field on
+      // another lets a stale value through: pick v3 and MD5, go back to v2c, and the protocol
+      // disappears while the passphrase it selected stays on screen. A rule reads one control, so
+      // the fix is to read the one every field here already reads. What it costs is an inert
+      // passphrase box on a v3 source with no authentication, which is the rarer wrong thing.
+      authPassphrase: {by: 'snmpVersion', values: ['v3']},
+      privPassphrase: {by: 'snmpVersion', values: ['v3']}
+    },
+    defaults: {snmpVersion: 'v2c', port: 161, trapPort: 162, timeout: 1000, retries: 2,
+      authProtocol: 'NONE', privProtocol: 'NONE'},
+    rows: [['host', 'port'], ['readCommunity', 'writeCommunity'],
+      ['securityName', 'contextName'], ['authProtocol', 'authPassphrase'],
+      ['privProtocol', 'privPassphrase'], ['engineId', 'contextEngineId']]
+  },
+
+  /**
+   * An SNMP point: which OID, read as what, and whether it can be written.
+   *
+   * `settable` is hidden because it is an answer rather than a question.
+   * `SnmpPointLocatorVO.isSettable()` returns `setType != 0` and
+   * `SnmpPointLocatorModel.toVO` never sets it — it builds a fresh VO and copies seven fields,
+   * none of them that one — so a control for it would change nothing while appearing to.
+   * `Not settable` on the set type is the same statement, and it is the one the gateway reads.
+   *
+   * `configurationDescription` is the gateway's own rendering of the OID, and `relinquishable`
+   * is not a field of the SNMP VO at all.
+   *
+   * Both silent-zero defaults are measured, not inferred. `multiplicand` is `1.0D` on the VO and a
+   * bare `double` on the model, so an absent one stores 0 and scales every reading to nothing —
+   * the same defect as BACnet's `multiplier`. `setType` is worse: `ExportCodes.getId(null)`
+   * returns **-1**, which is not zero, so a point saved without one reports itself *settable* with
+   * a set type no SNMP type answers to. Both were 201 Created with no warning (**D63**).
+   */
+  'SNMP.PL': {
+    hidden: ['settable', 'relinquishable', 'configurationDescription'],
+    options: {setType: SNMP_SET_TYPES},
+    visibleWhen: {
+      // `SnmpPointLocatorRT` reads `binary0Value` on the binary branch alone: it is the raw value
+      // that means 0, and there is nothing for it to mean on a numeric or multistate point.
+      binary0Value: {by: 'dataType', values: ['BINARY']},
+      multiplicand: {by: 'dataType', values: ['NUMERIC']},
+      augend: {by: 'dataType', values: ['NUMERIC']}
+    },
+    defaults: {dataType: 'NUMERIC', setType: 'NONE', multiplicand: 1, binary0Value: '0'},
+    rows: [['oid', 'dataType'], ['multiplicand', 'augend']]
+  },
 
   /**
    * The fields every data point carries, whatever protocol it reads.

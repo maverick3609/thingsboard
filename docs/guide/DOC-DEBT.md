@@ -33,3 +33,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `c2c8ed9744` feat(gateway): lay out an SNMP source around its version, and stop an add from becoming an update
 - [ ] `ca21b1010c` feat(gateway): give a meta point a script box and a point picker
 - [ ] `233eefa2e3` fix(gateway): stop an edit from erasing a credential the gateway will not show
+- [ ] `33264c14a0` feat(gateway): lay out an MQTT source and its point, and refuse what the broker cannot parse

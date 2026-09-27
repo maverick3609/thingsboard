@@ -35,3 +35,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `233eefa2e3` fix(gateway): stop an edit from erasing a credential the gateway will not show
 - [ ] `33264c14a0` feat(gateway): lay out an MQTT source and its point, and refuse what the broker cannot parse
 - [ ] `d7791ea3a8` feat(gateway): lay out an HTTP receiver around the two lists that are its security
+- [ ] `f0262aef6f` fix(gateway): hand out a copy of a layout's defaults, not the table's own values

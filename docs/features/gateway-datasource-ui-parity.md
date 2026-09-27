@@ -247,7 +247,7 @@ consulted.
 | 6 | `BACNET_MSTP.DS` | `BACNET_MSTP.PL` | **done** — 2026-09-26; **D57 fixed and A22 answered yes** 2026-09-27, so points work; re-verify after the gateway upgrade |
 | 7 | `META.DS` | `META.PL` | **done** — 2026-09-27; parked 2026-09-26 pending A23, answered and laid out the same day; needs an on-screen pass |
 | 8 | `SNMP.DS` | `SNMP.PL` | **done** — 2026-09-26; **D60-D64 fixed** 2026-09-27, and verifying that turned up **D68-D70** and two fixes on our side; point form still needs an on-screen pass |
-| 9 | `MQTT.DS` | `MQTT.PL` | `writeOnly` secrets; empty must mean "unchanged" |
+| 9 | `MQTT.DS` | `MQTT.PL` | **done** — 2026-09-28; **D71-D73** filed, and D73 forced a correction to the 2026-09-27 verb change; needs an on-screen pass |
 | 10 | `HTTP_RECEIVER.DS` | `HTTP_RECEIVER.PL` | "HTTP" is two types on this stack; both are in scope |
 | 11 | `HTTP_JSON_RETRIEVER.DS` | `HTTP_JSON_RETRIEVER.PL` | the other half of 10 |
 | 12 | `INTERNAL.DS` | `INTERNAL.PL` | 1 live; deferred behind the protocols above |
@@ -944,6 +944,79 @@ D62 reason above. Console clean.
 > and the read-modify-write edit of it answers **200**. The six probe rows were deleted; the instance
 > is back to the 21 data sources it started with.
 
+### 9 — `MQTT.DS` / `MQTT.PL` (done, 2026-09-28)
+
+**The first data source with no polling period at all.** `MqttDataSourceVO` is not a polling source —
+it holds a live client and is driven by what the broker sends — so there is no `timePeriod` on the
+model. Every form before this one opened on "Polling interval"; this one does not have the field.
+
+**Four fields cannot be omitted, and each one answers 500 rather than a message.** `toVO` resolves
+`qosType`, `publishTopicType`, `subscribeTopicType` and `publishQosType` with `Enum.valueOf` and no
+null check, and `toVO` runs before `validate`. `brokerUri` is the same class through `validateURI`,
+which does `new URI(vo.getBrokerUri())` and then `uri.getScheme().hashCode()` — so an absent URI **and
+an empty one** are both a 500 with no field attached. Measured, all five. Filed as **D71**.
+
+The four enums are seeded. `brokerUri` cannot be: there is no value that would be right, and a
+plausible-looking `tcp://` with no host actually *passes* validation and produces a source that never
+connects. So it needed the form to refuse it, which needed two things the layout language did not have:
+
+- **`required`**, a layout key that adds to whatever the schema already marks required and never
+  subtracts. `MQTT.DS` names `brokerUri` and `topicFilters`; `MQTT.PL` names both topics.
+- **A save that reads the form's validity**, which the dialog never did. The schema forms are bound
+  with `standalone: true`, so the `NG_VALIDATORS` each one registers reached no parent control: only
+  `identityForm` was checked, and a required field was decorative — the dialog closed and the gateway
+  answered for it. `save()` now collects every rendered form through
+  `@ViewChildren(GatewayFormComponent)` and refuses an invalid one, which needed each per-type
+  subclass to provide itself under that token (a subclass is a different directive, so the query would
+  not otherwise see it). A `mat-error` on each control branch says which field, because a blocked save
+  with no message is a worse dead end than the 500 it replaces.
+
+  This was a pre-existing hole rather than an MQTT one — any schema-declared `required` field had the
+  same gap. Nothing regressed by closing it: **no rendered field on any of the nine worked types is
+  schema-required**, checked across the whole document, so the gate bites only where a layout asks it
+  to.
+
+**Both MQTT topics are required, and that is the model.** `MqttTopic.validate(topic, false)` runs over
+each — no wildcards, length 1–65535 — and a null one comes back as a 422 quoting a Paho NPE. So there
+is no publish-only or subscribe-only MQTT point, which is also why `settable` is hidden:
+`isSettable()` answers `publishTopic != null && length > 0`, which a valid point always satisfies. It
+is derived, not chosen.
+
+**`topicFilters` is a newline-separated list** — split on `\n`, each line validated with wildcards
+allowed — so it is a textarea. The two PEM certificates are textareas too. `privateKey` deliberately
+is **not**: it is `writeOnly`, which types it as a password, which is what makes an empty one mean
+"unchanged" in `keep()`. A textarea would turn every save of an unchanged key into an erasure.
+
+**Only two of the three TLS fields are gated.** `useCertificate` is the client-certificate switch —
+`MqttConfigurationMapping` passes it as `awsIot` and `MqttClientRuntime` reads it to choose
+`getAwsSocketFactory` (mutual TLS) over `getSocketFactory` (server-authenticated TLS). So the client
+certificate and its key are gated on it and **the CA is not**: `validateURI` requires a CA for any
+`ssl://` broker whatever the switch says, and gating it would hide the field that refusal names.
+
+`keepAliveInterval` and `connectionTimeout` seed 60 and 30 — the values Cortex's own broker dialog
+already uses for the same fields on the platform-integration client, so the two forms agree. Absent
+lands as 0, which `validate` accepts and which means "no keep-alive" and "wait forever" to Paho.
+
+**And a correction to the 2026-09-27 verb change, found by measuring instead of reasoning.** That
+commit switched both the data source and the data point update to `PATCH`, to stop `PUT` nulling the
+secrets the `GET` will not return (D68). The data source half was measured and is right. **The data
+point half was not, and it was wrong**: `PartialUpdateArgumentResolver` merges with
+`readerForUpdating`, which cannot merge into a *polymorphic* member, so `PATCH` refuses any body
+carrying a `pointLocator` — 400 `"Failed to read request"`, whatever is in it. Every point edit
+through Cortex would have failed.
+
+Points are back on `PUT`, and safely, for a measured reason: **no `pointLocator` type in the whole
+schema document declares a `writeOnly` field.** The secrets are on `SNMP.DS`, `MQTT.DS`, `OPC.DS` and
+`MQTT_SENDER.PUB` alone. Filed as **D73**, with the part Cortex cannot fix: a publisher body carries
+`points`, so `PATCH` refuses it, and `MQTT_SENDER.PUB` declares two `writeOnly` fields, so `PUT`
+erases them — **there is no verb a client can use to edit an MQTT sender**, and our publisher save
+erases both credentials on every edit until the stack fixes one of the two.
+
+**Verified.** The exact body each form posts answers 201 on the fixed build, and both edits 200 — the
+point edit only after the verb was corrected. 72 layout, 40 schema, 10 renderer and 17 service specs
+green. Sixteen probe rows deleted; the instance is back to the 21 data sources it started with. The
+on-screen pass is owed with rows 6, 7 and 8.
+
 ## Per-type components
 
 Settled 2026-09-25, after the question was raised directly: **is one renderer for 148 model types
@@ -1036,6 +1109,18 @@ changed.
   authenticate, and with D64 in place the operator cannot see that the value is missing.
 
   Written up in `Inferrix-stack/docs/specs/2026-09-27-put-erases-every-writeonly-field.md`.
+
+- **D71 (P1)** — `MQTT.DS.qosType`, `MQTT.PL`'s three enums and `brokerUri` (absent *or* blank) each
+  answer **500** rather than a message: four `Enum.valueOf(null)` calls in `toVO`, which runs before
+  `validate`, and a `new URI(null)` / `getScheme().hashCode()` in `validateURI`.
+- **D72 (P3, cosmetic)** — the MQTT QoS and payload-format lists register `mqtt.QosType.*` and
+  `mqtt.topicType.*` message keys that `i18n_en.properties` does not carry, so every one of those
+  dropdowns is unlabelled in the gateway's own UI. Same family as D67.
+- **D73 (P1)** — `PATCH` cannot read a body with a polymorphic member, so it refuses every
+  read-modify-write of a data point or a publisher. Together with D68 that leaves **no verb** for
+  editing an MQTT sender without erasing its credential.
+
+  Written up in `Inferrix-stack/docs/specs/2026-09-28-mqtt-rest-surface.md`.
 
 - **W11 (P1)** — a multistate virtual point cannot be configured at all. The template switches on
   `'MULTISTATE'`, a case its own dropdown can never emit (it emits `INCREMENT_MULTISTATE`), so the

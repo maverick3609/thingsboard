@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: Copyright The Inferrix Authors
 // SPDX-License-Identifier: Apache-2.0
-import { Component, Inject } from '@angular/core';
+import { Component, Inject, QueryList, ViewChildren } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { Router } from '@angular/router';
@@ -10,6 +10,7 @@ import { DialogComponent } from '@shared/components/dialog.component';
 import { FormProperty, FormPropertyType } from '@shared/models/dynamic-form.models';
 import { GatewayRecipient } from '@shared/models/inferrix-gateway-event.models';
 import { GatewayFormLayout } from '@shared/models/inferrix-gateway-layout.models';
+import { GatewayFormComponent } from './gateway-form.component';
 
 
 /**
@@ -148,6 +149,9 @@ export class GatewayModelDialogComponent
       : ['name', 'detail', 'enabled', 'actions'];
   }
 
+  /** Every schema form the dialog rendered: the model's, and a point's locator. */
+  @ViewChildren(GatewayFormComponent) private forms: QueryList<GatewayFormComponent>;
+
   identityForm: UntypedFormGroup;
   values: {[id: string]: any};
   locatorValues: {[id: string]: any};
@@ -185,6 +189,16 @@ export class GatewayModelDialogComponent
   save(): void {
     if (this.identityForm.invalid) {
       this.identityForm.markAllAsTouched();
+      return;
+    }
+    // The schema forms too, which nothing collected before. They are bound with `standalone: true`,
+    // so the `NG_VALIDATORS` each one registers reaches no parent control and a required field was
+    // decorative: the dialog closed and the gateway answered for it -- a 500 where `MQTT.DS` has no
+    // broker URI to parse. Every rendered form answers the query because each subclass provides
+    // itself under {@link GatewayFormComponent}.
+    const invalid = (this.forms?.toArray() ?? []).filter(form => form.form.invalid);
+    if (invalid.length) {
+      invalid.forEach(form => form.form.markAllAsTouched());
       return;
     }
     const identity = this.identityForm.getRawValue();

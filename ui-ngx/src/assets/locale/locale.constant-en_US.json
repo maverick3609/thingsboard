@@ -4222,6 +4222,7 @@
       "change-broker-hint": "The gateway reconnects to the new address within seconds, without restarting. A wrong address takes its telemetry down just as quickly, so check it against the platform you are pointing it at.",
       "broker-uri": "Broker URI",
       "broker-uri-hint": "Scheme, host and port \u2014 for example tcp://10.0.0.5:1883. tcp, ssl, ws and wss are the schemes the gateway can dial.",
+      "field-required": "This field is required",
       "broker-uri-required": "A broker URI is required",
       "broker-uri-invalid": "Use tcp://, ssl://, ws:// or wss:// followed by a host and port",
       "topic-filters": "Subscribed topics",

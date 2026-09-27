@@ -98,7 +98,27 @@ const FIELD_LABELS: {[property: string]: string} = {
   executionDelaySeconds: 'Execution delay (seconds)',
   logSize: 'Log file size (MB)',
   logCount: 'Log files retained',
+  // MQTT. The one model in the document whose fields carry **no descriptions at all**, so every
+  // label here is the humanised Java name being corrected rather than a description being shortened.
+  // `useCertificate` is the client-certificate switch -- `MqttConfigurationMapping` passes it as
+  // `awsIot` and `MqttClientRuntime` reads it to choose mutual TLS over server-authenticated TLS --
+  // and "Use certificate" reads as though a CA-only setup does not need it, which is the opposite.
+  // `qosType` is the QoS of every subscription the source makes, not of anything it publishes.
   brokerUri: 'Broker Url',
+  topicFilters: 'Topic filters (one per line)',
+  qosType: 'Subscription QoS',
+  clientId: 'Client ID',
+  userName: 'Username',
+  userPassword: 'Password',
+  keepAliveInterval: 'Keep-alive interval (seconds)',
+  connectionTimeout: 'Connection timeout (seconds)',
+  useCertificate: 'Use a client certificate',
+  x509CaCrt: 'CA certificate (PEM)',
+  x509ClientCrt: 'Client certificate (PEM)',
+  privateKey: 'Client private key (PEM)',
+  publishTopicType: 'Publish payload format',
+  publishQosType: 'Publish QoS',
+  subscribeTopicType: 'Subscribe payload format',
   logIO: 'Log I/O',
   ioLogFileSizeMBytes: 'I/O log file size (MB)',
   maxHistoricalIOLogs: 'Max Historical IO Logs',

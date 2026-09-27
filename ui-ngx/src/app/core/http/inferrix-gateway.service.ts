@@ -343,14 +343,25 @@ export class InferrixGatewayService {
 
   /**
    * `create` for the reason {@link saveDataSource} takes one: a point's add form offers the xid too.
-   * `PATCH` for the same reason as well — a locator carries `writeOnly` fields of its own, and a
-   * `PUT` would null every one the gateway would not let us read back.
+   *
+   * **`PUT` here and `PATCH` there, and the asymmetry is the gateway's rather than a slip.** `PATCH`
+   * resolves its argument by merging the request body onto a model built from the stored VO, and
+   * Jackson's `readerForUpdating` cannot merge into a **polymorphic** member — so any body carrying a
+   * `pointLocator` is refused outright, `400 "Failed to read request"`, whatever is in it. Measured
+   * on `inferrix-stack-v5.1.x`: `{name}` alone patches, `{name, pointLocator}` does not, and the same
+   * holds for a publisher's `points`. A data source has no polymorphic member of its own, which is
+   * why it can be patched and this cannot.
+   *
+   * That leaves the D68 hazard `PATCH` exists to avoid, and here it does not apply: **no point locator
+   * in the whole schema document declares a `writeOnly` field** — the secrets live on three data
+   * source types and one publisher type and nowhere else. So there is nothing a `PUT` of a
+   * read-modify-write body can erase on a point.
    */
   public saveDataPoint(deviceId: string, point: GatewayDataPoint,
                        config?: RequestConfig, create?: boolean): Observable<GatewayDataPoint> {
     return (create ?? !point.xid)
       ? this.proxy<GatewayDataPoint>(deviceId, 'POST', '/v2/data-point', point, config)
-      : this.proxy<GatewayDataPoint>(deviceId, 'PATCH',
+      : this.proxy<GatewayDataPoint>(deviceId, 'PUT',
           `/v2/data-point/${encodeURIComponent(point.xid)}`, point, config);
   }
 

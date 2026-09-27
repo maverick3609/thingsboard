@@ -110,6 +110,20 @@ export interface GatewayFormLayout {
    * signal in the schema for it: `required` is not set on it, and the empty value is legal.
    */
   sendEmpty?: string[];
+  /**
+   * Fields the form refuses to submit empty, because the gateway cannot accept an empty one.
+   *
+   * Adds to whatever the schema already marks `required`, never subtracts — so this cannot weaken a
+   * constraint the device declared, only state one it failed to. `MQTT.DS.brokerUri` is why it
+   * exists: `validateURI` calls `new URI(vo.getBrokerUri())` and then `uri.getScheme().hashCode()`,
+   * so an absent broker URI **and an empty one** are both a 500 rather than a message on the field
+   * (measured 2026-09-27, filed as **D71**). A field that can only ever be answered has to be
+   * answered here rather than at the gateway.
+   *
+   * Never name a field that is also {@link advanced}: the panel is collapsed, so the save would be
+   * blocked by a control the operator cannot see. There is a spec for that.
+   */
+  required?: string[];
 }
 
 export interface GatewayGatedOptions {
@@ -398,6 +412,39 @@ const BACNET_POINT: GatewayFormLayout = {
   rows: [['remoteDeviceInstanceNumber', 'objectInstanceNumber'],
     ['objectTypeId', 'propertyIdentifierId'], ['multiplier', 'additive']]
 };
+
+/**
+ * The three QoS levels a gateway MQTT client will accept.
+ *
+ * `QosType` declares a fourth, `FAILURE(128)`, and leaves it out of `VALID_TYPES` -- it is what a
+ * broker answers with, not something a client asks for, and `MqttDataSourceDefinition.validate`
+ * refuses it on both the data source and the point ("Invalid choice", measured). The numbers are the
+ * enum's own `byteValue`, which is the MQTT level, and the constant is spelled `ATLEAST_ONCE`
+ * without the second underscore.
+ */
+const MQTT_QOS_TYPES: FormSelectItem[] = [
+  {value: 'AT_MOST_ONCE', label: 'At most once (0)'},
+  {value: 'ATLEAST_ONCE', label: 'At least once (1)'},
+  {value: 'EXACTLY_ONCE', label: 'Exactly once (2)'}
+];
+
+/**
+ * How a point's payload is written and read, for the four `DataSourceTopicType.VALID_TYPES`.
+ *
+ * `NONE` is declared and excluded, and the validator quotes the topic back when it is sent
+ * ("Invalid publish topic type for topic …", measured). `INFERRIX_JSON` is the only one with a model
+ * class behind it and is what the VO starts on.
+ *
+ * Relabelled because the gateway cannot label them itself: the enum registers `mqtt.topicType.*`
+ * message keys and `i18n_en.properties` carries none of them, so its own dropdown is blank. Same for
+ * the QoS list above (**D72**).
+ */
+const MQTT_TOPIC_TYPES: FormSelectItem[] = [
+  {value: 'PLAIN', label: 'Plain value'},
+  {value: 'JSON', label: 'JSON'},
+  {value: 'JSON_WITH_TIMESTAMP', label: 'JSON with timestamp'},
+  {value: 'INFERRIX_JSON', label: 'Inferrix JSON'}
+];
 
 /**
  * What triggers a meta point's script, in the gateway's own words.
@@ -929,6 +976,97 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     hidden: ['enabled', 'settable', 'readPermission', 'setPermission'],
     advanced: ['deviceName', 'purgeOverride', 'purgePeriod', 'textRenderer',
       'loggingPropertiesModel']
+  },
+
+  /**
+   * An MQTT client: which broker, which credential, and which topics it subscribes to.
+   *
+   * **The only data source so far with no polling period at all.** `MqttDataSourceVO` is not a
+   * polling source -- it holds a live client and is driven by what the broker sends -- so there is no
+   * `timePeriod` on the model and nothing here to put under a "Polling interval" label.
+   *
+   * `brokerUri` and `topicFilters` are {@link required} because the gateway cannot answer for either.
+   * `validateURI` does `new URI(vo.getBrokerUri())` and then `uri.getScheme().hashCode()`, so an
+   * absent *or* empty URI is a 500 with no field on it; `topicFilters` is a clean 422
+   * ("validate.cannotContainEmptyString") and is required here so the operator is told before the
+   * round trip rather than after it. Neither may move into Advanced: a required field behind a
+   * collapsed panel blocks a save invisibly.
+   *
+   * `topicFilters` is a **newline-separated list**, split on `\n` and each line run through
+   * `MqttTopic.validate(topic, true)` -- wildcards allowed, so `plant/+/temp` and `plant/#` are both
+   * legal. One line in a single-line box is what the schema's bare string would otherwise give, hence
+   * the textarea.
+   *
+   * `qosType` is the QoS applied to **every** one of those subscriptions:
+   * `Arrays.fill(qosTypes, connectionParameters.getQosType().byteValue)` before `subscribe`. It is
+   * defaulted because `toVO` resolves it with `QosType.valueOf`, which answers a missing value with a
+   * 500 -- the same reason the three enums on the locator are defaulted.
+   *
+   * **The TLS fields, and why only two of them are gated.** `useCertificate` is the client-certificate
+   * switch: with it off and a CA present the client does server-authenticated TLS
+   * (`SslUtil.getSocketFactory`), and with it on and all three present it does mutual TLS
+   * (`getAwsSocketFactory` -- the method is named for AWS IoT, which is what the flag is called
+   * internally, but the mechanism is an ordinary client certificate). So the client certificate and
+   * its key are gated on the switch and **the CA is not**: `validateURI` requires a CA for any
+   * `ssl://` broker whatever the switch says, and gating it would hide the field that refusal names.
+   *
+   * `privateKey` is `writeOnly` and so arrives as a password field, which is what makes an empty one
+   * mean "unchanged" on a save. It is deliberately *not* retyped to a textarea for that reason, even
+   * though what goes in it is a PEM block: {@link GatewayModelDialogComponent.keep} keys on the
+   * password type, and a textarea would turn a blank field into an erased key.
+   *
+   * The keep-alive and the timeout are the bare-`int` family again -- absent lands as 0, which
+   * `validate` accepts (it only refuses negatives) and which means "no keep-alive" and "wait forever"
+   * to Paho. 60 and 30 are the values Cortex's own broker dialog already seeds for the same fields on
+   * the platform-integration client, so the two forms agree.
+   */
+  'MQTT.DS': {
+    advanced: ['clientId', 'autoReconnect', 'cleanSession', 'keepAliveInterval',
+      'connectionTimeout', 'useCertificate', 'x509CaCrt', 'x509ClientCrt', 'privateKey'],
+    types: {topicFilters: FormPropertyType.textarea, x509CaCrt: FormPropertyType.textarea,
+      x509ClientCrt: FormPropertyType.textarea},
+    options: {qosType: MQTT_QOS_TYPES},
+    required: ['brokerUri', 'topicFilters'],
+    visibleWhen: {
+      x509ClientCrt: {by: 'useCertificate', values: [true]},
+      privateKey: {by: 'useCertificate', values: [true]}
+    },
+    defaults: {qosType: 'ATLEAST_ONCE', keepAliveInterval: 60, connectionTimeout: 30,
+      autoReconnect: true, cleanSession: true, useCertificate: false},
+    rows: [['brokerUri', 'qosType'], ['userName', 'userPassword'],
+      ['keepAliveInterval', 'connectionTimeout']]
+  },
+
+  /**
+   * An MQTT point: the topic it publishes to, the topic it subscribes to, and how each is encoded.
+   *
+   * **Both topics are required, and that is the model rather than an oversight.** The point validator
+   * runs `MqttTopic.validate(topic, false)` over each -- no wildcards, length 1-65535 -- and a null
+   * one arrives as a 422 quoting a Paho NPE ("Cannot invoke \"String.getBytes(String)\" because
+   * \"topicString\" is null"). So there is no publish-only or subscribe-only MQTT point, which is
+   * also why `settable` is hidden: `MqttPointLocatorVO.isSettable()` answers
+   * `publishTopic != null && length > 0`, which a valid point always satisfies. It is derived, not
+   * chosen. `relinquishable` is not read by `toVO` at all.
+   *
+   * **All three enums are defaulted because an absent one is a 500.** `toVO` resolves each with
+   * `DataSourceTopicType.valueOf` / `QosType.valueOf` and no null check, and `toVO` runs before
+   * `validate` -- so omitting `publishTopicType`, `subscribeTopicType` or `publishQosType` answers
+   * `Internal Server Error` rather than a message on the field (measured; **D71**). The two topic
+   * types start on `INFERRIX_JSON`, which is the VO's own default; the QoS has no VO default at all,
+   * and at-least-once is what the rest of the product picks.
+   *
+   * There is no subscribe QoS. The data source's `qosType` is the one applied to every subscription
+   * it makes, and this is the QoS the point publishes with.
+   */
+  'MQTT.PL': {
+    hidden: ['settable', 'relinquishable', 'configurationDescription'],
+    options: {publishTopicType: MQTT_TOPIC_TYPES, subscribeTopicType: MQTT_TOPIC_TYPES,
+      publishQosType: MQTT_QOS_TYPES},
+    required: ['publishTopic', 'subscribeTopic'],
+    defaults: {dataType: 'NUMERIC', publishTopicType: 'INFERRIX_JSON',
+      subscribeTopicType: 'INFERRIX_JSON', publishQosType: 'ATLEAST_ONCE'},
+    rows: [['publishTopic', 'publishTopicType'], ['publishQosType'],
+      ['subscribeTopic', 'subscribeTopicType']]
   }
 };
 

@@ -255,7 +255,9 @@ export class GatewayFormComponent implements ControlValueAccessor, OnChanges {
     // `disabled` is already how the mapper marks a `readOnly` field, so a layout naming one adds
     // to that set rather than introducing a second way of saying it.
     const disabled = property.disabled || (this.layout?.readonly ?? []).includes(property.id);
-    const retyped = {...property, disabled, type: this.laidOutType(property)};
+    // Adds to the schema's own `required`, never clears it.
+    const required = property.required || (this.layout?.required ?? []).includes(property.id);
+    const retyped = {...property, disabled, required, type: this.laidOutType(property)};
     return items && this.narrowable(property)
       ? {...retyped, type: FormPropertyType.select, items} : retyped;
   }

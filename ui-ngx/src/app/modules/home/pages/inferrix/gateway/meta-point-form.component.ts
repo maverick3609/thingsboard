@@ -34,6 +34,10 @@ const MAX_CONTEXT_POINTS = 200;
   templateUrl: './gateway-form.component.html',
   styleUrls: ['./gateway-form.component.scss'],
   providers: [
+    // Answers the dialog's view query as well as its own type, so `save` can find every form it
+    // rendered and refuse to submit an invalid one. A subclass is a different directive: without
+    // this the query matching {@link GatewayFormComponent} would not see it.
+    {provide: GatewayFormComponent, useExisting: forwardRef(() => MetaPointFormComponent)},
     {provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => MetaPointFormComponent), multi: true},
     {provide: NG_VALIDATORS, useExisting: forwardRef(() => MetaPointFormComponent), multi: true}
   ],

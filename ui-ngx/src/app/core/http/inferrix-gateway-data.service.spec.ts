@@ -162,8 +162,11 @@ describe('InferrixGatewayService data sources and points', () => {
     };
     service.saveDataPoint(DEVICE, point).subscribe();
     const request = httpMock.expectOne(proxy('/v2/data-point/DP_1'));
-    // Same verb and the same reason as a data source: a locator carries `writeOnly` fields too.
-    expect(request.request.method).toBe('PATCH');
+    // PUT, unlike a data source. `PATCH` merges with `readerForUpdating`, which cannot merge into a
+    // polymorphic member, so any body carrying a `pointLocator` is refused 400 outright. Safe here
+    // because no point locator in the schema document declares a `writeOnly` field -- the secrets are
+    // on three data source types and one publisher type.
+    expect(request.request.method).toBe('PUT');
     expect(request.request.body.pointLocator.offset).toBe(40001);
     expect(request.request.body.pointLocator.modelType).toBe('MODBUS.PL');
     request.flush({...point});

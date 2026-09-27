@@ -104,7 +104,10 @@ describe('gateway form layouts', () => {
       'snmpVersion', 'setType', 'authProtocol', 'privProtocol',
       // Meta. Both are `String` on the REST model over an `ExportCodes` table, relabelled in the
       // gateway's own words rather than narrowed.
-      'updateEvent', 'contextUpdateEvent']);
+      'updateEvent', 'contextUpdateEvent',
+      // MQTT. All four are `String` on the REST model over a Java enum, relabelled because the
+      // gateway registers message keys its own property file does not carry.
+      'qosType', 'publishQosType', 'publishTopicType', 'subscribeTopicType']);
     Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
       [...Object.keys(layout.options ?? {}), ...Object.keys(layout.gatedOptions ?? {})]
         .forEach(id => expect(scalars.has(id)).withContext(`${modelType}.${id}`).toBe(true));
@@ -490,6 +493,81 @@ describe('gateway form layouts', () => {
     // is the other way round -- absent is fine, `""` is 422 `validate.minLength`. So one of the two
     // is named here and the other must not be.
     expect(snmp.sendEmpty).toEqual(['contextName']);
+  });
+
+  const mqtt = GATEWAY_FORM_LAYOUTS['MQTT.DS'];
+  const mqttPoint = GATEWAY_FORM_LAYOUTS['MQTT.PL'];
+
+  it('offers the three QoS levels VALID_TYPES admits, and not the one a broker answers with', () => {
+    // `QosType` declares FAILURE(128) and leaves it out of `VALID_TYPES`; `validate` refuses it on
+    // both models. The constant is `ATLEAST_ONCE`, without the second underscore.
+    [mqtt.options.qosType, mqttPoint.options.publishQosType].forEach(items => {
+      expect(items.map(item => item.value))
+        .toEqual(['AT_MOST_ONCE', 'ATLEAST_ONCE', 'EXACTLY_ONCE']);
+      expect(items.map(item => item.value)).not.toContain('FAILURE');
+    });
+  });
+
+  it('offers the four topic types VALID_TYPES admits, and not NONE', () => {
+    [mqttPoint.options.publishTopicType, mqttPoint.options.subscribeTopicType].forEach(items =>
+      expect(items.map(item => item.value))
+        .toEqual(['PLAIN', 'JSON', 'JSON_WITH_TIMESTAMP', 'INFERRIX_JSON']));
+  });
+
+  it('seeds every MQTT enum, because toVO resolves each one with valueOf', () => {
+    // `QosType.valueOf(null)` and `DataSourceTopicType.valueOf(null)` throw, and `toVO` runs before
+    // `validate` -- so an absent one is a 500 rather than a message. Measured on 5.1.x.
+    expect(mqtt.defaults.qosType).toBe('ATLEAST_ONCE');
+    expect(mqttPoint.defaults.publishQosType).toBe('ATLEAST_ONCE');
+    expect(mqttPoint.defaults.publishTopicType).toBe('INFERRIX_JSON');
+    expect(mqttPoint.defaults.subscribeTopicType).toBe('INFERRIX_JSON');
+    expect(mqttPoint.defaults.dataType).toBe('NUMERIC');
+  });
+
+  it('refuses to submit a broker URI or a topic filter the gateway cannot parse', () => {
+    // An absent or empty `brokerUri` is a 500 inside `validateURI`; `topicFilters` is a clean 422 and
+    // is required so the operator hears it before the round trip.
+    expect(mqtt.required).toEqual(['brokerUri', 'topicFilters']);
+    expect(mqttPoint.required).toEqual(['publishTopic', 'subscribeTopic']);
+  });
+
+  it('never names a field in both required and advanced', () => {
+    // The Advanced panel is collapsed, so a required field inside it blocks a save with nothing on
+    // screen to explain why.
+    Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
+      const advanced = new Set(layout.advanced ?? []);
+      (layout.required ?? []).forEach(id =>
+        expect(advanced.has(id)).withContext(`${modelType}.${id}`).toBe(false));
+    });
+  });
+
+  it('never names a field in both required and hidden', () => {
+    Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
+      const hidden = new Set(layout.hidden ?? []);
+      (layout.required ?? []).forEach(id =>
+        expect(hidden.has(id)).withContext(`${modelType}.${id}`).toBe(false));
+    });
+  });
+
+  it('leaves the private key a password field, so a blank one cannot erase it', () => {
+    // `privateKey` is `writeOnly`, which is what types it as a password, which is what makes `keep()`
+    // drop an empty one instead of sending it. A textarea would read better for a PEM block and would
+    // turn every save of an unchanged key into an erasure.
+    expect(mqtt.types.privateKey).toBeUndefined();
+    expect(mqtt.types.x509CaCrt).toBe(FormPropertyType.textarea);
+    expect(mqtt.types.topicFilters).toBe(FormPropertyType.textarea);
+  });
+
+  it('gates the client certificate on the switch and the CA on nothing', () => {
+    // `validateURI` requires a CA for any `ssl://` broker whatever `useCertificate` says, so gating
+    // the CA would hide the field that refusal names.
+    expect(Object.keys(mqtt.visibleWhen)).toEqual(['x509ClientCrt', 'privateKey']);
+    expect(mqtt.visibleWhen.privateKey).toEqual({by: 'useCertificate', values: [true]});
+  });
+
+  it('hides the two MQTT locator fields the gateway derives or never reads', () => {
+    // `isSettable()` answers `publishTopic != null && length > 0`, and a valid point always has one.
+    expect(mqttPoint.hidden).toEqual(['settable', 'relinquishable', 'configurationDescription']);
   });
 
   it('never names a field in both sendEmpty and hidden', () => {

@@ -113,6 +113,18 @@ describe('gateway form layout mechanics', () => {
     expect(form.delegatedProperties.context).toBe(applied);
   });
 
+  it('makes a field the layout names required, and reports the form invalid', () => {
+    // What the dialog's save gate reads. `MQTT.DS.brokerUri` is the case: the gateway answers an
+    // absent or empty one with a 500 inside `validateURI`, so the form has to refuse it first.
+    build({required: ['script']});
+    expect(shownProperty('script').required).toBe(true);
+    form.writeValue({script: '', context: []});
+    expect(form.form.get('script').hasError('required')).toBe(true);
+    expect(form.validate(null)).toEqual({gatewayForm: {valid: false}});
+    form.writeValue({script: 'return 1;', context: []});
+    expect(form.validate(null)).toBeNull();
+  });
+
   it('keeps the list when the form is written to again', () => {
     // A second write rebuilds the delegated properties, which is where the list was written. Without
     // the applied-set being rebuilt with them, the select would fall back to a text box and nothing

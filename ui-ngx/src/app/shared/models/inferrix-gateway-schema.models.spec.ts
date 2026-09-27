@@ -276,13 +276,16 @@ describe('inferrix-gateway-schema.models', () => {
       // The gateway sends no i18n labels and no help text. Blocking on a dictionary lookup that
       // will never answer would leave every form showing raw identifiers.
       expect(mapped({type: 'string'}).name).toBe('P');
+      // Three real property names that carry no label override, so what they read is what
+      // `humanise` produced. `userPassword` used to stand here and now has one ("Password"), which
+      // is the point of the override table rather than a failure of this one.
       const doc2: GatewaySchemaDocument = {
         families: {f: {t: {type: 'object', properties: {
-          userPassword: {type: 'string'}, maxReadBitCount: {type: 'integer'}, xid: {type: 'string'}
+          writeCommunity: {type: 'string'}, maxReadBitCount: {type: 'integer'}, xid: {type: 'string'}
         }}}}, components: {schemas: {}}
       };
       const named = schemaToFormProperties(doc2, 'f', 't');
-      expect(named.find(p => p.id === 'userPassword').name).toBe('User password');
+      expect(named.find(p => p.id === 'writeCommunity').name).toBe('Write community');
       expect(named.find(p => p.id === 'maxReadBitCount').name).toBe('Max read bit count');
       expect(named.find(p => p.id === 'xid').name).toBe('Xid');
     });

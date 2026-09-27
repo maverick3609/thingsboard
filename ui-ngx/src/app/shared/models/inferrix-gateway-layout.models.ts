@@ -98,6 +98,18 @@ export interface GatewayFormLayout {
    * one that cannot hold its value, so such an entry is ignored rather than obeyed.
    */
   types?: {[id: string]: FormPropertyType};
+  /**
+   * Fields whose empty value must still be sent on an add, because the gateway wants the key rather
+   * than a value.
+   *
+   * The add drops every empty field so that a model's Java field initialisers apply — which is what
+   * makes a Modbus source's four timeouts work. `SNMP.DS.contextName` is the exception the rule
+   * needs: on v3 an absent key is refused `"Required value"` while `""` is accepted (measured on
+   * `inferrix-stack-v5.1.x`), so dropping it turns a correctly filled form into a 422 on a field the
+   * operator deliberately left blank. Named per field rather than inferred, because there is no
+   * signal in the schema for it: `required` is not set on it, and the empty value is legal.
+   */
+  sendEmpty?: string[];
 }
 
 export interface GatewayGatedOptions {
@@ -839,6 +851,7 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
   'SNMP.DS': {
     advanced: ['retries', 'timeout', 'trapPort', 'maxRequestVars', 'localAddress',
       'engineId', 'contextEngineId'],
+    sendEmpty: ['contextName'],
     options: {snmpVersion: SNMP_VERSIONS, authProtocol: SNMP_AUTH_PROTOCOLS,
       privProtocol: SNMP_PRIV_PROTOCOLS},
     visibleWhen: {

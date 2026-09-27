@@ -113,6 +113,16 @@ describe('gateway form layout mechanics', () => {
     expect(form.delegatedProperties.context).toBe(applied);
   });
 
+  it('keeps the list when the form is written to again', () => {
+    // A second write rebuilds the delegated properties, which is where the list was written. Without
+    // the applied-set being rebuilt with them, the select would fall back to a text box and nothing
+    // would ever put it back -- the lookup has already returned.
+    build();
+    form.arrive({'context.xid': POINTS});
+    form.writeValue({script: 'return 2;', context: [{xid: 'DP_1'}]});
+    expect(contextItemFields()[0].type).toBe(FormPropertyType.select);
+  });
+
   it('ignores a nested key naming a field the array does not have', () => {
     build();
     form.arrive({'context.nosuchfield': POINTS, 'nosucharray.xid': POINTS});

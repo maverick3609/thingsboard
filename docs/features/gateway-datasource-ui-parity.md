@@ -246,7 +246,7 @@ consulted.
 | 5 | `BACNET_IP.DS` | `BACNET_IP.PL` | **done** — 2026-09-26; needs a local device on the gateway first |
 | 6 | `BACNET_MSTP.DS` | `BACNET_MSTP.PL` | **done** — 2026-09-26; **D57 fixed and A22 answered yes** 2026-09-27, so points work; re-verify after the gateway upgrade |
 | 7 | `META.DS` | `META.PL` | **done** — 2026-09-27; parked 2026-09-26 pending A23, answered and laid out the same day; needs an on-screen pass |
-| 8 | `SNMP.DS` | `SNMP.PL` | **done** — 2026-09-26; **D60-D64 all fixed** 2026-09-27, incl. v3 and the credentials; point form still needs an on-screen pass |
+| 8 | `SNMP.DS` | `SNMP.PL` | **done** — 2026-09-26; **D60-D64 fixed** 2026-09-27, and verifying that turned up **D68-D70** and two fixes on our side; point form still needs an on-screen pass |
 | 9 | `MQTT.DS` | `MQTT.PL` | `writeOnly` secrets; empty must mean "unchanged" |
 | 10 | `HTTP_RECEIVER.DS` | `HTTP_RECEIVER.PL` | "HTTP" is two types on this stack; both are in scope |
 | 11 | `HTTP_JSON_RETRIEVER.DS` | `HTTP_JSON_RETRIEVER.PL` | the other half of 10 |
@@ -906,6 +906,44 @@ tripped with every default and both protocols at `NONE`, and the v3 fields null.
 fields and defaults were exercised against the live gateway by REST rather than on screen, for the
 D62 reason above. Console clean.
 
+> **Re-verified 2026-09-27 against the fixed build, and it moved two things here.** D60-D64 are all
+> in: `authProtocol` and `privProtocol` now carry real enums, the four credentials are `writeOnly`,
+> and the nine invisible `ZZ …` rows are listable again, so D62's truncation is gone.
+>
+> **The `writeOnly` change makes the reviewer's earlier 🟡 the live case, and it was already handled —
+> but it also exposed a defect that was not.** The rebuttal to that review rested on a measurement:
+> on 5.1.1 `readCommunity` came back in full, so an empty form field could not overwrite a stored
+> secret. On the fixed build it comes back **absent**, so `keep()`'s password handling — which was
+> already there — is now load-bearing rather than belt-and-braces. What the rebuttal did not
+> anticipate is the other end of the round trip: `DatasourceResource.update` answers a `PUT` with
+> `service.update(xid, model.toVO())`, a **fresh** VO from the body alone. A key the body omits is
+> stored as `null`. So dropping the empty secret from the payload — the correct client behaviour, and
+> the only one available, since the GET will not return it — was **erasing the credential** on every
+> edit and answering 200.
+>
+> Filed as **D68 (P0)**. Cortex's half is fixed here: an update is now a `PATCH`, at both
+> `saveDataSource` and `saveDataPoint`. `PATCH` resolves through `PartialUpdateArgumentResolver`,
+> which maps the stored VO to a model — `fromVO` copies the secrets — and applies the body over it
+> with `readerForUpdating`, so an absent key keeps what the gateway holds. Measured: a `PATCH` body of
+> `{modelType, name}` alone answers 200 with every other field intact. Nothing else about the save
+> changes, because the dialog already sends every non-secret key explicitly on an edit.
+>
+> This is not SNMP-specific and it is why it was worth chasing before row 9: `MQTT.DS`'s broker
+> password, `OPC.DS`'s and the HTTP retriever's auth are all `writeOnly`, and MQTT is next.
+>
+> **A second fix, on the v3 add form.** `contextName` is refused when the key is *absent* — 422,
+> "Required value" — and accepted when it is `""`; `engineId` is the exact reverse (absent fine,
+> `""` refused `validate.minLength`). Neither is marked `required` in the schema. The add-drop that
+> makes every other field's Java initialiser work therefore turned a correctly filled v3 form into a
+> 422 on a field the operator deliberately left blank. A new layout key, `sendEmpty`, names the
+> exception — `SNMP.DS` names `contextName` and nothing else — and `keep()` sends `''` for it on an
+> add rather than dropping it. Filed as **D69**, with **D70** for the related hole: a v3 source with
+> `MD5` and no passphrase at all is accepted 201 and cannot authenticate.
+>
+> Verified end to end on the fixed build: the exact body the v3 add form now posts answers **201**,
+> and the read-modify-write edit of it answers **200**. The six probe rows were deleted; the instance
+> is back to the 21 data sources it started with.
+
 ## Per-type components
 
 Settled 2026-09-25, after the question was raised directly: **is one renderer for 148 model types
@@ -985,6 +1023,19 @@ changed.
   `dsEdit.meta.event.none`.
 
   Written up in `Inferrix-stack/docs/specs/2026-09-27-absent-code-table-value-is-minus-one.md`.
+
+- **D68 (P0, data loss)** — `PUT /v2/data-source/{xid}` builds a fresh VO from the body alone, so a
+  read-modify-write erases every `writeOnly` field. Since D64 made the four SNMP credentials
+  `writeOnly`, the `GET` cannot return them and the `PUT` requires them: **no client can perform the
+  round trip an edit form is without destroying the credential**, and the response looks like a
+  successful save. `PATCH` merges against the stored model and is the only safe verb.
+- **D69 (P2)** — `contextName` and `engineId` disagree about what "not set" means on v3: absent is
+  refused for the first and fine for the second, blank is the other way round. Neither is marked
+  `required`.
+- **D70 (P2)** — a v3 source with `authProtocol: MD5` and no passphrase is accepted 201. It cannot
+  authenticate, and with D64 in place the operator cannot see that the value is missing.
+
+  Written up in `Inferrix-stack/docs/specs/2026-09-27-put-erases-every-writeonly-field.md`.
 
 - **W11 (P1)** — a multistate virtual point cannot be configured at all. The template switches on
   `'MULTISTATE'`, a case its own dropdown can never emit (it emits `INCREMENT_MULTISTATE`), so the

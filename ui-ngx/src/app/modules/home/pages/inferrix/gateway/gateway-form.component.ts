@@ -200,7 +200,6 @@ export class GatewayFormComponent implements ControlValueAccessor, OnChanges {
     // the gateway chose, and `{}` would answer `constructor` with a function.
     this.slices = Object.create(null);
     this.delegatedProperties = Object.create(null);
-    this.nestedApplied = Object.create(null);
     const hidden = new Set(this.layout?.hidden ?? []);
     this.shown = (this.properties ?? []).filter(property => !hidden.has(property.id))
       .map(property => this.withLayout(property));
@@ -217,6 +216,11 @@ export class GatewayFormComponent implements ControlValueAccessor, OnChanges {
       return;
     }
     this.form.patchValue(this.value, {emitEvent: false});
+    // Rebuilt together with the delegated properties they were written onto, and re-applied by the
+    // `layoutRows` below. Kept here rather than in `build` because this is where those properties
+    // are replaced: a second write would otherwise leave a looked-up list recorded as applied and
+    // the plain field on screen, with nothing left to trigger it again.
+    this.nestedApplied = Object.create(null);
     this.shown.filter(property => !RENDERED_TYPES.includes(property.type)).forEach(property => {
       this.slices[property.id] = {[property.id]: this.value[property.id]};
       this.delegatedProperties[property.id] = [property];

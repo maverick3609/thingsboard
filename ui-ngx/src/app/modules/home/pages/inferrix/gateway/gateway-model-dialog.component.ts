@@ -191,14 +191,15 @@ export class GatewayModelDialogComponent
     // Spread the original first so everything the form does not render -- modelType, the surrogate
     // id, and any field a newer gateway added that this schema mapper skipped -- survives the
     // round trip. A save that sent only the rendered fields would silently reset the rest.
-    const saved: any = {...this.data.model, ...this.keep(this.values, this.data.properties),
+    const saved: any = {...this.data.model,
+      ...this.keep(this.values, this.data.properties, this.data.layout),
       name: identity.name};
     if (identity.xid) {
       saved.xid = identity.xid;
     }
     if (this.data.locatorProperties?.length) {
       saved.pointLocator = {...(this.data.model?.pointLocator ?? {}),
-        ...this.keep(this.locatorValues, this.data.locatorProperties)};
+        ...this.keep(this.locatorValues, this.data.locatorProperties, this.data.locatorLayout)};
     }
     (this.data.recipientFields ?? []).forEach(field => {
       saved[field] = this.recipients[field] ?? [];
@@ -234,16 +235,32 @@ export class GatewayModelDialogComponent
    *
    * Only password-typed properties are treated this way. An ordinary text field cleared on purpose
    * is a real edit and must reach the gateway as one.
+   *
+   * A layout's {@link GatewayFormLayout.sendEmpty} names the fields that have to be sent even when
+   * empty, because the gateway wants the key rather than a value. `SNMP.DS.contextName` is one:
+   * on v3 an absent key is 422 `"Required value"` while `""` is accepted, so the add-drop above
+   * refuses a form the operator filled in correctly.
    */
-  private keep(values: {[id: string]: any}, properties: FormProperty[]): {[id: string]: any} {
+  private keep(values: {[id: string]: any}, properties: FormProperty[],
+               layout?: GatewayFormLayout): {[id: string]: any} {
     const secrets = new Set((properties ?? [])
       .filter(property => property.type === FormPropertyType.password)
       .map(property => property.id));
+    const sendEmpty = new Set(layout?.sendEmpty ?? []);
     const kept: {[id: string]: any} = {};
     Object.keys(values ?? {}).forEach(id => {
       const value = values[id];
       const empty = value === null || value === undefined || value === '';
-      if (empty && (this.isAdd || secrets.has(id))) {
+      if (empty && secrets.has(id)) {
+        return;
+      }
+      if (empty && this.isAdd) {
+        if (!sendEmpty.has(id)) {
+          return;
+        }
+        // The key, with the empty value the gateway asked for rather than the null a control that
+        // was never touched holds -- a null is refused by the same validator.
+        kept[id] = '';
         return;
       }
       kept[id] = value;

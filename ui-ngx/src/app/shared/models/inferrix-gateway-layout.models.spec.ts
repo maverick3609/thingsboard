@@ -485,6 +485,22 @@ describe('gateway form layouts', () => {
         .toEqual({by: 'snmpVersion', values: ['v3']}));
   });
 
+  it('sends an empty context name on v3, because absent is the one value refused', () => {
+    // Measured on 5.1.x: `contextName` absent is 422 "Required value", `""` is 201, and `engineId`
+    // is the other way round -- absent is fine, `""` is 422 `validate.minLength`. So one of the two
+    // is named here and the other must not be.
+    expect(snmp.sendEmpty).toEqual(['contextName']);
+  });
+
+  it('never names a field in both sendEmpty and hidden', () => {
+    // A hidden field has no control to be empty; naming it in both says one of the two is wrong.
+    Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
+      const hidden = new Set(layout.hidden ?? []);
+      (layout.sendEmpty ?? []).forEach(id =>
+        expect(hidden.has(id)).withContext(`${modelType}.${id}`).toBe(false));
+    });
+  });
+
   it('gates no field on a field that is itself gated', () => {
     // A gate hides a row and keeps its control, so a rule reading a gated field reads a value the
     // operator can no longer see. Gating `authPassphrase` on `authProtocol` is the precise

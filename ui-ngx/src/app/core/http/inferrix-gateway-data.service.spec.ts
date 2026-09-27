@@ -86,7 +86,11 @@ describe('InferrixGatewayService data sources and points', () => {
     service.saveDataSource(DEVICE, dataSource).subscribe(result => saved = result);
 
     const request = httpMock.expectOne(proxy('/v2/data-source/DS_1'));
-    expect(request.request.method).toBe('PUT');
+    // PATCH rather than PUT, and not as a preference. A `writeOnly` field is never returned by the
+    // gateway, and `DatasourceResource.update` builds a fresh VO from the PUT body alone -- so a
+    // read-modify-write PUT stores null over every secret on the row. PATCH resolves against the
+    // stored model, so a key the body omits keeps what the gateway holds.
+    expect(request.request.method).toBe('PATCH');
     // The xid stays in the body as well as the URL. The gateway's own identifier is what every
     // point, event detector and publisher refers to this data source by, so a save that dropped
     // or reassigned it would orphan all of them.
@@ -106,7 +110,7 @@ describe('InferrixGatewayService data sources and points', () => {
 
   it('creates against the collection when told to, even carrying an xid', () => {
     // The add form offers the xid field so an operator can name the row, and the gateway accepts a
-    // caller-chosen xid on a create. Reading the verb off the xid alone made that a PUT against
+    // caller-chosen xid on a create. Reading the verb off the xid alone made that an update against
     // something that does not exist yet: 404, dialog closed, nothing saved.
     service.saveDataSource(DEVICE, {xid: 'MY_OWN_XID', name: 'New', modelType: 'MODBUS_IP.DS'},
       undefined, true).subscribe();
@@ -158,6 +162,8 @@ describe('InferrixGatewayService data sources and points', () => {
     };
     service.saveDataPoint(DEVICE, point).subscribe();
     const request = httpMock.expectOne(proxy('/v2/data-point/DP_1'));
+    // Same verb and the same reason as a data source: a locator carries `writeOnly` fields too.
+    expect(request.request.method).toBe('PATCH');
     expect(request.request.body.pointLocator.offset).toBe(40001);
     expect(request.request.body.pointLocator.modelType).toBe('MODBUS.PL');
     request.flush({...point});

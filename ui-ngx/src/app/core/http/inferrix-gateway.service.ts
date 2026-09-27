@@ -180,16 +180,33 @@ export class InferrixGatewayService {
    *
    * `create` says which verb to use, because the xid cannot. The gateway accepts a caller-chosen
    * xid on `POST`, and the add dialog offers the field for exactly that — so inferring the verb
-   * from the xid being present turned an operator who typed one into a `PUT` against something
+   * from the xid being present turned an operator who typed one into an update against something
    * that does not exist yet, which answers 404 and saves nothing. Left inferred when not passed,
    * for a caller that only ever edits.
+   *
+   * **An update is a `PATCH`, not a `PUT`, and that is about credentials rather than style.** A
+   * `writeOnly` field — an SNMP community string, an MQTT broker password — is accepted by the
+   * gateway and never returned by it, so no client can read one back to send it again.
+   * `DatasourceResource.update` answers a `PUT` with `service.update(xid, model.toVO())`, building
+   * a **fresh** VO from the request body alone: every field the body omits is stored as null. So a
+   * read-modify-write `PUT` — which is what editing a form is — silently erases every secret on the
+   * row and takes the data source offline at its next poll, with nothing in either UI saying so.
+   * Measured on `inferrix-stack-v5.1.x`: a `GET` of a v3 SNMP source returns none of its four
+   * credentials, and a `PUT` of exactly that body answers 200. Filed as **D68**.
+   *
+   * `PATCH` resolves its argument through `PartialUpdateArgumentResolver`, which maps the *stored*
+   * VO to a model — `fromVO` copies the secrets — and then applies the body over it with
+   * `readerForUpdating`. An absent key therefore keeps what the gateway holds, which is the whole
+   * contract {@link GatewayModelDialogComponent.keep} was written against. Everything else is
+   * unchanged: the dialog sends every other key explicitly on an edit, empty included, so a field
+   * cleared on purpose still reaches the gateway as one.
    */
   public saveDataSource(deviceId: string, dataSource: GatewayDataSource,
                         config?: RequestConfig,
                         create?: boolean): Observable<GatewayDataSource> {
     return (create ?? !dataSource.xid)
       ? this.proxy<GatewayDataSource>(deviceId, 'POST', '/v2/data-source', dataSource, config)
-      : this.proxy<GatewayDataSource>(deviceId, 'PUT',
+      : this.proxy<GatewayDataSource>(deviceId, 'PATCH',
           `/v2/data-source/${encodeURIComponent(dataSource.xid)}`, dataSource, config);
   }
 
@@ -324,12 +341,16 @@ export class InferrixGatewayService {
       null, config);
   }
 
-  /** `create` for the reason {@link saveDataSource} takes one: a point's add form offers the xid too. */
+  /**
+   * `create` for the reason {@link saveDataSource} takes one: a point's add form offers the xid too.
+   * `PATCH` for the same reason as well — a locator carries `writeOnly` fields of its own, and a
+   * `PUT` would null every one the gateway would not let us read back.
+   */
   public saveDataPoint(deviceId: string, point: GatewayDataPoint,
                        config?: RequestConfig, create?: boolean): Observable<GatewayDataPoint> {
     return (create ?? !point.xid)
       ? this.proxy<GatewayDataPoint>(deviceId, 'POST', '/v2/data-point', point, config)
-      : this.proxy<GatewayDataPoint>(deviceId, 'PUT',
+      : this.proxy<GatewayDataPoint>(deviceId, 'PATCH',
           `/v2/data-point/${encodeURIComponent(point.xid)}`, point, config);
   }
 

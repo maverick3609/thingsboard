@@ -248,7 +248,7 @@ consulted.
 | 7 | `META.DS` | `META.PL` | **done** — 2026-09-27; parked 2026-09-26 pending A23, answered and laid out the same day; needs an on-screen pass |
 | 8 | `SNMP.DS` | `SNMP.PL` | **done** — 2026-09-26; **D60-D64 fixed** 2026-09-27, and verifying that turned up **D68-D70** and two fixes on our side; point form still needs an on-screen pass |
 | 9 | `MQTT.DS` | `MQTT.PL` | **done** — 2026-09-28; **D71-D73** filed, and D73 forced a correction to the 2026-09-27 verb change; needs an on-screen pass |
-| 10 | `HTTP_RECEIVER.DS` | `HTTP_RECEIVER.PL` | "HTTP" is two types on this stack; both are in scope |
+| 10 | `HTTP_RECEIVER.DS` | `HTTP_RECEIVER.PL` | **done** — 2026-09-28; **D74-D75** filed; needs an on-screen pass |
 | 11 | `HTTP_JSON_RETRIEVER.DS` | `HTTP_JSON_RETRIEVER.PL` | the other half of 10 |
 | 12 | `INTERNAL.DS` | `INTERNAL.PL` | 1 live; deferred behind the protocols above |
 | 13 | `MESH_CONTROLLER.DS` | — | 1 live |
@@ -1017,6 +1017,54 @@ point edit only after the verb was corrected. 72 layout, 40 schema, 10 renderer 
 green. Sixteen probe rows deleted; the instance is back to the 21 data sources it started with. The
 on-screen pass is owed with rows 6, 7 and 8.
 
+### 10 — `HTTP_RECEIVER.DS` / `HTTP_RECEIVER.PL` (done, 2026-09-28)
+
+**The whole data source is an access list.** There is no connection to configure and no poll — the
+gateway runs a servlet and devices POST to it — so once the platform strips the identity fields, the
+two descriptions and the four the points table owns, the form is `ipWhiteList`, `deviceIdWhiteList`
+and nothing else. The smallest type worked so far, and the one where the two fields left are the
+security boundary.
+
+**Both lists are seeded because an absent one is a 500.** `validate` iterates each array with no null
+check and `toVO` copies the model's field straight across, so a body omitting either throws inside
+the validator. `HttpReceiverDataSourceVO` starts on `*.*.*.*` and `*`, which is what the layout seeds
+— the D54 family again: the defaults exist and the model cannot reach them. Filed as **D74**.
+
+**An empty list is accepted and then drops every request**, which is the part worth being careful
+about. `ipWhiteListCheck` walks the array and returns false having found no match, and
+`globWhiteListMatchIgnoreCase` answers false for a zero-length array before looking at anything. So
+deleting every row in the editor saves 201 and produces a receiver that silently rejects everything.
+Filed as **D75**.
+
+Cortex cannot make these `required`: they are arrays, rendered by the shared array editor, and a
+required-field validator needs a control. What it can do is seed them permissive and say the trap in
+the label — "Allowed IPs (empty allows none)" — because the schema carries **no description for
+either field**, so there is no hint channel to put it in. That is the second type in a row where the
+label is doing a hint's job (MQTT was the first); if a third turns up, a `hints` layout key is
+probably worth the six lines.
+
+**The point is one field.** `parameterName` is matched against the keys of whatever was posted, and
+`validate` refuses an empty one, so it is `required` rather than left to the round trip. `dataType` is
+seeded for convenience rather than to avoid a crash: this is the **first locator whose validator
+actually checks it** (`DataTypes.CODES.isValidId`), so an absent one is a clean 422 naming the field
+rather than the silent `-1` of D65 — and the message says `dataType`, the client's name, not
+`dataTypeId`.
+
+`binary0Value` is gated on BINARY, the same field and the same rule as `SNMP.PL`:
+`HttpReceiverDataSourceRT` compares the posted string against it only when the data type is BINARY
+**and** it is non-empty, and parses by type otherwise. `settable` is hidden because `isSettable()`
+returns a hard `false` — a receiver is pushed to, never written to — and a submitted `true` is
+accepted and ignored.
+
+**Not built, and noted rather than guessed at:** the form says nothing about *where* devices should
+POST. That is the one thing an operator opening this type actually needs, and it is a computed value
+rather than a field, so no layout key reaches it. Worth a decision of its own.
+
+**Verified.** Both add bodies 201 against the fixed build, the source's edit 200 on `PATCH` and the
+point's 200 on `PUT`, `settable` reading back `false` after a submitted `true`. 76 layout and 40
+schema specs green. Fourteen probe rows deleted; the instance is back to the 21 data sources it
+started with. On-screen pass owed with rows 6-9.
+
 ## Per-type components
 
 Settled 2026-09-25, after the question was raised directly: **is one renderer for 148 model types
@@ -1121,6 +1169,15 @@ changed.
   editing an MQTT sender without erasing its credential.
 
   Written up in `Inferrix-stack/docs/specs/2026-09-28-mqtt-rest-surface.md`.
+
+- **D74 (P1)** — an `HTTP_RECEIVER.DS` body omitting `ipWhiteList` or `deviceIdWhiteList` answers
+  **500**: `validate` iterates each array and `toVO` copies a null model field across. The VO has the
+  defaults (`*.*.*.*`, `*`) and the model cannot reach them.
+- **D75 (P2)** — an **empty** whitelist saves 201 and then rejects every request, because both
+  matchers answer false for a zero-length array. Reachable by deleting rows in a form, with nothing on
+  the data source to say what happened.
+
+  Written up in `Inferrix-stack/docs/specs/2026-09-28-http-receiver-whitelists.md`.
 
 - **W11 (P1)** — a multistate virtual point cannot be configured at all. The template switches on
   `'MULTISTATE'`, a case its own dropdown can never emit (it emits `INCREMENT_MULTISTATE`), so the

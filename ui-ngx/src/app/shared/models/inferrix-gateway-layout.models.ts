@@ -1067,6 +1067,61 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
       subscribeTopicType: 'INFERRIX_JSON', publishQosType: 'ATLEAST_ONCE'},
     rows: [['publishTopic', 'publishTopicType'], ['publishQosType'],
       ['subscribeTopic', 'subscribeTopicType']]
+  },
+
+  /**
+   * An HTTP receiver: what the gateway lets push to it.
+   *
+   * The whole type is an access list. There is no connection to configure and no poll -- the gateway
+   * runs a servlet and devices POST to it -- so after the platform strips the identity, the
+   * descriptions and the four the points table owns, the form is the two lists and nothing else.
+   *
+   * **Both are seeded because an absent one is a 500 rather than a message.**
+   * `HttpReceiverDataSourceDefinition.validate` does `for (String ipmask : vo.getIpWhiteList())` over
+   * each, and `toVO` copies the model's field straight across -- so a body that omits either throws
+   * inside the validator (measured; **D74**). `HttpReceiverDataSourceVO` starts on `*.*.*.*` and `*`,
+   * which is what is seeded here.
+   *
+   * **An empty list is accepted and rejects everything**, which is why both labels say so.
+   * `InetAddressUtilities.ipWhiteListCheck` walks the array and returns false having found no match,
+   * and `globWhiteListMatchIgnoreCase` answers false for a zero-length array before looking at
+   * anything -- so an operator who deletes every row gets a receiver that silently drops every
+   * request, and the gateway saves it 201. The lists are delegated arrays, so {@link required} cannot
+   * reach them: a validator needs a control, and an array has none.
+   *
+   * The masks are dotted quads with `*` wildcards and **not CIDR**: `10.0.0.*` and `10.0.0.7` are
+   * accepted, `10.0.0.0/8` is refused with *"Integer parsing error in '0/8'"*.
+   */
+  'HTTP_RECEIVER.DS': {
+    defaults: {ipWhiteList: ['*.*.*.*'], deviceIdWhiteList: ['*']}
+  },
+
+  /**
+   * An HTTP receiver point: which parameter of the pushed body it reads.
+   *
+   * `parameterName` is the whole locator -- `HttpReceiverDataSourceRT` matches it against the keys of
+   * whatever was posted -- and `validate` refuses an empty one, so it is {@link required} rather than
+   * left to the round trip.
+   *
+   * `dataType` is seeded for convenience rather than to avoid a crash: this is the one locator so far
+   * whose validator checks it (`DataTypes.CODES.isValidId`), so an absent one is a clean 422 naming
+   * the field rather than the silent `-1` of **D65**.
+   *
+   * `binary0Value` is gated on BINARY because that is the only branch that reads it:
+   * `HttpReceiverDataSourceRT` compares the posted string against it only when
+   * `dataTypeId == DataTypes.BINARY` **and** it is non-empty, and otherwise parses the string by data
+   * type. Same field and same rule as `SNMP.PL`.
+   *
+   * `settable` is hidden because `isSettable()` returns a hard `false` -- a receiver is pushed to,
+   * never written to -- and a submitted `true` is accepted and ignored. `relinquishable` is not read
+   * by `toVO` at all.
+   */
+  'HTTP_RECEIVER.PL': {
+    hidden: ['settable', 'relinquishable', 'configurationDescription'],
+    required: ['parameterName'],
+    visibleWhen: {binary0Value: {by: 'dataType', values: ['BINARY']}},
+    defaults: {dataType: 'NUMERIC', binary0Value: '0'},
+    rows: [['parameterName', 'dataType']]
   }
 };
 

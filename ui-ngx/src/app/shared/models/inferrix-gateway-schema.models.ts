@@ -123,6 +123,13 @@ const FIELD_LABELS: {[property: string]: string} = {
   ioLogFileSizeMBytes: 'I/O log file size (MB)',
   maxHistoricalIOLogs: 'Max Historical IO Logs',
   binary0Value: 'Binary 0 Value',
+  // An HTTP receiver's two access lists. Both humanise to "Ip white list" / "Device id white list",
+  // and both need the trap said out loud: the gateway accepts an empty list and then rejects every
+  // request, because `ipWhiteListCheck` walks the array and finds no match and
+  // `globWhiteListMatchIgnoreCase` answers false for a zero-length one. There is no hint channel --
+  // the schema carries no description for either -- so the label carries it.
+  ipWhiteList: 'Allowed IPs (empty allows none)',
+  deviceIdWhiteList: 'Allowed device IDs (empty allows none)',
   // A virtual point's simulator settings. All five are declared on `VIRTUAL.PL` and on no other
   // model in the document, so naming them here cannot reach a field that means something else.
   // The gateway's own labels, except that it calls `maxChange` "Minimum Change" on the attractor

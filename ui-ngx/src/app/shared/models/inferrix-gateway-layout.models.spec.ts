@@ -541,6 +541,31 @@ describe('gateway form layouts', () => {
     });
   });
 
+  const receiver = GATEWAY_FORM_LAYOUTS['HTTP_RECEIVER.DS'];
+  const receiverPoint = GATEWAY_FORM_LAYOUTS['HTTP_RECEIVER.PL'];
+
+  it('seeds both receiver lists on what the VO starts on, because an absent one is a 500', () => {
+    // `validate` iterates each array, and `toVO` copies the model's field straight across -- so an
+    // omitted list throws inside the validator. `HttpReceiverDataSourceVO` starts on these two.
+    expect(receiver.defaults).toEqual({ipWhiteList: ['*.*.*.*'], deviceIdWhiteList: ['*']});
+  });
+
+  it('asks a receiver point for the parameter it reads, and nothing else', () => {
+    // `parameterName` is the whole locator and `validate` refuses an empty one. `dataType` is
+    // seeded for convenience: this validator checks it, so an absent one is a 422 rather than -1.
+    expect(receiverPoint.required).toEqual(['parameterName']);
+    expect(receiverPoint.defaults.dataType).toBe('NUMERIC');
+    expect(receiverPoint.hidden).toEqual(['settable', 'relinquishable', 'configurationDescription']);
+  });
+
+  it('shows binary0Value only on a binary point, on both types that carry it', () => {
+    // `HttpReceiverDataSourceRT` and `SnmpPointLocatorRT` each read it only when the data type is
+    // BINARY, and parse the raw value by type otherwise.
+    [receiverPoint, snmpPoint].forEach(layout =>
+      expect(layout.visibleWhen.binary0Value).toEqual({by: 'dataType', values: ['BINARY']}));
+    expect(receiverPoint.defaults.binary0Value).toBe('0');
+  });
+
   it('never makes a gated field required', () => {
     // A gate hides the row and keeps the control, validator included. A required field whose gate is
     // closed leaves the save blocked by a control that is not on screen, with nothing to fill in.

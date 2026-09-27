@@ -34,3 +34,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `ca21b1010c` feat(gateway): give a meta point a script box and a point picker
 - [ ] `233eefa2e3` fix(gateway): stop an edit from erasing a credential the gateway will not show
 - [ ] `33264c14a0` feat(gateway): lay out an MQTT source and its point, and refuse what the broker cannot parse
+- [ ] `d7791ea3a8` feat(gateway): lay out an HTTP receiver around the two lists that are its security

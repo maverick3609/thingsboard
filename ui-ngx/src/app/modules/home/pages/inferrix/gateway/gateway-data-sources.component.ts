@@ -17,7 +17,7 @@ import { GATEWAY_DATA_SOURCE_HIDDEN_FIELDS, GATEWAY_IDENTITY_FIELDS, GATEWAY_REP
   GatewayPage } from '@shared/models/inferrix-gateway-data.models';
 import { componentToFormProperties, GatewaySchemaDocument,
   schemaToFormProperties } from '@shared/models/inferrix-gateway-schema.models';
-import { gatewayFormLayout } from '@shared/models/inferrix-gateway-layout.models';
+import { gatewayFormDefaults, gatewayFormLayout } from '@shared/models/inferrix-gateway-layout.models';
 import { FormProperty } from '@shared/models/dynamic-form.models';
 
 /**
@@ -108,7 +108,7 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
     // Seeded onto the model for the reason a point's locator is, below: a serial source whose
     // line settings the operator never opened must still post them, because the gateway converts
     // each with `Enum.valueOf` and answers an absent one with a null-pointer exception.
-    this.open({...(gatewayFormLayout(type.type)?.defaults ?? {}),
+    this.open({...gatewayFormDefaults(type.type),
       modelType: type.type, enabled: false},
       this.translate.instant('inferrix.gateway.add-data-source'), []);
   }
@@ -200,7 +200,7 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
         const locator = this.locatorType(model, rows);
         this.editPoint(model, {
           dataSourceXid: model.xid, enabled: false,
-          pointLocator: {...(gatewayFormLayout(locator)?.defaults ?? {}), modelType: locator}
+          pointLocator: {...gatewayFormDefaults(locator), modelType: locator}
         }, rows);
       },
       edit: row => this.editPoint(model, row, rows),

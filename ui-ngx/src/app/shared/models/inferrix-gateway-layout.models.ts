@@ -1138,3 +1138,16 @@ export const gatewayFormLayout = (modelType: string): GatewayFormLayout | undefi
   typeof modelType === 'string'
     && Object.prototype.hasOwnProperty.call(GATEWAY_FORM_LAYOUTS, modelType)
     ? GATEWAY_FORM_LAYOUTS[modelType] : undefined;
+
+/**
+ * What a new model of this type starts with, as a fresh object every time.
+ *
+ * A copy rather than the table's own value, because a caller spreads this onto a model an editor then
+ * edits. A shallow spread of {@link GatewayFormLayout.defaults} copies its keys and **shares its
+ * values**, so `HTTP_RECEIVER.DS`'s seeded `['*.*.*.*']` would be the very same array on every new
+ * receiver in the session -- and one editor that mutated it in place would rewrite the table for all
+ * of them. ThingsBoard's own array editor rebuilds rather than mutates, so nothing does that today;
+ * this is one line for a class of bug that is invisible until it corrupts a form nobody touched.
+ */
+export const gatewayFormDefaults = (modelType: string): {[id: string]: any} =>
+  structuredClone(gatewayFormLayout(modelType)?.defaults ?? {});

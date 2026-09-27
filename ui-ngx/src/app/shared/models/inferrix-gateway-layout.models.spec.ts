@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright The Inferrix Authors
 // SPDX-License-Identifier: Apache-2.0
 import { FormPropertyType } from '@shared/models/dynamic-form.models';
-import { GATEWAY_FORM_LAYOUTS,
+import { GATEWAY_FORM_LAYOUTS, gatewayFormDefaults,
   gatewayFormLayout } from '@shared/models/inferrix-gateway-layout.models';
 
 /**
@@ -543,6 +543,21 @@ describe('gateway form layouts', () => {
 
   const receiver = GATEWAY_FORM_LAYOUTS['HTTP_RECEIVER.DS'];
   const receiverPoint = GATEWAY_FORM_LAYOUTS['HTTP_RECEIVER.PL'];
+
+  it('hands out a fresh copy of the defaults, never the table\'s own values', () => {
+    // A caller spreads these onto a model an editor edits, and a shallow spread shares the values.
+    // Without the copy the seeded array would be the same instance on every new receiver.
+    const first = gatewayFormDefaults('HTTP_RECEIVER.DS');
+    const second = gatewayFormDefaults('HTTP_RECEIVER.DS');
+    expect(first).toEqual(second);
+    expect(first.ipWhiteList).not.toBe(second.ipWhiteList);
+    expect(first.ipWhiteList).not.toBe(GATEWAY_FORM_LAYOUTS['HTTP_RECEIVER.DS'].defaults.ipWhiteList);
+    first.ipWhiteList.push('10.0.0.1');
+    expect(GATEWAY_FORM_LAYOUTS['HTTP_RECEIVER.DS'].defaults.ipWhiteList).toEqual(['*.*.*.*']);
+    // And an answer for a type with no entry, since every add site calls this unconditionally.
+    expect(gatewayFormDefaults('NO_SUCH.DS')).toEqual({});
+    expect(gatewayFormDefaults('constructor')).toEqual({});
+  });
 
   it('seeds both receiver lists on what the VO starts on, because an absent one is a 500', () => {
     // `validate` iterates each array, and `toVO` copies the model's field straight across -- so an

@@ -21,3 +21,13 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `bc80c34043` feat(gateway): configure points inside their parent, and add publishers
 - [ ] `0a20f55230` feat(gateway): let the broker address be changed from Cortex
 - [ ] `5da7be3e66` feat(controller): choose every enumerated config value, and say why Apply failed
+- [ ] `0c07436a86` feat(controller): pick a point's channel, and name what QoS means
+- [ ] `da58696668` feat(gateway): open a data source form on what the operator came for
+- [ ] `d732e61eea` feat(gateway): show a virtual point the five fields it actually has
+- [ ] `9aadbf192f` feat(gateway): stop offering to edit what a mesh node reports
+- [ ] `0c577a9cff` feat(gateway): let a protocol bring a component, not just a layout
+- [ ] `f0063b3bb9` feat(gateway): lay out a Modbus/IP source and its point the way the protocol works
+- [ ] `8241c60f97` feat(gateway): give a Modbus serial line the settings it actually has
+- [ ] `90631c3e09` feat(gateway): let a BACnet point say which object it reads, and how
+- [ ] `03403f4d9a` feat(gateway): give BACnet MS/TP the BACnet form, and the locator type the gateway withholds
+- [ ] `c2c8ed9744` feat(gateway): lay out an SNMP source around its version, and stop an add from becoming an update

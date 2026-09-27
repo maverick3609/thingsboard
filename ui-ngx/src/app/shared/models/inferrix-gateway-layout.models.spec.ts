@@ -101,7 +101,10 @@ describe('gateway form layouts', () => {
       'writePriority',
       // SNMP. The first two are `String` on the REST model, mapped through a code table rather than
       // an enum; the two protocols are real enums, relabelled rather than narrowed.
-      'snmpVersion', 'setType', 'authProtocol', 'privProtocol']);
+      'snmpVersion', 'setType', 'authProtocol', 'privProtocol',
+      // Meta. Both are `String` on the REST model over an `ExportCodes` table, relabelled in the
+      // gateway's own words rather than narrowed.
+      'updateEvent', 'contextUpdateEvent']);
     Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
       [...Object.keys(layout.options ?? {}), ...Object.keys(layout.gatedOptions ?? {})]
         .forEach(id => expect(scalars.has(id)).withContext(`${modelType}.${id}`).toBe(true));
@@ -390,6 +393,76 @@ describe('gateway form layouts', () => {
       .filter(([modelType]) => modelType !== 'BACNET_MSTP.DS')
       .forEach(([modelType, layout]) =>
         expect(layout.pointLocatorType).withContext(modelType).toBeUndefined());
+  });
+
+  const metaPoint = GATEWAY_FORM_LAYOUTS['META.PL'];
+
+  it('gives a meta script the box a script needs, which the schema cannot ask for', () => {
+    // Declared `{"type": "string"}` with no `format`, so the mapper's single-line text box is the
+    // right reading of the schema and the wrong control for a JavaScript body.
+    expect(metaPoint.types.script).toBe(FormPropertyType.textarea);
+  });
+
+  it('offers the eight update events MetaPointLocatorVO registers, NONE first', () => {
+    // `UPDATE_EVENT_CODES` in registration order. `NONE` shares its id (0) with
+    // `UPDATE_EVENT_CONTEXT_UPDATE` and is labelled `dsEdit.meta.event.context`, which is why it
+    // reads "Context update" rather than "None" -- a point on it runs when its context does.
+    expect(metaPoint.options.updateEvent.map(item => item.value))
+      .toEqual(['NONE', 'MINUTES', 'HOURS', 'DAYS', 'WEEKS', 'MONTHS', 'YEARS', 'CRON']);
+    expect(metaPoint.options.updateEvent[0].label).toBe('Context update');
+    expect(metaPoint.options.contextUpdateEvent.map(item => item.value))
+      .toEqual(['CONTEXT_UPDATE', 'CONTEXT_CHANGE', 'CONTEXT_LOGGED']);
+  });
+
+  it('asks for a cron pattern on CRON and on nothing else', () => {
+    // The only one of the eight that brings a field with it. `validate` parses the pattern only on
+    // CRON -- measured: junk in it is accepted while the event is NONE.
+    expect(metaPoint.visibleWhen).toEqual({updateCronPattern: {by: 'updateEvent', values: ['CRON']}});
+  });
+
+  it('hides the meta locator fields the gateway derives, ignores or decides', () => {
+    // `isSettable()` returns a hard false, `toVO` never reads `relinquishable`,
+    // `getConfigurationDescription()` is the script's first 40 characters, and `scriptEngine` is a
+    // one-value enum. `scriptPermissions` is hidden so the form cannot ask for an unconfined engine.
+    expect(metaPoint.hidden).toEqual(['settable', 'relinquishable', 'configurationDescription',
+      'scriptEngine', 'scriptPermissions']);
+  });
+
+  it('sends the two fields whose absent value is -1 rather than a default', () => {
+    // Both map through `ExportCodes.getId`, which answers -1 for a value it cannot find -- and
+    // `getId(null)` finds nothing. Measured on 5.1.x: a locator posted without either is accepted
+    // 201 and reads back with `dataType: null` and `scriptEngine: null`. Hiding `scriptEngine`
+    // therefore means defaulting it, not dropping it.
+    expect(metaPoint.defaults.scriptEngine).toBe('JAVASCRIPT');
+    expect(metaPoint.defaults.dataType).toBe('NUMERIC');
+    expect(metaPoint.hidden).toContain('scriptEngine');
+  });
+
+  it('starts a meta point on what MetaPointLocatorVO starts on', () => {
+    // The VO's own field initialisers, which Jackson applies only where the key is absent:
+    // `variableName = "my"`, `logLevel = NONE`, `logSize = 1.0F`, `logCount = 5`,
+    // `contextUpdateEvent = 0` (CONTEXT_UPDATE). All four are defaultable on 5.1.x and seeded here
+    // so the form shows what the gateway would have chosen.
+    expect(metaPoint.defaults.variableName).toBe('my');
+    expect(metaPoint.defaults.logLevel).toBe('NONE');
+    expect(metaPoint.defaults.logSize).toBe(1);
+    expect(metaPoint.defaults.logCount).toBe(5);
+    expect(metaPoint.defaults.contextUpdateEvent).toBe('CONTEXT_UPDATE');
+    // Not defaultable, and the one the whole form hangs off: an absent `updateEvent` is refused
+    // with "Invalid value", so it is seeded whatever else is.
+    expect(metaPoint.defaults.updateEvent).toBe('NONE');
+  });
+
+  it('keeps the script and its trigger on the form and the log under Advanced', () => {
+    expect(metaPoint.advanced)
+      .toEqual(['executionDelaySeconds', 'logLevel', 'logSize', 'logCount']);
+    expect(metaPoint.rows.flat()).not.toContain('script');
+  });
+
+  it('gives the meta data source nothing to arrange', () => {
+    // Every field it declares is one the platform strips: identity, the descriptions, and the four
+    // the points table owns. Present so the type counts as worked through.
+    expect(GATEWAY_FORM_LAYOUTS['META.DS']).toEqual({});
   });
 
   const snmp = GATEWAY_FORM_LAYOUTS['SNMP.DS'];

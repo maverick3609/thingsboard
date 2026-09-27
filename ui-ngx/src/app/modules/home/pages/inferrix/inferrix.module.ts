@@ -39,6 +39,7 @@ import { GatewayPublishersComponent }
 import { GatewayProvisioningComponent }
   from '@home/pages/inferrix/gateway/gateway-provisioning.component';
 import { GatewayFormComponent } from '@home/pages/inferrix/gateway/gateway-form.component';
+import { MetaPointFormComponent } from '@home/pages/inferrix/gateway/meta-point-form.component';
 import { VirtualPointFormComponent } from '@home/pages/inferrix/gateway/virtual-point-form.component';
 import { BacnetDataSourceFormComponent }
   from '@home/pages/inferrix/gateway/bacnet-data-source-form.component';
@@ -95,6 +96,7 @@ import { WidgetSettingsCommonModule }
     GatewayPublishersComponent,
     GatewayProvisioningComponent,
     GatewayFormComponent,
+    MetaPointFormComponent,
     VirtualPointFormComponent,
     BacnetDataSourceFormComponent,
     BacnetPointFormComponent,

@@ -6,7 +6,8 @@ import { ControlValueAccessor, NG_VALIDATORS, NG_VALUE_ACCESSOR, UntypedFormBuil
   UntypedFormControl, UntypedFormGroup, ValidatorFn, Validators } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { coerceBoolean } from '@shared/decorators/coercion';
-import { FormProperty, FormPropertyType, FormSelectItem } from '@shared/models/dynamic-form.models';
+import { FormFieldSetProperty, FormProperty, FormPropertyType,
+  FormSelectItem } from '@shared/models/dynamic-form.models';
 import { GATEWAY_ADVANCED_GROUP } from '@shared/models/inferrix-gateway-schema.models';
 import { GatewayFormLayout } from '@shared/models/inferrix-gateway-layout.models';
 
@@ -107,6 +108,9 @@ export class GatewayFormComponent implements ControlValueAccessor, OnChanges {
   /** The same, for the `properties` input: a new array each pass would reset the form it built. */
   delegatedProperties: {[id: string]: FormProperty[]} = Object.create(null);
 
+  /** Which looked-up list is already on which nested field. See {@link applyNestedOptions}. */
+  private nestedApplied: {[key: string]: FormSelectItem[]} = Object.create(null);
+
   protected value: {[id: string]: any} = {};
   protected shown: FormProperty[] = [];
   private propagateChange: (value: any) => void = () => {};
@@ -196,6 +200,7 @@ export class GatewayFormComponent implements ControlValueAccessor, OnChanges {
     // the gateway chose, and `{}` would answer `constructor` with a function.
     this.slices = Object.create(null);
     this.delegatedProperties = Object.create(null);
+    this.nestedApplied = Object.create(null);
     const hidden = new Set(this.layout?.hidden ?? []);
     this.shown = (this.properties ?? []).filter(property => !hidden.has(property.id))
       .map(property => this.withLayout(property));
@@ -246,8 +251,23 @@ export class GatewayFormComponent implements ControlValueAccessor, OnChanges {
     // `disabled` is already how the mapper marks a `readOnly` field, so a layout naming one adds
     // to that set rather than introducing a second way of saying it.
     const disabled = property.disabled || (this.layout?.readonly ?? []).includes(property.id);
+    const retyped = {...property, disabled, type: this.laidOutType(property)};
     return items && this.narrowable(property)
-      ? {...property, disabled, type: FormPropertyType.select, items} : {...property, disabled};
+      ? {...retyped, type: FormPropertyType.select, items} : retyped;
+  }
+
+  /**
+   * The type the layout asks for, where it asks for one this component can lay out.
+   *
+   * Only ever a move between the types rendered here -- a `text` that is really a script body
+   * becoming a `textarea`. Refusing anything else is what keeps a layout from replacing a delegated
+   * field's editor with a control that cannot hold its value: `build` types the control from what
+   * this returns, so an array turned into a textarea would lose its rows on the first keystroke.
+   */
+  private laidOutType(property: FormProperty): FormPropertyType {
+    const type = own(this.layout?.types, property.id);
+    return type && RENDERED_TYPES.includes(type) && RENDERED_TYPES.includes(property.type)
+      ? type : property.type;
   }
 
   /**
@@ -269,6 +289,11 @@ export class GatewayFormComponent implements ControlValueAccessor, OnChanges {
    * the one thing it cannot describe. `VIRTUAL.PL.attractionPointXid` is the first -- the choices
    * are every numeric point on the gateway, which is an HTTP call, so the type gets a component.
    *
+   * A key of the form `array.field` names a field *inside* a delegated array's rows instead --
+   * `META.PL`'s `context.xid` is another point on the gateway, one per context entry. The two cannot
+   * be confused: the mapper's `PROPERTY_NAME` admits no dot, so no top-level property can be called
+   * `context.xid`.
+   *
    * Consulted on every layout pass rather than when controls are built, so a list arriving after
    * the form is on screen turns the field from a text box into a select without disturbing what the
    * operator has already typed elsewhere.
@@ -281,6 +306,36 @@ export class GatewayFormComponent implements ControlValueAccessor, OnChanges {
   protected refresh(): void {
     this.layoutRows();
     this.cd.markForCheck();
+  }
+
+  /**
+   * Puts a looked-up option list on a field inside a delegated array's rows.
+   *
+   * `tb-dynamic-form` builds each row of an array of objects by cloning the *array* property and
+   * swapping its type for `arrayItemType` (`toPropertyGroups`), so the row's fields are the
+   * `properties` carried on the array itself. Rewriting one there reaches every row, including rows
+   * the operator adds afterwards, without this component knowing anything about how they are drawn.
+   *
+   * Guarded on the list's identity rather than redone each pass. `delegatedProperties[id]` has to
+   * keep the same reference between change-detection passes -- a new array rebuilds the form inside
+   * it -- so a subclass holding its list in one object, as they all do, applies this exactly once.
+   */
+  private applyNestedOptions(): void {
+    Object.entries(this.runtimeOptions()).forEach(([key, items]) => {
+      const dot = key.indexOf('.');
+      if (dot < 0 || this.nestedApplied[key] === items) {
+        return;
+      }
+      const array = this.delegatedProperties[key.slice(0, dot)]?.[0] as FormFieldSetProperty;
+      const nested = array?.properties;
+      const target = nested?.find(child => child.id === key.slice(dot + 1));
+      if (!target || !this.narrowable(target)) {
+        return;
+      }
+      this.nestedApplied[key] = items;
+      this.delegatedProperties[key.slice(0, dot)] = [{...array, properties: nested.map(child =>
+        child === target ? {...child, type: FormPropertyType.select, items} : child)}];
+    });
   }
 
   private gatedProperty(property: FormProperty): FormProperty {
@@ -335,6 +390,7 @@ export class GatewayFormComponent implements ControlValueAccessor, OnChanges {
    * before pairing, so a hidden field does not leave a gap beside its neighbour.
    */
   protected layoutRows(): void {
+    this.applyNestedOptions();
     const advanced = new Set([...(this.layout?.advanced ?? []),
       ...this.shown.filter(property => property.group === GATEWAY_ADVANCED_GROUP)
         .map(property => property.id)]);

@@ -244,9 +244,9 @@ consulted.
 | 3 | `MODBUS_IP.DS` | `MODBUS.PL` | **done** — 2026-09-25 |
 | 4 | `MODBUS_SERIAL.DS` | `MODBUS.PL` | **done** — 2026-09-25; data source only, locator shared with 3 |
 | 5 | `BACNET_IP.DS` | `BACNET_IP.PL` | **done** — 2026-09-26; needs a local device on the gateway first |
-| 6 | `BACNET_MSTP.DS` | `BACNET_MSTP.PL` | **done** — 2026-09-26; forms match 5, but the gateway 500s on every point (**D57**) |
-| 7 | `META.DS` | `META.PL` | **parked** — 2026-09-26; scripting locator, security answer owed (**D58**, **A23**) |
-| 8 | `SNMP.DS` | `SNMP.PL` | **done** — 2026-09-26; v3 unreachable and the rows invisible, both gateway-side (**D61**, **D62**) |
+| 6 | `BACNET_MSTP.DS` | `BACNET_MSTP.PL` | **done** — 2026-09-26; **D57 fixed and A22 answered yes** 2026-09-27, so points work; re-verify after the gateway upgrade |
+| 7 | `META.DS` | `META.PL` | **done** — 2026-09-27; parked 2026-09-26 pending A23, answered and laid out the same day; needs an on-screen pass |
+| 8 | `SNMP.DS` | `SNMP.PL` | **done** — 2026-09-26; **D60-D64 all fixed** 2026-09-27, incl. v3 and the credentials; point form still needs an on-screen pass |
 | 9 | `MQTT.DS` | `MQTT.PL` | `writeOnly` secrets; empty must mean "unchanged" |
 | 10 | `HTTP_RECEIVER.DS` | `HTTP_RECEIVER.PL` | "HTTP" is two types on this stack; both are in scope |
 | 11 | `HTTP_JSON_RETRIEVER.DS` | `HTTP_JSON_RETRIEVER.PL` | the other half of 10 |
@@ -602,6 +602,21 @@ Nothing conditional was added for it. A guard would have to come out again the m
 and supplying the locator type Cortex already knows is as far as it should go before A22 is
 answered.
 
+> **Both closed 2026-09-27, and nothing here has to be undone.** A22 is **yes** — MS/TP is meant to
+> carry points, and the `null` was an unfinished stub rather than a decision, so the Add point button
+> stays. D57 was one method: `BACnetMstpDataSourceVO.createPointLocator()` returned `null` and was
+> *declared* `PointLocatorVO`, and the two symptoms came from those two facts separately — the
+> declared type is what the types listing reads by reflection, and the returned value is what
+> `pointLocatorBelongsToDataSource` dereferenced. This section's localisation was right about where
+> and a little off about how: it read them as one fault rather than two. The separate guard asked for
+> above is in as well, as a 422 naming the field.
+>
+> So the layout's `pointLocatorType` is now a fallback that never fires — `/v2/data-source-types`
+> answers `BACNET_MSTP.PL` on the fixed build, and the gateway's own answer is consulted first. It
+> costs one line and self-deactivates, so it stays until a gateway carrying the fix is the only one
+> Cortex talks to. **Still owed: the on-screen pass for an MS/TP point, which was impossible before
+> this and has not been done since — the gateway has not been upgraded yet.**
+
 **A second proxy bug of our own, same shape as type 5's.**
 `/v2/data-source/default-event-types/{type}` was allowlisted with `TYPE`, which forbids dots — and
 every model type has one (`MODBUS_IP.DS`). The route was 403 for every input it can ever be given.
@@ -625,7 +640,7 @@ nine fields in order, Analog input / present-value / Numeric / multiplier 1, `wr
 with Settable off, and 60 object types in the list. Saving it is what surfaced D57. Console clean
 apart from that 500.
 
-### 7 — `META.DS` / `META.PL` (parked, 2026-09-26)
+### 7 — `META.DS` / `META.PL` (done, 2026-09-27; parked 2026-09-26)
 
 **Read before laid out, and then not laid out.** `META.PL` is a scripting locator: `script`,
 `scriptEngine`, a `context` of other points bound to variable names, `updateEvent` /
@@ -666,6 +681,120 @@ guard is per-route and was written around one payload. A `/v2/data-point` body c
 `META.PL`, `SCRIPTING.PL` or any other locator with a script in it is forwarded unread. Whether
 that becomes a field-level guard, a locator-type refusal, or nothing at all depends on A23, so it
 is not being fixed ahead of the answer — but it should not be discovered a second time.
+
+> **Unparked 2026-09-27. A23 was answered the narrow way, deliberately**, and it resolves the
+> question above: `META.PL` stays writable through `/v2/data-point` under the data-point permission,
+> and the escalation is closed by *validating* the groups rather than by gating the route. So Cortex
+> keeps forwarding the route unread and needs no body guard — a caller can no longer give a script
+> reach they do not have, which is the property the guard would have been protecting. The wider answer
+> (a permission of its own for scripting) sits cleanly on top later and needs nothing undone.
+>
+> D58 turned out smaller than this document claims, and the claim is worth correcting: it is **not**
+> true that "nothing checks the caller holds what they asked for". `MetaDataSourceDefinition.validate`
+> already called `permissionService.hasPermission(user, pl.getScriptRoles().getPermissions())` — in
+> the right place — and **discarded the boolean**. The whole defect was an unused return value. Acting
+> on it needed one real change beyond that: `hasPermission` splits its query on commas and answers
+> true if *any* part matches, so the groups are now checked one at a time, or a caller holding
+> `operators` could have asked for `superadmin,operators` and passed.
+>
+> D59 went further than asked: `logLevel` was defaultable too and was never measured here, and
+> `variableName` **is** defaultable — this document was wrong to call it otherwise, since the VO seeds
+> `my`. `context` stays required, and correctly so.
+>
+> **What the answer requires of the form**, quoted from the resolution: seed the four defaultable
+> fields (`logSize`, `logCount`, `contextUpdateEvent`, `logLevel`) or leave them out — both work now;
+> require at least one `context` entry with `contextUpdate` set when `updateEvent` is `NONE`; and
+> expect a 422 on `scriptPermissions` naming any group the signed-in user does not hold.
+>
+> **What the form still cannot do with a layout**, found on re-reading the schema for this: `script`
+> is `{"type": "string"}` with no `format`, so the mapper renders a JavaScript body in a **single-line
+> text input**, and `context[].xid` is a point reference rendered as a free text box inside a
+> delegated array. Neither is expressible in the layout language — it has no notion of overriding a
+> rendered type, and no notion of a nested field at all. That is the open decision on this type; the
+> rest of it is an ordinary layout.
+
+**Laid out 2026-09-27, against a stack carrying the fixes.** Measured on
+`inferrix-stack-v5.1.x` booted locally on `:8080` rather than over the LAN, since the deployed
+gateway is on a network this machine cannot currently reach — so every number below is from the fixed
+build, and the only thing still owed is the on-screen pass.
+
+**`updateEvent` is the form, and `NONE` does not mean "never".** `MetaPointLocatorVO` registers
+`UPDATE_EVENT_NONE = 0` — the same id as `UPDATE_EVENT_CONTEXT_UPDATE` — and gives it the message key
+`dsEdit.meta.event.context`, "Context update". A point on it runs when a context point it flagged
+changes. That is what makes `validate`'s requirement legible rather than arbitrary, and it is
+conditional in a way neither the schema nor this document had noticed:
+
+| `updateEvent` | `context` | response |
+|---|---|---|
+| `NONE` | one entry, `contextUpdate: true` | **201** |
+| `NONE` | `[]` | **422** `context`: *"No points are set to update context"* |
+| `NONE` | one entry, `contextUpdate: false` | **422** — same |
+| `MINUTES` | `[]` | **201** |
+| `CRON` + pattern | `[]` | **201** |
+
+So the requirement belongs to `NONE` alone. It is **not** expressed on the form: a layout can hide a
+row and narrow a list, and has no word for "this array needs an entry when that select holds this
+value". The gateway's refusal names the field and says why, and the field's own hint — the schema's
+words — says it before the operator gets there. Adding a validator for it is a change to make when an
+operator asks for one.
+
+`updateCronPattern` is gated on `CRON`, which is the one option of the eight that brings a field with
+it. A pattern is only parsed on `CRON`: junk in it is accepted while the event is `NONE` (measured),
+so the gate hiding a stale pattern costs nothing.
+
+**Five fields hidden, for four different reasons.** `isSettable()` returns a hard `false` on this
+locator, so a meta point never takes a write; `toVO` never reads `relinquishable`;
+`configurationDescription` is generated from the script's first 40 characters (confirmed on the read
+back — it comes out as `'return p1.value;'`); `scriptEngine` is a one-value enum with nothing to
+choose. And `scriptPermissions` is hidden **as a decision**: it is what
+`NashornScriptEngineDefinition.createEngine` reads to hand out the confined engine or the one with
+Java access, and an omitted value now means no groups, which is the confined one. The stack validates
+it against the caller's own groups, so this is not the security boundary — it is a browser-reachable
+form declining to ask for Java access. An existing point keeps whatever it was given: the dialog
+spreads the stored model under the form's values, so a hidden field is carried through a save
+untouched. Verified end to end — a `PUT` of the read-back row with only `script` changed answers 200
+with `scriptPermissions` intact.
+
+**Two hidden fields are defaulted rather than dropped, and that is the load-bearing part.** Both
+`dataType` and `scriptEngine` map through `ExportCodes.getId`, which answers **-1** for a value it
+cannot find — and `getId(null)` finds nothing. A locator posted without either is accepted **201**
+and reads back `null`, storing a data type and a script engine that are not constants. Filed as
+**D65** (family-wide: 53 locator models make that call unguarded) and **D66**. The four the stack now
+defaults itself — `variableName` (`my`), `logLevel`, `logSize`, `logCount` — are seeded anyway, so the
+form shows what the gateway would have chosen; `contextUpdateEvent` likewise. `updateEvent` is seeded
+because it is *not* defaultable: an absent one is a 422, `"Invalid value"`.
+
+**The two things a layout could not say, and now can.** Both were the open decision above, and both
+were built rather than deferred:
+
+- **`types`**, a new layout key: `script` becomes a `textarea`. Six lines on the descriptor and one
+  method on the renderer, and the type comes from our own table and never from the device. It only
+  ever moves a field *between* the types the form lays out itself — naming a delegated array there
+  would replace its editor with a control that cannot hold its rows, so such an entry is ignored
+  rather than obeyed.
+- **A looked-up option list on a field inside a delegated array.** `runtimeOptions()` gains a second
+  key shape, `array.field`, and `META.PL.context.xid` becomes a select of every point on the gateway.
+  The rewrite lands on the array property's own `properties`, which is what `tb-dynamic-form` clones
+  per row (`toPropertyGroups`), so every row gets it including rows added afterwards. It is applied
+  once, guarded on the list's identity, because `delegatedProperties[id]` has to keep its reference or
+  the form inside it is rebuilt under the operator. `META.PL` therefore gets a per-type component, the
+  third after `VIRTUAL.PL` and the BACnet pair — the whole of it is one HTTP call.
+
+  A nested `xid` is a data point reference *everywhere* it appears in the schema document — a context
+  variable, the point a detector watches, the point a published point publishes, whose own schema says
+  so in as many words — so it is labelled "Point" in `NESTED_FIELD_LABELS` rather than per type.
+
+**`META.DS` is `{}`.** Every field it declares is one the platform already strips: identity, the two
+descriptions, and the four the points table owns. It has no poll period at all, because a meta point
+is driven by its own `updateEvent`. The entry exists to mark the type as worked through.
+
+**Verified.** 61 layout specs and 8 new renderer specs green — and karma *does* run in this repo when
+`--include` narrows it to one spec file, which is worth knowing after months of assuming otherwise
+(the circular-import crash is a property of the whole-bundle build, not of the runner). The exact body
+the form posts on an add — the nine defaults plus a script and one context entry, with everything
+`keep()` drops on an add left out — answers **201** against the fixed build, and the edit round trip
+answers **200**. The probe source and its eighteen points were deleted afterwards; the instance is back
+to the 21 data sources it started with.
 
 ### 8 — `SNMP.DS` / `SNMP.PL` (done, 2026-09-26)
 
@@ -725,6 +854,37 @@ measured three times, with and without query parameters). The second is why the 
 be opened on screen: a data source Cortex cannot list is one no operator can click. v3 is still
 offered in the picker, for the reason MS/TP's Add point button is still offered — a workaround would
 come out again the moment the mapping is fixed, and the 422 at least names the field.
+
+> **All five closed 2026-09-27, and the paragraph above has D62 wrong.** Nothing about that defect
+> is SNMP-specific, and the rows that vanish are not the SNMP ones. `/v2/data-source` *streams* its
+> array, so a throw from one row's `toModel` ended the array where that row was — the 200 and every
+> row before it were already on the wire, and every row **after** it was lost too, whatever its type.
+> The correct statement is **one unreadable row truncates the tail of the listing**, and the
+> unreadable rows were exactly the null-protocol ones D60 describes. My own probe rows vanished
+> because they sat behind those, not because of anything about SNMP; both alternatives this section
+> offers as the likely cause are wrong. Fixed at both ends: D60 removes the throw, and a skipped row
+> is now left out and logged at ERROR with its class and id while the walk continues.
+>
+> The rest, and what each means for Cortex:
+>
+> - **D61** — v3 is reachable. The version helper now asks `SnmpVersion.values()` instead of a
+>   hand-written switch, so the option in the picker works and the next version added is reachable the
+>   day it is declared. The reason for offering v3 anyway held.
+> - **D64** — the four credentials carry `@JsonProperty(access = WRITE_ONLY)` and `@WriteOnlySecret`,
+>   so the schema now publishes `writeOnly: true` and the gateway merges an absent value against the
+>   stored one. **Cortex needs no change for this**: the mapper already password-types a `writeOnly`
+>   field and the dialog already treats empty as "unchanged", and the two arrive together by
+>   construction, so the blanking hazard this work worried about cannot occur. `readCommunity` is
+>   included, which is right — for v1 and v2c it *is* the authentication.
+> - **D60, D63** — the model initialisers are in, so the layout's `defaults` for the two protocols
+>   and the four locator fields now agree with the model rather than rescuing it. They stay: they are
+>   still what a new row should hold, they are what makes the form correct against a gateway that has
+>   not been upgraded, and `defaults` only fill an absent key. D63 also gained a `setType` validity
+>   check, which catches the misspelling a default cannot.
+> - **A24** — the data-type message now names the client's field.
+>
+> **Still owed: the on-screen pass for an SNMP point**, which D62 made impossible and which the fix
+> makes possible again. Needs the gateway upgraded, or simply the poison rows gone.
 
 **One Cortex bug of our own, found by using the form, and it was never SNMP-specific.**
 `saveDataSource` and `saveDataPoint` chose POST or PUT by whether the model carried an `xid`. The add
@@ -791,11 +951,40 @@ The gateway's own picker is worse than it looks, and W14 records it: its query i
 Closing the paren would return none — `dataTypeId` is not a filterable property; `dataType` is,
 by name.
 
+**The fourth, 2026-09-27: `MetaPointFormComponent`**, and the first whose list does not go on a
+property of the model. A meta point's `context` is an array of `{xid, variableName, contextUpdate}`
+delegated whole to `tb-dynamic-form`, so the field that needs the list is one level down. The hook
+took a second key shape rather than a second hook: `runtimeOptions()` may now answer
+`'context.xid'`, and the renderer puts that list on the array property's own `properties`, which is
+what `tb-dynamic-form` clones for each row. Every row gets the select, rows added afterwards
+included, and the base component still knows nothing about how a row is drawn.
+
+Applied once and guarded on the list's identity, because `delegatedProperties[id]` has to keep its
+reference between change-detection passes or the form inside it is rebuilt under the operator. That
+guard is the part worth a test, and it has one.
+
+Every data type, unlike `VIRTUAL.PL`'s numeric-only attraction target: a script reads a binary
+point as usefully as a numeric one.
+
 ## Handed over
 
 Defects found in the gateway's own webapp while matching its forms. Written up in
 `inferrixstack-webapp/docs/2026-09-25-webapp-open-items.md`; nothing in that repository was
 changed.
+
+- **D65 (P2)** — `DataTypes.CODES.getId(null)` answers `-1`, and **53 locator models** convert
+  `dataType` through it with no guard. A locator posted without one is accepted 201 and stores `-1`,
+  which reads back as `null`. Same family as D54/D56/D59/D63, one level further out: the absent key
+  lands on a code table rather than on a primitive, so `validate` never sees it.
+- **D66 (P3)** — `META.PL.scriptEngine` has exactly one legal value and is still not defaultable, by
+  the same mechanism. Cortex therefore hides the field *and sends it*, because absent is not
+  `JAVASCRIPT`.
+- **D67 (P3, cosmetic)** — four `META.PL` option labels register message keys `i18n_en.properties`
+  does not carry, so the gateway's own form cannot label them. One of the four is the `NONE`/context
+  equivalence: the file has `dsEdit.meta.event.context` where the code asks for
+  `dsEdit.meta.event.none`.
+
+  Written up in `Inferrix-stack/docs/specs/2026-09-27-absent-code-table-value-is-minus-one.md`.
 
 - **W11 (P1)** — a multistate virtual point cannot be configured at all. The template switches on
   `'MULTISTATE'`, a case its own dropdown can never emit (it emits `INCREMENT_MULTISTATE`), so the
@@ -834,7 +1023,20 @@ changed.
 - **W25 (P2)** — the BACnet data-type picker offers all five types for every property, although
   the route it already calls reports which ones each property supports.
 
-Stack-side findings go to `Inferrix-stack/docs/specs/` instead. From type 2, in
+Stack-side findings go to `Inferrix-stack/docs/specs/` instead.
+
+> **2026-09-27: every item this work filed from types 5 to 8 is closed on `inferrix-stack-v5.1.x`** —
+> D54-D64 and A20-A24, each with a resolution note in its own document, plus D57's A22 and META's A23
+> answered. Four of those notes correct something this side got wrong; the corrections are recorded
+> in the per-type sections above rather than here. The earlier Modbus items (D38-D41, A14-A19) were
+> already closed on 2026-09-25, except **D48 and D50, which are still open**. Nothing below has been
+> rewritten — the measurements are what they were, and the resolutions say so where they differ.
+>
+> **None of it is deployed yet.** Everything above was measured against 5.1.1 on
+> `Inferrix Gateway 155`; the fixes are on a branch. Two on-screen passes are owed once a gateway
+> carrying them is reachable: an MS/TP point (type 6) and an SNMP point (type 8).
+
+From type 2, in
 `2026-09-25-mesh-node-provisioned-rows.md`:
 
 - **D38 (P2)** — every provisioned mesh node point is named `nullDO 2 - Statusnull`. The

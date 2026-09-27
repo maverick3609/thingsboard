@@ -91,6 +91,13 @@ const FIELD_LABELS: {[property: string]: string} = {
   oid: 'OID',
   engineId: 'Engine ID',
   contextEngineId: 'Context engine ID',
+  // A meta point's script and its log. The gateway's own words for the first three; the two log
+  // fields carry their unit and their meaning, the way `ioLogFileSizeMBytes` above does.
+  context: 'Script context',
+  updateCronPattern: 'Cron pattern',
+  executionDelaySeconds: 'Execution delay (seconds)',
+  logSize: 'Log file size (MB)',
+  logCount: 'Log files retained',
   brokerUri: 'Broker Url',
   logIO: 'Log I/O',
   ioLogFileSizeMBytes: 'I/O log file size (MB)',
@@ -116,7 +123,19 @@ const FIELD_LABELS: {[property: string]: string} = {
  */
 const NESTED_FIELD_LABELS: {[property: string]: string} = {
   timePeriod: 'Period',
-  timePeriodType: 'Unit'
+  timePeriodType: 'Unit',
+  // A nested `xid` is a reference to a data point everywhere it appears in the document, and never
+  // the nested model's own identity: as a meta or scripting point's context variable, as the point a
+  // detector watches, and as the point a published point publishes -- whose schema says so in as
+  // many words ("XID of the internal data point whose values are published by this point"). The
+  // top-level `xid` is the model's own and is not labelled here, because the dialog renders it
+  // itself.
+  xid: 'Point',
+  // The two beside it, in a meta or scripting point's context rows. `contextUpdate` humanises to
+  // "Context update", which reads as the same thing as the point's own `contextUpdateEvent` and says
+  // nothing about what the checkbox does.
+  variableName: 'Variable',
+  contextUpdate: 'Triggers the script'
 };
 
 /**

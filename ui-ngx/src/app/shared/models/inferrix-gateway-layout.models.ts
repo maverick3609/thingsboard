@@ -85,6 +85,19 @@ export interface GatewayFormLayout {
    * overwritten.
    */
   defaults?: {[id: string]: any};
+  /**
+   * How to render a field the schema types too loosely to lay out.
+   *
+   * `META.PL.script` is declared `{"type": "string"}` with no `format`, so the mapper gives it the
+   * same single-line box as a host name — and what goes in it is a JavaScript function body. Swagger
+   * has no word for "long text"; this supplies it.
+   *
+   * The type comes from this table and never from the device, which is what keeps it inside the same
+   * boundary as the rest of the descriptor. It also only ever moves a field *between* the types the
+   * form lays out itself: turning a delegated array into a text box would replace its editor with
+   * one that cannot hold its value, so such an entry is ignored rather than obeyed.
+   */
+  types?: {[id: string]: FormPropertyType};
 }
 
 export interface GatewayGatedOptions {
@@ -373,6 +386,40 @@ const BACNET_POINT: GatewayFormLayout = {
   rows: [['remoteDeviceInstanceNumber', 'objectInstanceNumber'],
     ['objectTypeId', 'propertyIdentifierId'], ['multiplier', 'additive']]
 };
+
+/**
+ * What triggers a meta point's script, in the gateway's own words.
+ *
+ * A relabel of an enum the schema already declares, and the one place its first option is legible.
+ * `MetaPointLocatorVO` registers `UPDATE_EVENT_NONE = 0` under the message key
+ * `dsEdit.meta.event.context`, and the six period constants are `TimePeriods` ids rather than
+ * durations -- `MINUTES` is the *start of each minute*, not "every N minutes". The stack's own
+ * property file has no entry for that first key, so the gateway's UI cannot show the label its code
+ * asks for; these are the words the other seven carry.
+ */
+const META_UPDATE_EVENTS: FormSelectItem[] = [
+  {value: 'NONE', label: 'Context update'},
+  {value: 'MINUTES', label: 'Start of minute'},
+  {value: 'HOURS', label: 'Start of hour'},
+  {value: 'DAYS', label: 'Start of day'},
+  {value: 'WEEKS', label: 'Start of week'},
+  {value: 'MONTHS', label: 'Start of month'},
+  {value: 'YEARS', label: 'Start of year'},
+  {value: 'CRON', label: 'Cron pattern'}
+];
+
+/**
+ * Which change on a flagged context point re-runs the script.
+ *
+ * Humanising these gives "Context update", "Context change" and "Context logged", which repeat the
+ * field's own label and say nothing about the difference -- the choice is between *any* write, a
+ * write that changes the value, and a write that is logged. Same three values under plainer names.
+ */
+const META_CONTEXT_UPDATE_EVENTS: FormSelectItem[] = [
+  {value: 'CONTEXT_UPDATE', label: 'Any update'},
+  {value: 'CONTEXT_CHANGE', label: 'Value change'},
+  {value: 'CONTEXT_LOGGED', label: 'Logged value'}
+];
 
 /**
  * The three SNMP versions, which the schema declares as a bare string.
@@ -691,6 +738,72 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * so the two cannot drift.
    */
   'BACNET_MSTP.PL': BACNET_POINT,
+
+  /**
+   * A meta data source, which is nothing but a name and the events its scripts can raise.
+   *
+   * Every field the schema declares on it is one the platform already strips: the identity fields,
+   * the two description fields, and the four the points table owns (`enabled`, the purge pair,
+   * `editPermission`). What is left is `alarmLevels`. There is deliberately no poll period —
+   * a meta point is driven by its own `updateEvent`, not by the source.
+   *
+   * Present so the type is marked as worked through, the way `VIRTUAL.DS` is.
+   */
+  'META.DS': {},
+
+  /**
+   * A meta point: a script, what triggers it, and the other points it can read.
+   *
+   * `script` is the form. It arrives as `{"type": "string"}` with no `format`, so without
+   * {@link GatewayFormLayout.types} the operator writes a JavaScript body into a single-line box —
+   * which is what this type was parked over, along with the point picker below.
+   *
+   * **`updateEvent` decides what else the form means, and `NONE` does not mean "never".** The
+   * gateway registers it as `UPDATE_EVENT_NONE = 0`, the same id as `UPDATE_EVENT_CONTEXT_UPDATE`,
+   * and labels it `dsEdit.meta.event.context` — "Context update". A point on `NONE` runs when a
+   * context point it flagged changes, and `MetaPointLocatorVO.validate` then refuses it unless at
+   * least one `context` entry carries `contextUpdate` (*"No points are set to update context"*,
+   * measured 2026-09-27 on 5.1.x). Choosing a period or `CRON` lifts that: an empty context is
+   * accepted. The labels here are the gateway's own words, which are clearer than the humanised
+   * constants and are the only place the `NONE`/context equivalence is visible — the gateway's own
+   * UI cannot show it, because the key it registers for that option has no translation.
+   *
+   * **Three fields are hidden because the gateway ignores them.**
+   * `MetaPointLocatorVO.isSettable()` returns a hard `false`, so a meta point never takes a write;
+   * `relinquishable` is not read by `toVO` at all; and `configurationDescription` is generated from
+   * the script's first 40 characters. `scriptEngine` is hidden for the opposite reason — it is a
+   * one-value enum, so there is nothing to choose, and it still has to be *sent*: the model maps it
+   * through `ExportCodes.getId`, which answers `-1` for an absent value, and `-1` is not the
+   * JavaScript engine. It is defaulted rather than dropped for that reason, and the same goes for
+   * `dataType`, whose own `getId` answers `-1` just as quietly (filed as a stack open item).
+   *
+   * **`scriptPermissions` is hidden, and that is a security decision rather than a tidiness one.**
+   * It names the groups the script runs *as*, and `NashornScriptEngineDefinition.createEngine` reads
+   * it to decide whether to hand out the confined engine or the one with Java access. The stack now
+   * validates it against the caller's own groups (D58), so a Cortex operator cannot exceed
+   * themselves — but an omitted value means no groups, which is the confined engine, and that is the
+   * right thing for a form reachable from a browser to ask for. An existing point keeps whatever it
+   * was given: the dialog spreads the stored model under the form's values, so a hidden field is
+   * carried through a save untouched rather than blanked.
+   *
+   * The requirement `context` places on `updateEvent: NONE` is not expressed here. A layout can hide
+   * a row and narrow a list; it has no word for "this array needs an entry when that select holds
+   * this value", and the gateway's own refusal names the field and says why. The field's hint says
+   * so too, in the schema's own words.
+   */
+  'META.PL': {
+    hidden: ['settable', 'relinquishable', 'configurationDescription', 'scriptEngine',
+      'scriptPermissions'],
+    advanced: ['executionDelaySeconds', 'logLevel', 'logSize', 'logCount'],
+    types: {script: FormPropertyType.textarea},
+    options: {updateEvent: META_UPDATE_EVENTS, contextUpdateEvent: META_CONTEXT_UPDATE_EVENTS},
+    visibleWhen: {updateCronPattern: {by: 'updateEvent', values: ['CRON']}},
+    defaults: {dataType: 'NUMERIC', scriptEngine: 'JAVASCRIPT', updateEvent: 'NONE',
+      variableName: 'my', contextUpdateEvent: 'CONTEXT_UPDATE', executionDelaySeconds: 0,
+      logLevel: 'NONE', logSize: 1, logCount: 5},
+    rows: [['dataType', 'variableName'], ['updateEvent', 'updateCronPattern'],
+      ['contextUpdateEvent', 'executionDelaySeconds'], ['logLevel', 'logSize']]
+  },
 
   /**
    * An SNMP manager: which agent, over which version, with which credential.

@@ -541,6 +541,16 @@ describe('gateway form layouts', () => {
     });
   });
 
+  it('never makes a gated field required', () => {
+    // A gate hides the row and keeps the control, validator included. A required field whose gate is
+    // closed leaves the save blocked by a control that is not on screen, with nothing to fill in.
+    Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
+      const gated = new Set([...Object.keys(layout.visibleWhen ?? {})]);
+      (layout.required ?? []).forEach(id =>
+        expect(gated.has(id)).withContext(`${modelType}.${id}`).toBe(false));
+    });
+  });
+
   it('never names a field in both required and hidden', () => {
     Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
       const hidden = new Set(layout.hidden ?? []);

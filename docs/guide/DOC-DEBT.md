@@ -39,3 +39,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `0681b77ab3` feat(gateway): lay out a JSON retriever, and seed the poll period every polling type needs
 - [ ] `bc6bb134e1` fix(gateway): leave the bearer token clearable, because the gateway hands it back
 - [ ] `408bc7503b` feat(gateway): let a layout carry a hint, since three types now describe nothing
+- [ ] `7720f433ac` fix(gateway): stop offering a data type three locators cannot produce, and give a number a floor

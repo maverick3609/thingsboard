@@ -639,6 +639,17 @@ describe('gateway form layouts', () => {
     });
   });
 
+  it('never names a field in both required and readonly', () => {
+    // `readonly` disables the control, and Angular leaves a disabled control out of validation
+    // entirely -- so the pair reads as a rule and enforces nothing. Same family as the `advanced` and
+    // gated cases, and the reason `INTERNAL.PL` requires `monitorId` and only disables `dataType`.
+    Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
+      const readonly = new Set(layout.readonly ?? []);
+      (layout.required ?? []).forEach(id =>
+        expect(readonly.has(id)).withContext(`${modelType}.${id}`).toBe(false));
+    });
+  });
+
   it('never names a field in both required and hidden', () => {
     Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
       const hidden = new Set(layout.hidden ?? []);

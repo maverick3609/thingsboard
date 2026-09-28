@@ -1324,9 +1324,12 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * **omits the id** (**D83**), so there is no list to pick from and no way to check one short of
    * saving it.
    *
-   * Seeded with the monitor `InternalPointLocatorVO` itself starts on, which is a real one -- measured
-   * resolving to "Waiting High Priority Threads" -- so a new point is savable as it opens and shows the
-   * shape of an id at the same time.
+   * Seeded with the monitor `InternalPointLocatorVO` itself starts on. Safe to put a device-side id in
+   * this table because that one is not optional: `StackMonitoringService` is a plain `@Component` and
+   * creates it in its constructor, unconditionally, and `internal-ds` compiles against that class -- so
+   * a gateway with this data source type has the monitor. Measured resolving to "Waiting High Priority
+   * Threads". A new point is therefore savable as it opens, and shows the shape of an id at the same
+   * time, which given D83 is the only teaching material there is.
    */
   'INTERNAL.PL': {
     hidden: ['settable', 'relinquishable', 'configurationDescription'],

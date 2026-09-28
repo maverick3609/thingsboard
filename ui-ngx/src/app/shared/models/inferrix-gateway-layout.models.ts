@@ -1318,8 +1318,11 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * `monitorId` is the only field `InternalPointLocatorModel.toVO` reads -- it builds a fresh VO and
    * sets that one property -- so everything else here is decorative and `dataType` is {@link readonly}
    * rather than a dropdown that would lie. A submitted type is dropped and the VO's own `NUMERIC`
-   * stored, which is why the live `hardware.name` point is `ALPHANUMERIC` and nothing created through
-   * REST can be (**D84**). Seeded `NUMERIC` so the disabled field shows what will actually be stored.
+   * stored, so nothing created through REST can be anything else (**D84**) -- while the live
+   * `hardware.name` point *is* `ALPHANUMERIC`, because `maybeCreatePoints` sets that one xid's type in
+   * Java, on every boot. Seeded `NUMERIC`, which is what an add will store. Not on an edit:
+   * `gatewayFormDefaults` is called from the add paths only, so an existing point shows the type it
+   * actually has -- and the hint is then the sole warning that saving it resets that type to `NUMERIC`.
    *
    * It is {@link required} because an absent id is a 422 -- `getMonitor(null)` throws inside the
    * validator's `try` -- while a **wrong** id is accepted 201 and then reads nothing for ever, because

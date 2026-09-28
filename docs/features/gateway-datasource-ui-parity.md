@@ -1295,7 +1295,11 @@ adding a pattern, a malformed regex a clean 422 naming `createPointsPattern`, po
 seeded monitor, point edit 200 on `PUT` carrying the hidden fields and the disabled data type back. 90
 layout and 40 schema specs green. Six probe rows and one probe source deleted; the instance is back to
 21 sources and 106 points, and the live internal source and its 23 points were not touched. On-screen
-pass owed with rows 6-11.
+pass owed with rows 6-11; first item on this row's list is the point form, where `pack` would have
+paired `dataType` with `monitorId` and the layout deliberately does not — a full-width row each, so a
+61-character monitor id is not cut off, at the cost of a wide greyed select below it. Second item is
+the `dataType` tooltip itself, which is the fix this row's review produced and the one thing here that
+only a mouse can confirm.
 
 **A 500 that is nobody's type in particular.** A duplicate `xid` answers **500 Internal Server Error**
 with no field, on both `POST /v2/data-source` and `POST /v2/data-point` (**D86**). Both add forms offer

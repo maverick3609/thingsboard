@@ -42,3 +42,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `7720f433ac` fix(gateway): stop offering a data type three locators cannot produce, and give a number a floor
 - [ ] `edf4872a7c` feat(gateway): lay out the internal monitoring source, whose one useful field the gateway will not name
 - [ ] `6688788e45` fix(gateway): make a hint on a disabled field readable, and correct four claims
+- [ ] `cbcd72a748` fix(gateway): stop escaping a hint nothing renders as HTML

@@ -723,4 +723,61 @@ describe('gateway form layouts', () => {
       expect(new Set(ids).size).withContext(modelType).toBe(ids.length);
     });
   });
+
+  const retriever = GATEWAY_FORM_LAYOUTS['HTTP_JSON_RETRIEVER.DS'];
+  const retrieverPoint = GATEWAY_FORM_LAYOUTS['HTTP_JSON_RETRIEVER.PL'];
+
+  it('refuses an empty timeout and retry count, because the gateway blames another field', () => {
+    // Measured: `timeoutSeconds: 0` or `null` comes back 422 *"Must be greater than zero"* against
+    // `updatePeriods`, which this form does not have -- the definition files the message under the
+    // wrong property name. Seeding the model's own 30 and 2 and refusing an empty box is the only way
+    // the operator ever sees which field is wrong.
+    expect(retriever.required).toEqual(['url', 'timeoutSeconds', 'retries']);
+    expect(retriever.defaults.timeoutSeconds).toBe(30);
+    expect(retriever.defaults.retries).toBe(2);
+    // And neither may be advanced, or the refusal happens behind a closed toggle.
+    expect(retriever.advanced).toEqual(['setPointUrl']);
+  });
+
+  it('masks the bearer token and gates it on the switch that sends it', () => {
+    // The schema does not mark it `writeOnly`, so the gateway hands it back in full and the box is
+    // populated on an edit. Typing it as a password is what makes `keep()` drop an empty one.
+    expect(retriever.types.bearerToken).toBe(FormPropertyType.password);
+    expect(retriever.visibleWhen.bearerToken).toEqual({by: 'bearerAuth', values: [true]});
+  });
+
+  it('requires a retriever point\'s pointer and seeds its data type', () => {
+    // `pollPoints` collects only the points whose `valuePointer` is non-null, so a point saved without
+    // one is silently never read. Nothing validates `dataType` on this locator, so an absent one
+    // stores -1 and reads back null.
+    expect(retrieverPoint.required).toEqual(['valuePointer']);
+    expect(retrieverPoint.defaults).toEqual({dataType: 'NUMERIC'});
+  });
+
+  it('hides the three retriever locator fields no code reads', () => {
+    // `isSettable()` is a hard false, `toVO` never reads `relinquishable`, and `ignoreIfMissing` is
+    // stored and mapped and then read by nothing: the branch it documents raises the parse event
+    // either way.
+    expect(retrieverPoint.hidden)
+      .toEqual(['settable', 'relinquishable', 'ignoreIfMissing', 'configurationDescription']);
+  });
+
+  it('seeds a poll period on a polling type and on no other, from the schema', () => {
+    // `timePeriodType` is the only `required` in the whole schema document, and `timePeriod` is a
+    // delegated fieldset -- so a source saved without opening it posts `{}` and is refused, or worse
+    // accepted with a zero period where the type's own validate forgets to call the polling one.
+    const polling = [{id: 'url'}, {id: 'timePeriod'}] as any;
+    expect(gatewayFormDefaults('HTTP_JSON_RETRIEVER.DS', polling).timePeriod)
+      .toEqual({timePeriod: 5, timePeriodType: 'MINUTES'});
+    // A fresh object each time, like the rest of the defaults.
+    expect(gatewayFormDefaults('HTTP_JSON_RETRIEVER.DS', polling).timePeriod)
+      .not.toBe(gatewayFormDefaults('HTTP_JSON_RETRIEVER.DS', polling).timePeriod);
+    // Not on a type whose schema does not declare one, whatever the layout says.
+    expect(gatewayFormDefaults('HTTP_RECEIVER.DS', [{id: 'ipWhiteList'}] as any).timePeriod)
+      .toBeUndefined();
+    expect(gatewayFormDefaults('HTTP_JSON_RETRIEVER.DS').timePeriod).toBeUndefined();
+    // And a layout that names one itself is left alone.
+    expect(gatewayFormDefaults('MODBUS_IP.DS', polling).timePeriod)
+      .toEqual({timePeriod: 5, timePeriodType: 'MINUTES'});
+  });
 });

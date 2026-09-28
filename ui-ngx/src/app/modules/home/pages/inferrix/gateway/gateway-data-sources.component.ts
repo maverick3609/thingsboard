@@ -108,7 +108,9 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
     // Seeded onto the model for the reason a point's locator is, below: a serial source whose
     // line settings the operator never opened must still post them, because the gateway converts
     // each with `Enum.valueOf` and answers an absent one with a null-pointer exception.
-    this.open({...gatewayFormDefaults(type.type),
+    // The properties, because the polling default depends on the schema rather than on the type: a
+    // source that declares a poll period must post one, and an untouched fieldset posts `{}`.
+    this.open({...gatewayFormDefaults(type.type, this.propertiesFor(type.type)),
       modelType: type.type, enabled: false},
       this.translate.instant('inferrix.gateway.add-data-source'), []);
   }

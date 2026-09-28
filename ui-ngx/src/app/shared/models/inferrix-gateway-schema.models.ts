@@ -130,6 +130,21 @@ const FIELD_LABELS: {[property: string]: string} = {
   // the schema carries no description for either -- so the label carries it.
   ipWhiteList: 'Allowed IPs (empty allows none)',
   deviceIdWhiteList: 'Allowed device IDs (empty allows none)',
+  // A JSON retriever's own fields. Every one of them is declared on `HTTP_JSON_RETRIEVER` and nowhere
+  // else in the document except `url`, which `HTTP_SENDER.PUB` also has and where "URL" is equally
+  // right. The three that read as instructions are doing a hint's job: the schema carries no
+  // description for any field of this type, and the pointers are refused unless they start with a
+  // slash, `valueFormat` means two different things by data type, and `timeFormat` is consulted only
+  // when the timestamp arrives as text.
+  url: 'URL',
+  setPointUrl: 'Set point URL',
+  timeoutSeconds: 'Timeout (seconds)',
+  bearerAuth: 'Bearer token authentication',
+  valuePointer: 'Value pointer (e.g. /data/0/temp)',
+  valueFormat: 'Value format (number pattern; for binary, the text meaning 0)',
+  timePointer: 'Timestamp pointer (e.g. /data/0/ts)',
+  timeFormat: 'Timestamp format (only when the timestamp is text)',
+  setPointName: 'Set point JSON key',
   // A virtual point's simulator settings. All five are declared on `VIRTUAL.PL` and on no other
   // model in the document, so naming them here cannot reach a field that means something else.
   // The gateway's own labels, except that it calls `maxChange` "Minimum Change" on the attractor

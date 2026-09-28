@@ -249,7 +249,7 @@ consulted.
 | 8 | `SNMP.DS` | `SNMP.PL` | **done** — 2026-09-26; **D60-D64 fixed** 2026-09-27, and verifying that turned up **D68-D70** and two fixes on our side; point form still needs an on-screen pass |
 | 9 | `MQTT.DS` | `MQTT.PL` | **done** — 2026-09-28; **D71-D73** filed, and D73 forced a correction to the 2026-09-27 verb change; needs an on-screen pass |
 | 10 | `HTTP_RECEIVER.DS` | `HTTP_RECEIVER.PL` | **done** — 2026-09-28; **D74-D75** filed; needs an on-screen pass |
-| 11 | `HTTP_JSON_RETRIEVER.DS` | `HTTP_JSON_RETRIEVER.PL` | the other half of 10 |
+| 11 | `HTTP_JSON_RETRIEVER.DS` | `HTTP_JSON_RETRIEVER.PL` | **done** — 2026-09-28; **D76-D81** filed, one of them general to all 18 polling types; needs an on-screen pass |
 | 12 | `INTERNAL.DS` | `INTERNAL.PL` | 1 live; deferred behind the protocols above |
 | 13 | `MESH_CONTROLLER.DS` | — | 1 live |
 | … | the remaining ~40 | | mostly four to eight fields |
@@ -1065,6 +1065,89 @@ point's 200 on `PUT`, `settable` reading back `false` after a submitted `true`. 
 schema specs green. Fourteen probe rows deleted; the instance is back to the 21 data sources it
 started with. On-screen pass owed with rows 6-9.
 
+### 11 — `HTTP_JSON_RETRIEVER.DS` / `HTTP_JSON_RETRIEVER.PL` (done, 2026-09-28)
+
+**The most complete type so far, and the one with the most dead weight.** A polling source that GETs
+one JSON document and reads each point out of it by JSON Pointer, which makes the data source four
+fields (URL, timeout, retries, auth) and the point five (pointer, data type, value format, timestamp
+pointer, timestamp format). It is also the first type where a whole feature exists on both sides of the
+model and cannot run: `setPointUrl`, `setPointName`, `settable` and a fully written `setPointValue` all
+serve a path whose gate, `isSettable()`, returns a hard `false` (**D76**).
+
+**Three fields hidden, and all three for the same reason: no code reads them.** `settable` is the D76
+gate; `relinquishable` is never read by `toVO`; and `ignoreIfMissing` is stored, serialised, mapped —
+and then read by nothing at all (**D77**). The gateway's own help text describes what that checkbox is
+for, the regex retriever this type was derived from honours it, and the port lost it: `parseValue`
+throws on a missing node for all four data types and the poll raises the parse event either way. A
+switch that suppresses nothing is worse than an absent one, so it is hidden rather than shown.
+`setPointUrl` and `setPointName` are **advanced rather than hidden**, because unlike the other three
+they are stored, validated and would start working the day D76 is fixed.
+
+**The timeout is required because the gateway's refusal cannot be shown.**
+`HttpJsonRetrieverDataSourceDefinition.validate` files its `timeoutSeconds <= 0` message under the
+property name **`updatePeriods`** — the poll period, a field this form does not have (**D78**). So a
+zero or empty timeout comes back as *"Must be greater than zero"* pointing at nothing on screen. The
+answer is to keep the value from ever leaving the browser: seed the model's own 30 and 2, mark both
+required, and keep them on the main rows rather than under Advanced — a required field behind a closed
+toggle is the same trap in a different place, which is why the layout spec forbids that combination.
+
+**The bearer token is a credential the gateway hands back in plain text.** `bearerToken` carries no
+`writeOnly`, so `GET /v2/data-source/{xid}` returns it verbatim to anyone who can read the row
+(**D79**). Cortex renders it as a password field anyway, and the reason is not modesty: a `password`
+field is the one the dialog's `keep` protects, so an empty box is dropped rather than sent and an edit
+cannot blank a stored token. It is gated on `bearerAuth`, and the two share a row — the schema declares
+the token *before* the switch that reveals it, so left alone the box would appear above its own switch.
+
+**The pointers are JSON Pointers, and the gateway says so in a language nobody reads.**
+`JsonPointer.valueOf` runs inside `validate`, so a pointer that does not start with `/` is refused
+before it can break anything — but the message is `dsEdit.httpJsonReceiver.jsonPointerInvalid`, a key
+with no translation and with *Receiver* where every other name says *Retriever*. It is one of **15
+missing message keys out of the 18 this type uses** (**D80**), and two of those are in front of an
+operator in normal use: the same table also shows every point's configuration description as
+`dsEdit.httpJsonRetriever.dpconn`. Cortex does not paper over either. A form that guessed at the
+gateway's translations would be wrong in a way that is harder to notice, and the raw key at least names
+what is missing. What the label can do is carry the shape — "Value pointer (e.g. /data/0/temp)" — so
+the leading slash is on screen before the refusal is.
+
+**`valueFormat` is one field with two meanings**, which is why the label names both. For NUMERIC it is
+a `DecimalFormat` pattern applied to a textual value, and validated as one (a malformed pattern is a
+clean 422 with a real English message from `DecimalFormat` itself). For BINARY it is the text that
+means 0: `new BinaryValue(!valueFormat.equals(node.textValue()))`, so anything else reads as 1.
+MULTISTATE and ALPHANUMERIC ignore it. The gateway's own form solves this by relabelling the field per
+data type, which a static descriptor cannot do — so the label says "number pattern; for binary, the
+text meaning 0" and takes the length. `timeFormat` has a narrower rule worth saying too: a `long`
+timestamp is epoch millis whatever is in the box, and the format is consulted only for a textual one.
+
+**The poll period turned out to be everybody's problem.** `timePeriodType` is the only `required` in
+the whole schema document, and `timePeriod` is a delegated fieldset — so a source saved without opening
+it posts `{}` and is refused, while one with a unit and no count is **accepted with a zero period**.
+Measured on this type and on `MODBUS_IP.DS`: nothing validates the count anywhere.
+`PollingDataSourceVO.validate` has the guard and is unreachable from REST, and
+`PollingDataSourceDefinition`, which carries the same one, is extended by a single type in the tree
+(**D81**).
+
+That made the fix a shared one rather than a line in this layout: `gatewayFormDefaults` now seeds
+`{timePeriod: 5, timePeriodType: 'MINUTES'}` — `PollingDataSourceVO`'s own initialisers, which no
+subclass overrides — onto any new data source **whose schema declares the field**. Keyed on the schema
+rather than on a list of types, so it reaches the 6 polling types already laid out and the 11 not yet
+written without an invariant anyone has to remember. It is a mitigation in one client, not a fix; the
+gateway still accepts a zero period from anything else that posts one.
+
+**Deviations from the gateway's own form, all deliberate.** Its webapp marks `setPointUrl`,
+`valueFormat`, `timePointer` and `timeFormat` **required**, which the Java contradicts: `validate`
+requires none of them, and requiring all four would block the ordinary case of a numeric document with
+no timestamp. It also binds its "Settable" toggle to `pointLocator.setPointName` — a boolean written
+into a string field — and offers no control for `settable` at all. And it omits `timeoutSeconds` and
+`retries` entirely, although the gateway's own help text describes both as ordinary configuration.
+Filed as **W26-W27**.
+
+**Verified.** Both add bodies 201 with exactly the payload the form produces, including
+`alarmLevels: []` and the seeded period; the source's edit 200 on `PATCH` with the token omitted and
+the stored token intact afterwards; the point's edit 200 on `PUT` carrying the three hidden fields back
+unchanged; `settable: true` reading back `false`. 82 layout, 40 schema, 10 form and 17 service specs
+green. Every probe row created `enabled: false` against a dead port and deleted; the instance is back
+to its original 21 data sources. On-screen pass owed with rows 6-10.
+
 ## Per-type components
 
 Settled 2026-09-25, after the question was raised directly: **is one renderer for 148 model types
@@ -1179,6 +1262,26 @@ changed.
 
   Written up in `Inferrix-stack/docs/specs/2026-09-28-http-receiver-whitelists.md`.
 
+- **D76 (P2)** — `HttpJsonRetrieverPointLocatorVO.isSettable()` returns a hard `false`, so
+  `RuntimeManagerImpl` refuses every write and the type's whole set-point path — `setPointUrl`,
+  `setPointName`, `settable`, `setPointValue`, the `SET_POINT_FAILURE` event — is unreachable. A
+  submitted `settable: true` saves 201 and reads back false.
+- **D77 (P3)** — `ignoreIfMissing` is declared, serialised, mapped and read by nothing. The
+  event-suppressing behaviour the gateway's own help text describes never happens.
+- **D78 (P2)** — `timeoutSeconds <= 0` adds its message under the property name `updatePeriods`, a
+  field this model does not have, so no form can show the refusal against the field that caused it.
+- **D79 (P2, security)** — `bearerToken` is not `writeOnly`: the gateway returns the token verbatim
+  from every read of the data source, list endpoint included.
+- **D80 (P2)** — 15 of the 18 message keys this type uses are missing, including every point's
+  configuration description and the validation message for a bad JSON Pointer. `event.ds.dataParse`
+  resolves to French in `i18n_en.properties`.
+- **D81 (P2)** — **no** polling data source validates its poll period through REST. A body with a
+  period unit and no count saves 201 with a zero period; measured on `HTTP_JSON_RETRIEVER.DS` and
+  `MODBUS_IP.DS`. `PollingDataSourceVO.validate` has the guard and is unreachable, and
+  `PollingDataSourceDefinition` is extended by one type in the tree.
+
+  Written up in `Inferrix-stack/docs/specs/2026-09-28-http-json-retriever.md`.
+
 - **W11 (P1)** — a multistate virtual point cannot be configured at all. The template switches on
   `'MULTISTATE'`, a case its own dropdown can never emit (it emits `INCREMENT_MULTISTATE`), so the
   value list and roll flag never render and the point saves with an empty value set. Cortex uses
@@ -1215,6 +1318,12 @@ changed.
   form shows two fields called "Write Permission".
 - **W25 (P2)** — the BACnet data-type picker offers all five types for every property, although
   the route it already calls reports which ones each property supports.
+- **W26 (P2)** — the JSON retriever's point form marks `valueFormat`, `timePointer` and `timeFormat`
+  required, and the data source form marks `setPointUrl` required. `validate` requires none of the
+  four, and requiring them blocks the ordinary case: a numeric document with no timestamp.
+- **W27 (P1)** — the same form's "Settable" toggle is bound to `pointLocator.setPointName`, writing a
+  boolean into the string field that names the JSON key a write would post. There is no control for
+  `settable` at all, and any point saved through that toggle carries `setPointName: true`.
 
 Stack-side findings go to `Inferrix-stack/docs/specs/` instead.
 

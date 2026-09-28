@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: Copyright The Inferrix Authors
 // SPDX-License-Identifier: Apache-2.0
-import { FormPropertyType, FormSelectItem } from '@shared/models/dynamic-form.models';
+import { FormProperty, FormPropertyType, FormSelectItem } from '@shared/models/dynamic-form.models';
 
 /**
  * What a gateway's schema cannot say, written down per model type.
@@ -1122,6 +1122,80 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     visibleWhen: {binary0Value: {by: 'dataType', values: ['BINARY']}},
     defaults: {dataType: 'NUMERIC', binary0Value: '0'},
     rows: [['parameterName', 'dataType']]
+  },
+
+  /**
+   * A polling source that GETs one JSON document and reads each point out of it by JSON Pointer.
+   *
+   * `url` is {@link required} because the gateway requires it -- `validate` answers a blank one
+   * `validate.required` under the field's own name, and a malformed one `validate.invalidValue`, so
+   * this only moves the same refusal to where the operator is typing.
+   *
+   * **`timeoutSeconds` and `retries` are required and seeded, because the gateway's refusal cannot be
+   * shown.** `HttpJsonRetrieverDataSourceDefinition.validate` files its `timeoutSeconds <= 0` message
+   * under the property name **`updatePeriods`** -- a field this type's form does not have -- so an
+   * empty timeout comes back as *"Must be greater than zero"* against nothing on screen (measured;
+   * **D78**). Seeding the two the model's own initialisers hold, 30 and 2, and refusing an empty box
+   * keeps the form from ever sending the value that produces it. They are ordinary fields rather than
+   * {@link advanced} for the same reason: a {@link required} field behind the Advanced toggle blocks a
+   * save from a control that is not on screen, which is the trap this is avoiding.
+   *
+   * `bearerToken` is rendered as a password even though the schema does not mark it `writeOnly`, which
+   * means the gateway hands it back in full on every read (**D79**). Masking the box does not undo
+   * that, and is still worth it: the value is pasted once and read by nobody, and a `password` field
+   * is the one the dialog's `keep` protects -- an empty one is dropped rather than sent, so an edit
+   * cannot blank a stored token. It is gated on `bearerAuth` the way the gateway's own form gates it.
+   *
+   * `setPointUrl` is {@link advanced} rather than hidden. It is inert today -- the locator's
+   * `isSettable()` is a hard `false`, so no write ever reaches `setPointValue` (**D76**) -- but it is
+   * stored, validated as a URL when non-blank, and would start working the moment that is fixed.
+   */
+  'HTTP_JSON_RETRIEVER.DS': {
+    advanced: ['setPointUrl'],
+    types: {bearerToken: FormPropertyType.password},
+    required: ['url', 'timeoutSeconds', 'retries'],
+    visibleWhen: {bearerToken: {by: 'bearerAuth', values: [true]}},
+    defaults: {timeoutSeconds: 30, retries: 2, bearerAuth: false},
+    // The switch and the field it gates on one row, which is the only way to put them in that order:
+    // an explicit row lands where its first field falls, and the schema declares `bearerToken` before
+    // the `bearerAuth` that reveals it -- so left alone the box appears above its own switch.
+    rows: [['url'], ['timeoutSeconds', 'retries'], ['bearerAuth', 'bearerToken']]
+  },
+
+  /**
+   * One value in that document: where to find it, and how to read what is there.
+   *
+   * `valuePointer` is {@link required} because the gateway requires it and because an empty one is
+   * worse than a refusal: `pollPoints` collects only the points whose pointer is non-null, so a point
+   * saved without one is never read and never says so. The label carries the leading slash, because it
+   * is a **JSON Pointer** rather than a path -- `data/0/temp` is refused, `/data/0/temp` is not. The
+   * gateway checks the syntax itself with `JsonPointer.valueOf`, so nothing here needs to; what it
+   * cannot do is say so in English, because the message key is one of the 15 this type is missing
+   * (**D80**).
+   *
+   * `valueFormat` is one field with two meanings, which is why its label names both. For NUMERIC it is
+   * a `DecimalFormat` pattern applied to a textual value (and validated as one: a malformed pattern is
+   * a clean 422). For BINARY it is the text that means 0 -- `new BinaryValue(!valueFormat.equals(…))`,
+   * so anything else reads as 1. MULTISTATE and ALPHANUMERIC ignore it.
+   *
+   * `timeFormat` is only consulted when the timestamp node is textual: a `long` is taken as epoch
+   * millis whatever is in here, and a textual node with no format is a parse event rather than a value.
+   *
+   * `dataType` is seeded because nothing validates it on this locator -- an absent one stores `-1` and
+   * reads back `null`, the **D65** silence -- and `settable`, `relinquishable` and `ignoreIfMissing`
+   * are hidden because no code reads any of them. `isSettable()` is a hard `false`, `toVO` never looks
+   * at `relinquishable`, and `ignoreIfMissing` is stored, serialised, mapped and then read by nothing
+   * at all: the missing-value branch it documents raises the parse event either way (**D77**).
+   */
+  'HTTP_JSON_RETRIEVER.PL': {
+    hidden: ['settable', 'relinquishable', 'ignoreIfMissing', 'configurationDescription'],
+    advanced: ['setPointName'],
+    required: ['valuePointer'],
+    defaults: {dataType: 'NUMERIC'},
+    // Data type first, because it decides what the two format fields mean. `valueFormat` takes a row
+    // of its own so that the timestamp pair stays a pair: left to fall where it likes it would take
+    // `timePointer` with it and leave `timeFormat` on its own.
+    rows: [['dataType', 'valuePointer'], ['valueFormat'], ['timePointer', 'timeFormat']]
   }
 };
 
@@ -1149,5 +1223,19 @@ export const gatewayFormLayout = (modelType: string): GatewayFormLayout | undefi
  * of them. ThingsBoard's own array editor rebuilds rather than mutates, so nothing does that today;
  * this is one line for a class of bug that is invisible until it corrupts a form nobody touched.
  */
-export const gatewayFormDefaults = (modelType: string): {[id: string]: any} =>
-  structuredClone(gatewayFormLayout(modelType)?.defaults ?? {});
+export const gatewayFormDefaults = (modelType: string,
+                                    properties?: FormProperty[]): {[id: string]: any} => {
+  const defaults = structuredClone(gatewayFormLayout(modelType)?.defaults ?? {});
+  // Every polling source, rather than a line in eighteen layouts and a rule to remember in the rest.
+  // `timePeriod` is the one field a polling model cannot do without -- `timePeriodType` is the only
+  // `required` in the whole schema document -- and it is a delegated fieldset, so an operator who
+  // saves without opening it sends `{}` and is refused, while one who fills in the unit and not the
+  // count is **accepted with a zero poll period**: nothing validates it on any type, measured on two
+  // (**D81**). `PollingDataSourceVO` starts every subclass on five minutes and no subclass overrides
+  // it, so this is the gateway's own default, seeded only where the schema says the field exists.
+  if (!('timePeriod' in defaults)
+      && (properties ?? []).some(property => property.id === 'timePeriod')) {
+    defaults.timePeriod = {timePeriod: 5, timePeriodType: 'MINUTES'};
+  }
+  return defaults;
+};

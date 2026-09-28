@@ -1288,6 +1288,22 @@ guard is the part worth a test, and it has one.
 Every data type, unlike `VIRTUAL.PL`'s numeric-only attraction target: a script reads a binary
 point as usefully as a numeric one.
 
+## Our own known gaps
+
+Cortex-side, not the gateway's. Neither is worth a fix inside a per-type row; both want the on-screen
+pass that rows 6-11 are already owed.
+
+- **A failed schema read leaves every Add form empty, with nothing said.** `load()` fires the schema
+  request and the type request independently and swallows both errors on purpose — the list is worth
+  showing even when the second call fails, and the comment says so. But the type picker is populated by
+  the *other* call, so if only the schema read fails (an older gateway with no `/v2/model-schemas`, an
+  under-privileged token) Add still opens, with the identity fields and nothing else, and a save is a
+  422. Raised by the row-11 review as the first default whose presence depends on that race: no poll
+  period is seeded either. Wants an inline warning on the page rather than a guard on the button, since
+  the same emptiness affects an edit.
+- **`commPortId` is free text** because `/v2/utilities/gw/serial-ports` is not in the proxy allowlist.
+  Carried since row 4 and wanted by rows 4 and 6.
+
 ## Handed over
 
 Defects found in the gateway's own webapp while matching its forms. Written up in

@@ -811,6 +811,37 @@ describe('gateway form layouts', () => {
       .toEqual(['settable', 'relinquishable', 'ignoreIfMissing', 'configurationDescription']);
   });
 
+  const internal = GATEWAY_FORM_LAYOUTS['INTERNAL.DS'];
+  const internalPoint = GATEWAY_FORM_LAYOUTS['INTERNAL.PL'];
+
+  it('leaves the internal source its regex and adds no point button', () => {
+    // `createPointsPattern` is the whole data source, and `provisionedPoints` would be wrong: the
+    // gateway creates points only when a pattern is set, and the live source on the bench has none, so
+    // removing the add button would leave no way to add one.
+    expect(Object.keys(internal)).toEqual(['hints']);
+    expect(internal.hints.createPointsPattern).toContain('id');
+    expect(internal.provisionedPoints).toBeUndefined();
+  });
+
+  it('disables the internal point\'s data type, because the gateway drops what it is sent', () => {
+    // `InternalPointLocatorModel.toVO` builds a fresh VO and sets `monitorId` alone, so a submitted
+    // data type never reaches storage and the VO's own NUMERIC is kept. Measured: a point posted
+    // ALPHANUMERIC reads back NUMERIC. A dropdown here would be a lie, and the seed shows what will
+    // really be stored.
+    expect(internalPoint.readonly).toEqual(['dataType']);
+    expect(internalPoint.defaults.dataType).toBe('NUMERIC');
+    expect(internalPoint.options).toBeUndefined();
+  });
+
+  it('requires a monitor id and seeds one that exists', () => {
+    // An absent id is a 422 (`getMonitor(null)` throws inside the validator's try) but a wrong one is
+    // accepted 201 and reads nothing for ever, so the seed is a real monitor -- the one the VO itself
+    // starts on, measured resolving to "Waiting High Priority Threads".
+    expect(internalPoint.required).toEqual(['monitorId']);
+    expect(internalPoint.defaults.monitorId)
+      .toBe('com.inferrix.stack.rt.maint.WorkItemMonitor.highPriorityWaiting');
+  });
+
   it('seeds a poll period on a polling type and on no other, from the schema', () => {
     // `timePeriod` and its own `timePeriodType` are the only two names that appear in any `required`
     // array in the whole schema document, 28 sites and 1 -- and `timePeriod` is a delegated fieldset,

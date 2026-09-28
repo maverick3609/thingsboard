@@ -1279,6 +1279,69 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     // of its own so that the timestamp pair stays a pair: left to fall where it likes it would take
     // `timePointer` with it and leave `timeFormat` on its own.
     rows: [['dataType', 'valuePointer'], ['valueFormat'], ['timePointer', 'timeFormat']]
+  },
+
+  /**
+   * The gateway watching itself: one poll period and one regex, and no connection to anything.
+   *
+   * `createPointsPattern` is the whole data source. `InternalDataSourceRT` compiles it once and, on
+   * every poll, creates a point for each registered monitor whose **id** matches and that it is not
+   * already tracking -- enabled, named from the monitor, with logging types chosen by what kind of
+   * monitor it is. Left empty the source creates nothing and its points are added by hand, which is
+   * what the one live source on the bench gateway does, so {@link provisionedPoints} would be wrong
+   * here: the button it removes is the only way to add a point to a source with no pattern.
+   *
+   * The pattern matches ids and an operator can only see names (**D83**), so the hint carries the two
+   * id shapes that cover most of what is worth tracking. A malformed regex is a clean 422 naming the
+   * field, which is more than most of this gateway manages.
+   */
+  'INTERNAL.DS': {
+    hints: {
+      // Plain text: the template renders a hint as a Material tooltip, which does not read markdown, so
+      // a backtick would be shown rather than applied.
+      createPointsPattern: 'A Java regular expression, matched against each monitor\'s id rather than '
+        + 'the name shown on the gateway\'s own Stack Monitor page. Every monitor it matches gets a '
+        + 'point, created on the next poll and enabled. Examples: .*\\.COUNT for every row count, or '
+        + 'com\\.inferrix\\.infix\\.rt\\.dataSource\\.PollingDataSource.* for the poll health of every '
+        + 'data source on the gateway. Left empty, nothing is created.'
+    }
+  },
+
+  /**
+   * One monitored value, named by an id the gateway will not enumerate.
+   *
+   * `monitorId` is the only field `InternalPointLocatorModel.toVO` reads -- it builds a fresh VO and
+   * sets that one property -- so everything else here is decorative and `dataType` is {@link readonly}
+   * rather than a dropdown that would lie. A submitted type is dropped and the VO's own `NUMERIC`
+   * stored, which is why the live `hardware.name` point is `ALPHANUMERIC` and nothing created through
+   * REST can be (**D84**). Seeded `NUMERIC` so the disabled field shows what will actually be stored.
+   *
+   * It is {@link required} because an absent id is a 422 -- `getMonitor(null)` throws inside the
+   * validator's `try` -- while a **wrong** id is accepted 201 and then reads nothing for ever, because
+   * `getMonitor` answers an unknown id with null rather than an exception and the `catch` never fires
+   * (**D85**). Nothing on this side can tell the two apart, which is the other reason the hint spells
+   * out what an id looks like: `GET /v2/stack-monitor` lists 98 monitors by translated name and
+   * **omits the id** (**D83**), so there is no list to pick from and no way to check one short of
+   * saving it.
+   *
+   * Seeded with the monitor `InternalPointLocatorVO` itself starts on, which is a real one -- measured
+   * resolving to "Waiting High Priority Threads" -- so a new point is savable as it opens and shows the
+   * shape of an id at the same time.
+   */
+  'INTERNAL.PL': {
+    hidden: ['settable', 'relinquishable', 'configurationDescription'],
+    readonly: ['dataType'],
+    required: ['monitorId'],
+    hints: {
+      monitorId: 'The monitor\'s id, which is not the name the Stack Monitor page shows. They look '
+        + 'like java.lang.Runtime.freeMemory, com.inferrix.stack.dao.DataPointDao.COUNT or '
+        + 'stack.system.uptime. An id no monitor answers to is accepted and then reads nothing, so '
+        + 'check the value after the first poll.',
+      dataType: 'Always Numeric on a point saved from here: the gateway rebuilds the locator and keeps '
+        + 'only the monitor id, so it cannot be told that a monitor reports text.'
+    },
+    defaults: {monitorId: 'com.inferrix.stack.rt.maint.WorkItemMonitor.highPriorityWaiting',
+      dataType: 'NUMERIC'}
   }
 };
 

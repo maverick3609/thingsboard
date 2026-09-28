@@ -144,6 +144,9 @@ const FIELD_LABELS: {[property: string]: string} = {
   timePointer: 'Timestamp pointer',
   timeFormat: 'Timestamp format',
   setPointName: 'Set point JSON key',
+  // The internal monitoring source. Both are declared on `INTERNAL` models and nowhere else.
+  createPointsPattern: 'Auto-create points matching',
+  monitorId: 'Monitor ID',
   // A virtual point's simulator settings. All five are declared on `VIRTUAL.PL` and on no other
   // model in the document, so naming them here cannot reach a field that means something else.
   // The gateway's own labels, except that it calls `maxChange` "Minimum Change" on the attractor

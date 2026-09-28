@@ -250,7 +250,7 @@ consulted.
 | 9 | `MQTT.DS` | `MQTT.PL` | **done** — 2026-09-28; **D71-D73** filed, and D73 forced a correction to the 2026-09-27 verb change; needs an on-screen pass |
 | 10 | `HTTP_RECEIVER.DS` | `HTTP_RECEIVER.PL` | **done** — 2026-09-28; **D74-D75** filed; needs an on-screen pass |
 | 11 | `HTTP_JSON_RETRIEVER.DS` | `HTTP_JSON_RETRIEVER.PL` | **done** — 2026-09-28; **D76-D81** filed, one of them general to all 18 polling types; needs an on-screen pass |
-| 12 | `INTERNAL.DS` | `INTERNAL.PL` | 1 live; deferred behind the protocols above |
+| 12 | `INTERNAL.DS` | `INTERNAL.PL` | **done** — 2026-09-28; **D83-D87** filed, one of them general to every create; needs an on-screen pass |
 | 13 | `MESH_CONTROLLER.DS` | — | 1 live |
 | … | the remaining ~40 | | mostly four to eight fields |
 | last | the 13 types with no stack form | | left on the generic schema form — see Open decisions |
@@ -1228,6 +1228,65 @@ of them acted on and one of them reaching back into rows 7 and 8.
   two-row textarea. `pack` honours it unconditionally and the gate closing collapses the row to the
   switch alone, so it is correct; whether it *looks* right is the one thing a spec cannot answer.
 
+### 12 — `INTERNAL.DS` / `INTERNAL.PL` (done, 2026-09-28)
+
+**The gateway watching itself**, and the first type where the gateway's own UI is not a reference at
+all: its `internal-datasource` component delegates to the shared **mesh-node** sensor form, so it shows
+`address`, `anchorNode`, `location` and `zone` — none of which this model has — and offers neither the
+poll period nor `createPointsPattern`. The extra keys are silently ignored rather than refused
+(measured: an add carrying `address` saves 201), so it saves, it just cannot configure anything.
+Filed as **W28**. Parity here means matching the Java.
+
+**The data source is one regex.** `InternalDataSourceRT` compiles `createPointsPattern` once and, on
+every poll, creates a point for each registered monitor whose **id** matches and that it is not already
+tracking — enabled, named from the monitor, with logging types chosen by what kind of monitor it is
+(ON_CHANGE for a success count, 5-minute INTERVAL MAXIMUM for a poll duration). Left empty the source
+creates nothing and points are added by hand, which is what the one live source on the bench gateway
+does — so `provisionedPoints` would be **wrong** here, even though this is the most provisioned type in
+the sequence: the button it removes is the only way to add a point to a source with no pattern.
+
+**The one field a client needs does not exist on the wire.** `GET /v2/stack-monitor` returns 98 monitors
+as `{name, value}` — the translated name and the current value, and **not the id** (**D83**). The id is
+what `monitorId` stores and what the pattern matches, and it is not derivable from the name:
+"Schedules" is `com.inferrix.stack.dao.ScheduleDao.COUNT`. So the picker this type obviously wants
+cannot be built, and both fields fall back to text with a hint carrying real id shapes. The
+`/{id}` route can confirm an id already in hand but cannot enumerate one, which is the wrong way round.
+
+**A wrong id is accepted and then reads nothing for ever.** The validator is written —
+`try { getMonitor(id) } catch { "internal.missingMonitor" }` — and cannot fire, because `getMonitor`
+answers an unknown id with null rather than an exception (**D85**). Measured: `no.such.monitor` saves
+201 and the point simply never updates, because `doPoll` and `forcePointRead` both skip a null monitor.
+Only an *absent* id is refused, and that is the one case that throws. So `monitorId` is `required` here,
+which covers the refusable mistake and cannot cover the accepted one; the hint asks the operator to
+check the value after the first poll, which is the only verification left.
+
+**`dataType` is disabled rather than offered.** `InternalPointLocatorModel.toVO` builds a fresh VO and
+sets `monitorId` alone, so a submitted data type never reaches storage and the VO's own NUMERIC is kept
+(**D84**, measured: a point posted ALPHANUMERIC reads back NUMERIC). The type genuinely varies — the
+live `internal_name_hardware` point is ALPHANUMERIC, because it predates this REST surface — and the
+worse half of D84 is that **any save of such a point resets it**, since `PUT` replaces the locator
+wholesale and `PATCH` refuses a polymorphic member (D73). That half is read from the source rather than
+measured: reproducing it would have meant breaking the live text point on a shared instance. Nothing on
+this side can prevent it, because the gateway discards the field rather than misreading it; what the
+layout can do is stop pretending the dropdown works, and say why in the hint.
+
+**Seeded with a monitor that exists.** `InternalPointLocatorVO` starts on
+`…WorkItemMonitor.highPriorityWaiting`, which resolves live to "Waiting High Priority Threads" — so a
+new point is savable as it opens and shows the shape of an id at the same time, which given D83 is the
+only teaching material available.
+
+**Verified.** The form's own bodies: add 201 with the seeded period and `alarmLevels: []`, `PATCH` 200
+adding a pattern, a malformed regex a clean 422 naming `createPointsPattern`, point add 201 on the
+seeded monitor, point edit 200 on `PUT` carrying the hidden fields and the disabled data type back. 89
+layout and 40 schema specs green. Six probe rows and one probe source deleted; the instance is back to
+21 sources and 106 points, and the live internal source and its 23 points were not touched. On-screen
+pass owed with rows 6-11.
+
+**A 500 that is nobody's type in particular.** A duplicate `xid` answers **500 Internal Server Error**
+with no field, on both `POST /v2/data-source` and `POST /v2/data-point` (**D86**). Both add forms offer
+the xid, so it is an ordinary operator mistake answered with the least informative status there is. It
+has been reachable through all twelve rows; it took this one to notice, because a probe reused an xid.
+
 ## Per-type components
 
 Settled 2026-09-25, after the question was raised directly: **is one renderer for 148 model types
@@ -1383,6 +1442,23 @@ changed.
 
   Written up in `Inferrix-stack/docs/specs/2026-09-28-http-json-retriever.md`.
 
+- **D83 (P2)** — `ValueMonitorModel` publishes a monitor's translated name and current value and **not
+  its id**, so the 98-row `GET /v2/stack-monitor` cannot drive a picker for `INTERNAL.PL.monitorId` or
+  help write the `createPointsPattern` that matches ids. One field on one model.
+- **D84 (P1)** — `InternalPointLocatorModel.toVO` builds a fresh VO and copies only `monitorId`, so a
+  submitted `dataType` is dropped and the VO's NUMERIC kept. A text-valued monitor cannot be configured
+  through REST, and any save of an existing ALPHANUMERIC internal point resets it to NUMERIC.
+- **D85 (P2)** — a `monitorId` no monitor answers to saves 201. The validator's `getMonitor` returns
+  null for an unknown id instead of throwing, so its `catch` never runs; the point is then inert for
+  ever.
+- **D86 (P2)** — a duplicate `xid` answers **500** on both `POST /v2/data-source` and
+  `POST /v2/data-point`. General to every type.
+- **D87 (P3)** — `internal.missingMonitor`, `validate.invalidRegex` and the three
+  `dsEdit.internal.autoCreate.names.*` keys are missing, and `dsEdit.internal` resolves to French in
+  `i18n_en.properties`. The autoCreate keys are stored as auto-created points' **names**.
+
+  Written up in `Inferrix-stack/docs/specs/2026-09-28-internal-monitoring-source.md`.
+
 - **W11 (P1)** — a multistate virtual point cannot be configured at all. The template switches on
   `'MULTISTATE'`, a case its own dropdown can never emit (it emits `INCREMENT_MULTISTATE`), so the
   value list and roll flag never render and the point saves with an empty value set. Cortex uses
@@ -1425,6 +1501,10 @@ changed.
 - **W27 (P1)** — the same form's "Settable" toggle is bound to `pointLocator.setPointName`, writing a
   boolean into the string field that names the JSON key a write would post. There is no control for
   `settable` at all, and any point saved through that toggle carries `setPointName: true`.
+- **W28 (P2)** — the internal monitoring source's form delegates to the shared **mesh-node** sensor
+  form, so it offers `address`, `anchorNode`, `location` and `zone` — fields `INTERNAL.DS` does not have
+  — and neither the poll period nor `createPointsPattern`, which are the only two it does. The gateway
+  ignores the extra keys rather than refusing them, so the form saves and configures nothing.
 
 Stack-side findings go to `Inferrix-stack/docs/specs/` instead.
 

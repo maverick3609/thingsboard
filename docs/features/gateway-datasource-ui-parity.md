@@ -1238,12 +1238,20 @@ poll period nor `createPointsPattern`. The extra keys are silently ignored rathe
 Filed as **W28**. Parity here means matching the Java.
 
 **The data source is one regex.** `InternalDataSourceRT` compiles `createPointsPattern` once and, on
-every poll, creates a point for each registered monitor whose **id** matches and that it is not already
-tracking — enabled, named from the monitor, with logging types chosen by what kind of monitor it is
-(ON_CHANGE for a success count, 5-minute INTERVAL MAXIMUM for a poll duration). Left empty the source
-creates nothing and points are added by hand, which is what the one live source on the bench gateway
-does — so `provisionedPoints` would be **wrong** here, even though this is the most provisioned type in
-the sequence: the button it removes is the only way to add a point to a source with no pattern.
+every poll, creates a point for each registered monitor whose **whole id** matches (`matcher(...).
+matches()`, not `find()`) and that it is not already tracking — enabled, named from the monitor, with
+logging types chosen by what kind of monitor it is (ON_CHANGE for a success count, 5-minute INTERVAL
+MAXIMUM for a poll duration). Left empty the source creates nothing and points are added by hand — so
+`provisionedPoints` would be **wrong** here, even though this is the most provisioned type in the
+sequence: the button it removes is the only way to add a point to a source with no pattern.
+
+The live `internal_monitoring_ds` is **not** the by-hand example, as a first draft of this row claimed.
+`InternalLifecycleDefinition.postInitialize` installs its 23 points from a fixed table, under an
+`else` branch commented *"Ensure all points are added"* that re-runs on **every boot** and skips the
+ones that exist — so a point deleted through Cortex returns when the gateway restarts, and nothing
+in Cortex can hold that deletion. The decision stands unchanged, for the other half of the reason: that
+provisioner serves exactly one xid (`internal_monitoring_ds`), and a source an operator creates has no
+provisioner at all.
 
 **The one field a client needs does not exist on the wire.** `GET /v2/stack-monitor` returns 98 monitors
 as `{name, value}` — the translated name and the current value, and **not the id** (**D83**). The id is
@@ -1263,9 +1271,13 @@ check the value after the first poll, which is the only verification left.
 **`dataType` is disabled rather than offered.** `InternalPointLocatorModel.toVO` builds a fresh VO and
 sets `monitorId` alone, so a submitted data type never reaches storage and the VO's own NUMERIC is kept
 (**D84**, measured: a point posted ALPHANUMERIC reads back NUMERIC). The type genuinely varies — the
-live `internal_name_hardware` point is ALPHANUMERIC, because it predates this REST surface — and the
-worse half of D84 is that **any save of such a point resets it**, since `PUT` replaces the locator
-wholesale and `PATCH` refuses a polymorphic member (D73). That half is read from the source rather than
+live `internal_name_hardware` point is ALPHANUMERIC, and not as a legacy leftover: `maybeCreatePoints`
+does `pl.setDataTypeId(DataTypes.ALPHANUMERIC)` for that one xid, in current code, on every boot. So
+it is a configuration only the Java can produce, which makes the worse half of D84 — that **any save
+of such a point resets it**, since `PUT` replaces the locator wholesale and `PATCH` refuses a
+polymorphic member (D73) — a standing trap on a point the gateway itself ships, rather than a hazard
+confined to old installs. The boot-time provisioner will not repair it either: it only creates points
+that are missing. That half is read from the source rather than
 measured: reproducing it would have meant breaking the live text point on a shared instance. Nothing on
 this side can prevent it, because the gateway discards the field rather than misreading it; what the
 layout can do is stop pretending the dropdown works, and say why in the hint.
@@ -1273,7 +1285,10 @@ layout can do is stop pretending the dropdown works, and say why in the hint.
 **Seeded with a monitor that exists.** `InternalPointLocatorVO` starts on
 `…WorkItemMonitor.highPriorityWaiting`, which resolves live to "Waiting High Priority Threads" — so a
 new point is savable as it opens and shows the shape of an id at the same time, which given D83 is the
-only teaching material available.
+only teaching material available. Safe to carry a device-side id in our own table because that monitor
+is not optional: `StackMonitoringService` is a plain `@Component` whose constructor creates it, with no
+condition, and `internal-ds` compiles against that class — so a gateway offering this type has the
+monitor. One live measurement would not have been enough to claim that.
 
 **Verified.** The form's own bodies: add 201 with the seeded period and `alarmLevels: []`, `PATCH` 200
 adding a pattern, a malformed regex a clean 422 naming `createPointsPattern`, point add 201 on the
@@ -1286,6 +1301,42 @@ pass owed with rows 6-11.
 with no field, on both `POST /v2/data-source` and `POST /v2/data-point` (**D86**). Both add forms offer
 the xid, so it is an ordinary operator mistake answered with the least informative status there is. It
 has been reachable through all twelve rows; it took this one to notice, because a probe reused an xid.
+
+**What the adversarial review found, and what it changed.** Eight findings on the row-12 commit, six
+acted on, one rejected with a reason, one deferred to a later row.
+
+1. *A hint on a disabled field could not be read* — the high one, and it made the row's central
+   decision ("stop offering a dropdown that lies; say why in the hint") ship a greyed box beside a dead
+   icon. Material sets `pointer-events: none` on a disabled field's `.mat-mdc-text-field-wrapper` and
+   re-enables only `.mdc-text-field__input`; `matIconSuffix` renders inside that wrapper, and
+   `MatTooltip` opens on mouseenter, touchstart or keyboard focus — none of which a non-focusable
+   `mat-icon` behind `pointer-events: none` will ever see. Confirmed in the compiled Material CSS and
+   in the form-field template, and there is no ThingsBoard-wide override. One line in
+   `gateway-form.component.scss` (`pointer-events: auto`), which also repairs three cases the **mapper**
+   has produced since it was written: a `readOnly` field whose schema carried a description, a
+   `WIRE_STRING_COMPONENTS` ref ("Reported by the gateway"), and an unresolved `$ref`.
+2. *The reviewer also wanted a spec forbidding a hint on a `readonly` field* — **rejected**, because it
+   contradicts finding 1's own fix. The reason the `hidden` rule exists is that a hidden field renders
+   no icon at all; a disabled one renders an icon, and after the CSS fix that icon works. Recorded as a
+   comment on the spec so the next reader does not re-derive the wrong half.
+3. *"Its points are added by hand, which is what the one live source on the bench gateway does"* — wrong,
+   and it was the load-bearing premise for omitting `provisionedPoints`. Corrected above: the live
+   source is provisioned from Java on every boot. The decision survives on its other half.
+4. *"The live `internal_name_hardware` point is ALPHANUMERIC because it predates this REST surface"* —
+   wrong, and it understated D84. `maybeCreatePoints` sets that data type in current code, every boot.
+5. *D80 and D87 each attributed a French string to `i18n_en.properties`* — both false.
+   `core/.../i18n_en.properties:1419` is `event.ds.dataParse=Point data parse exception` and
+   `Modules/internal-ds/.../i18n_en.properties:9` is `dsEdit.internal=Internal Datasource`; the French
+   is in `i18n_fr.properties` where it belongs. Both clauses dropped here and in the handed-over specs,
+   and every other row was re-grepped for the same mistake — there were exactly two.
+6. *The `createPointsPattern` hint did not say the whole id must match* — `InternalDataSourceRT` uses
+   `matcher(id).matches()`, so `COUNT` on its own creates nothing and reports nothing. Both worked
+   examples in the hint happened to be anchored, which hid it. One clause added.
+7. *`monitorId` rendered second, behind the disabled box* — schema order is `dataType` first. Now
+   `rows: [['monitorId'], ['dataType']]`; a row each rather than a pair, because an id runs to 60-odd
+   characters and half a line cuts it off mid-package.
+8. *A stack-side `@Schema` note on the shared `settable` property* — deferred; it belongs to whichever
+   row next touches the shared point-locator fields, not to this one.
 
 ## Per-type components
 
@@ -1428,8 +1479,7 @@ changed.
 - **D79 (P2, security)** — `bearerToken` is not `writeOnly`: the gateway returns the token verbatim
   from every read of the data source, list endpoint included.
 - **D80 (P2)** — 15 of the 18 message keys this type uses are missing, including every point's
-  configuration description and the validation message for a bad JSON Pointer. `event.ds.dataParse`
-  resolves to French in `i18n_en.properties`.
+  configuration description and the validation message for a bad JSON Pointer.
 - **D81 (P2)** — **no** polling data source validates its poll period through REST. A body with a
   period unit and no count saves 201 with a zero period; measured on `HTTP_JSON_RETRIEVER.DS` and
   `MODBUS_IP.DS`. `PollingDataSourceVO.validate` has the guard and is unreachable, and
@@ -1454,8 +1504,8 @@ changed.
 - **D86 (P2)** — a duplicate `xid` answers **500** on both `POST /v2/data-source` and
   `POST /v2/data-point`. General to every type.
 - **D87 (P3)** — `internal.missingMonitor`, `validate.invalidRegex` and the three
-  `dsEdit.internal.autoCreate.names.*` keys are missing, and `dsEdit.internal` resolves to French in
-  `i18n_en.properties`. The autoCreate keys are stored as auto-created points' **names**.
+  `dsEdit.internal.autoCreate.names.*` keys appear in no `.properties` file at all. The autoCreate keys
+  are stored as auto-created points' **names**.
 
   Written up in `Inferrix-stack/docs/specs/2026-09-28-internal-monitoring-source.md`.
 

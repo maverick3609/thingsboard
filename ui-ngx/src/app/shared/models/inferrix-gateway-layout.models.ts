@@ -1285,11 +1285,14 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * The gateway watching itself: one poll period and one regex, and no connection to anything.
    *
    * `createPointsPattern` is the whole data source. `InternalDataSourceRT` compiles it once and, on
-   * every poll, creates a point for each registered monitor whose **id** matches and that it is not
-   * already tracking -- enabled, named from the monitor, with logging types chosen by what kind of
-   * monitor it is. Left empty the source creates nothing and its points are added by hand, which is
-   * what the one live source on the bench gateway does, so {@link provisionedPoints} would be wrong
-   * here: the button it removes is the only way to add a point to a source with no pattern.
+   * every poll, creates a point for each registered monitor whose **whole id** matches and that it is
+   * not already tracking -- enabled, named from the monitor, with logging types chosen by what kind of
+   * monitor it is. Left empty the source creates nothing, and its points are then added by hand, so
+   * {@link provisionedPoints} would be wrong here: the button it removes is the only way to add a
+   * point to a source with no pattern. The gateway's own `internal_monitoring_ds` is not the example:
+   * `InternalLifecycleDefinition.postInitialize` installs its 23 points from a fixed table and re-runs
+   * on every boot, so one deleted through Cortex comes back. That provisioner is for that single
+   * source only -- nothing provisions a source an operator creates.
    *
    * The pattern matches ids and an operator can only see names (**D83**), so the hint carries the two
    * id shapes that cover most of what is worth tracking. A malformed regex is a clean 422 naming the
@@ -1300,7 +1303,9 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
       // Plain text: the template renders a hint as a Material tooltip, which does not read markdown, so
       // a backtick would be shown rather than applied.
       createPointsPattern: 'A Java regular expression, matched against each monitor\'s id rather than '
-        + 'the name shown on the gateway\'s own Stack Monitor page. Every monitor it matches gets a '
+        + 'the name shown on the gateway\'s own Stack Monitor page. The whole id has to match, '
+        + 'so wrap a fragment in .* -- COUNT on its own matches nothing and reports nothing. '
+        + 'Every monitor it matches gets a '
         + 'point, created on the next poll and enabled. Examples: .*\\.COUNT for every row count, or '
         + 'com\\.inferrix\\.infix\\.rt\\.dataSource\\.PollingDataSource.* for the poll health of every '
         + 'data source on the gateway. Left empty, nothing is created.'
@@ -1344,7 +1349,11 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
         + 'only the monitor id, so it cannot be told that a monitor reports text.'
     },
     defaults: {monitorId: 'com.inferrix.stack.rt.maint.WorkItemMonitor.highPriorityWaiting',
-      dataType: 'NUMERIC'}
+      dataType: 'NUMERIC'},
+    // Schema order puts `dataType` first, which would open the form on a greyed box and push the one
+    // field that carries the meaning below it. A row each rather than a pair: an id is 60-odd
+    // characters and half a line cuts it off mid-package.
+    rows: [['monitorId'], ['dataType']]
   }
 };
 

@@ -14,6 +14,11 @@
   /* The schema's own description, as an icon inside the field -- the same grey ThingsBoard uses
      for a hint icon beside a settings row. */
   .tb-gateway-form-hint {
+    /* Material puts `pointer-events: none` on a disabled field's wrapper and re-enables only the
+       input itself -- and an icon suffix renders inside that wrapper. Without this the hint on a
+       disabled field is a greyed icon no tooltip ever opens from: `INTERNAL.PL.dataType`, and every
+       `readOnly` field whose schema carried a description. */
+    pointer-events: auto;
     color: #e0e0e0;
     font-size: 18px;
     width: 18px;

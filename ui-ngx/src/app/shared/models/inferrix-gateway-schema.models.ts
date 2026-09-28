@@ -393,11 +393,17 @@ const toProperty = (key: string, raw: any, required: boolean, doc: GatewaySchema
     // A ref the gateway sent but did not include. Disabled rather than dropped, so the operator
     // can see that a field exists and is not editable instead of wondering what is missing.
     return {...base, disabled: true,
-      hint: refName ? 'Unresolved schema reference: ' + escapeCell(refName) : undefined};
+      hint: refName ? 'Unresolved schema reference: ' + refName : undefined};
   }
 
   if (resolved.description) {
-    base.hint = escapeCell(resolved.description);
+    // Verbatim, not escaped. A hint reaches the page through `matTooltip` and through
+    // `[tb-hint-tooltip-icon]`, which is itself a `matTooltip` -- both set `textContent`, as does the
+    // interpolation that feeds them, and `tb-dynamic-form` renders a delegated field's hint the same
+    // way. Every sink is a text sink, so escaping here does not defend anything and does show: a
+    // gateway description mentioning "the source's start time" arrived as "the source&#39;s start
+    // time" on `INTERNAL.DS.quantize`. `escapeCell` is for a table cell, which is HTML.
+    base.hint = resolved.description;
   }
 
   // Checked on both the property's own schema and the resolved one: swagger writes `readOnly`

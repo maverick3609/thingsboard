@@ -1292,7 +1292,7 @@ monitor. One live measurement would not have been enough to claim that.
 
 **Verified.** The form's own bodies: add 201 with the seeded period and `alarmLevels: []`, `PATCH` 200
 adding a pattern, a malformed regex a clean 422 naming `createPointsPattern`, point add 201 on the
-seeded monitor, point edit 200 on `PUT` carrying the hidden fields and the disabled data type back. 89
+seeded monitor, point edit 200 on `PUT` carrying the hidden fields and the disabled data type back. 90
 layout and 40 schema specs green. Six probe rows and one probe source deleted; the instance is back to
 21 sources and 106 points, and the live internal source and its 23 points were not touched. On-screen
 pass owed with rows 6-11.
@@ -1302,8 +1302,8 @@ with no field, on both `POST /v2/data-source` and `POST /v2/data-point` (**D86**
 the xid, so it is an ordinary operator mistake answered with the least informative status there is. It
 has been reachable through all twelve rows; it took this one to notice, because a probe reused an xid.
 
-**What the adversarial review found, and what it changed.** Eight findings on the row-12 commit, six
-acted on, one rejected with a reason, one deferred to a later row.
+**What the adversarial review found, and what it changed.** Nine findings on the row-12 commit, eight
+acted on and one rejected with a reason.
 
 1. *A hint on a disabled field could not be read* — the high one, and it made the row's central
    decision ("stop offering a dropdown that lies; say why in the hint") ship a greyed box beside a dead
@@ -1335,8 +1335,21 @@ acted on, one rejected with a reason, one deferred to a later row.
 7. *`monitorId` rendered second, behind the disabled box* — schema order is `dataType` first. Now
    `rows: [['monitorId'], ['dataType']]`; a row each rather than a pair, because an id runs to 60-odd
    characters and half a line cuts it off mid-package.
-8. *A stack-side `@Schema` note on the shared `settable` property* — deferred; it belongs to whichever
-   row next touches the shared point-locator fields, not to this one.
+8. *The shared `settable` `@Schema` description names two read-only-by-construction locators and there
+   are three* — `InternalPointLocatorVO.isSettable()` also returns false unconditionally and is not in
+   the sentence, so a client generating its form from the schema offers a toggle the gateway accepts
+   and ignores. Filed as **D88**. Cortex already hides the field here, but from reading `toVO` rather
+   than from the schema — which is the reliance that description exists to remove.
+9. *An escaped device description rendered its entities literally* — pre-existing in the mapper, and
+   `INTERNAL.DS`'s Advanced panel is where it finally showed: `quantize` read "…rather than the
+   source&#39;s start time". `escapeCell` is for a table cell, which is HTML; a hint's only sinks are
+   `matTooltip`, `[tb-hint-tooltip-icon]` (another `matTooltip`) and `tb-dynamic-form`, which renders a
+   delegated field's hint the same way — all `textContent`. The one HTML sink in that component,
+   `[innerHTML]="safeHtml"`, is fed by `htmlContent` on a `htmlSection` property, which this mapper
+   cannot emit: the markup `FormPropertyType`s and `condition` are refused by specs of their own.
+   **The trade-off, stated plainly:** the mapper now puts device free text into `hint` unescaped, so
+   the defence is the sink and no longer the data. Anyone giving a hint an HTML sink later breaks it.
+   The spec that asserted the escaping now asserts the description arrives verbatim, and says why.
 
 ## Per-type components
 
@@ -1506,6 +1519,11 @@ changed.
 - **D87 (P3)** — `internal.missingMonitor`, `validate.invalidRegex` and the three
   `dsEdit.internal.autoCreate.names.*` keys appear in no `.properties` file at all. The autoCreate keys
   are stored as auto-created points' **names**.
+
+  Written up in `Inferrix-stack/docs/specs/2026-09-28-internal-monitoring-source.md`.
+
+- **D88 (P3)** — `PointLocatorModel.settable`'s `@Schema` description lists the locators that override
+  `isSettable()` to false and omits `INTERNAL.PL`, which does. One sentence.
 
   Written up in `Inferrix-stack/docs/specs/2026-09-28-internal-monitoring-source.md`.
 

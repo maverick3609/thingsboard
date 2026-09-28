@@ -140,7 +140,7 @@ describe('inferrix-gateway-schema.models', () => {
       }
     });
 
-    it('escapes every string it takes from the schema', () => {
+    it('refuses or contains every string it takes from the schema', () => {
       const payload = '<img src=x onerror=alert(1)>';
       const hostile: GatewaySchemaDocument = {
         families: {dataSource: {EVIL: {
@@ -154,11 +154,16 @@ describe('inferrix-gateway-schema.models', () => {
         components: {schemas: {}}
       };
       const properties = schemaToFormProperties(hostile, 'dataSource', 'EVIL');
-      const rendered = JSON.stringify(properties);
 
-      expect(rendered).not.toContain('<img');
-      // The description is escaped -- it is free text and the gateway is entitled to send any.
-      expect(rendered).toContain('&lt;img');
+      // A description is free text and the gateway is entitled to send any, markup included -- it
+      // arrives verbatim and is **not** escaped. What makes that safe is the sink, not the data: a
+      // hint reaches the page only through `matTooltip` and `[tb-hint-tooltip-icon]`, which is
+      // another `matTooltip`, and `tb-dynamic-form` renders a delegated field's hint the same way.
+      // All three set `textContent`. The one HTML sink in that component, `[innerHTML]="safeHtml"`,
+      // is fed by `htmlContent` on a `htmlSection` property -- which this mapper never emits,
+      // because the two specs above refuse both the markup types and `condition`. Escaping here
+      // bought nothing and showed: `INTERNAL.DS.quantize` read "the source&#39;s start time".
+      expect(properties.find(p => p.id === 'described').hint).toBe(payload);
       // The property NAME is not escaped, it is refused: a name is an identifier, and the mapper
       // has no legitimate use for one that is not. Nothing is lost by dropping it, because a field
       // the gateway named with markup is a field no model actually has.

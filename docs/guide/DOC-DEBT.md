@@ -38,3 +38,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `f0262aef6f` fix(gateway): hand out a copy of a layout's defaults, not the table's own values
 - [ ] `0681b77ab3` feat(gateway): lay out a JSON retriever, and seed the poll period every polling type needs
 - [ ] `bc6bb134e1` fix(gateway): leave the bearer token clearable, because the gateway hands it back
+- [ ] `408bc7503b` feat(gateway): let a layout carry a hint, since three types now describe nothing

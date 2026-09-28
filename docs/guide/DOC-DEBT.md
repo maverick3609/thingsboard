@@ -40,3 +40,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `bc6bb134e1` fix(gateway): leave the bearer token clearable, because the gateway hands it back
 - [ ] `408bc7503b` feat(gateway): let a layout carry a hint, since three types now describe nothing
 - [ ] `7720f433ac` fix(gateway): stop offering a data type three locators cannot produce, and give a number a floor
+- [ ] `edf4872a7c` feat(gateway): lay out the internal monitoring source, whose one useful field the gateway will not name

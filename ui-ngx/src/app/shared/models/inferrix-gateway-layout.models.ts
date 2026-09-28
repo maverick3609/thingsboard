@@ -141,6 +141,20 @@ export interface GatewayFormLayout {
    * renders its hint on the toggle's own label rather than in a field.
    */
   hints?: {[id: string]: string};
+
+  /**
+   * The smallest value a number field may hold, where the gateway has a rule and the schema has no
+   * `minimum`.
+   *
+   * `validatorsFor` already honours `FormProperty.min` on a number — this fills it in where the
+   * document left it out. It exists because `required` is not the guard it looks like: Angular's
+   * `Validators.required` treats `0` as a value, so a field whose gateway-side rule is `> 0` is still
+   * submittable as zero. `HTTP_JSON_RETRIEVER.DS.timeoutSeconds` is the case, and there the refusal
+   * that comes back names another field entirely (**D78**).
+   *
+   * Numbers only: `validatorsFor` applies it on {@link FormPropertyType.number} and nowhere else.
+   */
+  min?: {[id: string]: number};
 }
 
 export interface GatewayGatedOptions {
@@ -570,6 +584,28 @@ const SNMP_COMMUNITY_VERSIONS: (string | number | boolean)[] = ['v1', 'v2c'];
  * every field the schema declares, in schema order — so this table is additive and a gateway
  * module nobody has written a layout for is never worse off than it is today.
  */
+/**
+ * The four data types a locator can carry when its runtime cannot make an image.
+ *
+ * `DataTypes` has five and the schema declares all five on every point locator, because the column
+ * holds any of them -- but whether a given locator can *produce* one is the runtime's business, and
+ * three of the types worked so far answer an image with a throw rather than a refusal:
+ * `SnmpPointLocatorRT.variableToValue` and `HttpJsonRetrieverPointLocatorRT.parseValue` both end their
+ * switch on `default: throw`, and `JavaScriptService.coerce` ends its chain of data-type branches the
+ * same way. Nothing validates `dataType` on any of those three, so a point saved as IMAGE is accepted
+ * and then fails on every poll for ever, reading nothing.
+ *
+ * Deliberately **not** applied to every locator: `HTTP_RECEIVER.PL` really does support an image, via
+ * `PointValue.stringToValue`'s own `DataTypes.IMAGE` branch, which builds an `ImageValue` out of the
+ * posted string. Which types belong here is read per type, from the code that converts the value.
+ */
+const NON_IMAGE_DATA_TYPES: FormSelectItem[] = [
+  {value: 'BINARY', label: 'Binary'},
+  {value: 'MULTISTATE', label: 'Multistate'},
+  {value: 'NUMERIC', label: 'Numeric'},
+  {value: 'ALPHANUMERIC', label: 'Alphanumeric'}
+];
+
 export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
 
   /**
@@ -587,14 +623,7 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    */
   'VIRTUAL.PL': {
     hidden: ['relinquishable', 'configurationDescription'],
-    options: {
-      dataType: [
-        {value: 'BINARY', label: 'Binary'},
-        {value: 'MULTISTATE', label: 'Multistate'},
-        {value: 'NUMERIC', label: 'Numeric'},
-        {value: 'ALPHANUMERIC', label: 'Alphanumeric'}
-      ]
-    },
+    options: {dataType: NON_IMAGE_DATA_TYPES},
     gatedOptions: {
       changeType: {by: 'dataType', table: VIRTUAL_CHANGE_TYPES},
       // A binary point starts true or false and nothing else; every other data type parses its
@@ -872,7 +901,8 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
       'scriptPermissions'],
     advanced: ['executionDelaySeconds', 'logLevel', 'logSize', 'logCount'],
     types: {script: FormPropertyType.textarea},
-    options: {updateEvent: META_UPDATE_EVENTS, contextUpdateEvent: META_CONTEXT_UPDATE_EVENTS},
+    options: {updateEvent: META_UPDATE_EVENTS, contextUpdateEvent: META_CONTEXT_UPDATE_EVENTS,
+      dataType: NON_IMAGE_DATA_TYPES},
     visibleWhen: {updateCronPattern: {by: 'updateEvent', values: ['CRON']}},
     defaults: {dataType: 'NUMERIC', scriptEngine: 'JAVASCRIPT', updateEvent: 'NONE',
       variableName: 'my', contextUpdateEvent: 'CONTEXT_UPDATE', executionDelaySeconds: 0,
@@ -963,7 +993,7 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    */
   'SNMP.PL': {
     hidden: ['settable', 'relinquishable', 'configurationDescription'],
-    options: {setType: SNMP_SET_TYPES},
+    options: {setType: SNMP_SET_TYPES, dataType: NON_IMAGE_DATA_TYPES},
     visibleWhen: {
       // `SnmpPointLocatorRT` reads `binary0Value` on the binary branch alone: it is the raw value
       // that means 0, and there is nothing for it to mean on a numeric or multistate point.
@@ -1152,10 +1182,12 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * shown.** `HttpJsonRetrieverDataSourceDefinition.validate` files its `timeoutSeconds <= 0` message
    * under the property name **`updatePeriods`** -- a field this type's form does not have -- so an
    * empty timeout comes back as *"Must be greater than zero"* against nothing on screen (measured;
-   * **D78**). Seeding the two the model's own initialisers hold, 30 and 2, and refusing an empty box
-   * keeps the form from ever sending the value that produces it. They are ordinary fields rather than
-   * {@link advanced} for the same reason: a {@link required} field behind the Advanced toggle blocks a
-   * save from a control that is not on screen, which is the trap this is avoiding.
+   * **D78**). So the form has to refuse both values itself: the two are seeded with what the model's own
+   * initialisers hold, 30 and 2, {@link required} against an empty box, and given a {@link min} because
+   * `required` counts `0` as an answer and `0` is precisely the value that produces the unattributable
+   * refusal. They are ordinary fields rather than {@link advanced} for the same reason: a
+   * {@link required} field behind the Advanced toggle blocks a save from a control that is not on
+   * screen, which is the trap this is avoiding.
    *
    * `bearerToken` is a **textarea and deliberately not a password**, which is the opposite of every
    * other credential in this table. The schema does not mark it `writeOnly`, so the gateway hands the
@@ -1178,6 +1210,9 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     advanced: ['setPointUrl'],
     types: {bearerToken: FormPropertyType.textarea},
     required: ['url', 'timeoutSeconds', 'retries'],
+    // `required` alone would not stop the value D78 is about: Angular counts `0` as an answer, and the
+    // gateway's rules are `timeoutSeconds > 0` and `retries >= 0`.
+    min: {timeoutSeconds: 1, retries: 0},
     visibleWhen: {bearerToken: {by: 'bearerAuth', values: [true]}},
     defaults: {timeoutSeconds: 30, retries: 2, bearerAuth: false},
     // The switch and the field it gates on one row, which is the only way to put them in that order:
@@ -1215,6 +1250,7 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     hidden: ['settable', 'relinquishable', 'ignoreIfMissing', 'configurationDescription'],
     advanced: ['setPointName'],
     required: ['valuePointer'],
+    options: {dataType: NON_IMAGE_DATA_TYPES},
     hints: {
       valuePointer: 'Where the value is in the response, as a JSON Pointer: /data/0/temp. It has to '
         + 'start with a slash.',
@@ -1262,11 +1298,12 @@ export const gatewayFormDefaults = (modelType: string,
                                     properties?: FormProperty[]): {[id: string]: any} => {
   const defaults = structuredClone(gatewayFormLayout(modelType)?.defaults ?? {});
   // Every polling source, rather than a line in eighteen layouts and a rule to remember in the rest.
-  // `timePeriod` is the one field a polling model cannot do without -- `timePeriodType` is the only
-  // `required` in the whole schema document -- and it is a delegated fieldset, so an operator who
-  // saves without opening it sends `{}` and is refused, while one who fills in the unit and not the
-  // count is **accepted with a zero poll period**: nothing validates it on any type, measured on two
-  // (**D81**). `PollingDataSourceVO` starts every subclass on five minutes and no subclass overrides
+  // `timePeriod` is the one field a polling model cannot do without, and the document says so louder
+  // than any other field: `timePeriod` and its own `timePeriodType` are the **only two names that
+  // appear in any `required` array in the whole schema** -- 28 sites and 1 -- and it is a delegated
+  // fieldset, so an operator who saves without opening it sends `{}` and is refused, while one who
+  // fills in the unit and not the count is **accepted with a zero poll period**: nothing validates
+  // the count on any type, measured on two (**D81**). `PollingDataSourceVO` starts every subclass on five minutes and no subclass overrides
   // it, so this is the gateway's own default, seeded only where the schema says the field exists.
   if (!('timePeriod' in defaults)
       && (properties ?? []).some(property => property.id === 'timePeriod')) {

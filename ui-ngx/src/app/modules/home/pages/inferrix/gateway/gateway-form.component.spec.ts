@@ -138,6 +138,21 @@ describe('gateway form layout mechanics', () => {
     expect(form.validate(null)).toBeNull();
   });
 
+  it('gives a number the layout\'s floor, and never loosens the schema\'s', () => {
+    // `validatorsFor` reads `min` off the property, so a layout only has to fill it in. Tightening
+    // only: a layout must not be able to widen a range the device declared.
+    form.properties = [property('port', FormPropertyType.number)];
+    build({min: {port: 1}});
+    expect(shownProperty('port').min).toBe(1);
+    form.writeValue({port: 0});
+    expect(form.form.get('port').hasError('min')).toBe(true);
+    form.writeValue({port: 1});
+    expect(form.validate(null)).toBeNull();
+    form.properties = [property('port', FormPropertyType.number, {min: 1024})];
+    build({min: {port: 1}});
+    expect(shownProperty('port').min).toBe(1024);
+  });
+
   it('keeps the list when the form is written to again', () => {
     // A second write rebuilds the delegated properties, which is where the list was written. Without
     // the applied-set being rebuilt with them, the select would fall back to a text box and nothing

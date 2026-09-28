@@ -591,6 +591,44 @@ describe('gateway form layouts', () => {
     });
   });
 
+  it('narrows the data type away from IMAGE wherever the runtime cannot make one', () => {
+    // `SnmpPointLocatorRT.variableToValue` and `HttpJsonRetrieverPointLocatorRT.parseValue` end their
+    // switch on `default: throw`, and `JavaScriptService.coerce` ends its chain the same way -- and
+    // nothing validates `dataType` on any of the three, so an IMAGE point saves 201 and then fails
+    // every poll for ever. `HTTP_RECEIVER.PL` is deliberately absent: `PointValue.stringToValue` has a
+    // real `DataTypes.IMAGE` branch, so a receiver point can carry one.
+    ['VIRTUAL.PL', 'META.PL', 'SNMP.PL', 'HTTP_JSON_RETRIEVER.PL'].forEach(modelType =>
+      expect(GATEWAY_FORM_LAYOUTS[modelType].options.dataType.map(item => item.value))
+        .withContext(modelType)
+        .toEqual(['BINARY', 'MULTISTATE', 'NUMERIC', 'ALPHANUMERIC']));
+    expect(GATEWAY_FORM_LAYOUTS['HTTP_RECEIVER.PL'].options).toBeUndefined();
+  });
+
+  it('never types a field as a password, because that is the schema\'s word', () => {
+    // `keep()` builds its set of secrets from the *mapper's* properties, where a `password` type means
+    // the schema marked the field `writeOnly` -- it never sees `layout.types`. So a layout typing a
+    // field as a password would render it masked and get none of the empty-drop protection that makes
+    // masking safe, which is a worse position than either honest one. `HTTP_JSON_RETRIEVER.DS`'s
+    // bearer token was exactly that mistake, and is a textarea for it.
+    Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) =>
+      Object.entries(layout.types ?? {}).forEach(([id, type]) =>
+        expect(type).withContext(`${modelType}.${id}`).not.toBe(FormPropertyType.password)));
+  });
+
+  it('gives a number a floor where required would count zero as an answer', () => {
+    // The gateway wants `timeoutSeconds > 0` and `retries >= 0`, and Angular's `required` is satisfied
+    // by a typed 0 -- which for the timeout is the one value whose refusal names another field.
+    expect(retriever.min).toEqual({timeoutSeconds: 1, retries: 0});
+    Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) =>
+      Object.entries(layout.min ?? {}).forEach(([id, min]) => {
+        expect(typeof min).withContext(`${modelType}.${id}`).toBe('number');
+        // A floor on a field nobody can see refuses a save with nothing to correct.
+        expect((layout.hidden ?? []).includes(id)).withContext(`${modelType}.${id}`).toBe(false);
+        expect(Object.keys(layout.visibleWhen ?? {}).includes(id))
+          .withContext(`${modelType}.${id}`).toBe(false);
+      }));
+  });
+
   it('never hints a field it also hides', () => {
     // A hidden field has no control and no icon to hang a tooltip on, so a hint on one is text nobody
     // can reach -- and a sign that one of the two lines is stale.
@@ -774,9 +812,10 @@ describe('gateway form layouts', () => {
   });
 
   it('seeds a poll period on a polling type and on no other, from the schema', () => {
-    // `timePeriodType` is the only `required` in the whole schema document, and `timePeriod` is a
-    // delegated fieldset -- so a source saved without opening it posts `{}` and is refused, or worse
-    // accepted with a zero period where the type's own validate forgets to call the polling one.
+    // `timePeriod` and its own `timePeriodType` are the only two names that appear in any `required`
+    // array in the whole schema document, 28 sites and 1 -- and `timePeriod` is a delegated fieldset,
+    // so a source saved without opening it posts `{}` and is refused, while one with a unit and no
+    // count is accepted with a zero period, because nothing validates the count on any type.
     const polling = [{id: 'url'}, {id: 'timePeriod'}] as any;
     expect(gatewayFormDefaults('HTTP_JSON_RETRIEVER.DS', polling).timePeriod)
       .toEqual({timePeriod: 5, timePeriodType: 'MINUTES'});

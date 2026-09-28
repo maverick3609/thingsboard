@@ -260,7 +260,12 @@ export class GatewayFormComponent implements ControlValueAccessor, OnChanges {
     // A layout hint wins over the device's own description, because naming one is a decision taken
     // with that description in view. Left alone where the layout says nothing.
     const hint = own(this.layout?.hints, property.id) ?? property.hint;
-    const retyped = {...property, disabled, required, hint, type: this.laidOutType(property)};
+    // Same rule as `required`: tightens what the schema declared, never loosens it. `validatorsFor`
+    // reads `min` off the property, so filling it in here is all a layout has to do.
+    const min = own(this.layout?.min, property.id);
+    const retyped = {...property, disabled, required, hint,
+      min: typeof min === 'number' ? Math.max(min, property.min ?? min) : property.min,
+      type: this.laidOutType(property)};
     return items && this.narrowable(property)
       ? {...retyped, type: FormPropertyType.select, items} : retyped;
   }

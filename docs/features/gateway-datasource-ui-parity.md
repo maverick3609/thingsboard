@@ -245,8 +245,8 @@ consulted.
 | 4 | `MODBUS_SERIAL.DS` | `MODBUS.PL` | **done** — 2026-09-25; data source only, locator shared with 3 |
 | 5 | `BACNET_IP.DS` | `BACNET_IP.PL` | **done** — 2026-09-26; needs a local device on the gateway first |
 | 6 | `BACNET_MSTP.DS` | `BACNET_MSTP.PL` | **done** — 2026-09-26; **D57 fixed and A22 answered yes** 2026-09-27, so points work; re-verify after the gateway upgrade |
-| 7 | `META.DS` | `META.PL` | **done** — 2026-09-27; parked 2026-09-26 pending A23, answered and laid out the same day; needs an on-screen pass |
-| 8 | `SNMP.DS` | `SNMP.PL` | **done** — 2026-09-26; **D60-D64 fixed** 2026-09-27, and verifying that turned up **D68-D70** and two fixes on our side; point form still needs an on-screen pass |
+| 7 | `META.DS` | `META.PL` | **done** — 2026-09-27; data type narrowed away from IMAGE 2026-09-28 (row 11's review); parked 2026-09-26 pending A23, answered and laid out the same day; needs an on-screen pass |
+| 8 | `SNMP.DS` | `SNMP.PL` | **done** — 2026-09-26; data type narrowed away from IMAGE 2026-09-28 (row 11's review); **D60-D64 fixed** 2026-09-27, and verifying that turned up **D68-D70** and two fixes on our side; point form still needs an on-screen pass |
 | 9 | `MQTT.DS` | `MQTT.PL` | **done** — 2026-09-28; **D71-D73** filed, and D73 forced a correction to the 2026-09-27 verb change; needs an on-screen pass |
 | 10 | `HTTP_RECEIVER.DS` | `HTTP_RECEIVER.PL` | **done** — 2026-09-28; **D74-D75** filed; needs an on-screen pass |
 | 11 | `HTTP_JSON_RETRIEVER.DS` | `HTTP_JSON_RETRIEVER.PL` | **done** — 2026-09-28; **D76-D81** filed, one of them general to all 18 polling types; needs an on-screen pass |
@@ -1138,9 +1138,15 @@ data type, which a static descriptor cannot do — so both meanings go in the hi
 them. `timeFormat` has a narrower rule worth saying too: a `long` timestamp is epoch millis whatever is
 in the box, and the format is consulted only for a textual one.
 
-**The poll period turned out to be everybody's problem.** `timePeriodType` is the only `required` in
-the whole schema document, and `timePeriod` is a delegated fieldset — so a source saved without opening
-it posts `{}` and is refused, while one with a unit and no count is **accepted with a zero period**.
+**The poll period turned out to be everybody's problem.** `timePeriod` and its own `timePeriodType`
+are the only two names that appear in **any** `required` array in the whole schema document — 28 sites
+and 1 — and `timePeriod` is a delegated fieldset, so a source saved without opening it posts `{}` and
+is refused, while one with a unit and no count is **accepted with a zero period**. (An earlier draft of
+this section, and of the commit message, said `timePeriodType` was the only `required` in the document.
+That was read off the `TimePeriod` component alone and is wrong: `timePeriod` is required at the top
+level of 13 data-source types and in 15 of the components they inherit from. The seed keys on the
+*property*, which is declared on 18 types, so the implementation was right and only the sentence was
+wrong.)
 Measured on this type and on `MODBUS_IP.DS`: nothing validates the count anywhere.
 `PollingDataSourceVO.validate` has the guard and is unreachable from REST, and
 `PollingDataSourceDefinition`, which carries the same one, is extended by a single type in the tree
@@ -1167,6 +1173,39 @@ the stored token intact afterwards; the point's edit 200 on `PUT` carrying the t
 unchanged; `settable: true` reading back `false`. 82 layout, 40 schema, 10 form and 17 service specs
 green. Every probe row created `enabled: false` against a dead port and deleted; the instance is back
 to its original 21 data sources. On-screen pass owed with rows 6-10.
+
+**What the adversarial review found, and what it changed.** Five findings on the row-11 commit, four
+of them acted on and one of them reaching back into rows 7 and 8.
+
+- **Every point locator offered IMAGE, and three of them cannot make one.** The schema declares all
+  five `DataTypes` on every locator, because the column holds any of them — but
+  `SnmpPointLocatorRT.variableToValue` and `HttpJsonRetrieverPointLocatorRT.parseValue` both end their
+  switch on `default: throw`, and `JavaScriptService.coerce` (which is what a META point's script
+  result goes through) ends its chain of branches the same way. Nothing validates `dataType` on any of
+  the three, so a point saved as IMAGE is accepted and then fails on every poll for ever, reading
+  nothing. `VIRTUAL.PL` had been narrowing the list since row 1 for its own reasons; `META.PL`,
+  `SNMP.PL` and `HTTP_JSON_RETRIEVER.PL` now share the same constant, and a spec names all four.
+  The review's own recommendation — a blanket rule that *every* laid-out locator must narrow — is
+  wrong, and checking it is what showed why: `PointValue.stringToValue` has a real `DataTypes.IMAGE`
+  branch that builds an `ImageValue` from the posted string, so `HTTP_RECEIVER.PL` genuinely supports
+  an image and narrowing it would remove a working capability. Which types belong in the list is read
+  per type, from the code that converts the value. MQTT is the one still unread.
+- **`required` does not refuse a zero**, so it did not cover the value D78 is actually about: Angular's
+  `Validators.required` counts `0` as an answer, and `timeoutSeconds: 0` is precisely what comes back
+  as *"Must be greater than zero"* against `updatePeriods`. Hence the new `min` layout key — six lines,
+  because `validatorsFor` already honours `FormProperty.min`; the schema simply declares no `minimum`
+  here. `timeoutSeconds: 1`, `retries: 0`, and a message for the error the number field could not
+  previously explain.
+- **The claim that typing a field as a password buys `keep()`'s protection was false.** `keep()` builds
+  its set of secrets from the *mapper's* properties, where `password` means the schema marked the field
+  `writeOnly`; it never sees `layout.types`. So a layout-typed password would have rendered masked with
+  none of the empty-drop protection that makes masking safe — worse than either honest option. The
+  bearer token had already been moved to a textarea for a different reason (it is clearable now), which
+  happens to be the right end state; what was missing was anything holding the rule. A spec now refuses
+  `FormPropertyType.password` anywhere in a layout's `types`.
+- **A closed `visibleWhen` gate keeps its control and still sends its value**, so a token typed and
+  then hidden by turning `bearerAuth` off is stored anyway. That one is **left alone deliberately** —
+  see the third open decision below.
 
 ## Per-type components
 
@@ -1465,8 +1504,8 @@ From type 8, in `2026-09-26-snmp-rest-surface.md`:
 
 ## Open decisions
 
-Two calls that change the work and cannot be read out of the code. Both have been taken the way
-the recommendation says, and both are reversible.
+Three calls that change the work and cannot be read out of the code. All have been taken the way
+the recommendation says, and all are reversible.
 
 1. **The 106 fields the stack hides.** Hide them too — exact parity, and Cortex can no longer
    configure things the stack's UI cannot reach — or keep them behind an **Advanced** expander,
@@ -1476,6 +1515,17 @@ the recommendation says, and both are reversible.
 2. **The 13 types with no stack form.** Leave them on today's generic schema form, or hide them
    from the type picker for parity? *Taken: leave them.* Removing a working form to match a UI
    that never had one is a loss.
+3. **What a closed `visibleWhen` gate should do with its value** (raised by the row-11 review,
+   2026-09-28). A gate hides the row and keeps the control, so the value is still submitted — which
+   means a credential typed while the gate was open is stored after it closes, in a field the gateway
+   hands back verbatim to every reader of the row. Clear it on close instead? *Taken: keep it.* The
+   alternative is worse in the case that matters more: a form where turning a switch off **destroys a
+   stored credential** — an operator disabling certificate auth on an MQTT source to test something
+   would lose the private key, silently, and `PATCH` would not be able to give it back. Keeping the
+   value is also what makes a gate reversible: `META.PL`'s cron pattern survives a trip through another
+   update event. The exposure this leaves is a value the operator typed themselves, unused by the
+   gateway while the switch is off; the real problem in front of it is D79, the field being readable at
+   all. Revisit if a gate ever hides something the operator did not enter.
 
 ## Superseded
 

@@ -113,6 +113,8 @@
             }
             @if (form.get(item.property.id)?.hasError('required')) {
               <mat-error translate>inferrix.gateway.field-required</mat-error>
+            } @else if (form.get(item.property.id)?.hasError('min')) {
+              <mat-error>{{ 'inferrix.gateway.field-min' | translate:{min: item.property.min} }}</mat-error>
             }
           </mat-form-field>
         } @else {

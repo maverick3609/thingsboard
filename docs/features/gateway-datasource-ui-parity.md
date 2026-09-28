@@ -1083,13 +1083,20 @@ switch that suppresses nothing is worse than an absent one, so it is hidden rath
 `setPointUrl` and `setPointName` are **advanced rather than hidden**, because unlike the other three
 they are stored, validated and would start working the day D76 is fixed.
 
-**The timeout is required because the gateway's refusal cannot be shown.**
+**The timeout is required and floored because the gateway's refusal cannot be shown.**
 `HttpJsonRetrieverDataSourceDefinition.validate` files its `timeoutSeconds <= 0` message under the
 property name **`updatePeriods`** — the poll period, a field this form does not have (**D78**). So a
 zero or empty timeout comes back as *"Must be greater than zero"* pointing at nothing on screen. The
-answer is to keep the value from ever leaving the browser: seed the model's own 30 and 2, mark both
-required, and keep them on the main rows rather than under Advanced — a required field behind a closed
-toggle is the same trap in a different place, which is why the layout spec forbids that combination.
+answer is to keep the value from ever leaving the browser: seed the model's own 30, mark it required
+against an empty box, and floor it at 1 because `required` counts a typed zero as an answer.
+
+`retries` is required too but for a different reason, and **D78 does not reach it** — a first draft of
+this section said it did. `validate` refuses only a negative there and files that under `retries`, its
+own name, so a wrong value says which field it is. What it is protected from is an empty box: that
+posts `null`, Jackson lands it on the primitive as 0, and the source silently stops retrying. Floored
+at 0, which is what the gateway allows. Both sit on the main rows rather than under Advanced — a
+required field behind a closed toggle is the same trap in a different place, which is why the layout
+spec forbids that combination.
 
 **The bearer token is a credential the gateway hands back in plain text**, and that is what decides how
 to render it. `bearerToken` carries no `writeOnly`, so `GET /v2/data-source/{xid}` returns it verbatim
@@ -1156,8 +1163,16 @@ That made the fix a shared one rather than a line in this layout: `gatewayFormDe
 `{timePeriod: 5, timePeriodType: 'MINUTES'}` — `PollingDataSourceVO`'s own initialisers, which no
 subclass overrides — onto any new data source **whose schema declares the field**. Keyed on the schema
 rather than on a list of types, so it reaches the 6 polling types already laid out and the 11 not yet
-written without an invariant anyone has to remember. It is a mitigation in one client, not a fix; the
-gateway still accepts a zero period from anything else that posts one.
+written without an invariant anyone has to remember. Keying on the schema also draws a line a hand-kept
+list would have got wrong: `MODBUS_SLAVE_DEVICE.DS` does not declare a poll period and
+`MODBUS_SLAVE_DEVICE_POLLING.DS` does.
+
+**What the seed closes is the source nobody opened the fieldset on, and only that.** An operator who
+opens it and clears the count still posts `{timePeriod: null, …}` and still gets a zero period, and no
+client-side rule can stop them: the mapper does mark the fieldset `required`, but a fieldset is
+delegated to `tb-dynamic-form`, `build` creates no control for it, and the delegate is bound
+`standalone: true` — so neither the form's own `validate` nor the dialog's save gate ever sees its
+validity. Cortex removes the silent zero, not the deliberate one. The rest is the gateway's to fix.
 
 **Deviations from the gateway's own form, all deliberate.** Its webapp marks `setPointUrl`,
 `valueFormat`, `timePointer` and `timeFormat` **required**, which the Java contradicts: `validate`
@@ -1206,6 +1221,12 @@ of them acted on and one of them reaching back into rows 7 and 8.
 - **A closed `visibleWhen` gate keeps its control and still sends its value**, so a token typed and
   then hidden by turning `bearerAuth` off is stored anyway. That one is **left alone deliberately** —
   see the third open decision below.
+- **Two smaller corrections**, both to prose rather than code: `retries` was bracketed with
+  `timeoutSeconds` under D78 when the gateway names that field correctly (above), and the seed's reach
+  was overstated (above). And one note for the on-screen pass: `['bearerAuth', 'bearerToken']` is the
+  first explicit row in the table to pair two types `PAIRABLE_TYPES` excludes — a toggle beside a
+  two-row textarea. `pack` honours it unconditionally and the gate closing collapses the row to the
+  switch alone, so it is correct; whether it *looks* right is the one thing a spec cannot answer.
 
 ## Per-type components
 

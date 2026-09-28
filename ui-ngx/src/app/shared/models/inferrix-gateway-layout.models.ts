@@ -1178,16 +1178,22 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * `validate.required` under the field's own name, and a malformed one `validate.invalidValue`, so
    * this only moves the same refusal to where the operator is typing.
    *
-   * **`timeoutSeconds` and `retries` are required and seeded, because the gateway's refusal cannot be
-   * shown.** `HttpJsonRetrieverDataSourceDefinition.validate` files its `timeoutSeconds <= 0` message
-   * under the property name **`updatePeriods`** -- a field this type's form does not have -- so an
-   * empty timeout comes back as *"Must be greater than zero"* against nothing on screen (measured;
-   * **D78**). So the form has to refuse both values itself: the two are seeded with what the model's own
-   * initialisers hold, 30 and 2, {@link required} against an empty box, and given a {@link min} because
-   * `required` counts `0` as an answer and `0` is precisely the value that produces the unattributable
-   * refusal. They are ordinary fields rather than {@link advanced} for the same reason: a
-   * {@link required} field behind the Advanced toggle blocks a save from a control that is not on
-   * screen, which is the trap this is avoiding.
+   * **`timeoutSeconds` is required and floored because its refusal cannot be shown.**
+   * `HttpJsonRetrieverDataSourceDefinition.validate` files its `timeoutSeconds <= 0` message under the
+   * property name **`updatePeriods`** -- a field this type's form does not have -- so a zero or empty
+   * timeout comes back as *"Must be greater than zero"* against nothing on screen (measured; **D78**).
+   * Hence all three of seeding the model's own 30, {@link required} against an empty box, and
+   * {@link min} `1`: `required` counts a typed `0` as an answer, and `0` is the value that produces the
+   * unattributable refusal.
+   *
+   * **`retries` is a different case and D78 does not reach it.** `validate` refuses only `< 0` there and
+   * files that under `retries`, its own name, so a wrong value says which field it is. It is required
+   * for its own reason -- an empty box posts `null`, which Jackson lands on the primitive as 0, so the
+   * source would silently stop retrying -- and floored at 0 rather than 1, which is what the gateway
+   * allows.
+   *
+   * Both are ordinary fields rather than {@link advanced}: a {@link required} field behind the Advanced
+   * toggle blocks a save from a control that is not on screen, which is the trap this is avoiding.
    *
    * `bearerToken` is a **textarea and deliberately not a password**, which is the opposite of every
    * other credential in this table. The schema does not mark it `writeOnly`, so the gateway hands the
@@ -1218,6 +1224,12 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     // The switch and the field it gates on one row, which is the only way to put them in that order:
     // an explicit row lands where its first field falls, and the schema declares `bearerToken` before
     // the `bearerAuth` that reveals it -- so left alone the box appears above its own switch.
+    //
+    // It is also the first explicit row here to pair two types `PAIRABLE_TYPES` excludes -- a toggle
+    // beside a two-row textarea -- which `pack` allows because an explicit row is honoured
+    // unconditionally. Chosen over the alternative it replaces rather than because it reads well, and
+    // the first thing to look at on the on-screen pass this type owes. With the gate closed the row
+    // collapses to the switch alone.
     rows: [['url'], ['timeoutSeconds', 'retries'], ['bearerAuth', 'bearerToken']]
   },
 
@@ -1303,8 +1315,16 @@ export const gatewayFormDefaults = (modelType: string,
   // appear in any `required` array in the whole schema** -- 28 sites and 1 -- and it is a delegated
   // fieldset, so an operator who saves without opening it sends `{}` and is refused, while one who
   // fills in the unit and not the count is **accepted with a zero poll period**: nothing validates
-  // the count on any type, measured on two (**D81**). `PollingDataSourceVO` starts every subclass on five minutes and no subclass overrides
-  // it, so this is the gateway's own default, seeded only where the schema says the field exists.
+  // the count on any type, measured on two (**D81**). `PollingDataSourceVO` starts every subclass on
+  // five minutes and no subclass overrides it, so this is the gateway's own default, seeded only where
+  // the schema says the field exists.
+  //
+  // What this closes is the source nobody opened the fieldset on, and only that. An operator who opens
+  // it and clears the count still posts `{timePeriod: null, timePeriodType: …}` and still gets a zero
+  // period, and **no client-side rule can stop them**: the mapper does mark the fieldset `required`,
+  // but a fieldset is delegated to `tb-dynamic-form`, `build` creates no control for it, and the
+  // delegate is bound `standalone: true` -- so neither `validate` nor the dialog's save gate ever sees
+  // its validity. The rest is the gateway's to fix.
   if (!('timePeriod' in defaults)
       && (properties ?? []).some(property => property.id === 'timePeriod')) {
     defaults.timePeriod = {timePeriod: 5, timePeriodType: 'MINUTES'};

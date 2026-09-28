@@ -257,7 +257,10 @@ export class GatewayFormComponent implements ControlValueAccessor, OnChanges {
     const disabled = property.disabled || (this.layout?.readonly ?? []).includes(property.id);
     // Adds to the schema's own `required`, never clears it.
     const required = property.required || (this.layout?.required ?? []).includes(property.id);
-    const retyped = {...property, disabled, required, type: this.laidOutType(property)};
+    // A layout hint wins over the device's own description, because naming one is a decision taken
+    // with that description in view. Left alone where the layout says nothing.
+    const hint = own(this.layout?.hints, property.id) ?? property.hint;
+    const retyped = {...property, disabled, required, hint, type: this.laidOutType(property)};
     return items && this.narrowable(property)
       ? {...retyped, type: FormPropertyType.select, items} : retyped;
   }

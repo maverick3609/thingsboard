@@ -591,6 +591,16 @@ describe('gateway form layouts', () => {
     });
   });
 
+  it('never hints a field it also hides', () => {
+    // A hidden field has no control and no icon to hang a tooltip on, so a hint on one is text nobody
+    // can reach -- and a sign that one of the two lines is stale.
+    Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
+      const hidden = new Set(layout.hidden ?? []);
+      Object.keys(layout.hints ?? {}).forEach(id =>
+        expect(hidden.has(id)).withContext(`${modelType}.${id}`).toBe(false));
+    });
+  });
+
   it('never names a field in both required and hidden', () => {
     Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
       const hidden = new Set(layout.hidden ?? []);

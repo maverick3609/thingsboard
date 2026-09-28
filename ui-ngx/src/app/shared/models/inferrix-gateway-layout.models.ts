@@ -124,6 +124,23 @@ export interface GatewayFormLayout {
    * blocked by a control the operator cannot see. There is a spec for that.
    */
   required?: string[];
+
+  /**
+   * What a field means, where the schema does not say.
+   *
+   * The mapper already fills `FormProperty.hint` from the property's `description`, and the template
+   * already renders it as the tooltip on an info icon in the field — so this is the same channel, for
+   * the types whose schema carries no description at all. Three of the ten worked so far carry none
+   * (`MQTT`, `HTTP_RECEIVER`, `HTTP_JSON_RETRIEVER`), and before this key existed the only place to
+   * put a syntax rule or a unit was inside the label, which is not where ThingsBoard puts one.
+   *
+   * Given precedence over a description the device sent, because a layout naming a hint has looked at
+   * that description and decided against it. Two limits: a **delegated** field has no hint channel —
+   * `tb-dynamic-form` draws its own rows and the template's icon is not among them — so a hint on an
+   * array or a fieldset is silently dropped, and the label is the only place left. And a `switch`
+   * renders its hint on the toggle's own label rather than in a field.
+   */
+  hints?: {[id: string]: string};
 }
 
 export interface GatewayGatedOptions {
@@ -1198,6 +1215,17 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     hidden: ['settable', 'relinquishable', 'ignoreIfMissing', 'configurationDescription'],
     advanced: ['setPointName'],
     required: ['valuePointer'],
+    hints: {
+      valuePointer: 'Where the value is in the response, as a JSON Pointer: /data/0/temp. It has to '
+        + 'start with a slash.',
+      valueFormat: 'Numeric points: a number pattern, such as #.## — used only when the value arrives '
+        + 'as text. Binary points: the text that means 0, with anything else reading as 1. Ignored for '
+        + 'the other types.',
+      timePointer: 'Where that value\'s own timestamp is, as a JSON Pointer: /data/0/ts. Left empty, '
+        + 'each value is stamped with the time of the poll.',
+      timeFormat: 'Only read when the timestamp arrives as text: a date pattern, such as '
+        + 'yyyy-MM-dd HH:mm:ss. A number is taken as milliseconds since the epoch.'
+    },
     defaults: {dataType: 'NUMERIC'},
     // Data type first, because it decides what the two format fields mean. `valueFormat` takes a row
     // of its own so that the timestamp pair stays a pair: left to fall where it likes it would take

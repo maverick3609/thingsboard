@@ -89,6 +89,19 @@ describe('gateway form layout mechanics', () => {
     expect(shownProperty('script').type).toBe(FormPropertyType.text);
   });
 
+  it('puts the layout\'s hint on the field, over the one the device sent', () => {
+    // The mapper fills `hint` from the schema's own `description`; a layout naming one has read that
+    // description and decided against it. Where the layout says nothing the device's text stands.
+    form.properties = [property('script', FormPropertyType.text, {hint: 'from the gateway'}),
+      property('context', FormPropertyType.array,
+        {arrayItemType: FormPropertyType.fieldset, properties: CONTEXT_ITEM_FIELDS})];
+    build({hints: {script: 'ours'}});
+    expect(shownProperty('script').hint).toBe('ours');
+    form.properties = [property('script', FormPropertyType.text, {hint: 'from the gateway'})];
+    build();
+    expect(shownProperty('script').hint).toBe('from the gateway');
+  });
+
   it('puts a looked-up list on a field inside a delegated array', () => {
     build();
     expect(contextItemFields()[0].type).toBe(FormPropertyType.text);

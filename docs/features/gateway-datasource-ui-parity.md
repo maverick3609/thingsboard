@@ -1116,17 +1116,27 @@ missing message keys out of the 18 this type uses** (**D80**), and two of those 
 operator in normal use: the same table also shows every point's configuration description as
 `dsEdit.httpJsonRetriever.dpconn`. Cortex does not paper over either. A form that guessed at the
 gateway's translations would be wrong in a way that is harder to notice, and the raw key at least names
-what is missing. What the label can do is carry the shape — "Value pointer (e.g. /data/0/temp)" — so
-the leading slash is on screen before the refusal is.
+what is missing.
+
+**This is the type that paid for the `hints` layout key**, which row 10 said was worth six lines if a
+third type turned up with no schema descriptions. It did, and with four fields wanting one rather than
+one. The channel already existed and was being missed: the mapper fills `FormProperty.hint` from a
+property's `description`, and the template already renders it as the tooltip on an info icon inside the
+field. So `hints` writes to the same place, takes precedence over a description the device sent, and
+the labels go back to being names — "Value pointer", not "Value pointer (e.g. /data/0/temp)", which is
+where ThingsBoard puts a syntax rule and where the user asked this UI to be. Two limits worth knowing:
+a **delegated** field has no hint channel, because `tb-dynamic-form` draws its own rows and the icon is
+not one of them — which is why row 10's whitelist labels stay long — and a `switch` renders its hint on
+the toggle's label instead.
 
 **`valueFormat` is one field with two meanings**, which is why the label names both. For NUMERIC it is
 a `DecimalFormat` pattern applied to a textual value, and validated as one (a malformed pattern is a
 clean 422 with a real English message from `DecimalFormat` itself). For BINARY it is the text that
 means 0: `new BinaryValue(!valueFormat.equals(node.textValue()))`, so anything else reads as 1.
 MULTISTATE and ALPHANUMERIC ignore it. The gateway's own form solves this by relabelling the field per
-data type, which a static descriptor cannot do — so the label says "number pattern; for binary, the
-text meaning 0" and takes the length. `timeFormat` has a narrower rule worth saying too: a `long`
-timestamp is epoch millis whatever is in the box, and the format is consulted only for a textual one.
+data type, which a static descriptor cannot do — so both meanings go in the hint, which has room for
+them. `timeFormat` has a narrower rule worth saying too: a `long` timestamp is epoch millis whatever is
+in the box, and the format is consulted only for a textual one.
 
 **The poll period turned out to be everybody's problem.** `timePeriodType` is the only `required` in
 the whole schema document, and `timePeriod` is a delegated fieldset — so a source saved without opening

@@ -1339,6 +1339,11 @@ changed.
   `MODBUS_IP.DS`. `PollingDataSourceVO.validate` has the guard and is unreachable, and
   `PollingDataSourceDefinition` is extended by one type in the tree.
 
+- **D82 (P2)** — an unsupported data type is accepted and then fails on every poll. Nothing validates
+  `dataType` against what the locator's own runtime can make: `HTTP_JSON_RETRIEVER.PL`, `SNMP.PL` and
+  `META.PL` all end their conversion on a throw, so an IMAGE point saves 201 and reads nothing for
+  ever. Per-locator rather than blanket — `HTTP_RECEIVER.PL` really does support an image.
+
   Written up in `Inferrix-stack/docs/specs/2026-09-28-http-json-retriever.md`.
 
 - **W11 (P1)** — a multistate virtual point cannot be configured at all. The template switches on

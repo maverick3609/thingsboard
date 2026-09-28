@@ -739,10 +739,11 @@ describe('gateway form layouts', () => {
     expect(retriever.advanced).toEqual(['setPointUrl']);
   });
 
-  it('masks the bearer token and gates it on the switch that sends it', () => {
-    // The schema does not mark it `writeOnly`, so the gateway hands it back in full and the box is
-    // populated on an edit. Typing it as a password is what makes `keep()` drop an empty one.
-    expect(retriever.types.bearerToken).toBe(FormPropertyType.password);
+  it('leaves the bearer token clearable, and gates it on the switch that sends it', () => {
+    // Deliberately not a password, unlike every other credential here. The schema does not mark it
+    // `writeOnly`, so the read carries the token and the box is always populated -- and `keep()` drops
+    // an empty password rather than sending it, which would make a stored token impossible to remove.
+    expect(retriever.types.bearerToken).toBe(FormPropertyType.textarea);
     expect(retriever.visibleWhen.bearerToken).toEqual({by: 'bearerAuth', values: [true]});
   });
 

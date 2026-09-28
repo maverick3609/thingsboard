@@ -1140,11 +1140,18 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * {@link advanced} for the same reason: a {@link required} field behind the Advanced toggle blocks a
    * save from a control that is not on screen, which is the trap this is avoiding.
    *
-   * `bearerToken` is rendered as a password even though the schema does not mark it `writeOnly`, which
-   * means the gateway hands it back in full on every read (**D79**). Masking the box does not undo
-   * that, and is still worth it: the value is pasted once and read by nobody, and a `password` field
-   * is the one the dialog's `keep` protects -- an empty one is dropped rather than sent, so an edit
-   * cannot blank a stored token. It is gated on `bearerAuth` the way the gateway's own form gates it.
+   * `bearerToken` is a **textarea and deliberately not a password**, which is the opposite of every
+   * other credential in this table. The schema does not mark it `writeOnly`, so the gateway hands the
+   * token back in full on every read (**D79**) and the box is always populated on an edit -- there is
+   * no case where the form does not know the stored value, so nothing to protect against. Typing it as
+   * a password would buy masking that is cosmetic for a value the same response already carried in the
+   * clear, and cost the one thing an operator needs from a credential field: `keep` drops an empty
+   * password rather than sending it, so a cleared box would leave the stored token in place and a
+   * token could never be removed. Empty means empty here, measured: `""` stores empty and `null`
+   * stores null. The day the stack marks the field `writeOnly`, the mapper types it as a password
+   * itself and `keep` starts protecting it -- which is then the right behaviour, because the read
+   * would no longer carry the value. A textarea rather than a text box because tokens are long, which
+   * is what the gateway's own form uses. It is gated on `bearerAuth` the way that form gates it.
    *
    * `setPointUrl` is {@link advanced} rather than hidden. It is inert today -- the locator's
    * `isSettable()` is a hard `false`, so no write ever reaches `setPointValue` (**D76**) -- but it is
@@ -1152,7 +1159,7 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    */
   'HTTP_JSON_RETRIEVER.DS': {
     advanced: ['setPointUrl'],
-    types: {bearerToken: FormPropertyType.password},
+    types: {bearerToken: FormPropertyType.textarea},
     required: ['url', 'timeoutSeconds', 'retries'],
     visibleWhen: {bearerToken: {by: 'bearerAuth', values: [true]}},
     defaults: {timeoutSeconds: 30, retries: 2, bearerAuth: false},

@@ -1091,12 +1091,22 @@ answer is to keep the value from ever leaving the browser: seed the model's own 
 required, and keep them on the main rows rather than under Advanced — a required field behind a closed
 toggle is the same trap in a different place, which is why the layout spec forbids that combination.
 
-**The bearer token is a credential the gateway hands back in plain text.** `bearerToken` carries no
-`writeOnly`, so `GET /v2/data-source/{xid}` returns it verbatim to anyone who can read the row
-(**D79**). Cortex renders it as a password field anyway, and the reason is not modesty: a `password`
-field is the one the dialog's `keep` protects, so an empty box is dropped rather than sent and an edit
-cannot blank a stored token. It is gated on `bearerAuth`, and the two share a row — the schema declares
-the token *before* the switch that reveals it, so left alone the box would appear above its own switch.
+**The bearer token is a credential the gateway hands back in plain text**, and that is what decides how
+to render it. `bearerToken` carries no `writeOnly`, so `GET /v2/data-source/{xid}` returns it verbatim
+to anyone who can read the row (**D79**). The first attempt typed it as a password, on the reasoning
+that every other credential in the table is one — and that was wrong in a way worth recording, because
+`keep` drops an empty password rather than sending it. On a field the read does not carry that is
+protection: an untouched box cannot blank a stored secret. On a field the read *does* carry it is a
+functional gap, because the box is always populated, so clearing it is an operator deliberately
+removing a credential and dropping the empty value silently keeps it. **A stored token could never be
+removed through the form.** So it is a textarea — long, like the gateway's own form makes it — and
+empty means empty, measured both ways: `""` stores empty, `null` stores null. The invariant that
+matters is left intact rather than blurred: a password field is one the schema marked `writeOnly`, and
+the day the stack marks this one, the mapper types it as a password by itself and `keep` starts
+protecting it — correctly, because by then the read will no longer carry the value.
+
+It is gated on `bearerAuth`, and the two share a row — the schema declares the token *before* the
+switch that reveals it, so left alone the box would appear above its own switch.
 
 **The pointers are JSON Pointers, and the gateway says so in a language nobody reads.**
 `JsonPointer.valueOf` runs inside `validate`, so a pointer that does not start with `/` is refused

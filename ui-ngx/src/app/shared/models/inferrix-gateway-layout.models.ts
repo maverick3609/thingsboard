@@ -599,6 +599,21 @@ const SNMP_COMMUNITY_VERSIONS: (string | number | boolean)[] = ['v1', 'v2c'];
  * `PointValue.stringToValue`'s own `DataTypes.IMAGE` branch, which builds an `ImageValue` out of the
  * posted string. Which types belong here is read per type, from the code that converts the value.
  */
+/**
+ * The one attribute a mesh controller reports.
+ *
+ * `MeshControllerAttributes` declares exactly one constant -- `HEARTBEAT(1, "HEARTBEAT", BINARY, …)`
+ * -- and the wire carries the **name**, which `MeshControllerPointLocatorModel.toVO` resolves through
+ * a code table. Written out here rather than left as free text because the gateway's own check is
+ * broken in a way that cannot be worked around from this side: see `MESH_CONTROLLER.PL` (**D90**).
+ */
+const MESH_CONTROLLER_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'}
+];
+
+/** The data type that one attribute reports, and the only one its conversion can produce. */
+const BINARY_ONLY: FormSelectItem[] = [{value: 'BINARY', label: 'Binary'}];
+
 const NON_IMAGE_DATA_TYPES: FormSelectItem[] = [
   {value: 'BINARY', label: 'Binary'},
   {value: 'MULTISTATE', label: 'Multistate'},
@@ -1378,6 +1393,82 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     // rather than a pair: an id is 60-odd characters and half a line cuts it off mid-package, and the
     // picker shows the name rather than the id only once the gateway has answered.
     rows: [['monitorId'], ['dataType']]
+  },
+
+  /**
+   * A mesh controller node: three fields, and the mesh owns the first of them.
+   *
+   * The gateway creates this source itself. A controller joining the mesh reaches
+   * `MeshControllerNodesDataSourceCreationManager`, and `CreateMeshControllerVO.createDataSource`
+   * saves the source at the node's address and then calls `createDataPoints`, which creates one point
+   * per `MeshControllerAttributes` constant -- one, `HEARTBEAT` -- with the attribute's own data type
+   * and text renderer, and starts the source. That is {@link provisionedPoints}: the Add button would
+   * only ever offer a second point for the one attribute that exists, which is a row the gateway never
+   * makes and the runtime has no use for. The live source on the team's instance is exactly this shape
+   * -- address 11, one BINARY `HEARTBEAT` point.
+   *
+   * `address` is {@link required} with a floor of 1. `MeshControllerDataSourceDefinition.validate`
+   * refuses `0` and `-1`, and the model's own initialiser **is** `-1`, so an omitted address is a 422
+   * rather than a default (measured: 0, -1 and omitted all answer *"Invalid value"* against
+   * `address`). Left editable although the mesh assigns it, which is what the gateway's own form does:
+   * disabling it would make the type unaddable by hand, and Cortex does not otherwise decide which
+   * sources an operator may create.
+   *
+   * `anchorNode` and `location` are both live -- `MeshControllerDataSourceRT` hands all three to
+   * `MeshControllerMeshActionListener`, and `location` is the model's name for the VO's `zone`.
+   */
+  'MESH_CONTROLLER.DS': {
+    provisionedPoints: true,
+    required: ['address'],
+    min: {address: 1},
+    hints: {
+      address: 'The node address the mesh assigned this controller. Changing it points the source at '
+        + 'a different node; the gateway refuses 0 and -1.',
+      anchorNode: 'Anchor nodes are the fixed reference points the mesh measures position against. '
+        + 'The gateway registers this one as an anchor when the source starts.',
+      location: 'A free-text zone or place, stored as the node\'s zone and shown wherever the mesh '
+        + 'console lists it.'
+    },
+    // The toggle falls on its own line, which is where a switch reads best; `location` comes up beside
+    // the address rather than sitting under the toggle on a line of its own.
+    rows: [['address', 'location']]
+  },
+
+  /**
+   * One attribute of a mesh controller, as a point -- and there is one attribute.
+   *
+   * **The gateway cannot tell a wrong attribute from a right one, and this is why the list is ours.**
+   * `MeshPointLocatorVO` declares a single `public static ExportCodes ATTRIBUTE_CODES`, and **37**
+   * subclasses reassign that one field from their own static initialiser -- mesh extender, mesh
+   * switch, every sensor tag, the thermostats, the light controllers. There is one table, and the
+   * last class to initialise wins. `MeshControllerDataSourceDefinition.validate` checks
+   * `MeshControllerPointLocatorVO.ATTRIBUTE_CODES.isValidId(...)`, which resolves to that shared
+   * field. Measured on 5.1.3: a `MESH_CONTROLLER.PL` point saved **201** with
+   * `attributeId: "BATTERY"`, an attribute only the mesh extender declares, and read back as
+   * `"BATTERY"` -- so `fromVO`'s lookup is reading the wrong table too. Filed as **D90**. A one-option
+   * list written out here is the only thing on this side that refuses it.
+   *
+   * `dataType` is `BINARY` alone for the same reason the attribute list has one entry:
+   * `HEARTBEAT`'s conversion is `value -> new BinaryValue(value.getBooleanValue())`, and the
+   * provisioner sets the attribute's own `DataTypes.BINARY`. Nothing on the gateway refuses another
+   * type -- the definition only checks that the type exists -- so a numeric mesh controller point
+   * would be a point the mesh writes a binary value to.
+   *
+   * `settable` and `relinquishable` are hidden because `MeshControllerPointLocatorModel.toVO` builds
+   * a fresh VO and copies `attributeId` and `dataType` alone. `settable` is not read-only by
+   * construction here -- `MeshPointLocatorVO.isSettable()` answers the stored field -- it is simply
+   * never given a value. Measured: `settable: true` saves 201 and reads back `false`, and
+   * `relinquishable` reads back `null`. The same shape D84 closed on `INTERNAL.PL`, filed as **D91**.
+   */
+  'MESH_CONTROLLER.PL': {
+    hidden: ['settable', 'relinquishable', 'configurationDescription'],
+    options: {attributeId: MESH_CONTROLLER_ATTRIBUTES, dataType: BINARY_ONLY},
+    defaults: {attributeId: 'HEARTBEAT', dataType: 'BINARY'},
+    hints: {
+      attributeId: 'What this point reads from the controller. A mesh controller reports one '
+        + 'attribute, its heartbeat, so there is nothing else to choose.'
+    },
+    rows: [['attributeId', 'dataType']]
   }
 };
 

@@ -107,7 +107,11 @@ describe('gateway form layouts', () => {
       'updateEvent', 'contextUpdateEvent',
       // MQTT. All four are `String` on the REST model over a Java enum, relabelled because the
       // gateway registers message keys its own property file does not carry.
-      'qosType', 'publishQosType', 'publishTopicType', 'subscribeTopicType']);
+      'qosType', 'publishQosType', 'publishTopicType', 'subscribeTopicType',
+      // Mesh controller. A `String` on the REST model over an `ExportCodes` table, written out here
+      // rather than narrowed from the schema -- the schema says `string` and the gateway's own check
+      // reads a table 37 classes share (D90).
+      'attributeId']);
     Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
       [...Object.keys(layout.options ?? {}), ...Object.keys(layout.gatedOptions ?? {})]
         .forEach(id => expect(scalars.has(id)).withContext(`${modelType}.${id}`).toBe(true));
@@ -648,6 +652,50 @@ describe('gateway form layouts', () => {
       Object.keys(layout.hints ?? {}).forEach(id =>
         expect(hidden.has(id)).withContext(`${modelType}.${id}`).toBe(false));
     });
+  });
+
+  const controller = GATEWAY_FORM_LAYOUTS['MESH_CONTROLLER.DS'];
+  const controllerPoint = GATEWAY_FORM_LAYOUTS['MESH_CONTROLLER.PL'];
+
+  it('takes the mesh controller\'s Add-point button away, because the gateway makes the point', () => {
+    // `CreateMeshControllerVO.createDataSource` saves the source and then `createDataPoints` creates
+    // one point per `MeshControllerAttributes` constant -- there is one. An Add button could only
+    // offer a duplicate of it.
+    expect(controller.provisionedPoints).toBe(true);
+  });
+
+  it('refuses a mesh address the gateway refuses, including the one it defaults to', () => {
+    // `validate` rejects 0 and -1, and `MeshControllerDataSourceModel.address` initialises to -1, so
+    // an omitted address is a 422 rather than a default. Measured: all three answer "Invalid value"
+    // against `address`.
+    expect(controller.required).toEqual(['address']);
+    expect(controller.min).toEqual({address: 1});
+    // And it stays editable: disabling what the mesh assigns would make the type unaddable by hand,
+    // which is not this feature's call to make.
+    expect(controller.readonly).toBeUndefined();
+  });
+
+  it('writes the mesh controller\'s one attribute out rather than trusting the gateway to check', () => {
+    // `MeshPointLocatorVO` has one `public static ATTRIBUTE_CODES` and 37 subclasses reassign it from
+    // their own static initialiser, so the last class to load decides what every mesh locator
+    // validates against. Measured on 5.1.3: a MESH_CONTROLLER point saved 201 with
+    // `attributeId: "BATTERY"`, which only the mesh extender declares, and read back as "BATTERY".
+    // D90. A one-option list is the only refusal available on this side.
+    expect(controllerPoint.options.attributeId.map(item => item.value)).toEqual(['HEARTBEAT']);
+    expect(controllerPoint.defaults.attributeId).toBe('HEARTBEAT');
+    // HEARTBEAT's conversion builds a `BinaryValue`, and the provisioner stores the attribute's own
+    // BINARY. Nothing on the gateway refuses another type.
+    expect(controllerPoint.options.dataType.map(item => item.value)).toEqual(['BINARY']);
+    expect(controllerPoint.defaults.dataType).toBe('BINARY');
+  });
+
+  it('hides the two mesh controller locator fields toVO never copies', () => {
+    // `MeshControllerPointLocatorModel.toVO` builds a fresh VO and copies `attributeId` and
+    // `dataType` alone. Measured: `settable: true` saves 201 and reads back false. Unlike
+    // MESH_SWITCH and MESH_UART this locator is not read-only by construction --
+    // `MeshPointLocatorVO.isSettable()` answers the stored field -- it is never given one. D91.
+    expect(controllerPoint.hidden)
+      .toEqual(['settable', 'relinquishable', 'configurationDescription']);
   });
 
   it('never names a field in both required and readonly', () => {

@@ -154,7 +154,11 @@ const FIELD_LABELS: {[property: string]: string} = {
   min: 'Minimum',
   max: 'Maximum',
   maxChange: 'Maximum change',
-  attractionPointXid: 'Attraction point'
+  attractionPointXid: 'Attraction point',
+  // "Attribute Id" is what `humanise` makes of it, and the id is the one thing the operator never
+  // sees: every locator that carries this field shows the attribute's name. Shared by the mesh
+  // locators and every sensor-tag type, and it means the same on all of them.
+  attributeId: 'Attribute'
 };
 
 /**

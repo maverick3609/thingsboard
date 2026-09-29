@@ -251,7 +251,7 @@ consulted.
 | 10 | `HTTP_RECEIVER.DS` | `HTTP_RECEIVER.PL` | **done** — 2026-09-28; **D74-D75** filed; needs an on-screen pass |
 | 11 | `HTTP_JSON_RETRIEVER.DS` | `HTTP_JSON_RETRIEVER.PL` | **done** — 2026-09-28; **D76-D81** filed, one of them general to all 18 polling types; needs an on-screen pass |
 | 12 | `INTERNAL.DS` | `INTERNAL.PL` | **done** — 2026-09-28; **D83-D87** filed, one of them general to every create; needs an on-screen pass |
-| 13 | `MESH_CONTROLLER.DS` | — | 1 live |
+| 13 | `MESH_CONTROLLER.DS` | `MESH_CONTROLLER.PL` | **done** — 2026-09-29; **D90-D91** filed, and D90 is general to 34 mesh locator types; needs an on-screen pass |
 | … | the remaining ~40 | | mostly four to eight fields |
 | last | the 13 types with no stack form | | left on the generic schema form — see Open decisions |
 
@@ -1430,6 +1430,63 @@ member still fails; the workaround it was filed to justify is unnecessary now th
 read-modify-write `PUT` safe. The verb asymmetry this feature works to is unchanged — sources
 `PATCH`, points and publishers `PUT` — but the reason to prefer `PATCH` for a secret is not.
 
+### 13 — `MESH_CONTROLLER.DS` / `MESH_CONTROLLER.PL` (done, 2026-09-29)
+
+Three fields on the source and two on the point, and the mesh owns most of them. The first type in
+the sequence whose **source** is provisioned as well as its points.
+
+**The gateway makes both.** A controller joining the mesh reaches
+`MeshControllerNodesDataSourceCreationManager`, and `CreateMeshControllerVO.createDataSource` saves
+the source at the node's address, calls `createDataPoints` — one point per `MeshControllerAttributes`
+constant, with that attribute's own data type and text renderer — and starts it. There is one
+constant, `HEARTBEAT(1, "HEARTBEAT", BINARY, …)`. The live source on the team's instance is exactly
+that: address 11, one BINARY `HEARTBEAT` point. So `provisionedPoints` is on, for the reason it was
+wrong on `INTERNAL.DS` and right here: the Add button could only ever offer a second point for the
+one attribute that exists.
+
+**`address` is required with a floor of 1, and that is not defensive.** `validate` refuses `0` and
+`-1`, and `MeshControllerDataSourceModel.address` **initialises to `-1`** — so an omitted address is
+a 422 rather than a default. Measured: `0`, `-1` and omitted all answer *"Invalid value"* against
+`address`. Left editable although the mesh assigns it, which is what the gateway's own form does:
+disabling it would make the type unaddable by hand, and refusing to create a source is not a
+decision this layer should be taking on the operator's behalf. The hint says what changing it does.
+
+**`anchorNode` and `location` are both live.** `MeshControllerDataSourceRT` hands the address, the
+anchor flag and the zone to `MeshControllerMeshActionListener`; `location` is the model's name for
+the VO's `zone`, which is worth knowing when reading the Java next to the wire.
+
+**The attribute list is written out here because the gateway cannot check it.** `MeshPointLocatorVO`
+declares one `public static ExportCodes ATTRIBUTE_CODES` and **34 subclasses reassign that one
+field** from their own static initialisers — every sensor tag, the thermostats, the light
+controllers, the mesh extender and switch, and the controller. Each replaces the table rather than
+adding to it, so the process holds exactly one attribute table: whichever class initialised last.
+`MeshControllerDataSourceDefinition.validate` reads it through inheritance, and so does
+`fromVO`. Measured on 5.1.3: a `MESH_CONTROLLER.PL` point saved **201** with
+`attributeId: "BATTERY"` — an attribute only the mesh extender declares — and read back as
+`"BATTERY"`. Filed as **D90**, and it is general to all 34. A one-option list on this side is the
+only refusal available; it is a convenience, not a boundary, because anything posting to
+`/v2/data-point` directly still gets its 201.
+
+`dataType` is narrowed the same way and for a related reason: `HEARTBEAT`'s conversion is
+`value -> new BinaryValue(value.getBooleanValue())` and the provisioner stores the attribute's own
+`BINARY`, while the definition checks only that the submitted type *exists*. A numeric mesh
+controller point would be a point the mesh writes a binary value into.
+
+**`settable` and `relinquishable` are hidden, and this is the pre-D84 shape again.**
+`MeshControllerPointLocatorModel.toVO` builds a fresh VO and copies `attributeId` and `dataType`
+alone, while `fromVO` inherits the base and reports `settable` back. Measured: `settable: true`
+saves 201 and reads back `false`; `relinquishable` reads back `null`. Filed as **D91** — and noted
+there that this locator is *not* read-only by construction the way D88's list is:
+`MeshPointLocatorVO.isSettable()` answers the stored field, it is simply never given one.
+
+**Verified.** The form's own bodies: source add 201 with address/anchor/location round-tripping,
+`PATCH` 200 on the location with the address preserved, point add 201 with the configuration
+description resolving to "Heartbeat", `PUT` 200 on the whole point with the hidden fields carried
+back. 94 layout and 41 schema specs green. Every probe row deleted; the instance is back to 12
+sources and 106 points — **12 rather than 21 because the nine `ZZ …` SNMP rows left behind by row 8
+were mine and are now gone**, which closes one of the cleanup items this document has been carrying.
+On-screen pass owed with rows 6-12.
+
 ## Per-type components
 
 Settled 2026-09-25, after the question was raised directly: **is one renderer for 148 model types
@@ -1608,6 +1665,15 @@ and wrong, or stale, and are recorded there too. D73 is deliberately not fixed a
   `isSettable()` to false and omits `INTERNAL.PL`, which does. One sentence.
 
   Written up in `Inferrix-stack/docs/specs/2026-09-28-internal-monitoring-source.md`.
+
+- **D90 (P1)** — `MeshPointLocatorVO.ATTRIBUTE_CODES` is one `public static` field that 34 mesh
+  locator subclasses reassign from their own static initialisers, so every mesh type validates its
+  attribute against whichever class loaded last. Measured: a `MESH_CONTROLLER.PL` point accepts
+  `attributeId: "BATTERY"`, which only the mesh extender declares.
+- **D91 (P3)** — `MeshControllerPointLocatorModel.toVO` drops `settable` and `relinquishable` while
+  the read reports them, the shape D84 closed on `INTERNAL.PL`.
+
+  Both written up in `Inferrix-stack/docs/specs/2026-09-29-mesh-controller-rest-surface.md`.
 
 - **W11 (P1)** — a multistate virtual point cannot be configured at all. The template switches on
   `'MULTISTATE'`, a case its own dropdown can never emit (it emits `INCREMENT_MULTISTATE`), so the

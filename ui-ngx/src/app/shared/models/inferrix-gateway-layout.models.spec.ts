@@ -1298,4 +1298,106 @@ describe('gateway form layouts', () => {
     // it would be one of nine picked at random for a form nobody opens.
     expect(thermostatPoint.defaults).toBeUndefined();
   });
+
+  // --- the provisioned mesh device family -------------------------------------------------------
+
+  const meshSources = Object.entries(GATEWAY_FORM_LAYOUTS)
+    .filter(([modelType]) => modelType.endsWith('.DS'))
+    .filter(([, layout]) => JSON.stringify(layout.rows) === JSON.stringify([['address', 'location']]));
+
+  it('gives all 24 provisioned mesh device sources one shape', () => {
+    // Measured off the schema document's `families` map: 24 published data source types declare
+    // `address`, `anchorNode` and `location` over the common ten and nothing else. One shape, one
+    // factory -- the mesh controller and the thermostat were folded into it rather than left as two
+    // more copies of it.
+    expect(meshSources.length).toBe(24);
+    meshSources.forEach(([modelType, layout]) => {
+      expect(layout.provisionedPoints).withContext(modelType).toBe(true);
+      expect(layout.readonly).withContext(modelType).toEqual(['address']);
+      expect(Object.keys(layout).sort().join(','))
+        .withContext(modelType).toBe('hints,provisionedPoints,readonly,rows');
+      // The only thing that varies is the noun, and every one of them names something.
+      expect(layout.hints.address).withContext(modelType)
+        .toMatch(/^The node address the mesh assigned this .+\. It identifies/);
+    });
+    // A fresh object per type, so a mutation of one cannot reach another.
+    expect(meshSources[0][1]).not.toBe(meshSources[1][1]);
+  });
+
+  const meshPoints = meshSources.map(([modelType]) =>
+    [modelType.replace('.DS', '.PL'), GATEWAY_FORM_LAYOUTS[modelType.replace('.DS', '.PL')]] as const);
+
+  it('reads each mesh point\'s settable flag from its locator VO, not from a guess', () => {
+    // Three dispositions, all read from the Java. `hidden` where the VO overrides `isSettable()` to a
+    // hard false; `readonly` where it inherits `MeshPointLocatorVO.isSettable()` -- which answers the
+    // stored field -- but the model's `toVO` drops it on a fresh VO (D109); `editable` where `toVO`
+    // copies it, which is `MODBUS_CONTROLLER` alone out of 24.
+    const shown = (layout): string =>
+      (layout.hidden ?? []).includes('settable') ? 'hidden'
+        : (layout.readonly ?? []).includes('settable') ? 'readonly' : 'editable';
+    const byMode: {[mode: string]: string[]} = {};
+    meshPoints.forEach(([modelType, layout]) =>
+      (byMode[shown(layout)] = byMode[shown(layout)] ?? []).push(modelType));
+    expect(byMode.editable).toEqual(['MODBUS_CONTROLLER.PL']);
+    expect(byMode.readonly.sort()).toEqual(['4DI_2DO_CARD.PL', 'PEOPLE_COUNTER.PL',
+      'PEOPLE_COUNT_CAMERA.PL', 'THERMOSTAT.PL', 'VAV_CONTROLLER.PL']);
+    expect(byMode.hidden.length).toBe(18);
+    // A flag that is hidden is never also read-only, and one that is shown always carries a hint
+    // saying who decides it.
+    meshPoints.forEach(([modelType, layout]) => {
+      expect((layout.hidden ?? []).includes('settable') && (layout.readonly ?? []).includes('settable'))
+        .withContext(modelType).toBe(false);
+      if (shown(layout) !== 'hidden') {
+        expect(layout.hints.settable).withContext(modelType).toBeTruthy();
+      }
+    });
+  });
+
+  it('locks the attribute and the data type on every provisioned mesh point', () => {
+    // The mesh chooses both when it provisions the point, which is what `provisionedPoints` already
+    // claims of every locator field on such a point.
+    meshPoints.forEach(([modelType, layout]) => {
+      expect(layout.readonly.slice(0, 2)).withContext(modelType).toEqual(['attributeId', 'dataType']);
+      expect(layout.options.attributeId.length).withContext(modelType).toBeGreaterThan(0);
+      expect(layout.rows).withContext(modelType).toEqual([['attributeId', 'dataType']]);
+      // No Add form on any of them, so a default would be invented for a form nobody opens.
+      expect(layout.defaults === undefined || modelType === 'MESH_CONTROLLER.PL')
+        .withContext(modelType).toBe(true);
+    });
+  });
+
+  it('carries the three attribute names that are not their constant names', () => {
+    // The code table is built from `attributeName`; `GET /v2/export-code/sensors/*` publishes
+    // `Enum::name`. Three of the 97 differ, and one of the three has spaces in it. D113.
+    const values = (modelType: string): string[] =>
+      GATEWAY_FORM_LAYOUTS[modelType].options.attributeId.map(item => item.value);
+    expect(values('THERMOSTAT.PL')).toContain('ENERGY_SAVING_MODE');
+    expect(values('THERMOSTAT.PL')).not.toContain('ENERGY_SAVING');
+    expect(values('SENSOR_TAG_PIR.PL')).toContain('OCCUPANCY_STATUS');
+    expect(values('SENSOR_TAG_PIR.PL')).not.toContain('OCCUPANCY');
+    expect(values('SENSOR_TAG_INJECTION_MOULD_COUNT.PL')).toContain('INJECTION MOULD COUNT');
+    expect(values('SENSOR_TAG_INJECTION_MOULD_COUNT.PL')).not.toContain('INJECTION_MOULD_COUNT');
+    // And the I/O card's two digital outputs are spelt with a digit zero in the gateway's own enum,
+    // while their translation keys call them do1/do2. The value is the zero; the label is the letter.
+    const card = GATEWAY_FORM_LAYOUTS['4DI_2DO_CARD.PL'].options.attributeId;
+    expect(card.map(item => item.value)).toContain('D01_STATUS');
+    expect(card.find(item => item.value === 'D01_STATUS').label).toBe('DO1 status');
+  });
+
+  it('gives every mesh attribute a value and a label, and no duplicates', () => {
+    let total = 0;
+    meshPoints.forEach(([modelType, layout]) => {
+      const items = layout.options.attributeId;
+      total += items.length;
+      items.forEach(item => {
+        expect(item.value).withContext(modelType).toBeTruthy();
+        expect(item.label).withContext(modelType).toBeTruthy();
+        // A label that is still a translation key means the bundle gap (D111) leaked into our list.
+        expect(item.label).withContext(`${modelType} ${item.value}`).not.toContain('dsEdit.');
+      });
+      expect(new Set(items.map(item => item.value)).size).withContext(modelType).toBe(items.length);
+    });
+    // 97 across the 22 batched, plus the thermostat's 9 and the mesh controller's 1.
+    expect(total).toBe(107);
+  });
 });

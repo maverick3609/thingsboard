@@ -750,6 +750,263 @@ const NON_IMAGE_DATA_TYPES: FormSelectItem[] = [
 const SYSTEM_ATTRIBUTE_DATA_TYPES: FormSelectItem[] =
   NON_IMAGE_DATA_TYPES.filter(item => item.value !== 'MULTISTATE');
 
+/**
+ * The data source form every provisioned mesh device shares.
+ *
+ * Measured off the schema document's own `families` map: 24 of the 63 published data source types
+ * declare `address`, `anchorNode` and `location` over the common ten and nothing else -- the mesh
+ * controller, the thermostat and the 22 batched with them. One shape, so one function, with the
+ * only difference the noun the hints use for the thing on the other end of the radio.
+ *
+ * `address` is read-only because the mesh assigns it when the device joins, and each type's
+ * `validate` refuses -1 and 0 -- measured on the thermostat, both 422. `location` is the node's
+ * zone under another name; every one of these models maps it to `vo.setZone`.
+ */
+const meshDeviceSource = (device: string): GatewayFormLayout => ({
+  provisionedPoints: true,
+  readonly: ['address'],
+  hints: {
+    address: `The node address the mesh assigned this ${device}. It identifies the node the gateway `
+      + 'files this source and its mesh records under, so it is not editable here.',
+    anchorNode: 'Anchor nodes are the fixed reference points the mesh measures position against. '
+      + 'The gateway registers this one as an anchor when the source starts.',
+    location: 'A free-text zone or place, stored as the node\'s zone and shown wherever the mesh '
+      + 'console lists it.'
+  },
+  rows: [['address', 'location']]
+});
+
+/**
+ * The point form those same devices share: one attribute of the device, provisioned when it joins.
+ *
+ * `attributeId` and `dataType` are read-only on every one of them, because the mesh chooses both.
+ * The attribute list is the type's own, read out of its `*Attributes` enum and carrying each
+ * constant's **`attributeName`** -- see {@link THERMOSTAT_ATTRIBUTES} for why that is not the same
+ * as its constant name, and {@link SENSOR_TAG_PIR_ATTRIBUTES} and
+ * {@link SENSOR_TAG_INJECTION_MOULD_COUNT_ATTRIBUTES} for the other two places it differs.
+ *
+ * Whether `settable` is worth showing is the one real difference between these types, and it is
+ * read from the locator VO rather than guessed:
+ *
+ * - **`hidden`** (19 of the 24) -- the VO overrides `isSettable()` to a hard `false`, so the flag
+ *   can never be anything else and a checkbox would be a lie.
+ * - **`readonly`** (4DI_2DO_CARD, PEOPLE_COUNTER, PEOPLE_COUNT_CAMERA, VAV_CONTROLLER) -- the VO
+ *   inherits `MeshPointLocatorVO.isSettable()`, which answers the stored field, but the model's
+ *   `toVO` builds a fresh VO and copies `attributeId` and `dataType` alone. The flag is real and
+ *   worth reading; the platform cannot change it, and a REST write erases it (D109).
+ * - **`editable`** (MODBUS_CONTROLLER alone) -- `toVO` copies `settable`, so it is a real choice.
+ *
+ * No `defaults`: `provisionedPoints` means there is no Add form on any of these, so a default would
+ * be a value invented for a form nobody opens.
+ */
+const meshDevicePoint = (attributes: FormSelectItem[], device: string,
+                         settable: 'hidden' | 'readonly' | 'editable'): GatewayFormLayout => ({
+  hidden: settable === 'hidden'
+    ? ['settable', 'relinquishable', 'configurationDescription']
+    : ['relinquishable', 'configurationDescription'],
+  readonly: settable === 'readonly'
+    ? ['attributeId', 'dataType', 'settable']
+    : ['attributeId', 'dataType'],
+  // `dataType` keeps the full non-image list rather than being narrowed to the types this device's
+  // attributes actually use. The field is a read-only display of what the device reported, and a
+  // narrowed list on such a field cannot prevent a wrong value -- it can only blank a right one.
+  options: {attributeId: attributes, dataType: NON_IMAGE_DATA_TYPES},
+  hints: {
+    attributeId: `What this point reads from the ${device}. The gateway creates one point per `
+      + 'attribute when the device joins the mesh, so there is nothing to choose here.',
+    ...(settable === 'editable'
+      ? {settable: `Whether the platform may write this attribute back to the ${device}.`}
+      : {}),
+    ...(settable === 'readonly'
+      ? {settable: 'Whether the mesh accepts a write to this attribute. The device decides it when '
+          + 'the point is created, so it is shown rather than set.'}
+      : {})
+  },
+  rows: [['attributeId', 'dataType']]
+});
+
+/**
+ * One attribute list per provisioned mesh device type, read out of each type's `*Attributes` enum.
+ *
+ * 97 attributes across 22 types. The values are each constant's `attributeName`, which is what the
+ * code table is built from and therefore what the wire takes -- **not** the constant name, and not
+ * what `GET /v2/export-code/sensors/*` publishes (D113). Three differ: the thermostat's
+ * `ENERGY_SAVING` is `ENERGY_SAVING_MODE`, the PIR tag's `OCCUPANCY` is `OCCUPANCY_STATUS`, and the
+ * injection-mould tag's `INJECTION_MOULD_COUNT` is `INJECTION MOULD COUNT` -- with spaces.
+ *
+ * The I/O card's two digital outputs are `D01_STATUS` and `D02_STATUS` with a **digit zero**, in the
+ * enum constant and the wire name alike, while their own translation keys call them `do1Status` and
+ * `do2Status`. The label below reads DO1 because that is what the device is; the value is the zero,
+ * because that is what the gateway takes.
+ *
+ * Labels are the gateway's own words from `i18n_en.properties`, sentence-cased. Thirteen of the 97
+ * have no entry in any English bundle, so `configurationDescription` hands those back as the raw
+ * key (D111); their labels here are ours.
+ */
+
+const CARD_4DI_2DO_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'DI1_STATUS', label: 'DI1 status'},
+  {value: 'DI2_STATUS', label: 'DI2 status'},
+  {value: 'DI3_STATUS', label: 'DI3 status'},
+  {value: 'DI4_STATUS', label: 'DI4 status'},
+  {value: 'D01_STATUS', label: 'DO1 status'},
+  {value: 'D02_STATUS', label: 'DO2 status'}
+];
+
+const DISTANCE_SENSOR_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'BATTERY', label: 'Battery'},
+  {value: 'DISTANCE', label: 'Distance'}
+];
+
+const DUSTBIN_LEVEL_SENSOR_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'BATTERY', label: 'Battery'},
+  {value: 'DISTANCE', label: 'Distance'},
+  {value: 'DUSTBIN_LEVEL', label: 'Dustbin level'}
+];
+
+const MESH_EXTENDER_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'BATTERY', label: 'Battery'}
+];
+
+const MESH_SWITCH_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'ROOM_NUMBER', label: 'Room number'},
+  {value: 'ENABLED', label: 'Enabled'}
+];
+
+const MESH_UART_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'}
+];
+
+const MODBUS_CONTROLLER_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'}
+];
+
+const PAPER_TOWEL_LEVEL_SENSOR_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'BATTERY', label: 'Battery'},
+  {value: 'DISTANCE', label: 'Distance'},
+  {value: 'PAPER_TOWEL_LEVEL', label: 'Paper towel level'}
+];
+
+const PEOPLE_COUNTER_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'ENTRY', label: 'Entry'},
+  {value: 'EXIT', label: 'Exit'},
+  {value: 'TOTAL', label: 'Total'},
+  {value: 'RESET', label: 'Reset'}
+];
+
+const PEOPLE_COUNT_CAMERA_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'LAST_COUNT', label: 'Last people count'},
+  {value: 'CURRENT_COUNT', label: 'Current people count'}
+];
+
+const SENSOR_TAG_IAQ_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'BATTERY', label: 'Battery'},
+  {value: 'TEMPERATURE', label: 'Temperature'},
+  {value: 'HUMIDITY', label: 'Humidity'},
+  {value: 'IAQ', label: 'Indoor air quality'},
+  {value: 'CO2', label: 'CO2'}
+];
+
+const SENSOR_TAG_IAQ_V2_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'BATTERY', label: 'Battery'},
+  {value: 'TEMPERATURE', label: 'Temperature'},
+  {value: 'HUMIDITY', label: 'Humidity'},
+  {value: 'IAQ', label: 'Indoor air quality'},
+  {value: 'CO2', label: 'CO2'},
+  {value: 'TVOC', label: 'TVOC'}
+];
+
+const SENSOR_TAG_INJECTION_MOULD_COUNT_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'BATTERY', label: 'Battery'},
+  {value: 'INJECTION MOULD COUNT', label: 'Injection mould count'},
+  {value: 'LOCATION', label: 'Location'}
+];
+
+const SENSOR_TAG_LUX_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'BATTERY', label: 'Battery'},
+  {value: 'LUX', label: 'Lux'}
+];
+
+const SENSOR_TAG_PIR_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'BATTERY', label: 'Battery'},
+  {value: 'OCCUPANCY_STATUS', label: 'Occupancy'}
+];
+
+const SENSOR_TAG_PM_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'BATTERY', label: 'Battery'},
+  {value: 'PM1', label: 'PM1'},
+  {value: 'PM2_5', label: 'PM2.5'},
+  {value: 'PM4', label: 'PM4'},
+  {value: 'PM10', label: 'PM10'},
+  {value: 'TEMPERATURE', label: 'Temperature'},
+  {value: 'HUMIDITY', label: 'Humidity'},
+  {value: 'IAQ', label: 'Indoor air quality'},
+  {value: 'CO2', label: 'CO2'},
+  {value: 'TVOC', label: 'TVOC'}
+];
+
+const SENSOR_TAG_TH_OLD_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'BATTERY', label: 'Battery'},
+  {value: 'TEMPERATURE', label: 'Temperature'},
+  {value: 'HUMIDITY', label: 'Humidity'},
+  {value: 'PRESSURE', label: 'Pressure'}
+];
+
+const SENSOR_TAG_TH_SHT21_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'BATTERY', label: 'Battery'},
+  {value: 'TEMPERATURE', label: 'Temperature'},
+  {value: 'HUMIDITY', label: 'Humidity'}
+];
+
+const SENSOR_TAG_TH_SHT45_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'BATTERY', label: 'Battery'},
+  {value: 'TEMPERATURE', label: 'Temperature'},
+  {value: 'HUMIDITY', label: 'Humidity'}
+];
+
+const SOAP_DISPENSER_SENSOR_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'BATTERY', label: 'Battery'},
+  {value: 'DISTANCE', label: 'Distance'},
+  {value: 'SOAP_TANK_CAP_STATUS', label: 'Soap tank cap status'},
+  {value: 'SOAP_TANK_LEVEL', label: 'Soap tank level'}
+];
+
+const VAV_CONTROLLER_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'DI1_STATUS', label: 'DI1 status'},
+  {value: 'AO1_STATUS', label: 'AO1 status'},
+  {value: 'AO2_STATUS', label: 'AO2 status'},
+  {value: 'AI1_STATUS', label: 'AI1 status'},
+  {value: 'AI2_STATUS', label: 'AI2 status'},
+  {value: 'AI3_STATUS', label: 'AI3 status'},
+  {value: 'PRESSURE_DATA', label: 'Pressure'},
+  {value: 'TEMPERATURE', label: 'Temperature'}
+];
+
+const WATER_LEAKAGE_DETECTOR_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'BATTERY', label: 'Battery'},
+  {value: 'LEAKAGE', label: 'Leakage'}
+];
+
 export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
 
   /**
@@ -822,19 +1079,7 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * POST is accepted all the same -- measured 201 -- so `provisionedPoints` is what removes the add
    * path for its points, exactly as on row 13.
    */
-  'THERMOSTAT.DS': {
-    provisionedPoints: true,
-    readonly: ['address'],
-    hints: {
-      address: 'The node address the mesh assigned this thermostat. It identifies the node the '
-        + 'gateway files this source and its mesh records under, so it is not editable here.',
-      anchorNode: 'Anchor nodes are the fixed reference points the mesh measures position against. '
-        + 'The gateway registers this one as an anchor when the source starts.',
-      location: 'A free-text zone or place, stored as the node\'s zone and shown wherever the mesh '
-        + 'console lists it.'
-    },
-    rows: [['address', 'location']]
-  },
+  'THERMOSTAT.DS': meshDeviceSource('thermostat'),
 
   /**
    * One attribute of a thermostat, as a point. Nine of them, provisioned when the device joins.
@@ -1653,21 +1898,7 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * `anchorNode` and `location` are both live -- `MeshControllerDataSourceRT` hands all three to
    * `MeshControllerMeshActionListener`, and `location` is the model's name for the VO's `zone`.
    */
-  'MESH_CONTROLLER.DS': {
-    provisionedPoints: true,
-    readonly: ['address'],
-    hints: {
-      address: 'The node address the mesh assigned this controller. It identifies the node the '
-        + 'gateway files this source and its mesh records under, so it is not editable here.',
-      anchorNode: 'Anchor nodes are the fixed reference points the mesh measures position against. '
-        + 'The gateway registers this one as an anchor when the source starts.',
-      location: 'A free-text zone or place, stored as the node\'s zone and shown wherever the mesh '
-        + 'console lists it.'
-    },
-    // The toggle falls on its own line, which is where a switch reads best; `location` comes up beside
-    // the address rather than sitting under the toggle on a line of its own.
-    rows: [['address', 'location']]
-  },
+  'MESH_CONTROLLER.DS': meshDeviceSource('controller'),
 
   /**
    * One attribute of a mesh controller, as a point -- and there is one attribute.
@@ -2005,6 +2236,51 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * as `META.DS`, for the same reason, and measured: a created source carries only `alarmLevels`,
    * the purge pair, `editPermission`, `enabled` and the identity fields.
    */
+  '4DI_2DO_CARD.DS': meshDeviceSource('I/O card'),
+  '4DI_2DO_CARD.PL': meshDevicePoint(CARD_4DI_2DO_ATTRIBUTES, 'I/O card', 'readonly'),
+  'DISTANCE_SENSOR.DS': meshDeviceSource('distance sensor'),
+  'DISTANCE_SENSOR.PL': meshDevicePoint(DISTANCE_SENSOR_ATTRIBUTES, 'distance sensor', 'hidden'),
+  'DUSTBIN_LEVEL_SENSOR.DS': meshDeviceSource('dustbin sensor'),
+  'DUSTBIN_LEVEL_SENSOR.PL': meshDevicePoint(DUSTBIN_LEVEL_SENSOR_ATTRIBUTES, 'dustbin sensor', 'hidden'),
+  'MESH_EXTENDER.DS': meshDeviceSource('extender'),
+  'MESH_EXTENDER.PL': meshDevicePoint(MESH_EXTENDER_ATTRIBUTES, 'extender', 'hidden'),
+  'MESH_SWITCH.DS': meshDeviceSource('switch'),
+  'MESH_SWITCH.PL': meshDevicePoint(MESH_SWITCH_ATTRIBUTES, 'switch', 'hidden'),
+  'MESH_UART.DS': meshDeviceSource('UART node'),
+  'MESH_UART.PL': meshDevicePoint(MESH_UART_ATTRIBUTES, 'UART node', 'hidden'),
+  'MODBUS_CONTROLLER.DS': meshDeviceSource('Modbus controller'),
+  'MODBUS_CONTROLLER.PL': meshDevicePoint(MODBUS_CONTROLLER_ATTRIBUTES, 'Modbus controller', 'editable'),
+  'PAPER_TOWEL_LEVEL_SENSOR.DS': meshDeviceSource('paper-towel sensor'),
+  'PAPER_TOWEL_LEVEL_SENSOR.PL': meshDevicePoint(PAPER_TOWEL_LEVEL_SENSOR_ATTRIBUTES, 'paper-towel sensor', 'hidden'),
+  'PEOPLE_COUNTER.DS': meshDeviceSource('people counter'),
+  'PEOPLE_COUNTER.PL': meshDevicePoint(PEOPLE_COUNTER_ATTRIBUTES, 'people counter', 'readonly'),
+  'PEOPLE_COUNT_CAMERA.DS': meshDeviceSource('camera'),
+  'PEOPLE_COUNT_CAMERA.PL': meshDevicePoint(PEOPLE_COUNT_CAMERA_ATTRIBUTES, 'camera', 'readonly'),
+  'SENSOR_TAG_IAQ.DS': meshDeviceSource('air-quality tag'),
+  'SENSOR_TAG_IAQ.PL': meshDevicePoint(SENSOR_TAG_IAQ_ATTRIBUTES, 'air-quality tag', 'hidden'),
+  'SENSOR_TAG_IAQ_V2.DS': meshDeviceSource('air-quality tag'),
+  'SENSOR_TAG_IAQ_V2.PL': meshDevicePoint(SENSOR_TAG_IAQ_V2_ATTRIBUTES, 'air-quality tag', 'hidden'),
+  'SENSOR_TAG_INJECTION_MOULD_COUNT.DS': meshDeviceSource('counter tag'),
+  'SENSOR_TAG_INJECTION_MOULD_COUNT.PL': meshDevicePoint(SENSOR_TAG_INJECTION_MOULD_COUNT_ATTRIBUTES, 'counter tag', 'hidden'),
+  'SENSOR_TAG_LUX.DS': meshDeviceSource('light tag'),
+  'SENSOR_TAG_LUX.PL': meshDevicePoint(SENSOR_TAG_LUX_ATTRIBUTES, 'light tag', 'hidden'),
+  'SENSOR_TAG_PIR.DS': meshDeviceSource('occupancy tag'),
+  'SENSOR_TAG_PIR.PL': meshDevicePoint(SENSOR_TAG_PIR_ATTRIBUTES, 'occupancy tag', 'hidden'),
+  'SENSOR_TAG_PM.DS': meshDeviceSource('particulate tag'),
+  'SENSOR_TAG_PM.PL': meshDevicePoint(SENSOR_TAG_PM_ATTRIBUTES, 'particulate tag', 'hidden'),
+  'SENSOR_TAG_TH_OLD.DS': meshDeviceSource('temperature tag'),
+  'SENSOR_TAG_TH_OLD.PL': meshDevicePoint(SENSOR_TAG_TH_OLD_ATTRIBUTES, 'temperature tag', 'hidden'),
+  'SENSOR_TAG_TH_SHT21.DS': meshDeviceSource('temperature tag'),
+  'SENSOR_TAG_TH_SHT21.PL': meshDevicePoint(SENSOR_TAG_TH_SHT21_ATTRIBUTES, 'temperature tag', 'hidden'),
+  'SENSOR_TAG_TH_SHT45.DS': meshDeviceSource('temperature tag'),
+  'SENSOR_TAG_TH_SHT45.PL': meshDevicePoint(SENSOR_TAG_TH_SHT45_ATTRIBUTES, 'temperature tag', 'hidden'),
+  'SOAP_DISPENSER_SENSOR.DS': meshDeviceSource('soap-dispenser sensor'),
+  'SOAP_DISPENSER_SENSOR.PL': meshDevicePoint(SOAP_DISPENSER_SENSOR_ATTRIBUTES, 'soap-dispenser sensor', 'hidden'),
+  'VAV_CONTROLLER.DS': meshDeviceSource('VAV controller'),
+  'VAV_CONTROLLER.PL': meshDevicePoint(VAV_CONTROLLER_ATTRIBUTES, 'VAV controller', 'readonly'),
+  'WATER_LEAKAGE_DETECTOR.DS': meshDeviceSource('leak detector'),
+  'WATER_LEAKAGE_DETECTOR.PL': meshDevicePoint(WATER_LEAKAGE_DETECTOR_ATTRIBUTES, 'leak detector', 'hidden'),
+
   'SYSTEM_ATTRIBUTES.DS': {},
 
   /**

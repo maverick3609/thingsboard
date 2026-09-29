@@ -258,7 +258,8 @@ consulted.
 | 17 | `SYSTEM_ATTRIBUTES.DS` | `SYSTEM_ATTRIBUTES.PL` | **done** — 2026-09-29; **D105-D107** filed, the last a pairing rule only the gateway's two front ends know; needs an on-screen pass |
 | — | `OPC.DS` | `OPC.PL` | **addable and not done** — deferred by the user on 2026-09-29; the one type on the Add menu without a layout |
 | 18 | `THERMOSTAT.DS` | `THERMOSTAT.PL` | **done** — 2026-09-29; **D108-D113** filed, D108 a P1 general to all 34 mesh locator types that supersedes D90; needs an on-screen pass |
-| … | the other 45 types | | provisioned-only: no Add form, an edit form like rows 13 and 18 |
+| 19 | the 22 remaining mesh device types | their locators | **done** — 2026-09-30; batched at the user's direction; **D115-D117** filed and D109 widened to five types; needs an on-screen pass |
+| … | the other 23 types | | provisioned-only, nine other shapes: mesh nodes, asset tags, Modbus slaves |
 | last | the 13 types with no stack form | | left on the generic schema form — see Open decisions |
 
 **The "remaining ~40" this table used to carry was the wrong shape.** `/v2/data-source-types` — the
@@ -2057,6 +2058,64 @@ guess.
 `tsc -p src/tsconfig.app.json` exit 0; every rule above read in the Java first and measured against
 5.1.3, probe rows deleted. The on-screen pass is owed with rows 6–17.
 
+### 19 — the 22 remaining mesh device types (done, 2026-09-30)
+
+Batched at the user's direction after row 18 measured the shape. One row rather than 22, because
+there was one form to build: the schema document's `families` map puts these 22 — plus the mesh
+controller from row 13 and the thermostat from row 18 — on **one data source shape and one locator
+shape**, 24 types in all. What differs between them is a list.
+
+So the layout gained two factories, `meshDeviceSource` and `meshDevicePoint`, and rows 13 and 18 were
+folded into the first of them rather than left as two more copies. Their existing specs passed
+unchanged, which is the equivalence proof: the DS entries assert `provisionedPoints`, the read-only
+address and the row layout, and none of them moved.
+
+**The attribute lists are 97 items read out of 22 `*Attributes` enums, and the reason they are read
+rather than fetched got stronger.** Row 18 found the gateway's own dropdown endpoint publishing
+`Enum::name` where the API validates `attributeName`, differing for one thermostat attribute. Across
+all 24 enums there are three, and the third cannot be guessed by anyone:
+
+| enum | constant | what the wire takes |
+|---|---|---|
+| `ThermostatAttributes` | `ENERGY_SAVING` | `ENERGY_SAVING_MODE` |
+| `SensorTagPIRAttributes` | `OCCUPANCY` | `OCCUPANCY_STATUS` |
+| `SensorTagInjectionMouldCountAttributes` | `INJECTION_MOULD_COUNT` | `INJECTION MOULD COUNT` |
+
+Measured: `"INJECTION MOULD COUNT"` is a 201 and `"INJECTION_MOULD_COUNT"` is a 422. **D115.**
+
+The I/O card is worse in a quieter way. Its two digital outputs are `D01_STATUS` and `D02_STATUS`
+with a **digit zero**, in the constant and the wire name alike, while their translation keys are
+`do1Status`/`do2Status` and the labels read "DO1". Measured: the zero is a 201, the letter O is a
+422. Our list carries the zero as the value and the letter in the label, which is the only
+combination that is both true and usable. **D117.**
+
+**`settable` is the one real difference between these types, and it was read out of each locator VO
+rather than assumed.** Three dispositions:
+
+| disposition | types | why |
+|---|---|---|
+| hidden | 18 | the VO overrides `isSettable()` to a hard `false` |
+| read-only | `4DI_2DO_CARD`, `PEOPLE_COUNTER`, `PEOPLE_COUNT_CAMERA`, `THERMOSTAT`, `VAV_CONTROLLER` | inherits the stored field, but `toVO` drops it (D109) |
+| editable | `MODBUS_CONTROLLER` | `toVO` copies it — the only one of 24 |
+
+That widens D109 from one type to five, and makes `ModbusControllerPointLocatorModel` the worked
+example of its fix: it already does what the other five need.
+
+Thirteen of the 97 attributes have no English bundle entry, so `configurationDescription` hands those
+back as a raw translation key — the whole VAV controller bar two. **D116**, which is D111 counted
+properly. Our labels for those thirteen are ours, and a spec fails if one of them ever starts with
+`dsEdit.`.
+
+**What this row does not fix, and cannot:** D108. All 24 of these types share the one mutable
+`ATTRIBUTE_CODES` static, so on any given gateway most of them cannot validate their own attributes.
+The lists here are right about what each device reports; whether the gateway will accept one depends
+on which mesh class loaded last.
+
+*Verified:* 130 layout, 41 schema, 14 form and 17 service specs green, and
+`tsc -p src/tsconfig.app.json` exit 0. Every attribute list extracted from the Java and two of the
+surprising ones checked live both ways; probe rows deleted, the instance back at 12 sources. The
+on-screen pass is owed with rows 6–18.
+
 ## Per-type components
 
 Settled 2026-09-25, after the question was raised directly: **is one renderer for 148 model types
@@ -2339,6 +2398,24 @@ and wrong, or stale, and are recorded there too. D73 is deliberately not fixed a
   front ends forbid, and the pairing decides the value class the runtime stores. Measured 201 for
   NUMERIC with a `BOOLEAN_ATTRIBUTE` and for MULTISTATE, which has no valid attribute type at all.
   `AttributeTypeVO.getAttributeTypes(dataTypeId)` already encodes the rule and has zero callers.
+
+- **D115 (P2)** — `Enum::name` versus `attributeName` differs on three of the 24 mesh attribute
+  enums, not one, and `SensorTagInjectionMouldCountAttributes` publishes `INJECTION_MOULD_COUNT`
+  while the wire takes `INJECTION MOULD COUNT` — **with spaces**. Measured 201 and 422 respectively.
+  No client can derive that value from anything the API exposes.
+
+- **D116 (P3)** — 13 of the 97 mesh attribute descriptions have no English bundle entry, so
+  `configurationDescription` returns the raw key against a schema documenting it as pre-translated.
+  The VAV controller loses seven of its nine. D111 counted properly.
+
+- **D117 (P3)** — the I/O card's digital outputs are `D01_STATUS`/`D02_STATUS` with a digit zero,
+  while their translation keys and labels say DO1/DO2. Measured: the letter O is a 422. Reads like a
+  typo and will be "corrected" eventually, which would break stored points.
+
+- **D109 (P2), widened 2026-09-30** — five types, not one: `4DI_2DO_CARD`, `PEOPLE_COUNTER`,
+  `PEOPLE_COUNT_CAMERA`, `THERMOSTAT` and `VAV_CONTROLLER` all inherit a `settable` that answers the
+  stored field and all drop it in `toVO`. `MODBUS_CONTROLLER` is the only one of 24 that copies it,
+  and is the worked example of the fix.
 
 - **D114 (P2)** — an analog system attribute accepts a non-numeric `startValue` (measured 201) and
   `AnalogAttributeRT.getStartValue()` then does a bare `Double.parseDouble` when the point starts.

@@ -258,8 +258,8 @@ consulted.
 | 17 | `SYSTEM_ATTRIBUTES.DS` | `SYSTEM_ATTRIBUTES.PL` | **done** — 2026-09-29; **D105-D107** filed, the last a pairing rule only the gateway's two front ends know; needs an on-screen pass |
 | — | `OPC.DS` | `OPC.PL` | **addable and not done** — deferred by the user on 2026-09-29; the one type on the Add menu without a layout |
 | 18 | `THERMOSTAT.DS` | `THERMOSTAT.PL` | **done** — 2026-09-29; **D108-D113** filed, D108 a P1 general to all 34 mesh locator types that supersedes D90; needs an on-screen pass |
-| 19 | the 22 remaining mesh device types | their locators | **done** — 2026-09-30; batched at the user's direction; **D115-D117** filed and D109 widened to five types; needs an on-screen pass |
-| … | the other 23 types | | provisioned-only, nine other shapes: mesh nodes, asset tags, Modbus slaves |
+| 19 | the 24 remaining mesh device types | their locators | **done** — 2026-09-30; batched at the user's direction; **D115-D117** filed and D109 widened to five types; needs an on-screen pass |
+| … | the other 21 types | | provisioned-only, nine other shapes: mesh nodes, asset tags, light controllers, Modbus slaves |
 | last | the 13 types with no stack form | | left on the generic schema form — see Open decisions |
 
 **The "remaining ~40" this table used to carry was the wrong shape.** `/v2/data-source-types` — the
@@ -1988,11 +1988,20 @@ deleted, the instance back at 12 sources. The on-screen pass is owed with rows 6
 ### 18 — `THERMOSTAT.DS` / `THERMOSTAT.PL` (done, 2026-09-29)
 
 The first of the provisioned-only tail proper, and the row that showed the tail is not 46 pieces of
-work. Measured off the schema document's own `families` map: the 46 remaining types have **ten
-distinct (data source fields, locator fields) pairs** between them, and **23 of them are
-field-identical to `MESH_CONTROLLER`** — `address`, `anchorNode`, `location` over the common ten, and
-a locator that is `attributeId` plus the usual three. Thermostat is one of the 23, chosen as the
-representative because it has nine attributes across three data types with six of them writable,
+work. Measured off the schema document's own `families` map: most of the 46 remaining types share a
+handful of shapes, and a large block of them is **field-identical to `MESH_CONTROLLER`** — `address`,
+`anchorNode`, `location` over the common ten, and a locator that is `attributeId` plus the usual
+three. Thermostat is one of that block, chosen as the
+
+> **The counts this paragraph first carried — "ten distinct pairs", "23 identical" — were wrong**, and
+> the row-18 review caught it. Two mistakes in the measurement: 14 data source and 9 locator schemas
+> in the document compose with `allOf` rather than listing `properties`, so reading `properties`
+> directly returned nothing for them; and six data source types have a locator that is not their own
+> name with `.PL` on the end, so pairing by name mismatched them. With `allOf` resolved and the
+> pairing taken from the Java, the 63 published types have **24 distinct shapes**, the mesh-device
+> block is **26 types**, and **21** remain after it in 9 shapes. Corrected 2026-09-30; row 19 is built
+> on the corrected numbers.
+representative because it has nine attributes across three data types with seven of them writable,
 where a mesh controller has one binary attribute that is not. Whatever the form has to do, this type
 makes it do it.
 
@@ -2050,38 +2059,54 @@ No `defaults` on the locator, unlike row 13: `provisionedPoints` means there is 
 guess.
 
 > **The probing left the team's local instance in the D108 state** — it loaded
-> `MeshSwitchPointLocatorVO`, so the shared table is the switch's until the instance restarts. No row
-> was changed and the inventory is back to 12 sources and 106 points, but mesh attribute names read
-> over REST there will be wrong until a restart. Recorded at the end of the findings doc.
+> `MeshSwitchPointLocatorVO`, so the shared table is the mesh switch's. No row was changed and the
+> inventory is back to 12 sources and 106 points, but mesh attribute names read over REST there are
+> currently wrong. This section first said a restart would clear it; **it would not**. The ratchet
+> starts again at boot and the next call touching a fresh mesh type moves it, so a restart only
+> re-rolls which types are broken. Corrected 2026-09-30, and the findings doc now says so too.
 
 *Verified:* 124 layout, 41 schema, 14 form and 17 service specs green, and
 `tsc -p src/tsconfig.app.json` exit 0; every rule above read in the Java first and measured against
 5.1.3, probe rows deleted. The on-screen pass is owed with rows 6–17.
 
-### 19 — the 22 remaining mesh device types (done, 2026-09-30)
+### 19 — the 24 remaining mesh device types (done, 2026-09-30)
 
-Batched at the user's direction after row 18 measured the shape. One row rather than 22, because
-there was one form to build: the schema document's `families` map puts these 22 — plus the mesh
+Batched at the user's direction after row 18 measured the shape. One row rather than 24, because
+there was one form to build: the schema document's `families` map puts these 24 — plus the mesh
 controller from row 13 and the thermostat from row 18 — on **one data source shape and one locator
-shape**, 24 types in all. What differs between them is a list.
+shape**, 26 types in all. What differs between them is a list.
+
+Two of the 24 were nearly missed, and the row-18 review is why they were not: **a data source's
+locator is not always its own name with `.PL` on the end.** `SENSOR_TAG_DOOR_SENSOR.DS` uses
+`SENSOR_TAG_DOOR.PL` and `SENSOR_TAG_STROKE_COUNT.DS` uses `SENSOR_TAG_STROBE_COUNT.PL`. Pairing by
+name put both in a group of their own with an empty locator, which is exactly what a wrong
+measurement looks like when it is not challenged. The layout keys on what the device publishes, so
+those two entries carry the locator's own name.
 
 So the layout gained two factories, `meshDeviceSource` and `meshDevicePoint`, and rows 13 and 18 were
 folded into the first of them rather than left as two more copies. Their existing specs passed
 unchanged, which is the equivalence proof: the DS entries assert `provisionedPoints`, the read-only
 address and the row layout, and none of them moved.
 
-**The attribute lists are 97 items read out of 22 `*Attributes` enums, and the reason they are read
-rather than fetched got stronger.** Row 18 found the gateway's own dropdown endpoint publishing
-`Enum::name` where the API validates `attributeName`, differing for one thermostat attribute. Across
-all 24 enums there are three, and the third cannot be guessed by anyone:
+**The attribute lists are 104 items read out of 24 `*Attributes` enums — 114 counting rows 13 and 18
+— and the reason they are read rather than fetched got stronger.** Row 18 found the gateway's own
+dropdown endpoint publishing `Enum::name` where the API validates `attributeName`, differing for one
+thermostat attribute. Across all 26 enums there are four, and two of them carry spaces:
 
 | enum | constant | what the wire takes |
 |---|---|---|
 | `ThermostatAttributes` | `ENERGY_SAVING` | `ENERGY_SAVING_MODE` |
 | `SensorTagPIRAttributes` | `OCCUPANCY` | `OCCUPANCY_STATUS` |
 | `SensorTagInjectionMouldCountAttributes` | `INJECTION_MOULD_COUNT` | `INJECTION MOULD COUNT` |
+| `SensorTagStrokeCountAttributes` | `STROKE_COUNT` | `STROKE COUNT` |
 
 Measured: `"INJECTION MOULD COUNT"` is a 201 and `"INJECTION_MOULD_COUNT"` is a 422. **D115.**
+
+The stroke counter is the type that cannot decide how it is spelt: the data source is
+`SENSOR_TAG_STROKE_COUNT.DS`, its locator is `SENSOR_TAG_STROBE_COUNT.PL`, the enum asks for the key
+`...attribute.strokeCount` while the bundle defines `...attribute.strobeCount`, and the wire name is
+`STROKE COUNT`. Four spellings of one word, and the mismatched key is why that attribute has no
+label of the gateway's own.
 
 The I/O card is worse in a quieter way. Its two digital outputs are `D01_STATUS` and `D02_STATUS`
 with a **digit zero**, in the constant and the wire name alike, while their translation keys are
@@ -2094,19 +2119,19 @@ rather than assumed.** Three dispositions:
 
 | disposition | types | why |
 |---|---|---|
-| hidden | 18 | the VO overrides `isSettable()` to a hard `false` |
+| hidden | 20 | the VO overrides `isSettable()` to a hard `false` |
 | read-only | `4DI_2DO_CARD`, `PEOPLE_COUNTER`, `PEOPLE_COUNT_CAMERA`, `THERMOSTAT`, `VAV_CONTROLLER` | inherits the stored field, but `toVO` drops it (D109) |
 | editable | `MODBUS_CONTROLLER` | `toVO` copies it — the only one of 24 |
 
 That widens D109 from one type to five, and makes `ModbusControllerPointLocatorModel` the worked
 example of its fix: it already does what the other five need.
 
-Thirteen of the 97 attributes have no English bundle entry, so `configurationDescription` hands those
+Fourteen of the 114 attributes have no English bundle entry, so `configurationDescription` hands those
 back as a raw translation key — the whole VAV controller bar two. **D116**, which is D111 counted
-properly. Our labels for those thirteen are ours, and a spec fails if one of them ever starts with
+properly. Our labels for those fourteen are ours, and a spec fails if one of them ever starts with
 `dsEdit.`.
 
-**What this row does not fix, and cannot:** D108. All 24 of these types share the one mutable
+**What this row does not fix, and cannot:** D108. All 26 of these types share the one mutable
 `ATTRIBUTE_CODES` static, so on any given gateway most of them cannot validate their own attributes.
 The lists here are right about what each device reports; whether the gateway will accept one depends
 on which mesh class loaded last.
@@ -2399,12 +2424,12 @@ and wrong, or stale, and are recorded there too. D73 is deliberately not fixed a
   NUMERIC with a `BOOLEAN_ATTRIBUTE` and for MULTISTATE, which has no valid attribute type at all.
   `AttributeTypeVO.getAttributeTypes(dataTypeId)` already encodes the rule and has zero callers.
 
-- **D115 (P2)** — `Enum::name` versus `attributeName` differs on three of the 24 mesh attribute
-  enums, not one, and `SensorTagInjectionMouldCountAttributes` publishes `INJECTION_MOULD_COUNT`
-  while the wire takes `INJECTION MOULD COUNT` — **with spaces**. Measured 201 and 422 respectively.
-  No client can derive that value from anything the API exposes.
+- **D115 (P2)** — `Enum::name` versus `attributeName` differs on four of the 26 mesh attribute
+  enums, not one, and two of the four wire names contain **spaces**: `INJECTION MOULD COUNT` and
+  `STROKE COUNT`. Measured 201 for the spaced value and 422 for the underscored one the endpoint
+  publishes. No client can derive those values from anything the API exposes.
 
-- **D116 (P3)** — 13 of the 97 mesh attribute descriptions have no English bundle entry, so
+- **D116 (P3)** — 14 of the 114 mesh attribute descriptions have no English bundle entry, so
   `configurationDescription` returns the raw key against a schema documenting it as pre-translated.
   The VAV controller loses seven of its nine. D111 counted properly.
 
@@ -2423,12 +2448,13 @@ and wrong, or stale, and are recorded there too. D73 is deliberately not fixed a
 
 - **D108 (P1, supersedes D90)** — `MeshPointLocatorVO.ATTRIBUTE_CODES` is one mutable `public
   static` field shared by 34 subclasses, each reassigning it in a static initialiser that runs once,
-  at first class load. The last-loaded class wins for the life of the JVM, so valid attributes are
+  at first class load, so the table is a one-way ratchet: it moves each time a mesh locator class is
+  first instantiated and settles only once all 34 have been. Valid attributes are therefore
   refused, foreign ones accepted, and stored points read back `attributeId: null`. Measured by
   flipping it mid-session; the gateway's own lookup endpoint contradicts the validator throughout.
 
 - **D109 (P2)** — `ThermostatPointLocatorModel.toVO` builds a fresh VO and never copies `settable`,
-  which the provisioner sets from the enum for six of the nine attributes. So a REST write of a
+  which the provisioner sets from the enum for seven of the nine attributes. So a REST write of a
   provisioned point **erases** it and the setpoint stops being writable. Measured 201 reading back
   `false`. D91's shape, with a consequence.
 

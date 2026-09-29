@@ -1273,8 +1273,8 @@ describe('gateway form layouts', () => {
 
   it('shows a thermostat point\'s settable flag, disabled, instead of hiding it', () => {
     // The first locator in this sequence where the flag is worth showing: `isSettable()` answers the
-    // stored field and the provisioner fills it from the enum, so six of the nine attributes really
-    // are writable. It is disabled because `toVO` builds a fresh VO and copies `attributeId` and
+    // stored field and the provisioner fills it from the enum, so seven of the nine attributes
+    // really are writable -- everything but the heartbeat and the temperature. It is disabled because `toVO` builds a fresh VO and copies `attributeId` and
     // `dataType` alone -- measured, a submitted `true` reads back `false` -- which also means a REST
     // write of a provisioned point erases it. D109.
     expect(thermostatPoint.readonly).toEqual(['attributeId', 'dataType', 'settable']);
@@ -1305,12 +1305,17 @@ describe('gateway form layouts', () => {
     .filter(([modelType]) => modelType.endsWith('.DS'))
     .filter(([, layout]) => JSON.stringify(layout.rows) === JSON.stringify([['address', 'location']]));
 
-  it('gives all 24 provisioned mesh device sources one shape', () => {
-    // Measured off the schema document's `families` map: 24 published data source types declare
-    // `address`, `anchorNode` and `location` over the common ten and nothing else. One shape, one
-    // factory -- the mesh controller and the thermostat were folded into it rather than left as two
-    // more copies of it.
-    expect(meshSources.length).toBe(24);
+  it('gives all 26 provisioned mesh device sources one shape', () => {
+    // Measured off the schema document's `families` map, with `allOf` resolved against
+    // `components.schemas` and each source paired to its locator through the Java rather than by
+    // name: 26 published data source types declare `address`, `anchorNode` and `location` over the
+    // common ten and nothing else. One shape, one factory -- the mesh controller and the thermostat
+    // were folded into it rather than left as two more copies of it.
+    //
+    // Two of the 26 were missed on the first pass because their locator is not their own name with
+    // `.PL` on the end: `SENSOR_TAG_DOOR_SENSOR.DS` uses `SENSOR_TAG_DOOR.PL` and
+    // `SENSOR_TAG_STROKE_COUNT.DS` uses `SENSOR_TAG_STROBE_COUNT.PL`.
+    expect(meshSources.length).toBe(26);
     meshSources.forEach(([modelType, layout]) => {
       expect(layout.provisionedPoints).withContext(modelType).toBe(true);
       expect(layout.readonly).withContext(modelType).toEqual(['address']);
@@ -1324,8 +1329,12 @@ describe('gateway form layouts', () => {
     expect(meshSources[0][1]).not.toBe(meshSources[1][1]);
   });
 
-  const meshPoints = meshSources.map(([modelType]) =>
-    [modelType.replace('.DS', '.PL'), GATEWAY_FORM_LAYOUTS[modelType.replace('.DS', '.PL')]] as const);
+  // Derived from the layouts themselves rather than by renaming the sources, because two of these
+  // locators are not named after their source.
+  const meshPoints = Object.entries(GATEWAY_FORM_LAYOUTS)
+    .filter(([modelType]) => modelType.endsWith('.PL'))
+    .filter(([, layout]) =>
+      JSON.stringify(layout.rows) === JSON.stringify([['attributeId', 'dataType']]));
 
   it('reads each mesh point\'s settable flag from its locator VO, not from a guess', () => {
     // Three dispositions, all read from the Java. `hidden` where the VO overrides `isSettable()` to a
@@ -1341,7 +1350,8 @@ describe('gateway form layouts', () => {
     expect(byMode.editable).toEqual(['MODBUS_CONTROLLER.PL']);
     expect(byMode.readonly.sort()).toEqual(['4DI_2DO_CARD.PL', 'PEOPLE_COUNTER.PL',
       'PEOPLE_COUNT_CAMERA.PL', 'THERMOSTAT.PL', 'VAV_CONTROLLER.PL']);
-    expect(byMode.hidden.length).toBe(18);
+    expect(byMode.hidden.length).toBe(20);
+    expect(byMode.hidden.length + byMode.readonly.length + byMode.editable.length).toBe(26);
     // A flag that is hidden is never also read-only, and one that is shown always carries a hint
     // saying who decides it.
     meshPoints.forEach(([modelType, layout]) => {
@@ -1366,9 +1376,9 @@ describe('gateway form layouts', () => {
     });
   });
 
-  it('carries the three attribute names that are not their constant names', () => {
+  it('carries the four attribute names that are not their constant names', () => {
     // The code table is built from `attributeName`; `GET /v2/export-code/sensors/*` publishes
-    // `Enum::name`. Three of the 97 differ, and one of the three has spaces in it. D113.
+    // `Enum::name`. Four of the 114 differ, and two of the four have spaces in them. D115.
     const values = (modelType: string): string[] =>
       GATEWAY_FORM_LAYOUTS[modelType].options.attributeId.map(item => item.value);
     expect(values('THERMOSTAT.PL')).toContain('ENERGY_SAVING_MODE');
@@ -1377,6 +1387,8 @@ describe('gateway form layouts', () => {
     expect(values('SENSOR_TAG_PIR.PL')).not.toContain('OCCUPANCY');
     expect(values('SENSOR_TAG_INJECTION_MOULD_COUNT.PL')).toContain('INJECTION MOULD COUNT');
     expect(values('SENSOR_TAG_INJECTION_MOULD_COUNT.PL')).not.toContain('INJECTION_MOULD_COUNT');
+    expect(values('SENSOR_TAG_STROBE_COUNT.PL')).toContain('STROKE COUNT');
+    expect(values('SENSOR_TAG_STROBE_COUNT.PL')).not.toContain('STROKE_COUNT');
     // And the I/O card's two digital outputs are spelt with a digit zero in the gateway's own enum,
     // while their translation keys call them do1/do2. The value is the zero; the label is the letter.
     const card = GATEWAY_FORM_LAYOUTS['4DI_2DO_CARD.PL'].options.attributeId;
@@ -1397,7 +1409,7 @@ describe('gateway form layouts', () => {
       });
       expect(new Set(items.map(item => item.value)).size).withContext(modelType).toBe(items.length);
     });
-    // 97 across the 22 batched, plus the thermostat's 9 and the mesh controller's 1.
-    expect(total).toBe(107);
+    // 104 across the 24 batched, plus the thermostat's 9 and the mesh controller's 1.
+    expect(total).toBe(114);
   });
 });

@@ -753,9 +753,11 @@ const SYSTEM_ATTRIBUTE_DATA_TYPES: FormSelectItem[] =
 /**
  * The data source form every provisioned mesh device shares.
  *
- * Measured off the schema document's own `families` map: 24 of the 63 published data source types
- * declare `address`, `anchorNode` and `location` over the common ten and nothing else -- the mesh
- * controller, the thermostat and the 22 batched with them. One shape, so one function, with the
+ * Measured off the schema document's own `families` map, with `allOf` resolved against
+ * `components.schemas` and each source paired to its locator through the Java rather than by name:
+ * **26** of the 63 published data source types declare `address`, `anchorNode` and `location` over
+ * the common ten and nothing else -- the mesh controller, the thermostat and the 24 batched with
+ * them. One shape, so one function, with the
  * only difference the noun the hints use for the thing on the other end of the radio.
  *
  * `address` is read-only because the mesh assigns it when the device joins, and each type's
@@ -828,20 +830,21 @@ const meshDevicePoint = (attributes: FormSelectItem[], device: string,
 /**
  * One attribute list per provisioned mesh device type, read out of each type's `*Attributes` enum.
  *
- * 97 attributes across 22 types. The values are each constant's `attributeName`, which is what the
- * code table is built from and therefore what the wire takes -- **not** the constant name, and not
- * what `GET /v2/export-code/sensors/*` publishes (D113). Three differ: the thermostat's
- * `ENERGY_SAVING` is `ENERGY_SAVING_MODE`, the PIR tag's `OCCUPANCY` is `OCCUPANCY_STATUS`, and the
- * injection-mould tag's `INJECTION_MOULD_COUNT` is `INJECTION MOULD COUNT` -- with spaces.
+ * 104 attributes across 24 types, 114 counting the thermostat's nine and the mesh controller's one.
+ * The values are each constant's `attributeName`, which is what the code table is built from and
+ * therefore what the wire takes -- **not** the constant name, and not what
+ * `GET /v2/export-code/sensors/*` publishes (D115). Four differ: the thermostat's `ENERGY_SAVING`
+ * is `ENERGY_SAVING_MODE`, the PIR tag's `OCCUPANCY` is `OCCUPANCY_STATUS`, and two carry spaces --
+ * `INJECTION MOULD COUNT` and `STROKE COUNT`.
  *
  * The I/O card's two digital outputs are `D01_STATUS` and `D02_STATUS` with a **digit zero**, in the
  * enum constant and the wire name alike, while their own translation keys call them `do1Status` and
  * `do2Status`. The label below reads DO1 because that is what the device is; the value is the zero,
  * because that is what the gateway takes.
  *
- * Labels are the gateway's own words from `i18n_en.properties`, sentence-cased. Thirteen of the 97
+ * Labels are the gateway's own words from `i18n_en.properties`, sentence-cased. Fourteen of the 114
  * have no entry in any English bundle, so `configurationDescription` hands those back as the raw
- * key (D111); their labels here are ours.
+ * key (D116); their labels here are ours.
  */
 
 const CARD_4DI_2DO_ATTRIBUTES: FormSelectItem[] = [
@@ -930,6 +933,28 @@ const SENSOR_TAG_INJECTION_MOULD_COUNT_ATTRIBUTES: FormSelectItem[] = [
   {value: 'HEARTBEAT', label: 'Heartbeat'},
   {value: 'BATTERY', label: 'Battery'},
   {value: 'INJECTION MOULD COUNT', label: 'Injection mould count'},
+  {value: 'LOCATION', label: 'Location'}
+];
+
+const SENSOR_TAG_DOOR_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'DOOR_STATUS', label: 'Door status'},
+  {value: 'BATTERY', label: 'Battery'}
+];
+
+/**
+ * The stroke counter, whose own name cannot decide how it is spelt.
+ *
+ * The data source type is `SENSOR_TAG_STROKE_COUNT.DS`, its locator is
+ * `SENSOR_TAG_STROBE_COUNT.PL`, the enum asks for the description key
+ * `dsEdit.inferrixSensors.attribute.strokeCount` while the bundle defines
+ * `...attribute.strobeCount`, and the wire name is `STROKE COUNT` with a space. Four spellings of
+ * one word, and the mismatched key is why this attribute has no label of the gateway's own (D116).
+ */
+const SENSOR_TAG_STROBE_COUNT_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'BATTERY', label: 'Battery'},
+  {value: 'STROKE COUNT', label: 'Stroke count'},
   {value: 'LOCATION', label: 'Location'}
 ];
 
@@ -1087,8 +1112,9 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * **The gateway's own validator cannot be relied on for any mesh type, and this row is where that
    * became provable.** `MeshPointLocatorVO.ATTRIBUTE_CODES` is one `public static` field that 34
    * subclasses each reassign from their own static initialiser. A static initialiser runs **once**,
-   * at first class load, so the table ends up holding whatever mesh locator class was loaded last
-   * and never changes again. Measured on 5.1.3, in one session: a thermostat point saved
+   * at first class load, so the table is a one-way ratchet: it moves each time a mesh locator class
+   * is first instantiated, and settles only once all 34 have been. Measured on 5.1.3, in one
+   * session: a thermostat point saved
    * `SETPOINT_TEMPERATURE` 201; one POST to a `MESH_SWITCH.PL` point then loaded that class; after
    * it, the same thermostat POST was **422**, a `MESH_CONTROLLER.PL` point accepted `ROOM_NUMBER`,
    * and the thermostat points already stored read back `attributeId: null` with
@@ -1105,8 +1131,8 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    *
    * **`settable` is read-only rather than hidden, which is new.** On `MESH_CONTROLLER.PL` it was
    * hidden because nothing could ever set it. Here `ThermostatPointLocatorVO` declares its own
-   * `settable` and `isSettable()` answers it, and the provisioner fills it from the enum -- six of
-   * the nine attributes are writable, including the setpoint. So the flag carries real information
+   * `settable` and `isSettable()` answers it, and the provisioner fills it from the enum -- seven
+   * of the nine attributes are writable, everything but the heartbeat and the temperature. So the flag carries real information
    * and belongs on screen. It is disabled because `ThermostatPointLocatorModel.toVO` builds a fresh
    * VO and copies `attributeId` and `dataType` alone: a submitted `true` is dropped, measured 201
    * reading back `false`. Which also means any REST write of a provisioned point **erases** it --
@@ -2262,6 +2288,13 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
   'SENSOR_TAG_IAQ_V2.PL': meshDevicePoint(SENSOR_TAG_IAQ_V2_ATTRIBUTES, 'air-quality tag', 'hidden'),
   'SENSOR_TAG_INJECTION_MOULD_COUNT.DS': meshDeviceSource('counter tag'),
   'SENSOR_TAG_INJECTION_MOULD_COUNT.PL': meshDevicePoint(SENSOR_TAG_INJECTION_MOULD_COUNT_ATTRIBUTES, 'counter tag', 'hidden'),
+  'SENSOR_TAG_DOOR_SENSOR.DS': meshDeviceSource('door sensor'),
+  // The locator's own model type, which is not the data source's name with `.PL` on the end -- the
+  // renderer keys on what the device publishes, and for these two that is a different word.
+  'SENSOR_TAG_DOOR.PL': meshDevicePoint(SENSOR_TAG_DOOR_ATTRIBUTES, 'door sensor', 'hidden'),
+  'SENSOR_TAG_STROKE_COUNT.DS': meshDeviceSource('stroke counter'),
+  'SENSOR_TAG_STROBE_COUNT.PL':
+    meshDevicePoint(SENSOR_TAG_STROBE_COUNT_ATTRIBUTES, 'stroke counter', 'hidden'),
   'SENSOR_TAG_LUX.DS': meshDeviceSource('light tag'),
   'SENSOR_TAG_LUX.PL': meshDevicePoint(SENSOR_TAG_LUX_ATTRIBUTES, 'light tag', 'hidden'),
   'SENSOR_TAG_PIR.DS': meshDeviceSource('occupancy tag'),

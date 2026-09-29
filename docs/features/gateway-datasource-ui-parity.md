@@ -2196,6 +2196,15 @@ is a 201, the same as everywhere else in this family; and a `PUT` changing `ctId
 `KWH` both read back `configurationDescription` as their raw translation key, confirming the five new
 D116 rows.
 
+**Two of these 27 types cannot hold a point at all, which the row-19 review's count question turned
+up.** `DustbinLevelSensorDataSourceDefinition` and `SoapDispenserSensorDataSourceDefinition` both
+open their point `validate` with `if (!(dsvo instanceof DistanceSensorDataSourceVO))`, naming the
+distance sensor's VO; both types extend `MeshDataSourceVO` directly and are not subclasses of it, so
+the condition is always true and the refusal is always added. Measured: the source POSTs 201 and a
+point on it is a **422** on `dataSourceId`. `PaperTowelLevelSensorDataSourceDefinition`, the third
+copy of the same file, names its own VO and its point POSTs 201 — the control. **D120, P1.** Our
+layout for the two is correct and inert; nothing on this side can make a point exist.
+
 **What this row does not fix, and cannot:** D108. All 27 of these types share the one mutable
 `ATTRIBUTE_CODES` static, so on any given gateway most of them cannot validate their own attributes.
 The lists here are right about what each device reports; whether the gateway will accept one depends
@@ -2518,6 +2527,22 @@ and wrong, or stale, and are recorded there too. D73 is deliberately not fixed a
   The VAV controller loses seven of its nine; the thermostat loses `STATUS`; the current sensor loses
   all five all-phase attributes, whose keys exist in `i18n_fr.properties` and nowhere else — so the
   French install is the only one that reads them. D111 counted properly.
+
+- **D120 (P1)** — `DUSTBIN_LEVEL_SENSOR` and `SOAP_DISPENSER_SENSOR` can never hold a data point:
+  their definitions' point `validate` tests `dsvo instanceof DistanceSensorDataSourceVO` and neither
+  VO is one. Measured 422 on `dataSourceId` for both, 201 for the paper towel sensor whose copy of
+  the same file names its own VO. Two words in two files.
+
+- **D118 (P2)** — the same three level sensors resolve `attributeId` against
+  `DistanceSensorPointLocatorVO.ATTRIBUTE_CODES` in `toVO`, although each has its own attributes enum
+  and its own static initialiser. Under D108 that initialises the wrong class and leaves the shared
+  table holding the distance sensor's three attributes, which contain none of the three types'
+  distinguishing ones. Driving D108's ratchet rather than suffering it.
+
+- **D119 (P3)** — nothing cross-checks a current sensor's attribute against its phase.
+  `CurrentSensorDataSourceDefinition.validate` checks the four locator fields one at a time and never
+  against each other, so a whole-supply attribute on `PHASE_2` saves (measured 201) and is then never
+  routed. A point that reports nothing looks like a dead sensor.
 
 - **D117 (P3)** — the I/O card's digital outputs are `D01_STATUS`/`D02_STATUS` with a digit zero,
   while their translation keys and labels say DO1/DO2. Measured: the letter O is a 422. Reads like a

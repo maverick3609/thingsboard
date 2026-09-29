@@ -256,7 +256,8 @@ consulted.
 | 15 | `POE_LIGHTING.DS` | `POE_LIGHTING.PL` | **done** — 2026-09-29; **D96-D100** filed, the first a credential readable two ways; needs an on-screen pass |
 | 16 | `SCRIPTING.DS` | `SCRIPTING.PL` | **done** — 2026-09-29; **D101-D103** filed, the first a 500 on reading a row and writing it back; needs an on-screen pass |
 | 17 | `SYSTEM_ATTRIBUTES.DS` | `SYSTEM_ATTRIBUTES.PL` | **done** — 2026-09-29; **D105-D107** filed, the last a pairing rule only the gateway's two front ends know; **the Add menu is now complete**; needs an on-screen pass |
-| … | the other 46 types | | provisioned-only: no Add form, an edit form like row 13's |
+| 18 | `THERMOSTAT.DS` | `THERMOSTAT.PL` | **done** — 2026-09-29; **D108-D113** filed, D108 a P1 general to all 34 mesh locator types that supersedes D90; needs an on-screen pass |
+| … | the other 45 types | | provisioned-only: no Add form, an edit form like rows 13 and 18 |
 | last | the 13 types with no stack form | | left on the generic schema form — see Open decisions |
 
 **The "remaining ~40" this table used to carry was the wrong shape.** `/v2/data-source-types` — the
@@ -1530,6 +1531,14 @@ subclasses race for that one. The 34 is only right because of the shadow.)
 only refusal available; it is a convenience, not a boundary, because anything posting to
 `/v2/data-point` directly still gets its 201.
 
+> **Superseded by D108 (row 18).** This row, and the review that followed it, read the shared table
+> as a fixed if arbitrary snapshot — "whichever class loaded last", settled at boot, probed to
+> `MeshExtenderAttributes` exactly. It is not settled at boot. A static initialiser runs at first
+> class **load**, so the table changes while the gateway runs, and row 18 flipped it mid-session and
+> measured all three consequences: valid attributes refused, foreign attributes accepted, and stored
+> points reading back `attributeId: null`. The narrowing here is still right; the reason it cannot be
+> relied on is worse than this section says.
+
 `dataType` is narrowed the same way and for a related reason: `HEARTBEAT`'s conversion is
 `value -> new BinaryValue(value.getBooleanValue())` and the provisioner stores the attribute's own
 `BINARY`, while the definition checks only that the submitted type *exists*. A numeric mesh
@@ -1950,6 +1959,79 @@ is a constant, and that is a legitimate thing to want, so it is a choice rather 
 `tsc -p src/tsconfig.app.json` exit 0; every rule above measured against 5.1.3 and every probe row
 deleted, the instance back at 12 sources. The on-screen pass is owed with rows 6–16.
 
+### 18 — `THERMOSTAT.DS` / `THERMOSTAT.PL` (done, 2026-09-29)
+
+The first of the provisioned-only tail proper, and the row that showed the tail is not 46 pieces of
+work. Measured off the schema document's own `families` map: the 46 remaining types have **ten
+distinct (data source fields, locator fields) pairs** between them, and **23 of them are
+field-identical to `MESH_CONTROLLER`** — `address`, `anchorNode`, `location` over the common ten, and
+a locator that is `attributeId` plus the usual three. Thermostat is one of the 23, chosen as the
+representative because it has nine attributes across three data types with six of them writable,
+where a mesh controller has one binary attribute that is not. Whatever the form has to do, this type
+makes it do it.
+
+**The attribute list is read out of the Java enum rather than fetched, and that turned out to be
+load-bearing.** The gateway publishes `GET /v2/export-code/sensors/thermostat`, annotated *"Read-only
+lookup returning the selectable thermostat attribute names used to populate UI dropdowns"*. It is
+`Arrays.stream(ThermostatAttributes.values()).map(Enum::name)`. The code table the API actually
+validates against is built from `getAttributeName()`, and for one constant the two differ —
+`ENERGY_SAVING` carries the name `ENERGY_SAVING_MODE`. So the endpoint whose job is to fill dropdowns
+publishes one value in nine that the same gateway refuses. **D113.** The lookup also gives names
+only: no label, no data type, no settable flag, and it exists for about eleven of the 23 types.
+
+**D108 is the row's headline, and it is a P1 that belongs to all 34 mesh locator types.**
+`MeshPointLocatorVO.ATTRIBUTE_CODES` is one `public static` field; every subclass reassigns it from
+its own static initialiser. Row 13 read that as "the last class to initialise wins", settled at boot.
+A static initialiser runs at first class **load**, so it is not settled at boot — and this row
+flipped it mid-session on purpose:
+
+| step | measured |
+|---|---|
+| a thermostat point with `SETPOINT_TEMPERATURE` | 201 |
+| a `MESH_CONTROLLER.PL` point with `FAN_SPEED` | 201 — a thermostat attribute on a controller |
+| one `MESH_SWITCH.PL` point, which loads that class | 201 |
+| **the same thermostat point again** | **422** |
+| `STATUS`, `TEMPERATURE` on a thermostat | **422** |
+| a `MESH_CONTROLLER.PL` point with `ROOM_NUMBER` | 201 |
+| `GET /v2/export-code/sensors/thermostat` | still lists all nine |
+| `GET` the points saved before the flip | `attributeId: null`, `configurationDescription: "Unknown"` |
+
+Three failures out of one field: valid input refused, invalid input accepted, and stored points that
+stop being readable — and since a read-modify-write then posts `attributeId: null`, renaming such a
+point fails too. Which type wins is decided by class-load order, which in production means whichever
+mesh device the gateway touched last. **Nothing on this side can do anything about it**, which is
+worth saying plainly: the client list keeps the form honest about which nine attributes a thermostat
+has, and that is the whole of what it can achieve.
+
+**`settable` is shown read-only, which no previous locator in this sequence has done.** Row 13 hid it
+because `MeshControllerPointLocatorVO` can never be settable. Here the VO declares its own `settable`,
+`isSettable()` answers it, and the provisioner fills it from the enum — the setpoint, the fan mode,
+the lock and three more are writable. So the flag carries information the operator wants. It is
+disabled because `ThermostatPointLocatorModel.toVO` builds a fresh VO and copies `attributeId` and
+`dataType` alone, so a submitted `true` is dropped — measured 201 reading back `false`. That drop is
+also an **erasure**: any REST write of a provisioned point clears the flag, and on a thermostat that
+costs the ability to write the setpoint. **D109**, D91's shape with a consequence attached.
+
+Two smaller ones. The code table is built from `ThermostatAttributes` while the provisioner uses
+`ThermostatAttributesV1_1` for firmware ≥ 1.1.0, which adds `ECO_SETPOINT_TEMPERATURE` — a point the
+gateway creates and then cannot name (**D110**). And `configurationDescription`, which the schema
+calls a string "the gateway has already translated", comes back as the raw key for attributes with no
+bundle entry — measured `dsEdit.inferrixSensors.attribute.roomNumber`, and the thermostat's `status`
+has no entry either (**D111**). `dataType` is not checked against the attribute's own (**D112**).
+
+No `defaults` on the locator, unlike row 13: `provisionedPoints` means there is no Add form, and row
+13 could name a default only because that type has exactly one attribute. One of nine would be a
+guess.
+
+> **The probing left the team's local instance in the D108 state** — it loaded
+> `MeshSwitchPointLocatorVO`, so the shared table is the switch's until the instance restarts. No row
+> was changed and the inventory is back to 12 sources and 106 points, but mesh attribute names read
+> over REST there will be wrong until a restart. Recorded at the end of the findings doc.
+
+*Verified:* 124 layout, 41 schema, 14 form and 17 service specs green, and
+`tsc -p src/tsconfig.app.json` exit 0; every rule above read in the Java first and measured against
+5.1.3, probe rows deleted. The on-screen pass is owed with rows 6–17.
+
 ## Per-type components
 
 Settled 2026-09-25, after the question was raised directly: **is one renderer for 148 model types
@@ -2151,10 +2233,11 @@ and wrong, or stale, and are recorded there too. D73 is deliberately not fixed a
 
   Written up in `Inferrix-stack/docs/specs/2026-09-28-internal-monitoring-source.md`.
 
-- **D90 (P1)** — `MeshPointLocatorVO.ATTRIBUTE_CODES` is one `public static` field that 34 mesh
-  locator subclasses reassign from their own static initialisers, so every mesh type validates its
-  attribute against whichever class loaded last. Measured: a `MESH_CONTROLLER.PL` point accepts
-  `attributeId: "BATTERY"`, which `MeshControllerAttributes` does not declare.
+- **D90 (P1, superseded by D108)** — `MeshPointLocatorVO.ATTRIBUTE_CODES` is one `public static`
+  field that 34 mesh locator subclasses reassign from their own static initialisers, so every mesh
+  type validates its attribute against whichever class loaded last. Measured: a `MESH_CONTROLLER.PL`
+  point accepts `attributeId: "BATTERY"`, which `MeshControllerAttributes` does not declare. D108
+  keeps the finding and corrects its scope: the table changes at runtime, not only at boot.
 - **D91 (P3)** — `MeshControllerPointLocatorModel.toVO` drops `settable` and `relinquishable` while
   the read reports them, the shape D84 closed on `INTERNAL.PL`.
 - **D92 (P3, withdrawn 2026-09-29)** — filed as "a client cannot tell which data source types it is
@@ -2229,6 +2312,34 @@ and wrong, or stale, and are recorded there too. D73 is deliberately not fixed a
   front ends forbid, and the pairing decides the value class the runtime stores. Measured 201 for
   NUMERIC with a `BOOLEAN_ATTRIBUTE` and for MULTISTATE, which has no valid attribute type at all.
   `AttributeTypeVO.getAttributeTypes(dataTypeId)` already encodes the rule and has zero callers.
+
+- **D108 (P1, supersedes D90)** — `MeshPointLocatorVO.ATTRIBUTE_CODES` is one mutable `public
+  static` field shared by 34 subclasses, each reassigning it in a static initialiser that runs once,
+  at first class load. The last-loaded class wins for the life of the JVM, so valid attributes are
+  refused, foreign ones accepted, and stored points read back `attributeId: null`. Measured by
+  flipping it mid-session; the gateway's own lookup endpoint contradicts the validator throughout.
+
+- **D109 (P2)** — `ThermostatPointLocatorModel.toVO` builds a fresh VO and never copies `settable`,
+  which the provisioner sets from the enum for six of the nine attributes. So a REST write of a
+  provisioned point **erases** it and the setpoint stops being writable. Measured 201 reading back
+  `false`. D91's shape, with a consequence.
+
+- **D110 (P2)** — the code table is built from `ThermostatAttributes` while the version handler
+  provisions from `ThermostatAttributesV1_1` on firmware ≥ 1.1.0, so a v1.1 thermostat's
+  `ECO_SETPOINT_TEMPERATURE` point can be created by the gateway and then neither named nor written
+  over REST.
+
+- **D113 (P2)** — `ThermostatAttributeResource` returns `Enum::name` while the API validates against
+  `getAttributeName()`; they differ for `ENERGY_SAVING` / `ENERGY_SAVING_MODE`, so the endpoint whose
+  documented job is filling UI dropdowns publishes a value the same gateway refuses. Worth auditing
+  the other ~11 `/v2/export-code/sensors/*` resources, which are written the same way.
+
+- **D111 (P3)** — `configurationDescription` is documented as pre-translated and returns the raw key
+  when the bundle has no entry. Measured `dsEdit.inferrixSensors.attribute.roomNumber`; the
+  thermostat's `status` key has no entry either.
+
+- **D112 (P3)** — an attribute's data type is not checked against the attribute's own. Measured:
+  `TEMPERATURE` (NUMERIC in the enum) saves 201 with `dataType: "BINARY"`.
 
 - **W11 (P1)** — a multistate virtual point cannot be configured at all. The template switches on
   `'MULTISTATE'`, a case its own dropdown can never emit (it emits `INCREMENT_MULTISTATE`), so the

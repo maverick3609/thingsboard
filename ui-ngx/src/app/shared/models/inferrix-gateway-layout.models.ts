@@ -619,6 +619,34 @@ const MESH_CONTROLLER_ATTRIBUTES: FormSelectItem[] = [
 const BINARY_ONLY: FormSelectItem[] = [{value: 'BINARY', label: 'Binary'}];
 
 /**
+ * The nine attributes a thermostat reports, in `ThermostatAttributes`' own order.
+ *
+ * The values are each constant's **`attributeName`**, not its constant name, because that is what
+ * `ThermostatPointLocatorVO`'s static block puts in the code table and therefore what the wire
+ * takes. The two differ for exactly one: the constant `ENERGY_SAVING` carries the name
+ * `ENERGY_SAVING_MODE`.
+ *
+ * That difference is why this list is read out of the enum rather than fetched from the gateway's
+ * own `GET /v2/export-code/sensors/thermostat`, whose stated job is "to populate UI dropdowns": it
+ * is `Arrays.stream(ThermostatAttributes.values()).map(Enum::name)`, so it publishes
+ * `ENERGY_SAVING` -- a value its own API refuses. Measured, the endpoint returns it. **D113.**
+ *
+ * Labels are the gateway's own words from its bundle, except `STATUS`, whose key
+ * `dsEdit.inferrixSensors.attribute.status` has no entry in any bundle (**D111**).
+ */
+const THERMOSTAT_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'STATUS', label: 'Status'},
+  {value: 'LOCK', label: 'Lock status'},
+  {value: 'RHV_STATUS', label: 'RHV status'},
+  {value: 'FAN_SPEED', label: 'Fan mode'},
+  {value: 'TEMPERATURE', label: 'Temperature'},
+  {value: 'ENERGY_SAVING_MODE', label: 'Energy saving mode'},
+  {value: 'AUTO_MANUAL', label: 'Auto/manual mode'},
+  {value: 'SETPOINT_TEMPERATURE', label: 'Setpoint temperature'}
+];
+
+/**
  * The start-value gate shared by `VIRTUAL.PL` and `SYSTEM_ATTRIBUTES.PL`.
  *
  * Both parse the field from free text for every data type but binary, where the only two values
@@ -762,6 +790,89 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * read. The gateway's own form disables them for the same reason, along with `editPermission`,
    * which Cortex drops entirely.
    */
+  /**
+   * A thermostat on the mesh, as a data source.
+   *
+   * Field-identical to `MESH_CONTROLLER.DS`, and so are twenty-one other provisioned mesh device
+   * types: `address`, `anchorNode` and `location` over the common ten. The mesh assigns the address
+   * when the device joins, `ThermostatDataSourceDefinition.validate` refuses -1 and 0 -- measured,
+   * both 422 -- and `location` is the node's zone under another name (`ThermostatDataSourceModel`
+   * maps it to `vo.setZone`).
+   *
+   * The type is not on the Add menu (`/v2/data-source-types` lists 16 and this is not one), but a
+   * POST is accepted all the same -- measured 201 -- so `provisionedPoints` is what removes the add
+   * path for its points, exactly as on row 13.
+   */
+  'THERMOSTAT.DS': {
+    provisionedPoints: true,
+    readonly: ['address'],
+    hints: {
+      address: 'The node address the mesh assigned this thermostat. It identifies the node the '
+        + 'gateway files this source and its mesh records under, so it is not editable here.',
+      anchorNode: 'Anchor nodes are the fixed reference points the mesh measures position against. '
+        + 'The gateway registers this one as an anchor when the source starts.',
+      location: 'A free-text zone or place, stored as the node\'s zone and shown wherever the mesh '
+        + 'console lists it.'
+    },
+    rows: [['address', 'location']]
+  },
+
+  /**
+   * One attribute of a thermostat, as a point. Nine of them, provisioned when the device joins.
+   *
+   * **The gateway's own validator cannot be relied on for any mesh type, and this row is where that
+   * became provable.** `MeshPointLocatorVO.ATTRIBUTE_CODES` is one `public static` field that 34
+   * subclasses each reassign from their own static initialiser. A static initialiser runs **once**,
+   * at first class load, so the table ends up holding whatever mesh locator class was loaded last
+   * and never changes again. Measured on 5.1.3, in one session: a thermostat point saved
+   * `SETPOINT_TEMPERATURE` 201; one POST to a `MESH_SWITCH.PL` point then loaded that class; after
+   * it, the same thermostat POST was **422**, a `MESH_CONTROLLER.PL` point accepted `ROOM_NUMBER`,
+   * and the thermostat points already stored read back `attributeId: null` with
+   * `configurationDescription: "Unknown"`. The gateway's own lookup endpoint still listed all nine
+   * as valid throughout. **D108**, which supersedes the narrower D90 -- that row read the table as a
+   * fixed if arbitrary snapshot, and it is not fixed.
+   *
+   * Nothing on this side can fix that. What the list does do is keep the form honest about which
+   * nine attributes a thermostat has, and keep us from inventing a tenth.
+   *
+   * `attributeId` and `dataType` are read-only because the mesh chooses both when it provisions the
+   * point -- the same reason as row 13, and what `provisionedPoints` already claims of every locator
+   * field on a provisioned point.
+   *
+   * **`settable` is read-only rather than hidden, which is new.** On `MESH_CONTROLLER.PL` it was
+   * hidden because nothing could ever set it. Here `ThermostatPointLocatorVO` declares its own
+   * `settable` and `isSettable()` answers it, and the provisioner fills it from the enum -- six of
+   * the nine attributes are writable, including the setpoint. So the flag carries real information
+   * and belongs on screen. It is disabled because `ThermostatPointLocatorModel.toVO` builds a fresh
+   * VO and copies `attributeId` and `dataType` alone: a submitted `true` is dropped, measured 201
+   * reading back `false`. Which also means any REST write of a provisioned point **erases** it --
+   * D91's shape, but on a thermostat it costs you the ability to write the setpoint. **D109.**
+   *
+   * `relinquishable` is hidden for the same reason as row 13 (never read, reads back null) and
+   * `configurationDescription` because it is the attribute's own name repeated -- and, for two of
+   * these nine, the raw translation key instead (**D111**).
+   *
+   * No `defaults`: `provisionedPoints` means there is no Add form, so a default would be a value
+   * invented for a form nobody opens. Row 13 could name one because that type has a single
+   * attribute; naming one of nine here would be a guess.
+   */
+  'THERMOSTAT.PL': {
+    hidden: ['relinquishable', 'configurationDescription'],
+    readonly: ['attributeId', 'dataType', 'settable'],
+    // `dataType` is left at the four rather than narrowed to the three these attributes use. The
+    // field is a read-only display of what the device reported, and a narrowed list on such a field
+    // can only ever blank a value the gateway does hold.
+    options: {attributeId: THERMOSTAT_ATTRIBUTES, dataType: NON_IMAGE_DATA_TYPES},
+    hints: {
+      attributeId: 'What this point reads from the thermostat. The gateway creates one point per '
+        + 'attribute when the thermostat joins the mesh, so there is nothing to choose here.',
+      settable: 'Whether the mesh accepts a write to this attribute — the setpoint, the fan mode '
+        + 'and the lock are writable, the temperature and the heartbeat are not. The thermostat '
+        + 'decides this when the point is created, so it is shown rather than set.'
+    },
+    rows: [['attributeId', 'dataType']]
+  },
+
   'VIRTUAL_MESH_NODE.DS': {
     readonly: ['controllerAddress', 'publisherId'],
     provisionedPoints: true

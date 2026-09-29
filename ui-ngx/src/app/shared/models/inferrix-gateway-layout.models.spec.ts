@@ -1217,4 +1217,55 @@ describe('gateway form layouts', () => {
     expect(sysAttrPoint.hidden).toEqual(['relinquishable', 'configurationDescription']);
     expect(sysAttrPoint.hints.settable).toContain('constant');
   });
+
+  const thermostat = GATEWAY_FORM_LAYOUTS['THERMOSTAT.DS'];
+  const thermostatPoint = GATEWAY_FORM_LAYOUTS['THERMOSTAT.PL'];
+
+  it('gives the thermostat source the mesh-device shape row 13 established', () => {
+    // `ThermostatDataSourceModel` adds `address`, `anchorNode` and `location` over the common ten,
+    // which is field-identical to `MESH_CONTROLLER.DS` and to twenty-one other provisioned types.
+    // The address is the mesh's, not ours -- `validate` refuses -1 and 0, measured 422 for both.
+    expect(thermostat.provisionedPoints).toBe(true);
+    expect(thermostat.readonly).toEqual(['address']);
+    expect(thermostat.rows).toEqual([['address', 'location']]);
+  });
+
+  it('carries the attribute names the wire takes, not the ones the enum constants are called', () => {
+    // `ThermostatPointLocatorVO`'s static block adds each constant's `attributeName` to the code
+    // table, and for one constant the two differ: `ENERGY_SAVING` carries `ENERGY_SAVING_MODE`. The
+    // gateway's own dropdown endpoint publishes the constant name -- `.map(Enum::name)` -- so a
+    // client that trusted it would post a value the same gateway refuses. D113.
+    const values = thermostatPoint.options.attributeId.map(item => item.value);
+    expect(values).toEqual(['HEARTBEAT', 'STATUS', 'LOCK', 'RHV_STATUS', 'FAN_SPEED', 'TEMPERATURE',
+      'ENERGY_SAVING_MODE', 'AUTO_MANUAL', 'SETPOINT_TEMPERATURE']);
+    expect(values).not.toContain('ENERGY_SAVING');
+  });
+
+  it('shows a thermostat point\'s settable flag, disabled, instead of hiding it', () => {
+    // The first locator in this sequence where the flag is worth showing: `isSettable()` answers the
+    // stored field and the provisioner fills it from the enum, so six of the nine attributes really
+    // are writable. It is disabled because `toVO` builds a fresh VO and copies `attributeId` and
+    // `dataType` alone -- measured, a submitted `true` reads back `false` -- which also means a REST
+    // write of a provisioned point erases it. D109.
+    expect(thermostatPoint.readonly).toEqual(['attributeId', 'dataType', 'settable']);
+    expect(thermostatPoint.hidden).toEqual(['relinquishable', 'configurationDescription']);
+    expect(thermostatPoint.hints.settable).toContain('setpoint');
+  });
+
+  it('leaves a read-only data type its full list rather than narrowing it', () => {
+    // These nine attributes use three of the four, but the field only ever displays what the device
+    // reported. Narrowing the list on a field nobody can change cannot prevent a wrong value; it can
+    // only blank a right one the gateway does hold.
+    // The same array object a virtual point gets, which is the full non-image list.
+    expect(thermostatPoint.options.dataType).toBe(GATEWAY_FORM_LAYOUTS['VIRTUAL.PL'].options.dataType);
+    expect(thermostatPoint.options.dataType.map(item => item.value))
+      .toEqual(['BINARY', 'MULTISTATE', 'NUMERIC', 'ALPHANUMERIC']);
+  });
+
+  it('names no default on a provisioned locator with nine attributes', () => {
+    // Row 13 could seed one because a mesh controller has a single attribute and the disabled select
+    // needed an item. There is no Add form here either, so a default would not be a convenience --
+    // it would be one of nine picked at random for a form nobody opens.
+    expect(thermostatPoint.defaults).toBeUndefined();
+  });
 });

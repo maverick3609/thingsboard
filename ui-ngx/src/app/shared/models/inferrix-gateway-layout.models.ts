@@ -906,6 +906,23 @@ const meshDevicePoint = (attributes: FormSelectItem[], device: string,
 });
 
 /**
+ * The three asset tags, as data sources: the mesh address and nothing else.
+ *
+ * `ASSET_TRACKING_BAND`, `LED_ASSET_TAG` and `STUDENT_ASSET_TAG` declare `address` over
+ * `AbstractDataSourceModel`'s eleven and no more -- not `anchorNode`, not `location`, which is why
+ * they cannot reuse {@link meshDeviceSource}. A tag is carried rather than installed, so it has no
+ * zone to record and is never a mesh anchor.
+ */
+const assetTagSource = (tag: string): GatewayFormLayout => ({
+  provisionedPoints: true,
+  readonly: ['address'],
+  hints: {
+    address: `The node address the mesh assigned this ${tag}. The gateway files the tag and its `
+      + 'points under it, so it is not editable here.'
+  }
+});
+
+/**
  * A mesh node, as a data source. Ten types, one shape.
  *
  * A mesh node is not a device the gateway talks to -- it is another gateway's data source, mirrored
@@ -1206,6 +1223,33 @@ const WATER_LEAKAGE_DETECTOR_ATTRIBUTES: FormSelectItem[] = [
   {value: 'HEARTBEAT', label: 'Heartbeat'},
   {value: 'BATTERY', label: 'Battery'},
   {value: 'LEAKAGE', label: 'Leakage'}
+];
+
+/**
+ * The three asset tag attribute lists. Ten attributes, all four names identical to their constants.
+ *
+ * Two have no English bundle entry and their labels are ours (**D116** again):
+ * `dsEdit.inferrixSensors.attribute.charging` for the tracking band -- note that the wristband's
+ * `CHARGING` uses a *different* key, `…attribute.wristBand.charging`, which does exist -- and
+ * `dsEdit.inferrixSensors.attribute.ledAssetTag.ledStatus` for the LED tag.
+ */
+const ASSET_TRACKING_BAND_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'CHARGING', label: 'Charging'},
+  {value: 'BATTERY', label: 'Battery'},
+  {value: 'LOCATION', label: 'Location'}
+];
+
+const LED_ASSET_TAG_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'BATTERY', label: 'Battery'},
+  {value: 'LED_STATUS', label: 'LED status'}
+];
+
+const STUDENT_ASSET_TAG_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'BATTERY', label: 'Battery'},
+  {value: 'LOCATION', label: 'Location'}
 ];
 
 /**
@@ -2745,6 +2789,28 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     meshDevicePoint(LIGHT_RELAY_CONTROLLER_ATTRIBUTES, 'relay controller', 'readonly'),
   'MOKO_BAND.DS': lightControllerSource('wristband'),
   'MOKO_BAND.PL': meshDevicePoint(MOKO_BAND_ATTRIBUTES, 'wristband', 'hidden'),
+
+  /**
+   * The three asset tags. The mesh device point form over a source that is the address alone.
+   *
+   * `LED_ASSET_TAG` is the only one whose `settable` is worth showing, and it is the plainest case
+   * of D109 in the file: `LedAssetTagPointLocatorVO.isSettable()` returns the stored field honestly,
+   * `CreateLedAssetTagVO` sets it `true` for `LED_STATUS` and false for the other two -- an LED is
+   * the one thing on a tag you can write to -- and `LedAssetTagPointLocatorModel.toVO` copies
+   * `attributeId` and `dataType` alone, so a save through this dialog erases it. Read-only, with the
+   * hint that says so. The other two override `isSettable()` to a hard `false`.
+   *
+   * `STUDENT_ASSET_TAG` publishes a second locator, `STUDENT_ASSET_TAG_MESH_NODE.PL`, which belongs
+   * to the mirrored-node family in row 20 and is laid out there. This is the device's own.
+   */
+  'ASSET_TRACKING_BAND.DS': assetTagSource('tracking band'),
+  'ASSET_TRACKING_BAND.PL':
+    meshDevicePoint(ASSET_TRACKING_BAND_ATTRIBUTES, 'tracking band', 'hidden'),
+  'LED_ASSET_TAG.DS': assetTagSource('LED tag'),
+  'LED_ASSET_TAG.PL': meshDevicePoint(LED_ASSET_TAG_ATTRIBUTES, 'LED tag', 'readonly-erased'),
+  'STUDENT_ASSET_TAG.DS': assetTagSource('student tag'),
+  'STUDENT_ASSET_TAG.PL':
+    meshDevicePoint(STUDENT_ASSET_TAG_ATTRIBUTES, 'student tag', 'hidden'),
 
   /**
    * One value the platform holds, as a point.

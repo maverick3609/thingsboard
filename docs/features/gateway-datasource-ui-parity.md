@@ -262,7 +262,7 @@ consulted.
 | 19a | `CURRENT_SENSOR` | `CURRENT_SENSOR.PL` | **done** — 2026-09-30; the 27th member of the mesh family, added after the row-19 review; family source, own point form (`phaseId`, `ctId`); needs an on-screen pass |
 | 20 | the 9 `*_MESH_NODE` types | their locators | **done** — 2026-09-30; one batch of ten with `VIRTUAL_MESH_NODE`, which was refactored into it; **D126-D127** filed; its attempted reversal of row 12 was withdrawn the same day; needs an on-screen pass |
 | 21 | the 4 light controllers | their locators | **done** — 2026-09-30; the mesh-device point form exactly, over a source with a poll period; **D121-D124** filed, two of them P1/P2 on the gateway's own provisioning; needs an on-screen pass |
-| 22 | the 3 asset tags | their locators | planned — `ASSET_TRACKING_BAND`, `LED_ASSET_TAG`, `STUDENT_ASSET_TAG`; `address` alone |
+| 22 | the 3 asset tags | their locators | **done** — 2026-09-30; `address` alone on the source, the mesh device point form; `LED_ASSET_TAG` is the plainest D109 case in the file; needs an on-screen pass |
 | 23 | the 2 Modbus slave shapes | their locators | planned — `MODBUS_SLAVE_DEVICE` and `…_POLLING`, which is the same three fields plus the polling pair |
 | 24 | `VIRTUAL_SWITCH.DS` | `VIRTUAL_SWITCH.PL` | planned — the one type left in a shape of its own |
 | last | the 13 types with no stack form | | left on the generic schema form — see Open decisions |
@@ -2428,6 +2428,50 @@ The other two light controllers override `isSettable()` to a hard `false` and st
 
 *Verified:* 133 layout, 41 schema, 14 form and 17 service specs green, and
 `tsc -p src/tsconfig.app.json` exit 0. The on-screen pass is owed with rows 6–20.
+
+### 22 — the three asset tags (done, 2026-09-30)
+
+`ASSET_TRACKING_BAND`, `LED_ASSET_TAG` and `STUDENT_ASSET_TAG`. The smallest row left, and the first
+since row 19 that turned up no new gateway defect.
+
+The source is `address` over the common eleven and **nothing else** — not `anchorNode`, not
+`location` — so it cannot reuse `meshDeviceSource` and gets a three-line `assetTagSource` instead. A
+tag is carried rather than installed: it has no zone to record and is never a mesh anchor. The point
+form is the mesh device family's exactly, so `meshDevicePoint` serves all three unchanged.
+
+**The `settable` provenance was checked before the layout was written this time**, which is the
+lesson rows 20 and 21 paid for. `LED_ASSET_TAG` is the only one where the flag is real:
+`LedAssetTagPointLocatorVO.isSettable()` returns the stored field honestly, and `CreateLedAssetTagVO`
+sets it with `attribute.getAttributeName().equals(LedAssetTagAttributes.LED_STATUS.getAttributeName())`
+— an LED is the one thing on a tag you can write to. But `LedAssetTagPointLocatorModel.toVO` copies
+`attributeId` and `dataType` alone, so a save through this dialog erases it. That makes it
+`readonly-erased`, the plainest case of D109 in the file. The other two override `isSettable()` to a
+hard `false` and are hidden.
+
+`STUDENT_ASSET_TAG` publishes a second locator, `STUDENT_ASSET_TAG_MESH_NODE.PL`, which belongs to
+the mirrored-node family and is laid out in row 20. This row is the device's own.
+
+Two more D116 rows: `dsEdit.inferrixSensors.attribute.charging` (the tracking band) and
+`dsEdit.inferrixSensors.attribute.ledAssetTag.ledStatus` (the LED tag) have no English entry. The
+tracking band's is worth a note — the *wristband*'s `CHARGING` uses a different key,
+`…attribute.wristBand.charging`, which does exist, so this is a near-miss of the same shape as
+`strokeCount`/`strobeCount` rather than a plain omission.
+
+*Measured against 5.1.3, every probe row deleted:* all three sources POST 201 carrying `address` and
+none of `anchorNode`, `location`, `quantize` or `timePeriod`; a `LED_ASSET_TAG` point submitted with
+`settable: true` reads back **false**, confirming D109 on the wire for this type; and `LED_STATUS`
+reads back `configurationDescription: "dsEdit.inferrixSensors.attribute.ledAssetTag.ledStatus"`, the
+raw key, confirming its D116 row.
+
+> **One probe of mine proved nothing and is recorded as such.** A follow-up `CHARGING` point on the
+> tracking band came back 422, which looks like evidence and is not: the LED and student tag probes
+> had instantiated their own locator classes in between, so the shared `ATTRIBUTE_CODES` table had
+> moved. It is exactly the trap the D108 note at the top of the handover doc describes, walked into
+> by probing without a positive control in the same run. The tracking band's missing label stands on
+> the bundle grep, which is direct; the wire confirmation is simply not available.
+
+*Verified:* 133 layout, 41 schema, 14 form and 17 service specs green, and
+`tsc -p src/tsconfig.app.json` exit 0. The on-screen pass is owed with rows 6–21.
 
 ## Per-type components
 

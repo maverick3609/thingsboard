@@ -1429,8 +1429,17 @@ describe('gateway form layouts', () => {
     // settable argument and no provisioner, upgrade or event listener sets the flag for that type,
     // so the form is the only source there is. Everything else that shows the flag shows it locked.
     expect(byMode.editable).toEqual(['MODBUS_CONTROLLER.PL']);
-    expect(byMode.readonly.sort()).toEqual(['4DI_2DO_CARD.PL', 'LIGHT_CONTROLLER_V4.PL',
-      'LIGHT_RELAY_CONTROLLER.PL', 'PEOPLE_COUNTER.PL', 'THERMOSTAT.PL', 'VAV_CONTROLLER.PL']);
+    expect(byMode.readonly.sort()).toEqual(['4DI_2DO_CARD.PL', 'LED_ASSET_TAG.PL',
+      'LIGHT_CONTROLLER_V4.PL', 'LIGHT_RELAY_CONTROLLER.PL', 'PEOPLE_COUNTER.PL', 'THERMOSTAT.PL',
+      'VAV_CONTROLLER.PL']);
+    // Five of those seven are read-only *and* erased on save -- `toVO` drops the field, so a PUT
+    // through this dialog overwrites a real value with the VO's default (D109). Two are read-only
+    // and round-trip correctly. Same disabled checkbox, two different truths, two different hints.
+    const erased = ['4DI_2DO_CARD.PL', 'LED_ASSET_TAG.PL', 'PEOPLE_COUNTER.PL', 'THERMOSTAT.PL',
+      'VAV_CONTROLLER.PL'];
+    erased.forEach(modelType =>
+      expect(GATEWAY_FORM_LAYOUTS[modelType].hints.settable).withContext(modelType)
+        .toContain('D109'));
     // The two light controllers are read-only for a different reason from the other four, and the
     // difference matters: their `toVO` copies `settable`, so it round-trips rather than being erased
     // (D109). They are locked because the flag comes from the attribute enum -- what the attribute
@@ -1440,8 +1449,8 @@ describe('gateway form layouts', () => {
     ['LIGHT_CONTROLLER_V4.PL', 'LIGHT_RELAY_CONTROLLER.PL'].forEach(modelType =>
       expect(GATEWAY_FORM_LAYOUTS[modelType].hints.settable).withContext(modelType)
         .toContain('BACnet'));
-    expect(byMode.hidden.length).toBe(23);
-    expect(byMode.hidden.length + byMode.readonly.length + byMode.editable.length).toBe(30);
+    expect(byMode.hidden.length).toBe(25);
+    expect(byMode.hidden.length + byMode.readonly.length + byMode.editable.length).toBe(33);
     // A flag that is hidden is never also read-only, and one that is shown always carries a hint
     // saying who decides it.
     meshPoints.forEach(([modelType, layout]) => {
@@ -1532,10 +1541,10 @@ describe('gateway form layouts', () => {
       });
       expect(new Set(items.map(item => item.value)).size).withContext(modelType).toBe(items.length);
     });
-    // 104 across the 24 mesh devices, the thermostat's 9, the mesh controller's 1, and the four
-    // light controllers' 7 + 2 + 8 + 4. The current sensor's 16 are counted by its own spec below,
-    // because its point form is not this one.
-    expect(total).toBe(135);
+    // 104 across the 24 mesh devices, the thermostat's 9, the mesh controller's 1, the four light
+    // controllers' 7 + 2 + 8 + 4, and the three asset tags' 4 + 3 + 3. The current sensor's 16 are
+    // counted by its own spec below, because its point form is not this one.
+    expect(total).toBe(145);
   });
 
   it('gives the current sensor the family source and a point form of its own', () => {

@@ -756,7 +756,7 @@ const SYSTEM_ATTRIBUTE_DATA_TYPES: FormSelectItem[] =
  * Measured off the schema document's own `families` map, with `allOf` resolved against
  * `components.schemas` and each source paired to its locator through the Java rather than by name:
  * **26** of the 63 published data source types declare `address`, `anchorNode` and `location` over
- * the common ten and nothing else -- the mesh controller, the thermostat and the 24 batched with
+ * the common eleven and nothing else -- the mesh controller, the thermostat and the 24 batched with
  * them. One shape, so one function, with the
  * only difference the noun the hints use for the thing on the other end of the radio.
  *
@@ -809,9 +809,17 @@ const meshDevicePoint = (attributes: FormSelectItem[], device: string,
   readonly: settable === 'readonly'
     ? ['attributeId', 'dataType', 'settable']
     : ['attributeId', 'dataType'],
-  // `dataType` keeps the full non-image list rather than being narrowed to the types this device's
-  // attributes actually use. The field is a read-only display of what the device reported, and a
-  // narrowed list on such a field cannot prevent a wrong value -- it can only blank a right one.
+  // `dataType` keeps the four non-image types rather than being narrowed to the two or three this
+  // device's attributes actually use. The field is a read-only display of what the device
+  // reported, and a narrowed list on such a field cannot prevent a wrong value -- it can only
+  // blank a right one.
+  //
+  // It is narrowed by exactly one, though, and that is worth being honest about: the schema
+  // publishes five and this list drops IMAGE. No mesh attribute conversion can produce an
+  // `ImageValue` -- every one of the 114 is binary, multistate, numeric or alphanumeric -- but the
+  // gateway does store the type if asked, measured 201 on `THERMOSTAT.PL`. So a point somehow
+  // holding IMAGE renders a blank box here, which is the cost the rule above describes, paid once
+  // for a value no device reports.
   options: {attributeId: attributes, dataType: NON_IMAGE_DATA_TYPES},
   hints: {
     attributeId: `What this point reads from the ${device}. The gateway creates one point per `
@@ -820,8 +828,9 @@ const meshDevicePoint = (attributes: FormSelectItem[], device: string,
       ? {settable: `Whether the platform may write this attribute back to the ${device}.`}
       : {}),
     ...(settable === 'readonly'
-      ? {settable: 'Whether the mesh accepts a write to this attribute. The device decides it when '
-          + 'the point is created, so it is shown rather than set.'}
+      ? {settable: 'Whether the mesh accepts a write to this attribute. The gateway sets it from the '
+          + 'attribute\'s own definition when it creates the point, and the platform cannot change '
+          + 'it — see the note on D109 before relying on it staying put.'}
       : {})
   },
   rows: [['attributeId', 'dataType']]
@@ -1094,8 +1103,9 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
   /**
    * A thermostat on the mesh, as a data source.
    *
-   * Field-identical to `MESH_CONTROLLER.DS`, and so are twenty-one other provisioned mesh device
-   * types: `address`, `anchorNode` and `location` over the common ten. The mesh assigns the address
+   * Field-identical to `MESH_CONTROLLER.DS`, and so are twenty-four other provisioned mesh device
+   * types: `address`, `anchorNode` and `location` over `AbstractDataSourceModel`'s eleven. The mesh
+   * assigns the address
    * when the device joins, `ThermostatDataSourceDefinition.validate` refuses -1 and 0 -- measured,
    * both 422 -- and `location` is the node's zone under another name (`ThermostatDataSourceModel`
    * maps it to `vo.setZone`).
@@ -1112,13 +1122,19 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * **The gateway's own validator cannot be relied on for any mesh type, and this row is where that
    * became provable.** `MeshPointLocatorVO.ATTRIBUTE_CODES` is one `public static` field that 34
    * subclasses each reassign from their own static initialiser. A static initialiser runs **once**,
-   * at first class load, so the table is a one-way ratchet: it moves each time a mesh locator class
+   * at class *initialisation* -- and JLS 12.4.1 is the load-bearing detail: reading a static
+   * through a subclass that does not declare it initialises only the declaring class, which is
+   * why `validate` and `fromVO` never restore the table while the `new` in `toVO` does. So the
+   * table is a one-way ratchet: it moves each time a mesh locator class
    * is first instantiated, and settles only once all 34 have been. Measured on 5.1.3, in one
    * session: a thermostat point saved
    * `SETPOINT_TEMPERATURE` 201; one POST to a `MESH_SWITCH.PL` point then loaded that class; after
    * it, the same thermostat POST was **422**, a `MESH_CONTROLLER.PL` point accepted `ROOM_NUMBER`,
    * and the thermostat points already stored read back `attributeId: null` with
-   * `configurationDescription: "Unknown"`. The gateway's own lookup endpoint still listed all nine
+   * `configurationDescription: "Unknown"` -- but only because those ids were outside the winning
+   * table. Where the ids collide the read is worse: the switch's 1/2/3 are HEARTBEAT, ROOM_NUMBER
+   * and ENABLED against the thermostat's HEARTBEAT, STATUS and LOCK, so such a point comes back
+   * **200 with another device's attribute name** rather than with nothing. The gateway's own lookup endpoint still listed all nine
    * as valid throughout. **D108**, which supersedes the narrower D90 -- that row read the table as a
    * fixed if arbitrary snapshot, and it is not fixed.
    *
@@ -1138,9 +1154,19 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * reading back `false`. Which also means any REST write of a provisioned point **erases** it --
    * D91's shape, but on a thermostat it costs you the ability to write the setpoint. **D109.**
    *
+   * **And one of those writes is ours.** `GatewayModelDialogComponent.save` always sends the whole
+   * `pointLocator`, and `InferrixGatewayService.saveDataPoint` uses `PUT` for a point that already
+   * has an `xid`, so renaming a thermostat point through this form turns its setpoint read-only on
+   * the gateway. The disabled control is not the problem -- `getRawValue()` re-sends the `true` it
+   * was given -- the mapper on the other end is. Nothing in this layout can prevent it; the form
+   * would have to stop sending the locator when nothing in it changed, which is a change to the
+   * dialog and is **not** made here. Recorded as an open item.
+   *
    * `relinquishable` is hidden for the same reason as row 13 (never read, reads back null) and
-   * `configurationDescription` because it is the attribute's own name repeated -- and, for two of
-   * these nine, the raw translation key instead (**D111**).
+   * `configurationDescription` because it is the attribute's own name repeated -- and, for one of
+   * these nine, `STATUS`, the raw translation key instead, because
+   * `dsEdit.inferrixSensors.attribute.status` is in no bundle at all (**D116**). The other example
+   * this comment used to give, `roomNumber`, belongs to the mesh switch, not here.
    *
    * No `defaults`: `provisionedPoints` means there is no Add form, so a default would be a value
    * invented for a form nobody opens. Row 13 could name one because that type has a single
@@ -1156,9 +1182,10 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     hints: {
       attributeId: 'What this point reads from the thermostat. The gateway creates one point per '
         + 'attribute when the thermostat joins the mesh, so there is nothing to choose here.',
-      settable: 'Whether the mesh accepts a write to this attribute — the setpoint, the fan mode '
-        + 'and the lock are writable, the temperature and the heartbeat are not. The thermostat '
-        + 'decides this when the point is created, so it is shown rather than set.'
+      settable: 'Whether the mesh accepts a write to this attribute. Seven of the nine are '
+        + 'writable; the heartbeat and the temperature are not. The gateway sets it from the '
+        + 'attribute\'s own definition when it creates the point, and the platform cannot change it '
+        + '— see the note on D109 before relying on it staying put.'
     },
     rows: [['attributeId', 'dataType']]
   },

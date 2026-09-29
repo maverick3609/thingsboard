@@ -61,3 +61,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `951c0e94ca` fix(gateway): timerValue's two rules fail differently, and a title it had not earned
 - [ ] `dcc1da972d` fix(gateway): IMAGE is broken the same way MULTISTATE is, and say what a dropped type costs
 - [ ] `2fc1c4d9d1` feat(gateway): lay out the 22 remaining mesh device types as one form
+- [ ] `d54333675d` fix(gateway): the mesh family is 26 types, not 24, and seven thermostat attributes are settable

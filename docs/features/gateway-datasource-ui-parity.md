@@ -1528,8 +1528,10 @@ declares one `public static ExportCodes ATTRIBUTE_CODES` and **34 subclasses rea
 field** from their own static initialisers — every sensor tag, the thermostats, the light
 controllers, the mesh extender and switch, and the controller. Each replaces the table rather than
 adding to it, so the 34 of them share one table: whichever initialised last. (There are two tables in
-all -- `MeshControllerNodesPointLocatorVO` declares its own, shadowing the parent's, and two further
-subclasses race for that one. The 34 is only right because of the shadow.)
+all -- `MeshControllerNodesPointLocatorVO` declares its own.) The 34 stands; the reason given here
+first did not. That class extends `AbstractPointLocatorVO`, a sibling hierarchy, so it shadows
+nothing. The arithmetic is 38 assigners minus the base's own, minus that class and its two
+subclasses. Corrected 2026-09-30.
 `MeshControllerDataSourceDefinition.validate` reads it through inheritance, and so does
 `fromVO`. Measured on 5.1.3: a `MESH_CONTROLLER.PL` point saved **201** with
 `attributeId: "BATTERY"` — which `MeshControllerAttributes` does not declare — and read back as
@@ -1990,7 +1992,7 @@ deleted, the instance back at 12 sources. The on-screen pass is owed with rows 6
 The first of the provisioned-only tail proper, and the row that showed the tail is not 46 pieces of
 work. Measured off the schema document's own `families` map: most of the 46 remaining types share a
 handful of shapes, and a large block of them is **field-identical to `MESH_CONTROLLER`** — `address`,
-`anchorNode`, `location` over the common ten, and a locator that is `attributeId` plus the usual
+`anchorNode`, `location` over `AbstractDataSourceModel`'s eleven, and a locator that is `attributeId` plus the usual
 three. Thermostat is one of that block, chosen as the
 
 > **The counts this paragraph first carried — "ten distinct pairs", "23 identical" — were wrong**, and
@@ -2227,6 +2229,23 @@ own — so 104 green specs said nothing about the file the build was failing on.
 
 Cortex-side, not the gateway's. Neither is worth a fix inside a per-type row; both want the on-screen
 pass that rows 6-11 are already owed.
+
+- **Saving a provisioned point through our own dialog erases `settable` on five mesh types.**
+  `GatewayModelDialogComponent.save` always sends the whole `pointLocator`, and `saveDataPoint` uses
+  `PUT` once the point has an `xid`, so the write goes through a `toVO` that drops the flag (D109).
+  Renaming a thermostat point turns its setpoint read-only on the gateway. The disabled control is
+  not at fault — `getRawValue()` re-sends the value it was given — so the fix is in the dialog:
+  either omit `pointLocator` when nothing in it changed, or use the `PATCH` route, which the service
+  already has and which the gateway accepts for `{name}` alone. **Not done**, because it changes the
+  save path for all 148 model types and wants deciding rather than sneaking into a review commit.
+
+- **The hint on a disabled toggle may have no reachable tooltip.** `settable` is the first field this
+  work has marked `readonly` that renders as a boolean, and a boolean is a `mat-slide-toggle` whose
+  hint rides `[tb-hint-tooltip-icon]` on the projected label — not the `.tb-gateway-form-hint`
+  `mat-icon` the `pointer-events: auto` rule targets. If Material kills pointer events on the
+  disabled toggle the way it does on a disabled form field, the hint is unreadable and `readonly`
+  buys nothing over `hidden` for those five types. Unverified: it needs the on-screen pass, and it is
+  the first thing to look at when that pass happens.
 
 - **A failed schema read leaves every Add form empty, with nothing said.** `load()` fires the schema
   request and the type request independently and swallows both errors on purpose — the list is worth

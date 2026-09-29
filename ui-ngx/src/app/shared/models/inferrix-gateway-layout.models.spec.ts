@@ -1252,8 +1252,9 @@ describe('gateway form layouts', () => {
   const thermostatPoint = GATEWAY_FORM_LAYOUTS['THERMOSTAT.PL'];
 
   it('gives the thermostat source the mesh-device shape row 13 established', () => {
-    // `ThermostatDataSourceModel` adds `address`, `anchorNode` and `location` over the common ten,
-    // which is field-identical to `MESH_CONTROLLER.DS` and to twenty-one other provisioned types.
+    // `ThermostatDataSourceModel` adds `address`, `anchorNode` and `location` over
+    // `AbstractDataSourceModel`'s eleven, which is field-identical to `MESH_CONTROLLER.DS` and to
+    // twenty-four other provisioned types.
     // The address is the mesh's, not ours -- `validate` refuses -1 and 0, measured 422 for both.
     expect(thermostat.provisionedPoints).toBe(true);
     expect(thermostat.readonly).toEqual(['address']);
@@ -1279,15 +1280,18 @@ describe('gateway form layouts', () => {
     // write of a provisioned point erases it. D109.
     expect(thermostatPoint.readonly).toEqual(['attributeId', 'dataType', 'settable']);
     expect(thermostatPoint.hidden).toEqual(['relinquishable', 'configurationDescription']);
-    expect(thermostatPoint.hints.settable).toContain('setpoint');
+    // The hint says how many are writable rather than listing a few as if that were all of them, and
+    // it does not claim the thermostat decides -- a Java enum does.
+    expect(thermostatPoint.hints.settable).toContain('Seven of the nine');
+    expect(thermostatPoint.hints.settable).not.toContain('thermostat decides');
   });
 
   it('leaves a read-only data type its full list rather than narrowing it', () => {
     // These nine attributes use three of the four, but the field only ever displays what the device
     // reported. Narrowing the list on a field nobody can change cannot prevent a wrong value; it can
     // only blank a right one the gateway does hold.
-    // The same array object a virtual point gets, which is the full non-image list.
-    expect(thermostatPoint.options.dataType).toBe(GATEWAY_FORM_LAYOUTS['VIRTUAL.PL'].options.dataType);
+    // The values, not the array identity: asserting the same object would break the moment either
+    // layout spread its list, and would couple this type to `VIRTUAL.PL` for no reason.
     expect(thermostatPoint.options.dataType.map(item => item.value))
       .toEqual(['BINARY', 'MULTISTATE', 'NUMERIC', 'ALPHANUMERIC']);
   });

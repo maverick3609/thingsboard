@@ -128,14 +128,54 @@ describe('gateway form layouts', () => {
     });
   });
 
-  it('leaves every mesh node locator field read-only, since the radio reports all of them', () => {
-    const meshPoint = GATEWAY_FORM_LAYOUTS['VIRTUAL_MESH_NODE.PL'];
-    // Everything `VirtualMeshNodePointLocatorModel.toVO` reads, and nothing else: `attributeId`
-    // and `type` are the node's own attribute and its wire encoding, `dataType` is how the gateway
-    // stores it, and `settable` is what makes a DO writable.
-    expect(meshPoint.readonly)
-      .toEqual(['dataType', 'settable', 'attributeId', 'type']);
-    expect(meshPoint.hidden).toContain('relinquishable');
+  // --- the ten mirrored mesh node types ---------------------------------------------------------
+
+  const meshNodeTypes = ['BACNET_IP_MESH_NODE', 'BACNET_MSTP_MESH_NODE', 'MESH_EXTENDER_MESH_NODE',
+    'META_MESH_NODE', 'MODBUS_MESH_NODE', 'POE_LIGHTING_MESH_NODE', 'SNMP_MESH_NODE',
+    'STUDENT_ASSET_TAG_MESH_NODE', 'VIRTUAL_MESH_NODE'];
+
+  it('locks the three fields a mesh node reports and leaves settable open', () => {
+    // `attributeId` and `type` are the node's own attribute and its wire encoding, `dataType` is how
+    // the gateway stores it. A node reports all three; it does not take them.
+    //
+    // `settable` is the exception, and it is a reversal of row 12. Every one of the ten
+    // `*MeshNodePointLocatorModel.toVO` copies it, and
+    // `MeshControllerNodesDataSourceRT.setPointValue` is a real write path -- a confirmed mesh
+    // command built from the locator's `type`, retried three times, committed locally only on the
+    // controller's answer. Every `Create*MeshNode*VO` hardcodes `setSettable(false)`, so if this
+    // form cannot change it, nothing can.
+    meshNodeTypes.forEach(type => {
+      const point = GATEWAY_FORM_LAYOUTS[`${type}.PL`];
+      expect(point.readonly).withContext(type).toEqual(['attributeId', 'dataType', 'type']);
+      expect(point.readonly).withContext(type).not.toContain('settable');
+      expect(point.hidden).withContext(type).toContain('relinquishable');
+      expect(point.hints.settable).withContext(type).toBeTruthy();
+    });
+  });
+
+  it('gives all ten mesh node sources one shape, and nine sources eight locators', () => {
+    // Verified against the schema document with `allOf` resolved: all ten sources declare
+    // `controllerAddress` and `publisherId` and nothing else over the common eleven. Both are
+    // read-only because the pair is the key every runtime matches an incoming frame against.
+    //
+    // Ten sources, nine locators: MODBUS_IP_MESH_NODE.DS and MODBUS_SERIAL_MESH_NODE.DS share
+    // MODBUS_MESH_NODE.PL.
+    const sources = Object.keys(GATEWAY_FORM_LAYOUTS)
+      .filter(modelType => modelType.endsWith('_MESH_NODE.DS'));
+    expect(sources.length).toBe(10);
+    expect(meshNodeTypes.length).toBe(9);
+    sources.forEach(modelType => {
+      const layout = GATEWAY_FORM_LAYOUTS[modelType];
+      expect(layout.provisionedPoints).withContext(modelType).toBe(true);
+      expect(layout.readonly).withContext(modelType).toEqual(['controllerAddress', 'publisherId']);
+      expect(layout.rows).withContext(modelType).toEqual([['controllerAddress', 'publisherId']]);
+      // The only thing that varies is the noun, and every one of them names something.
+      expect(layout.hints.controllerAddress).withContext(modelType)
+        .toMatch(/^The mesh controller this .+ node reports through\./);
+    });
+    // A fresh object per type, so a mutation of one cannot reach another.
+    expect(new Set(sources.map(modelType => GATEWAY_FORM_LAYOUTS[modelType])).size)
+      .toBe(sources.length);
   });
 
   it('offers no Add on a source whose points the gateway provisions', () => {
@@ -155,16 +195,29 @@ describe('gateway form layouts', () => {
     });
   });
 
-  it('gives a provisioned source nothing for an operator to fill in', () => {
-    // What makes suppressing Add correct rather than merely tidy: the locator's every field is
-    // read-only, so the form an Add opened would take no input and post a locator the gateway
-    // rejects. If a field here ever becomes editable, the button has to come back.
-    const layout = GATEWAY_FORM_LAYOUTS['VIRTUAL_MESH_NODE.PL'];
-    const editable = ['dataType', 'settable', 'relinquishable', 'configurationDescription',
-      'attributeId', 'type']
-      .filter(id => !(layout.hidden ?? []).includes(id))
-      .filter(id => !(layout.readonly ?? []).includes(id));
-    expect(editable).toEqual([]);
+  it('never asks a provisioned point for something an Add form could not supply', () => {
+    // This spec used to assert that a provisioned locator has no editable field at all, on the
+    // reasoning that an Add form would otherwise take no input. That rule was already false when it
+    // was written -- `MODBUS_CONTROLLER.PL` leaves `settable` editable and its source is
+    // provisioned -- and it is the wrong rule anyway: `provisionedPoints` removes the Add button, so
+    // there is no form to be empty. An editable field on a provisioned point is an *edit*, which is
+    // the only thing these forms are for.
+    //
+    // What does have to hold is the pairing rule, because a locator that is `required` somewhere it
+    // cannot be filled is unsubmittable rather than merely odd: a disabled control is left out of
+    // Angular's validation entirely, and a provisioned point has no Add path to seed a default from.
+    const provisioned = Object.keys(GATEWAY_FORM_LAYOUTS)
+      .filter(modelType => GATEWAY_FORM_LAYOUTS[modelType].provisionedPoints)
+      .map(modelType => modelType.replace(/\.DS$/, '.PL'))
+      .filter(modelType => GATEWAY_FORM_LAYOUTS[modelType]);
+    expect(provisioned.length).toBeGreaterThan(20);
+    provisioned.forEach(modelType => {
+      const layout = GATEWAY_FORM_LAYOUTS[modelType];
+      (layout.required ?? []).forEach(id => {
+        expect((layout.readonly ?? []).includes(id)).withContext(`${modelType}.${id}`).toBe(false);
+        expect((layout.hidden ?? []).includes(id)).withContext(`${modelType}.${id}`).toBe(false);
+      });
+    });
   });
 
   const modbus = GATEWAY_FORM_LAYOUTS['MODBUS.PL'];

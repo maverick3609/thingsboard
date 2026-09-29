@@ -260,7 +260,7 @@ consulted.
 | 18 | `THERMOSTAT.DS` | `THERMOSTAT.PL` | **done** — 2026-09-29; **D108-D113** filed, D108 a P1 general to all 34 mesh locator types that supersedes D90; needs an on-screen pass |
 | 19 | the 24 remaining mesh device types | their locators | **done** — 2026-09-30; batched at the user's direction; **D115-D117** filed and D109 widened; needs an on-screen pass |
 | 19a | `CURRENT_SENSOR` | `CURRENT_SENSOR.PL` | **done** — 2026-09-30; the 27th member of the mesh family, added after the row-19 review; family source, own point form (`phaseId`, `ctId`); needs an on-screen pass |
-| 20 | the 9 `*_MESH_NODE` types | their locators | **next** — one batch: `controllerAddress` + `publisherId`, the shape `VIRTUAL_MESH_NODE.DS` already carries |
+| 20 | the 9 `*_MESH_NODE` types | their locators | **done** — 2026-09-30; one batch of ten with `VIRTUAL_MESH_NODE`, which was refactored into it; reverses row 12's read-only `settable`; needs an on-screen pass |
 | 21 | the 4 light controllers | their locators | planned — `LIGHT_CONTROLLER_V4`, `LIGHT_DI_CONTROLLER`, `LIGHT_RELAY_CONTROLLER`, `MOKO_BAND`; the mesh-device shape plus `quantize`/`timePeriod` |
 | 22 | the 3 asset tags | their locators | planned — `ASSET_TRACKING_BAND`, `LED_ASSET_TAG`, `STUDENT_ASSET_TAG`; `address` alone |
 | 23 | the 2 Modbus slave shapes | their locators | planned — `MODBUS_SLAVE_DEVICE` and `…_POLLING`, which is the same three fields plus the polling pair |
@@ -2216,6 +2216,53 @@ surprising ones checked live both ways; the current sensor's source, its three p
 earlier probe row deleted, the instance back at 12 sources and 106 points. The `settable` disposition
 of all 27 types re-derived from the provisioner as well as the VO after the row-19 review, which
 moved two types and corrected D109. The on-screen pass is owed with rows 6–19a.
+
+### 20 — the ten mirrored mesh node types (done, 2026-09-30)
+
+The largest batch left, and the cheapest: one shape for the sources, one for the points, and
+`VIRTUAL_MESH_NODE` was already laid out as both. It was refactored into the two new factories rather
+than left as a third copy, the same move rows 18 and 19 made with the mesh controller and thermostat.
+
+A mesh node is not a device the gateway talks to. It is another gateway's data source, mirrored onto
+this one over the mesh. `controllerAddress` is the mesh controller it hangs off and `publisherId` is
+the publisher whose points it carries; **the pair is the match key**, tested by every one of the ten
+runtimes as `model.getNodeAddress() == vo.getControllerAddress() && model.getControllerReportingData()
+.getPublisherId() == vo.getPublisherId()` before a frame is accepted. Both read-only for that reason,
+and paired on one row because they are one fact.
+
+**Ten sources, nine locators.** `MODBUS_IP_MESH_NODE.DS` and `MODBUS_SERIAL_MESH_NODE.DS` share
+`MODBUS_MESH_NODE.PL` — the same "locator is not the source's name with `.PL` appended" shape that
+hid two members of the mesh device family until the row-18 review. Checked from the Java, not by
+name, as that review required.
+
+**This row reverses a row-12 decision.** `VIRTUAL_MESH_NODE.PL` had `settable` read-only, on the
+reasoning that the radio decides it. The Java says otherwise on all ten: every
+`*MeshNodePointLocatorModel.toVO` copies `settable`, and `MeshControllerNodesDataSourceRT
+.setPointValue` is a real write path — it builds a mesh command from the locator's `type`, sends it
+to `CONTROLLER_CONTROL_COMMANDS` with confirmation, retries three times with exponential backoff, and
+commits the value locally only once the controller answers. Meanwhile every `Create*MeshNode*VO`
+hardcodes `setSettable(false)`. So if this form cannot change the flag, nothing can, and a mirrored
+point stays unwritable for the life of the install even where the far side would accept the write. It
+is now editable, with a hint saying the far side still has to accept it.
+
+That reversal also took a spec with it. *"Gives a provisioned source nothing for an operator to fill
+in"* asserted that a provisioned locator has **no** editable field, reasoning that an Add form would
+otherwise take no input. The rule was already false when it was written — `MODBUS_CONTROLLER.PL`
+leaves `settable` editable and its source is provisioned — and it is the wrong rule anyway, because
+`provisionedPoints` removes the Add button, so there is no form to be empty. It was replaced with the
+rule that actually has to hold: a provisioned locator never marks a field `required` that it also
+hides or disables, since a disabled control is left out of Angular's validation entirely and there is
+no Add path to seed a default from. The new version checks every provisioned type rather than one.
+
+*Measured against 5.1.3, every probe row deleted:* the source POSTs 201 with `controllerAddress` and
+`publisherId` alone; `publisherId: 0` is a **422** naming `publisherId`, as `validate` says; a point
+with `settable: true` saves and reads back **true**, and a `PUT` preserves it — which is what
+distinguishes this family from the mesh device family, where the same field reads back false.
+`configurationDescription` reads back `"Unknown"` for an attribute id the gateway has no name for,
+which is why it stays hidden.
+
+*Verified:* 132 layout, 41 schema, 14 form and 17 service specs green, and
+`tsc -p src/tsconfig.app.json` exit 0. The on-screen pass is owed with rows 6–19a.
 
 ## Per-type components
 

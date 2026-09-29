@@ -852,6 +852,79 @@ const meshDevicePoint = (attributes: FormSelectItem[], device: string,
 });
 
 /**
+ * A mesh node, as a data source. Ten types, one shape.
+ *
+ * A mesh node is not a device the gateway talks to -- it is another gateway's data source, mirrored
+ * onto this one over the mesh. `controllerAddress` is the mesh controller it hangs off and
+ * `publisherId` is the publisher whose points it carries, and the two together are the match key:
+ * every one of the ten runtimes tests
+ * `model.getNodeAddress() == vo.getControllerAddress() && model.getControllerReportingData()
+ * .getPublisherId() == vo.getPublisherId()` before it will accept a frame. Change either and the
+ * source stops matching anything, so both are read-only.
+ *
+ * Each type's `validate` refuses `-1` and `0` for both. That rule is not stated as `required` for
+ * the reason `address` is not on {@link meshDeviceSource}: Angular leaves a disabled control out of
+ * validation entirely, so the pair would read as a rule and enforce nothing. `provisionedPoints`
+ * removes the Add path, and an edit carries the stored values in from `fromVO`.
+ */
+const meshNodeSource = (protocol: string): GatewayFormLayout => ({
+  provisionedPoints: true,
+  readonly: ['controllerAddress', 'publisherId'],
+  hints: {
+    controllerAddress: `The mesh controller this ${protocol} node reports through. It is half of `
+      + 'the key the gateway matches incoming frames against, so it is not editable here.',
+    publisherId: 'The publisher on the far side whose points this source mirrors. The other half of '
+      + 'the match key, and what the gateway starts and stops with this source.'
+  },
+  rows: [['controllerAddress', 'publisherId']]
+});
+
+/**
+ * One attribute of a mesh node, as a point. The same ten types, and one more shape.
+ *
+ * Every field but one describes what the radio sends: `attributeId` is the attribute number on the
+ * node, `type` is its wire encoding (`AttributeDataType`) and `dataType` is how the gateway stores
+ * it. A mesh node does not take a new value for any of the three -- it reports them -- so all three
+ * are shown and none is editable, which is what the gateway's own form does.
+ *
+ * **`settable` is editable, and this is a change.** Row 12 made it read-only on
+ * `VIRTUAL_MESH_NODE.PL`, reasoning that the radio decides it. The Java says otherwise on all ten:
+ * every `*MeshNodePointLocatorModel.toVO` copies `settable`, and
+ * `MeshControllerNodesDataSourceRT.setPointValue` is a real write path -- it builds a mesh command
+ * from the locator's `type`, sends it to `CONTROLLER_CONTROL_COMMANDS` with confirmation, retries
+ * three times with exponential backoff, and commits the value locally only once the controller
+ * answers. Meanwhile every `Create*MeshNode*VO` hardcodes `setSettable(false)`, so if the platform
+ * cannot change it, nothing can, and a mirrored point is read-only for the life of the install even
+ * where the far side would accept a write. `DataPointDao` writes `getPointLocator().isSettable()`
+ * over the point's own, so the flag here is the live copy.
+ *
+ * `relinquishable` is hidden because `toVO` never reads it on any of the ten: a value typed there is
+ * discarded in the mapper, before the gateway sees the point at all.
+ *
+ * `dataType` read-only is the one place the mapper's blanket `required` on a locator's data type
+ * cannot bite: a disabled control is left out of Angular's validation entirely, so the rule is inert
+ * here. It does not matter, because `provisionedPoints` on the data source removes the Add button --
+ * there is no path through this form that could post an empty one -- and an edit carries the stored
+ * type in from `fromVO`. If one of these data sources ever gains an Add button, this needs a default.
+ */
+const meshNodePoint = (protocol: string): GatewayFormLayout => ({
+  hidden: ['relinquishable', 'configurationDescription'],
+  readonly: ['attributeId', 'dataType', 'type'],
+  hints: {
+    attributeId: `What this point reads from the ${protocol} node. The gateway creates one point `
+      + 'per attribute when the node is mirrored, so there is nothing to choose here.',
+    type: 'How the value is encoded on the wire. The mesh command that writes this point is built '
+      + 'from it, which is why it is the node\'s to report and not ours to change.',
+    settable: 'Whether the platform may write this attribute back over the mesh. The gateway '
+      + 'creates every mirrored point unwritable, so this is the only place it can be turned on — '
+      + 'and it only works if the far side accepts the write.'
+  },
+  // `settable` is left to the mapper's own order under the three: pairing a checkbox with a select
+  // puts a control and its label on two different baselines.
+  rows: [['attributeId', 'type'], ['dataType']]
+});
+
+/**
  * One attribute list per provisioned mesh device type, read out of each type's `*Attributes` enum.
  *
  * 104 attributes across the 24 types this factory serves, 130 counting the thermostat's nine, the
@@ -1263,37 +1336,39 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     rows: [['attributeId', 'dataType']]
   },
 
-  'VIRTUAL_MESH_NODE.DS': {
-    readonly: ['controllerAddress', 'publisherId'],
-    provisionedPoints: true
-  },
-
   /**
-   * One attribute of a mesh node, as a point.
+   * The ten mirrored mesh node types, laid out by {@link meshNodeSource} and {@link meshNodePoint}.
    *
-   * Every field describes what the radio sends: `attributeId` is the attribute number on the node,
-   * `type` is its wire encoding (`AttributeDataType`) and `dataType` is how the gateway stores it.
-   * A mesh node does not take a new value for any of them — it reports them — so all four are
-   * shown and none is editable, which is what the gateway's own form does.
+   * One shape for the sources and one for the points, verified against the schema document with
+   * `allOf` resolved: all ten sources declare `controllerAddress` and `publisherId` over
+   * `AbstractDataSourceModel`'s eleven and nothing else, all ten locators declare `attributeId`,
+   * `type` and the common four, and every one of the ten `toVO` methods copies exactly
+   * `AttributeId`, `DataTypeId`, `Settable` and `Type`. No type's `validate` adds a field-level rule
+   * beyond the two address checks on the source.
    *
-   * `settable` is included although the gateway's form omits it, because it is the one field here
-   * an operator acts on: it is what puts the set-value control on a point, and on this locator it
-   * is the live copy (`DataPointDao` writes `getPointLocator().isSettable()` over the point's own).
-   * Read-only with the rest — a DO is writable because it is a DO.
-   *
-   * `relinquishable` is hidden because `VirtualMeshNodePointLocatorModel.toVO` never reads it: a
-   * value typed there is discarded in the mapper, before the gateway sees the point at all.
-   *
-   * `dataType` read-only is the one place the mapper's blanket `required` on a locator's data type
-   * cannot bite: a disabled control is left out of Angular's validation entirely, so the rule is inert
-   * here. It does not matter, because `provisionedPoints` on the data source removes the Add button --
-   * there is no path through this form that could post an empty one -- and an edit carries the stored
-   * type in from `fromVO`. If that data source ever gains an Add button, this needs a default.
+   * Nine sources, eight locators: `MODBUS_IP_MESH_NODE.DS` and `MODBUS_SERIAL_MESH_NODE.DS` share
+   * `MODBUS_MESH_NODE.PL`, the same "locator is not the source's name with `.PL` on the end" shape
+   * that hid two members of the mesh device family until the row-18 review.
    */
-  'VIRTUAL_MESH_NODE.PL': {
-    hidden: ['relinquishable', 'configurationDescription'],
-    readonly: ['dataType', 'settable', 'attributeId', 'type']
-  },
+  'BACNET_IP_MESH_NODE.DS': meshNodeSource('BACnet/IP'),
+  'BACNET_IP_MESH_NODE.PL': meshNodePoint('BACnet/IP'),
+  'BACNET_MSTP_MESH_NODE.DS': meshNodeSource('BACnet MS/TP'),
+  'BACNET_MSTP_MESH_NODE.PL': meshNodePoint('BACnet MS/TP'),
+  'MESH_EXTENDER_MESH_NODE.DS': meshNodeSource('mesh extender'),
+  'MESH_EXTENDER_MESH_NODE.PL': meshNodePoint('mesh extender'),
+  'META_MESH_NODE.DS': meshNodeSource('meta'),
+  'META_MESH_NODE.PL': meshNodePoint('meta'),
+  'MODBUS_IP_MESH_NODE.DS': meshNodeSource('Modbus/IP'),
+  'MODBUS_SERIAL_MESH_NODE.DS': meshNodeSource('Modbus serial'),
+  'MODBUS_MESH_NODE.PL': meshNodePoint('Modbus'),
+  'POE_LIGHTING_MESH_NODE.DS': meshNodeSource('PoE lighting'),
+  'POE_LIGHTING_MESH_NODE.PL': meshNodePoint('PoE lighting'),
+  'SNMP_MESH_NODE.DS': meshNodeSource('SNMP'),
+  'SNMP_MESH_NODE.PL': meshNodePoint('SNMP'),
+  'STUDENT_ASSET_TAG_MESH_NODE.DS': meshNodeSource('student asset tag'),
+  'STUDENT_ASSET_TAG_MESH_NODE.PL': meshNodePoint('student asset tag'),
+  'VIRTUAL_MESH_NODE.DS': meshNodeSource('virtual'),
+  'VIRTUAL_MESH_NODE.PL': meshNodePoint('virtual'),
 
   /**
    * A Modbus/IP data source: how to reach the device, and how hard to push it.

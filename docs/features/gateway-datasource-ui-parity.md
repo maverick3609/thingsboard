@@ -2002,13 +2002,29 @@ three. Thermostat is one of that block, chosen as the
 > directly returned nothing for them; and six data source types have a locator that is not their own
 > name with `.PL` on the end, so pairing by name mismatched them. With `allOf` resolved and the
 > pairing taken from the Java, the 63 published types have **24 distinct shapes**, the mesh-device
-> block is **26 types**, and **21** remain after it in 9 shapes. Corrected 2026-09-30; row 19 is built
+> block is **26 types**, and **21** remain after it. Corrected 2026-09-30; row 19 is built
 > on the corrected numbers.
 >
 > **And the mesh-device block is 27, not 26.** The row-19 review found `CURRENT_SENSOR.DS` missing
 > from the family: it is field-identical to the rest (checked key by key against `MESH_CONTROLLER.DS`
 > with `allOf` resolved), and was skipped because its *point* form is not the family's. So **20**
-> types remain after this block, still in 9 shapes.
+> types remain after this block, and re-deriving the shapes off the same resolved schema puts them in
+> **7**, not 9:
+>
+> | shape | types | extra fields over `AbstractDataSourceModel` |
+> |---|---|---|
+> | mesh node | `BACNET_IP_MESH_NODE`, `BACNET_MSTP_MESH_NODE`, `MESH_EXTENDER_MESH_NODE`, `META_MESH_NODE`, `MODBUS_IP_MESH_NODE`, `MODBUS_SERIAL_MESH_NODE`, `POE_LIGHTING_MESH_NODE`, `SNMP_MESH_NODE`, `STUDENT_ASSET_TAG_MESH_NODE` | `controllerAddress`, `publisherId` |
+> | light controller | `LIGHT_CONTROLLER_V4`, `LIGHT_DI_CONTROLLER`, `LIGHT_RELAY_CONTROLLER`, `MOKO_BAND` | `address`, `anchorNode`, `location`, `quantize`, `timePeriod` |
+> | asset tag | `ASSET_TRACKING_BAND`, `LED_ASSET_TAG`, `STUDENT_ASSET_TAG` | `address` |
+> | Modbus slave | `MODBUS_SLAVE_DEVICE` | `controller`, `deviceDefinition`, `slaveId` |
+> | Modbus slave, polling | `MODBUS_SLAVE_DEVICE_POLLING` | the three above plus `quantize`, `timePeriod` |
+> | virtual switch | `VIRTUAL_SWITCH` | `grade`, `gradeType`, `quantize`, `timePeriod`, `uid` |
+> | OPC | `OPC` | `domain`, `host`, `password`, `quantize`, `server`, `timePeriod`, `user` — deferred by the user |
+>
+> The first shape is the largest and the cheapest: `VIRTUAL_MESH_NODE.DS` is already laid out and is
+> that shape, so the nine are a batch like row 19 rather than nine rows. That leaves the light
+> controllers, the asset tags and the two Modbus slaves as the only real design work left, and OPC
+> out of scope.
 representative because it has nine attributes across three data types with seven of them writable,
 where a mesh controller has one binary attribute that is not. Whatever the form has to do, this type
 makes it do it.

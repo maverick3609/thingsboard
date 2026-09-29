@@ -53,3 +53,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `5bbcfa7926` fix(gateway): pair every floor above zero with required, and admit the tsc check was not one
 - [ ] `6a5b11d825` fix(gateway): the blanket locator data-type rule is not blanket
 - [ ] `b64e505a4c` fix(gateway): send an empty script too, and make sendEmpty and defaults a pair
+- [ ] `794dfb0dbf` fix(gateway): five sentences that were not true, one with a consequence

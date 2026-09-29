@@ -117,7 +117,11 @@ describe('gateway form layouts', () => {
       'pointType',
       // System attributes. A `String` on the REST model over an `ExportCodes` table, where an
       // unrecognised name resolves to -1 and skips validation rather than failing it (D105).
-      'attributeType']);
+      'attributeType',
+      // Current sensor. Both are real enums in the schema, so the renderer already narrows them;
+      // these lists relabel (`PHASE_1` reads as Phase 1, `32_A` as 32 A) and, for `ctId`, reorder
+      // by rating. Same membership as the schema publishes -- neither drops a value.
+      'phaseId', 'ctId']);
     Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
       [...Object.keys(layout.options ?? {}), ...Object.keys(layout.gatedOptions ?? {})]
         .forEach(id => expect(scalars.has(id)).withContext(`${modelType}.${id}`).toBe(true));
@@ -1309,17 +1313,20 @@ describe('gateway form layouts', () => {
     .filter(([modelType]) => modelType.endsWith('.DS'))
     .filter(([, layout]) => JSON.stringify(layout.rows) === JSON.stringify([['address', 'location']]));
 
-  it('gives all 26 provisioned mesh device sources one shape', () => {
+  it('gives all 27 provisioned mesh device sources one shape', () => {
     // Measured off the schema document's `families` map, with `allOf` resolved against
     // `components.schemas` and each source paired to its locator through the Java rather than by
-    // name: 26 published data source types declare `address`, `anchorNode` and `location` over the
-    // common ten and nothing else. One shape, one factory -- the mesh controller and the thermostat
-    // were folded into it rather than left as two more copies of it.
+    // name: 27 published data source types declare `address`, `anchorNode` and `location` over the
+    // common eleven and nothing else. One shape, one factory -- the mesh controller, the thermostat
+    // and the current sensor were folded into it rather than left as three more copies of it, even
+    // though the last two keep point forms of their own.
     //
-    // Two of the 26 were missed on the first pass because their locator is not their own name with
-    // `.PL` on the end: `SENSOR_TAG_DOOR_SENSOR.DS` uses `SENSOR_TAG_DOOR.PL` and
-    // `SENSOR_TAG_STROKE_COUNT.DS` uses `SENSOR_TAG_STROBE_COUNT.PL`.
-    expect(meshSources.length).toBe(26);
+    // This is a regression guard over our own table, not a proof that none is missing: a type the
+    // gateway publishes and we never added is a type this count never sees. Three were missed on
+    // the first pass -- two because their locator is not their own name with `.PL` on the end
+    // (`SENSOR_TAG_DOOR_SENSOR.DS` uses `SENSOR_TAG_DOOR.PL`, `SENSOR_TAG_STROKE_COUNT.DS` uses
+    // `SENSOR_TAG_STROBE_COUNT.PL`) and one, the current sensor, because its point form differs.
+    expect(meshSources.length).toBe(27);
     meshSources.forEach(([modelType, layout]) => {
       expect(layout.provisionedPoints).withContext(modelType).toBe(true);
       expect(layout.readonly).withContext(modelType).toEqual(['address']);
@@ -1329,8 +1336,9 @@ describe('gateway form layouts', () => {
       expect(layout.hints.address).withContext(modelType)
         .toMatch(/^The node address the mesh assigned this .+\. It identifies/);
     });
-    // A fresh object per type, so a mutation of one cannot reach another.
-    expect(meshSources[0][1]).not.toBe(meshSources[1][1]);
+    // A fresh object per type, so a mutation of one cannot reach another. Checked across all of
+    // them rather than on the first pair, which two calls of the same factory would pass anyway.
+    expect(new Set(meshSources.map(([, layout]) => layout)).size).toBe(meshSources.length);
   });
 
   // Derived from the layouts themselves rather than by renaming the sources, because two of these
@@ -1341,10 +1349,15 @@ describe('gateway form layouts', () => {
       JSON.stringify(layout.rows) === JSON.stringify([['attributeId', 'dataType']]));
 
   it('reads each mesh point\'s settable flag from its locator VO, not from a guess', () => {
-    // Three dispositions, all read from the Java. `hidden` where the VO overrides `isSettable()` to a
-    // hard false; `readonly` where it inherits `MeshPointLocatorVO.isSettable()` -- which answers the
-    // stored field -- but the model's `toVO` drops it on a fresh VO (D109); `editable` where `toVO`
-    // copies it, which is `MODBUS_CONTROLLER` alone out of 24.
+    // Three dispositions, all read from the Java, and the test is whether the flag can ever hold
+    // anything but false -- which takes the VO and the provisioner together, not the VO alone.
+    // `hidden` covers both ways of being permanently false: the VO overriding `isSettable()` to a
+    // hard false (19 of them), and the VO inheriting the honest accessor while the attribute enum
+    // carries no settable flag and no `Create*VO` ever calls `setSettable` (MESH_CONTROLLER,
+    // PEOPLE_COUNT_CAMERA, and CURRENT_SENSOR outside this set). `readonly` is where the
+    // provisioner calls `setSettable(attribute.isSettable())` over an enum that has `true` entries
+    // but `toVO` drops the field on a fresh VO (D109). `editable` is where `toVO` copies it, which
+    // is `MODBUS_CONTROLLER` alone.
     const shown = (layout): string =>
       (layout.hidden ?? []).includes('settable') ? 'hidden'
         : (layout.readonly ?? []).includes('settable') ? 'readonly' : 'editable';
@@ -1353,8 +1366,8 @@ describe('gateway form layouts', () => {
       (byMode[shown(layout)] = byMode[shown(layout)] ?? []).push(modelType));
     expect(byMode.editable).toEqual(['MODBUS_CONTROLLER.PL']);
     expect(byMode.readonly.sort()).toEqual(['4DI_2DO_CARD.PL', 'PEOPLE_COUNTER.PL',
-      'PEOPLE_COUNT_CAMERA.PL', 'THERMOSTAT.PL', 'VAV_CONTROLLER.PL']);
-    expect(byMode.hidden.length).toBe(20);
+      'THERMOSTAT.PL', 'VAV_CONTROLLER.PL']);
+    expect(byMode.hidden.length).toBe(21);
     expect(byMode.hidden.length + byMode.readonly.length + byMode.editable.length).toBe(26);
     // A flag that is hidden is never also read-only, and one that is shown always carries a hint
     // saying who decides it.
@@ -1372,7 +1385,11 @@ describe('gateway form layouts', () => {
     // claims of every locator field on such a point.
     meshPoints.forEach(([modelType, layout]) => {
       expect(layout.readonly.slice(0, 2)).withContext(modelType).toEqual(['attributeId', 'dataType']);
-      expect(layout.options.attributeId.length).withContext(modelType).toBeGreaterThan(0);
+      // Every device in this family reports its own liveness, so a list without `HEARTBEAT` is a
+      // list transcribed from the wrong enum. (The current sensor, which measures and does not
+      // report one, has its own entry and is not in this set.)
+      expect(layout.options.attributeId.map(item => item.value))
+        .withContext(modelType).toContain('HEARTBEAT');
       expect(layout.rows).withContext(modelType).toEqual([['attributeId', 'dataType']]);
       // No Add form on any of them, so a default would be invented for a form nobody opens.
       expect(layout.defaults === undefined || modelType === 'MESH_CONTROLLER.PL')
@@ -1413,7 +1430,26 @@ describe('gateway form layouts', () => {
       });
       expect(new Set(items.map(item => item.value)).size).withContext(modelType).toBe(items.length);
     });
-    // 104 across the 24 batched, plus the thermostat's 9 and the mesh controller's 1.
+    // 104 across the 24 batched, plus the thermostat's 9 and the mesh controller's 1. The current
+    // sensor's 16 are counted by its own spec below, because its point form is not this one.
     expect(total).toBe(114);
+  });
+
+  it('gives the current sensor the family source and a point form of its own', () => {
+    expect(GATEWAY_FORM_LAYOUTS['CURRENT_SENSOR.DS'].rows).toEqual([['address', 'location']]);
+    const point = GATEWAY_FORM_LAYOUTS['CURRENT_SENSOR.PL'];
+    // Sixteen attributes over two enums, both loaded into the one shared `ATTRIBUTE_CODES` table.
+    expect(point.options.attributeId.length).toBe(16);
+    expect(point.options.attributeId.map(item => item.value)).toContain('TOTAL_POWER');
+    // `ctId` scales every reading through `CTConversionUtil.ctConversionTable`, so it is the one
+    // field an installer has to be able to correct. `phaseId` is routing and stays locked.
+    expect(point.readonly).toEqual(['attributeId', 'dataType', 'phaseId']);
+    expect(point.readonly).not.toContain('ctId');
+    expect(point.hints.ctId).toBeTruthy();
+    // Sorted by rating rather than in the enum's order, which puts 120 A after 1200 A.
+    expect(point.options.ctId.map(item => item.value))
+      .toEqual(['32_A', '64_A', '100_A', '120_A', '250_A', '500_A', '800_A', '1200_A']);
+    // A current sensor measures, so nothing on the gateway ever has a `true` to put in `settable`.
+    expect(point.hidden).toContain('settable');
   });
 });

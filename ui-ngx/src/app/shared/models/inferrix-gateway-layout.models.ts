@@ -755,14 +755,19 @@ const SYSTEM_ATTRIBUTE_DATA_TYPES: FormSelectItem[] =
  *
  * Measured off the schema document's own `families` map, with `allOf` resolved against
  * `components.schemas` and each source paired to its locator through the Java rather than by name:
- * **26** of the 63 published data source types declare `address`, `anchorNode` and `location` over
- * the common eleven and nothing else -- the mesh controller, the thermostat and the 24 batched with
- * them. One shape, so one function, with the
+ * **27** of the 63 published data source types declare `address`, `anchorNode` and `location` over
+ * the common eleven and nothing else -- the mesh controller, the thermostat, the current sensor and
+ * the 24 batched with them. One shape, so one function, with the
  * only difference the noun the hints use for the thing on the other end of the radio.
  *
  * `address` is read-only because the mesh assigns it when the device joins, and each type's
  * `validate` refuses -1 and 0 -- measured on the thermostat, both 422. `location` is the node's
  * zone under another name; every one of these models maps it to `vo.setZone`.
+ *
+ * `address` and `location` share a row because they are the pair an operator reads together -- which
+ * node this is, and where it sits. `anchorNode` is left to the mapper's own order under them: it is
+ * a checkbox about the mesh's geometry rather than about this device, and pairing a checkbox with a
+ * text field puts a control and its label on two different baselines.
  */
 const meshDeviceSource = (device: string): GatewayFormLayout => ({
   provisionedPoints: true,
@@ -787,16 +792,26 @@ const meshDeviceSource = (device: string): GatewayFormLayout => ({
  * as its constant name, and {@link SENSOR_TAG_PIR_ATTRIBUTES} and
  * {@link SENSOR_TAG_INJECTION_MOULD_COUNT_ATTRIBUTES} for the other two places it differs.
  *
- * Whether `settable` is worth showing is the one real difference between these types, and it is
- * read from the locator VO rather than guessed:
+ * Whether `settable` is worth showing is the one real difference between these types. The test is
+ * not whether the VO overrides `isSettable()` -- that is only half the story -- but whether the
+ * flag can ever hold anything but `false`, which takes both the VO **and** the provisioner:
  *
- * - **`hidden`** (19 of the 24) -- the VO overrides `isSettable()` to a hard `false`, so the flag
- *   can never be anything else and a checkbox would be a lie.
- * - **`readonly`** (4DI_2DO_CARD, PEOPLE_COUNTER, PEOPLE_COUNT_CAMERA, VAV_CONTROLLER) -- the VO
- *   inherits `MeshPointLocatorVO.isSettable()`, which answers the stored field, but the model's
- *   `toVO` builds a fresh VO and copies `attributeId` and `dataType` alone. The flag is real and
- *   worth reading; the platform cannot change it, and a REST write erases it (D109).
+ * - **`hidden`** (22 of the 27) -- the flag is `false` and stays `false`, so a checkbox would be a
+ *   lie. Nineteen get there by overriding `isSettable()` to a hard `false`. The other three --
+ *   MESH_CONTROLLER, PEOPLE_COUNT_CAMERA, CURRENT_SENSOR -- inherit the honest accessor but their
+ *   attribute enums carry no settable flag at all and their `Create*VO` never calls `setSettable`,
+ *   so nothing on the gateway has a `true` to put there.
+ * - **`readonly`** (4DI_2DO_CARD, PEOPLE_COUNTER, THERMOSTAT, VAV_CONTROLLER) -- the provisioner
+ *   calls `locatorVO.setSettable(attribute.isSettable())` and the enum has entries that answer
+ *   `true` (the card's two digital outputs, the counter's `RESET`, four thermostat attributes, the
+ *   VAV's two analogue outputs). The flag is real and worth reading; the platform cannot change it,
+ *   because `toVO` builds a fresh VO and copies `attributeId` and `dataType` alone, so a REST write
+ *   erases it (**D109**).
  * - **`editable`** (MODBUS_CONTROLLER alone) -- `toVO` copies `settable`, so it is a real choice.
+ *
+ * D109's erase is six types wide by construction -- the four above plus MESH_CONTROLLER and
+ * PEOPLE_COUNT_CAMERA, which inherit the same accessor -- but it only loses information on the
+ * four, because on the other two it overwrites `false` with `false`.
  *
  * No `defaults`: `provisionedPoints` means there is no Add form on any of these, so a default would
  * be a value invented for a form nobody opens.
@@ -839,7 +854,8 @@ const meshDevicePoint = (attributes: FormSelectItem[], device: string,
 /**
  * One attribute list per provisioned mesh device type, read out of each type's `*Attributes` enum.
  *
- * 104 attributes across 24 types, 114 counting the thermostat's nine and the mesh controller's one.
+ * 104 attributes across the 24 types this factory serves, 130 counting the thermostat's nine, the
+ * mesh controller's one and the current sensor's sixteen.
  * The values are each constant's `attributeName`, which is what the code table is built from and
  * therefore what the wire takes -- **not** the constant name, and not what
  * `GET /v2/export-code/sensors/*` publishes (D115). Four differ: the thermostat's `ENERGY_SAVING`
@@ -851,9 +867,10 @@ const meshDevicePoint = (attributes: FormSelectItem[], device: string,
  * `do2Status`. The label below reads DO1 because that is what the device is; the value is the zero,
  * because that is what the gateway takes.
  *
- * Labels are the gateway's own words from `i18n_en.properties`, sentence-cased. Fourteen of the 114
+ * Labels are the gateway's own words from `i18n_en.properties`, sentence-cased. Twenty of the 130
  * have no entry in any English bundle, so `configurationDescription` hands those back as the raw
- * key (D116); their labels here are ours.
+ * key (D116); their labels here are ours. Five of the twenty are the current sensor's all-phase
+ * attributes, whose keys are in the French bundle and no other.
  */
 
 const CARD_4DI_2DO_ATTRIBUTES: FormSelectItem[] = [
@@ -1041,6 +1058,62 @@ const WATER_LEAKAGE_DETECTOR_ATTRIBUTES: FormSelectItem[] = [
   {value: 'LEAKAGE', label: 'Leakage'}
 ];
 
+/**
+ * The current sensor's attributes, which are two enums rather than one.
+ *
+ * `CurrentSensorPointLocatorVO`'s static initialiser loads `CurrentSensorPhaseAttributes` and then
+ * `CurrentSensorAllPhaseAttributes` into the one shared `ATTRIBUTE_CODES` table, so both are
+ * addressable from any point and the gateway cannot tell which belongs with which `phaseId`. The
+ * split is kept here because it is the difference between a reading of one phase and a reading of
+ * the installation: the first eleven are per-phase, the last five are the whole supply. All sixteen
+ * are NUMERIC.
+ *
+ * The last five have no English label anywhere -- their keys are in `i18n_fr.properties` and in no
+ * other bundle (D116), so the words below are ours. `PF` and `KWH` are spelled out for the same
+ * reason: nothing on the gateway would have spelled them out for us.
+ */
+const CURRENT_SENSOR_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'CURRENT', label: 'Current'},
+  {value: 'VOLTAGE', label: 'Voltage'},
+  {value: 'ACTIVE_POWER', label: 'Active power'},
+  {value: 'FUNDAMENTAL_POWER', label: 'Fundamental power'},
+  {value: 'REACTIVE_POWER', label: 'Reactive power'},
+  {value: 'APPARENT_POWER', label: 'Apparent power'},
+  {value: 'PHASE_ANGLE', label: 'Phase angle'},
+  {value: 'ACTIVE_ENERGY', label: 'Active energy'},
+  {value: 'FUNDAMENTAL_ENERGY', label: 'Fundamental energy'},
+  {value: 'REACTIVE_ENERGY', label: 'Reactive energy'},
+  {value: 'APPARENT_ENERGY', label: 'Apparent energy'},
+  {value: 'TOTAL_POWER', label: 'Total power'},
+  {value: 'TOTAL_APPARENT_POWER', label: 'Total apparent power'},
+  {value: 'PF', label: 'Power factor'},
+  {value: 'KWH', label: 'Energy (kWh)'},
+  {value: 'FREQUENCY', label: 'Frequency'}
+];
+
+const CURRENT_SENSOR_PHASES: FormSelectItem[] = [
+  {value: 'PHASE_1', label: 'Phase 1'},
+  {value: 'PHASE_2', label: 'Phase 2'},
+  {value: 'PHASE_3', label: 'Phase 3'},
+  {value: 'PHASE_ALL', label: 'All phases'}
+];
+
+/**
+ * The CT ratings, **reordered**. The schema publishes them in the enum's own order, which puts
+ * `120_A` last, after `1200_A`. That reads as a defect on a picker an installer uses to say which
+ * clamp is on the wire, and the values are untouched, so the list is sorted by rating instead.
+ */
+const CURRENT_SENSOR_CT_RATINGS: FormSelectItem[] = [
+  {value: '32_A', label: '32 A'},
+  {value: '64_A', label: '64 A'},
+  {value: '100_A', label: '100 A'},
+  {value: '120_A', label: '120 A'},
+  {value: '250_A', label: '250 A'},
+  {value: '500_A', label: '500 A'},
+  {value: '800_A', label: '800 A'},
+  {value: '1200_A', label: '1200 A'}
+];
+
 export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
 
   /**
@@ -1103,7 +1176,7 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
   /**
    * A thermostat on the mesh, as a data source.
    *
-   * Field-identical to `MESH_CONTROLLER.DS`, and so are twenty-four other provisioned mesh device
+   * Field-identical to `MESH_CONTROLLER.DS`, and so are twenty-five other provisioned mesh device
    * types: `address`, `anchorNode` and `location` over `AbstractDataSourceModel`'s eleven. The mesh
    * assigns the address
    * when the device joins, `ThermostatDataSourceDefinition.validate` refuses -1 and 0 -- measured,
@@ -1980,6 +2053,8 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * construction here -- `MeshPointLocatorVO.isSettable()` answers the stored field -- it is simply
    * never given a value. Measured: `settable: true` saves 201 and reads back `false`, and
    * `relinquishable` reads back `null`. The same shape D84 closed on `INTERNAL.PL`, filed as **D91**.
+   * `PEOPLE_COUNT_CAMERA.PL` and `CURRENT_SENSOR.PL` are hidden for the same reason -- see the
+   * three-way rule on {@link meshDevicePoint}, whose `hidden` bucket this is.
    */
   'MESH_CONTROLLER.PL': {
     hidden: ['settable', 'relinquishable', 'configurationDescription'],
@@ -2289,8 +2364,72 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * as `META.DS`, for the same reason, and measured: a created source carries only `alarmLevels`,
    * the purge pair, `editPermission`, `enabled` and the identity fields.
    */
+  'SYSTEM_ATTRIBUTES.DS': {},
+
+  /**
+   * The provisioned mesh device family, laid out by {@link meshDeviceSource} and
+   * {@link meshDevicePoint}. One shape, twenty-seven types; the mesh controller, the thermostat and
+   * the current sensor carry their own entries above and below because their point forms differ.
+   *
+   * Two of these do not pair by name: the door sensor publishes `SENSOR_TAG_DOOR_SENSOR.DS` with
+   * `SENSOR_TAG_DOOR.PL`, and the stroke counter publishes `SENSOR_TAG_STROKE_COUNT.DS` with
+   * `SENSOR_TAG_STROBE_COUNT.PL`. The keys below are what the gateway publishes, not what it
+   * should have published.
+   */
   '4DI_2DO_CARD.DS': meshDeviceSource('I/O card'),
   '4DI_2DO_CARD.PL': meshDevicePoint(CARD_4DI_2DO_ATTRIBUTES, 'I/O card', 'readonly'),
+  'CURRENT_SENSOR.DS': meshDeviceSource('current sensor'),
+
+  /**
+   * One reading from a current sensor. The only point in the family with fields of its own.
+   *
+   * `phaseId` and `ctId` both come out of {@link meshDevicePoint}'s shape and then stop matching it,
+   * so this type gets a literal rather than a fifth factory argument for one caller.
+   *
+   * **`ctId` is the one editable field on any provisioned mesh point that is not a permission.** It
+   * is the rating of the CT clamp physically fitted to the wire, and
+   * `CurrentSensorDataSourceRT.readAttributes` feeds it to
+   * `CTConversionUtil.ctConversionTable(attribute.getCtId(), ...)` to scale every raw reading. Get
+   * it wrong and the sensor reports a wrong number rather than no number, which is the kind of
+   * defect that survives commissioning. `CurrentSensorPointLocatorModel.toVO` copies it, so an edit
+   * here round-trips.
+   *
+   * `phaseId` is read-only for the opposite reason: it is routing, not calibration.
+   * `CurrentSensorDataSourceRT` keys `attributePhaseMap` on it and files this point under the phase
+   * the provisioner chose, so changing it repoints an existing point at another phase's frame.
+   *
+   * **Nothing checks that the attribute and the phase agree.** `CurrentSensorDataSourceDefinition`
+   * validates the four locator fields one at a time -- each against its own code table -- and never
+   * against each other, so a per-phase attribute on `PHASE_ALL`, or `TOTAL_POWER` on `PHASE_2`, is
+   * accepted and then simply never routed. The pairing is the provisioner's to get right; the hint
+   * says so, because a read-only field cannot.
+   *
+   * `settable` is hidden for the reason the other two inherit-but-never-set types are:
+   * `CurrentSensorAllPhaseAttributes` and `CurrentSensorPhaseAttributes` carry no settable flag, and
+   * no `Create*VO` calls `setSettable`. A current sensor measures.
+   */
+  'CURRENT_SENSOR.PL': {
+    hidden: ['settable', 'relinquishable', 'configurationDescription'],
+    readonly: ['attributeId', 'dataType', 'phaseId'],
+    options: {
+      attributeId: CURRENT_SENSOR_ATTRIBUTES,
+      dataType: NON_IMAGE_DATA_TYPES,
+      phaseId: CURRENT_SENSOR_PHASES,
+      ctId: CURRENT_SENSOR_CT_RATINGS
+    },
+    hints: {
+      attributeId: 'What this point reads from the current sensor. The gateway creates one point '
+        + 'per attribute and phase when the sensor joins the mesh, so there is nothing to choose '
+        + 'here.',
+      phaseId: 'Which phase this reading comes from, chosen when the point was provisioned. The '
+        + 'last five attributes are whole-supply readings and belong on All phases; the gateway '
+        + 'does not check the pairing, it just stops routing the reading.',
+      ctId: 'The rating of the CT clamp fitted to this wire. Every reading is scaled by it, so a '
+        + 'wrong rating gives wrong numbers rather than no numbers.'
+    },
+    rows: [['attributeId', 'dataType'], ['phaseId', 'ctId']]
+  },
+
   'DISTANCE_SENSOR.DS': meshDeviceSource('distance sensor'),
   'DISTANCE_SENSOR.PL': meshDevicePoint(DISTANCE_SENSOR_ATTRIBUTES, 'distance sensor', 'hidden'),
   'DUSTBIN_LEVEL_SENSOR.DS': meshDeviceSource('dustbin sensor'),
@@ -2308,7 +2447,7 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
   'PEOPLE_COUNTER.DS': meshDeviceSource('people counter'),
   'PEOPLE_COUNTER.PL': meshDevicePoint(PEOPLE_COUNTER_ATTRIBUTES, 'people counter', 'readonly'),
   'PEOPLE_COUNT_CAMERA.DS': meshDeviceSource('camera'),
-  'PEOPLE_COUNT_CAMERA.PL': meshDevicePoint(PEOPLE_COUNT_CAMERA_ATTRIBUTES, 'camera', 'readonly'),
+  'PEOPLE_COUNT_CAMERA.PL': meshDevicePoint(PEOPLE_COUNT_CAMERA_ATTRIBUTES, 'camera', 'hidden'),
   'SENSOR_TAG_IAQ.DS': meshDeviceSource('air-quality tag'),
   'SENSOR_TAG_IAQ.PL': meshDevicePoint(SENSOR_TAG_IAQ_ATTRIBUTES, 'air-quality tag', 'hidden'),
   'SENSOR_TAG_IAQ_V2.DS': meshDeviceSource('air-quality tag'),
@@ -2340,8 +2479,6 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
   'VAV_CONTROLLER.PL': meshDevicePoint(VAV_CONTROLLER_ATTRIBUTES, 'VAV controller', 'readonly'),
   'WATER_LEAKAGE_DETECTOR.DS': meshDeviceSource('leak detector'),
   'WATER_LEAKAGE_DETECTOR.PL': meshDevicePoint(WATER_LEAKAGE_DETECTOR_ATTRIBUTES, 'leak detector', 'hidden'),
-
-  'SYSTEM_ATTRIBUTES.DS': {},
 
   /**
    * One value the platform holds, as a point.

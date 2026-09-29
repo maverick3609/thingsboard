@@ -258,7 +258,8 @@ consulted.
 | 17 | `SYSTEM_ATTRIBUTES.DS` | `SYSTEM_ATTRIBUTES.PL` | **done** — 2026-09-29; **D105-D107** filed, the last a pairing rule only the gateway's two front ends know; needs an on-screen pass |
 | — | `OPC.DS` | `OPC.PL` | **addable and not done** — deferred by the user on 2026-09-29; the one type on the Add menu without a layout |
 | 18 | `THERMOSTAT.DS` | `THERMOSTAT.PL` | **done** — 2026-09-29; **D108-D113** filed, D108 a P1 general to all 34 mesh locator types that supersedes D90; needs an on-screen pass |
-| 19 | the 24 remaining mesh device types | their locators | **done** — 2026-09-30; batched at the user's direction; **D115-D117** filed and D109 widened to five types; needs an on-screen pass |
+| 19 | the 24 remaining mesh device types | their locators | **done** — 2026-09-30; batched at the user's direction; **D115-D117** filed and D109 widened; needs an on-screen pass |
+| 19a | `CURRENT_SENSOR` | `CURRENT_SENSOR.PL` | **done** — 2026-09-30; the 27th member of the mesh family, added after the row-19 review; family source, own point form (`phaseId`, `ctId`); needs an on-screen pass |
 | … | the other 21 types | | provisioned-only, nine other shapes: mesh nodes, asset tags, light controllers, Modbus slaves |
 | last | the 13 types with no stack form | | left on the generic schema form — see Open decisions |
 
@@ -2003,6 +2004,11 @@ three. Thermostat is one of that block, chosen as the
 > pairing taken from the Java, the 63 published types have **24 distinct shapes**, the mesh-device
 > block is **26 types**, and **21** remain after it in 9 shapes. Corrected 2026-09-30; row 19 is built
 > on the corrected numbers.
+>
+> **And the mesh-device block is 27, not 26.** The row-19 review found `CURRENT_SENSOR.DS` missing
+> from the family: it is field-identical to the rest (checked key by key against `MESH_CONTROLLER.DS`
+> with `allOf` resolved), and was skipped because its *point* form is not the family's. So **20**
+> types remain after this block, still in 9 shapes.
 representative because it has nine attributes across three data types with seven of them writable,
 where a mesh controller has one binary attribute that is not. Whatever the form has to do, this type
 makes it do it.
@@ -2119,29 +2125,68 @@ combination that is both true and usable. **D117.**
 **`settable` is the one real difference between these types, and it was read out of each locator VO
 rather than assumed.** Three dispositions:
 
+**The first pass got this rule half right, and the row-19 review caught it.** "Does the VO override
+`isSettable()`?" is not the question — the question is whether the flag can ever hold anything but
+`false`, and that takes the VO *and* the provisioner. Three types inherit the honest accessor and are
+still permanently false, because their attribute enum carries no settable flag at all and no
+`Create*VO` ever calls `setSettable`. Corrected dispositions, over all 27:
+
 | disposition | types | why |
 |---|---|---|
-| hidden | 20 | the VO overrides `isSettable()` to a hard `false` |
-| read-only | `4DI_2DO_CARD`, `PEOPLE_COUNTER`, `PEOPLE_COUNT_CAMERA`, `THERMOSTAT`, `VAV_CONTROLLER` | inherits the stored field, but `toVO` drops it (D109) |
-| editable | `MODBUS_CONTROLLER` | `toVO` copies it — the only one of 24 |
+| hidden | 22 | 19 override `isSettable()` to a hard `false`; `MESH_CONTROLLER`, `PEOPLE_COUNT_CAMERA` and `CURRENT_SENSOR` inherit it but nothing ever sets it |
+| read-only | `4DI_2DO_CARD`, `PEOPLE_COUNTER`, `THERMOSTAT`, `VAV_CONTROLLER` | the provisioner calls `setSettable(attribute.isSettable())` over an enum with `true` entries, and `toVO` drops it (D109) |
+| editable | `MODBUS_CONTROLLER` | `toVO` copies it — the only one of 27 |
 
-That widens D109 from one type to five, and makes `ModbusControllerPointLocatorModel` the worked
-example of its fix: it already does what the other five need.
+`PEOPLE_COUNT_CAMERA` moved out of read-only on that correction: `PeopleCountCameraAttributes` has no
+settable argument in its constructor and `CreatePeopleCountCameraDataSourceVO` never calls
+`setSettable`, so a read-only checkbox there would have displayed a permanent `false` as if it were a
+reading.
 
-Fourteen of the 114 attributes have no English bundle entry, so `configurationDescription` hands those
-back as a raw translation key — the whole VAV controller bar two. **D116**, which is D111 counted
-properly. Our labels for those fourteen are ours, and a spec fails if one of them ever starts with
-`dsEdit.`.
+That widens D109 from one type to **six by construction** — the four above plus `MESH_CONTROLLER` and
+`PEOPLE_COUNT_CAMERA`, which inherit the same accessor — but it only **loses information on the
+four**, because on the other two the erase overwrites `false` with `false`.
+`ModbusControllerPointLocatorModel` is the worked example of the fix: it already does what the other
+six need.
 
-**What this row does not fix, and cannot:** D108. All 26 of these types share the one mutable
+Twenty of the 130 attributes have no English bundle entry, so `configurationDescription` hands those
+back as a raw translation key — the whole VAV controller bar two, the thermostat's `STATUS`, and all
+five of the current sensor's all-phase attributes, whose keys are in `i18n_fr.properties` and in no
+other bundle. **D116**, which is D111 counted properly. Our labels for those twenty are ours, and a
+spec fails if one of them ever starts with `dsEdit.`.
+
+**A `CURRENT_SENSOR.PL` was added after the review, and it is the one point in this family with a
+field worth editing.** Sixteen attributes over two enums (eleven per-phase, five whole-supply), both
+loaded into the same shared `ATTRIBUTE_CODES` table, plus `phaseId` and `ctId`. `phaseId` is routing —
+`CurrentSensorDataSourceRT` keys `attributePhaseMap` on it — so it is read-only like `attributeId`.
+`ctId` is **calibration**: `CTConversionUtil.ctConversionTable(attribute.getCtId(), …)` scales every
+raw reading by it, so a wrong CT rating reports a wrong number rather than no number. It is left
+editable, and it is the only editable non-permission field on any provisioned mesh point. The CT list
+is also reordered — the enum publishes `120_A` after `1200_A`, which reads as a defect on a picker an
+installer uses to say which clamp is on the wire. Nothing on the gateway checks that the attribute and
+the phase agree: `CurrentSensorDataSourceDefinition.validate` checks the four locator fields one at a
+time against their own code tables and never against each other, so a whole-supply attribute on
+`PHASE_2` saves and is then simply never routed. The hint says so, because a read-only field cannot.
+
+*Measured against the live gateway, source `ZZ_CS_PROBE` and three points, all deleted after:* the
+source POSTs 201 with `address`/`anchorNode`/`location` and nothing else; `TOTAL_POWER` on `PHASE_2`
+is a **201** (D119); a `ctId` of `99_A` is a **422** naming `ctId`, so the rating is genuinely
+checked; `settable: true` saves and reads back **false**, which is why it is hidden; `dataType: IMAGE`
+is a 201, the same as everywhere else in this family; and a `PUT` changing `ctId` from `100_A` to
+`500_A` **round-trips**, so the one editable field is editable from our dialog. `TOTAL_POWER` and
+`KWH` both read back `configurationDescription` as their raw translation key, confirming the five new
+D116 rows.
+
+**What this row does not fix, and cannot:** D108. All 27 of these types share the one mutable
 `ATTRIBUTE_CODES` static, so on any given gateway most of them cannot validate their own attributes.
 The lists here are right about what each device reports; whether the gateway will accept one depends
 on which mesh class loaded last.
 
-*Verified:* 130 layout, 41 schema, 14 form and 17 service specs green, and
+*Verified:* 131 layout, 41 schema, 14 form and 17 service specs green, and
 `tsc -p src/tsconfig.app.json` exit 0. Every attribute list extracted from the Java and two of the
-surprising ones checked live both ways; probe rows deleted, the instance back at 12 sources. The
-on-screen pass is owed with rows 6–18.
+surprising ones checked live both ways; the current sensor's source, its three probe points and every
+earlier probe row deleted, the instance back at 12 sources and 106 points. The `settable` disposition
+of all 27 types re-derived from the provisioner as well as the VO after the row-19 review, which
+moved two types and corrected D109. The on-screen pass is owed with rows 6–19a.
 
 ## Per-type components
 
@@ -2443,23 +2488,28 @@ and wrong, or stale, and are recorded there too. D73 is deliberately not fixed a
   NUMERIC with a `BOOLEAN_ATTRIBUTE` and for MULTISTATE, which has no valid attribute type at all.
   `AttributeTypeVO.getAttributeTypes(dataTypeId)` already encodes the rule and has zero callers.
 
-- **D115 (P2)** — `Enum::name` versus `attributeName` differs on four of the 26 mesh attribute
+- **D115 (P2)** — `Enum::name` versus `attributeName` differs on four of the 27 mesh attribute
   enums, not one, and two of the four wire names contain **spaces**: `INJECTION MOULD COUNT` and
   `STROKE COUNT`. Measured 201 for the spaced value and 422 for the underscored one the endpoint
   publishes. No client can derive those values from anything the API exposes.
 
-- **D116 (P3)** — 14 of the 114 mesh attribute descriptions have no English bundle entry, so
+- **D116 (P3)** — 20 of the 130 mesh attribute descriptions have no English bundle entry, so
   `configurationDescription` returns the raw key against a schema documenting it as pre-translated.
-  The VAV controller loses seven of its nine. D111 counted properly.
+  The VAV controller loses seven of its nine; the thermostat loses `STATUS`; the current sensor loses
+  all five all-phase attributes, whose keys exist in `i18n_fr.properties` and nowhere else — so the
+  French install is the only one that reads them. D111 counted properly.
 
 - **D117 (P3)** — the I/O card's digital outputs are `D01_STATUS`/`D02_STATUS` with a digit zero,
   while their translation keys and labels say DO1/DO2. Measured: the letter O is a 422. Reads like a
   typo and will be "corrected" eventually, which would break stored points.
 
-- **D109 (P2), widened 2026-09-30** — five types, not one: `4DI_2DO_CARD`, `PEOPLE_COUNTER`,
-  `PEOPLE_COUNT_CAMERA`, `THERMOSTAT` and `VAV_CONTROLLER` all inherit a `settable` that answers the
-  stored field and all drop it in `toVO`. `MODBUS_CONTROLLER` is the only one of 24 that copies it,
-  and is the worked example of the fix.
+- **D109 (P2), widened 2026-09-30, corrected same day** — six types by construction, four with a
+  consequence. `4DI_2DO_CARD`, `PEOPLE_COUNTER`, `THERMOSTAT`, `VAV_CONTROLLER`, `MESH_CONTROLLER`
+  and `PEOPLE_COUNT_CAMERA` all inherit a `settable` that answers the stored field and all drop it in
+  `toVO`. On the first four the provisioner writes a real value from the attribute enum, so the
+  erase loses information; on the last two nothing ever writes anything but `false`, so it is a
+  no-op. `MODBUS_CONTROLLER` is the only one of 27 that copies it, and is the worked example of the
+  fix.
 
 - **D114 (P2)** — an analog system attribute accepts a non-numeric `startValue` (measured 201) and
   `AnalogAttributeRT.getStartValue()` then does a bare `Double.parseDouble` when the point starts.

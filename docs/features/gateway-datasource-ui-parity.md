@@ -2229,6 +2229,22 @@ point on it is a **422** on `dataSourceId`. `PaperTowelLevelSensorDataSourceDefi
 copy of the same file, names its own VO and its point POSTs 201 — the control. **D120, P1.** Our
 layout for the two is correct and inert; nothing on this side can make a point exist.
 
+**D108 was caught in the act on 2026-09-30, which is worth recording because it changes how every
+measurement in these rows should be read.** The identical request — a `CURRENT_SENSOR.PL` point with
+`attributeId: "CURRENT"` — returned **201** earlier in the session and **422 "Invalid value"** later,
+with no restart and no code change between them. Probing the same source further showed `HEARTBEAT`
+and `BROADCASTING_ENABLED` accepted and everything else refused, which is `WristBandAttributes`
+exactly: the row-21 probes had created and deleted a `MOKO_BAND.PL` point, initialising
+`MokoBandPointLocatorVO` and reassigning the one shared `ATTRIBUTE_CODES` static. A current sensor on
+that instance can now hold only a wristband's four attributes.
+
+So a 422 on an `attributeId` anywhere in these rows means "not in whichever table is loaded right
+now", not "not a valid attribute of this type". Every 422 relied on above was taken with a positive
+control in the same run — D121's `STATUS` 201 against `DIM_VALUE` 422, D123's `DIM_VALUE` 201 against
+three 422s, D120's refusal naming `dataSourceId` rather than `attributeId` — which is what keeps
+those findings sound. It also means **nothing in this family can be regression-tested against a live
+gateway** until D108 is fixed, which is the strongest argument for fixing it.
+
 **What this row does not fix, and cannot:** D108. All 27 of these types share the one mutable
 `ATTRIBUTE_CODES` static, so on any given gateway most of them cannot validate their own attributes.
 The lists here are right about what each device reports; whether the gateway will accept one depends

@@ -50,3 +50,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `2467eb1cb9` feat(gateway): lay out the ping source, whose rules the stack's own form has backwards
 - [ ] `7fe38586ef` feat(gateway): lay out PoE lighting, whose point type is a 500 waiting to happen
 - [ ] `344b7b47d5` feat(gateway): lay out scripting, and bring sendEmpty back for a worse case
+- [ ] `5bbcfa7926` fix(gateway): pair every floor above zero with required, and admit the tsc check was not one

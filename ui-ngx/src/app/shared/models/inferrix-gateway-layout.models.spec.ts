@@ -802,8 +802,11 @@ describe('gateway form layouts', () => {
     // Declared on the VO with a default of 10, serialised, mapped both ways, and never referenced
     // again in the tree -- unlike `retries`, which the runtime checks on every attempt.
     expect(poe.hidden).toEqual(['connectionTimeoutSeconds']);
-    expect(poe.defaults.connectionTimeoutSeconds).toBeUndefined();
     expect(poe.defaults.retries).toBe(2);
+    // Defaulted although hidden, which is not redundant: the field has the same three-way split as
+    // `retries` -- VO 10, REST model 0, discovery 10 -- so an add that dropped the key would store
+    // 0, and the gateway's own editor shows the field, where every other source reads 10.
+    expect(poe.defaults.connectionTimeoutSeconds).toBe(10);
   });
 
   it('requires the two PoE fields the gateway does not validate at all', () => {

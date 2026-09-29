@@ -1604,15 +1604,34 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * `ipAddress` and `token` are the whole connection: `PoeLightingService.createHeaders` does
    * `headers.setBearerAuth(token)` and every call is `restTemplate.exchange(baseUrl + …)`. Neither
    * is validated anywhere -- `PoeLightingDataSourceDefinition.validate` is an empty method, and so
-   * is its point overload -- so `required` here is **stricter than the gateway**, which this
-   * feature otherwise avoids. It is justified on the same ground row 11 failed on: an empty value
-   * is not a configuration the gateway can act on, it is a source that can never reach anything.
+   * is its point overload, and the gateway's own editor leaves both boxes optional too -- so
+   * `required` here is **stricter than the gateway and than its UI**, which this feature otherwise
+   * avoids. What justifies it is the mechanism rather than the omission:
+   * `HttpHeaders.setBearerAuth` has no null check, so a null token ships `Authorization: Bearer
+   * null` and a blank one ships `Authorization: Bearer `, through `createHeaders`, on every call
+   * the module makes. An empty token is therefore not a configuration that means something else --
+   * it is a source whose every request fails authentication. That is the test row 11's
+   * `valuePointer` failed and this one passes.
    *
-   * `connectionTimeoutSeconds` is hidden because **nothing reads it**. It is declared on the VO
-   * with a default of 10, serialised, mapped both ways by `PoeLightingDataSourceModel`, and written
-   * once more by the discovery path (`PoeLightingService` sets it to 10) -- but never *read*
-   * anywhere in the tree, unlike `retries`, which `PoeLightingDataSourceRT` checks on every
-   * attempt. A knob that stores a value and changes no behaviour is worse than no
+   * This cannot lock an operator out of a row the gateway made, and the reason is worth writing
+   * down because it is a dependency rather than a guarantee: discovery takes the token from
+   * `systemSettingsDao.getValue(POE_LIGHTING_TOKEN)`, whose definition supplies the literal default
+   * `"your-token-here"`, so a discovered source always carries something. If that placeholder is
+   * ever dropped, `required: ['token']` becomes a lockout on every discovered row.
+   *
+   * `connectionTimeoutSeconds` is hidden because **nothing reads it**, and the decisive evidence is
+   * not the absence of a reference: `PoeLightingService` builds `new RestTemplate()` with no
+   * `ClientHttpRequestFactory`, so the only HTTP client the module owns has no configurable connect
+   * or read timeout for the field to feed. It is still declared on the VO with a default of 10,
+   * serialised, mapped both ways, written once more by discovery -- and offered to the operator as
+   * an editable box in the gateway's own editor. `retries`, beside it, is checked by
+   * `PoeLightingDataSourceRT` on every attempt.
+   *
+   * It is **defaulted although it is hidden**, which looks redundant and is not. `retries` and this
+   * field have the identical three-way split -- VO 10, REST model 0, discovery 10 -- so an add that
+   * drops the key stores 0, and the next person to open that source in the gateway's own form reads
+   * a timeout of 0 where every other source reads 10. Cortex should not write a value into a field
+   * it refuses to show. A knob that stores a value and changes no behaviour is worse than no
    * knob, and the field keeps its stored value because a data source saves with `PATCH`.
    *
    * `alarmLevels` really has rows on this type -- communication failure and device failure, both
@@ -1634,7 +1653,7 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     // instead, so a source created without it retries nothing -- measured, a POST omitting
     // `retries` stores 0. Discovery sets 3; the VO's own answer is 2, and that is the one a form
     // building a fresh source should start from.
-    defaults: {retries: 2},
+    defaults: {retries: 2, connectionTimeoutSeconds: 10},
     rows: [['ipAddress', 'token']]
   },
 

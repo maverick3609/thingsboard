@@ -1258,12 +1258,25 @@ const CURRENT_SENSOR_PHASES: FormSelectItem[] = [
 ];
 
 /**
- * The CT ratings, **reordered**. The schema publishes them in the enum's own order, which puts
- * `120_A` last, after `1200_A`. That reads as a defect on a picker an installer uses to say which
- * clamp is on the wire, and the values are untouched, so the list is sorted by rating instead.
+ * The CT ratings, **reordered**, and one of them marked as broken.
+ *
+ * The schema publishes them in the enum's own order, which puts `120_A` last, after `1200_A`. That
+ * reads as a defect on a picker an installer uses to say which clamp is on the wire, and the values
+ * are untouched, so the list is sorted by rating instead.
+ *
+ * **`32_A` is a rating the gateway accepts and cannot convert.**
+ * `CTConversionUtil.ctConversionTable` has branches for 64, 100, 120, 250, 500, 800 and 1200 and
+ * none for 32, so it falls through to its initialiser, `double convertedValue = -1.000`. A 32 A
+ * point then reports a constant −0.001 A, and the three derived attributes go negative with it.
+ * `env.properties` agrees: seven `currentSensor.ct.*A` factors ship and `32A` is not one. But
+ * `CT_CODES` publishes it, so `validate` passes it and a form cannot refuse it.
+ *
+ * It is kept in the list rather than narrowed away, because a stored point may already hold it and
+ * a value dropped from a read-only-ish picker renders as a blank box -- the same rule the data type
+ * list follows. The label carries the warning instead. **D125.**
  */
 const CURRENT_SENSOR_CT_RATINGS: FormSelectItem[] = [
-  {value: '32_A', label: '32 A'},
+  {value: '32_A', label: '32 A (not supported)'},
   {value: '64_A', label: '64 A'},
   {value: '100_A', label: '100 A'},
   {value: '120_A', label: '120 A'},
@@ -2548,10 +2561,16 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * so this type gets a literal rather than a fifth factory argument for one caller.
    *
    * **`ctId` is the one editable field on any provisioned mesh point that is not a permission.** It
-   * is the rating of the CT clamp physically fitted to the wire, and
-   * `CurrentSensorDataSourceRT.readAttributes` feeds it to
-   * `CTConversionUtil.ctConversionTable(attribute.getCtId(), ...)` to scale every raw reading. Get
-   * it wrong and the sensor reports a wrong number rather than no number, which is the kind of
+   * is the rating of the CT clamp physically fitted to the wire.
+   * `CurrentSensorDataSourceRT.powerSensor` feeds it to
+   * `CTConversionUtil.ctConversionTable(attribute.getCtId(), data.getCurrent())` -- **inside the
+   * `CURRENT` branch only**, which is the single call site in the module. Every other attribute
+   * applies its own `getConversion()` to the device's raw value. So `ctId` reaches four of the
+   * sixteen: `CURRENT` directly, and `TOTAL_POWER`, `TOTAL_APPARENT_POWER` and `KWH` through
+   * `PointValueAttributeMap`, which derives all three from `voltage * current`. `PF` is
+   * `cos(phase)` alone and does not follow it.
+   *
+   * Get it wrong and those four report wrong numbers rather than no numbers, which is the kind of
    * defect that survives commissioning. `CurrentSensorPointLocatorModel.toVO` copies it, so an edit
    * here round-trips.
    *
@@ -2585,8 +2604,11 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
       phaseId: 'Which phase this reading comes from, chosen when the point was provisioned. The '
         + 'last five attributes are whole-supply readings and belong on All phases; the gateway '
         + 'does not check the pairing, it just stops routing the reading.',
-      ctId: 'The rating of the CT clamp fitted to this wire. Every reading is scaled by it, so a '
-        + 'wrong rating gives wrong numbers rather than no numbers.'
+      ctId: 'The rating of the CT clamp fitted to this wire. The current reading is scaled by it, '
+        + 'and the two total powers and the kWh are derived from that, so a wrong rating gives '
+        + 'wrong numbers on four of the sixteen attributes rather than no numbers. 32 A is listed '
+        + 'because the gateway accepts it, but it has no conversion factor: a point set to it '
+        + 'reports a constant −0.001 A.'
     },
     rows: [['attributeId', 'dataType'], ['phaseId', 'ctId']]
   },

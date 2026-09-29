@@ -1531,9 +1531,16 @@ describe('gateway form layouts', () => {
     expect(point.readonly).toEqual(['attributeId', 'dataType', 'phaseId']);
     expect(point.readonly).not.toContain('ctId');
     expect(point.hints.ctId).toBeTruthy();
-    // Sorted by rating rather than in the enum's order, which puts 120 A after 1200 A.
+    // Sorted by rating rather than in the enum's order, which puts 120 A after 1200 A. All eight
+    // values are kept, including the one that does not work, because a stored point may hold it.
     expect(point.options.ctId.map(item => item.value))
       .toEqual(['32_A', '64_A', '100_A', '120_A', '250_A', '500_A', '800_A', '1200_A']);
+    // `CTConversionUtil.ctConversionTable` has no branch for 32 A, so it returns its -1.000
+    // initialiser and the point reports a constant -0.001 A. The gateway accepts the value, so the
+    // only thing a layout can do about it is say so. D125.
+    expect(point.options.ctId.find(item => item.value === '32_A').label)
+      .toBe('32 A (not supported)');
+    expect(point.hints.ctId).toContain('32 A');
     // A current sensor measures, so nothing on the gateway ever has a `true` to put in `settable`.
     expect(point.hidden).toContain('settable');
   });

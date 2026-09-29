@@ -2178,11 +2178,28 @@ spec fails if one of them ever starts with `dsEdit.`.
 field worth editing.** Sixteen attributes over two enums (eleven per-phase, five whole-supply), both
 loaded into the same shared `ATTRIBUTE_CODES` table, plus `phaseId` and `ctId`. `phaseId` is routing —
 `CurrentSensorDataSourceRT` keys `attributePhaseMap` on it — so it is read-only like `attributeId`.
-`ctId` is **calibration**: `CTConversionUtil.ctConversionTable(attribute.getCtId(), …)` scales every
-raw reading by it, so a wrong CT rating reports a wrong number rather than no number. It is left
-editable, and it is the only editable non-permission field on any provisioned mesh point. The CT list
-is also reordered — the enum publishes `120_A` after `1200_A`, which reads as a defect on a picker an
-installer uses to say which clamp is on the wire. Nothing on the gateway checks that the attribute and
+`ctId` is **calibration**, and an installer has to be able to correct it, so it is left editable —
+the only editable non-permission field on any provisioned mesh point. The CT list is also reordered:
+the enum publishes `120_A` after `1200_A`, which reads as a defect on a picker an installer uses to
+say which clamp is on the wire.
+
+> **The first version of this row overstated what `ctId` does, and the row-19a review caught it.**
+> `CTConversionUtil.ctConversionTable` has exactly one call site,
+> `CurrentSensorDataSourceRT.powerSensor`, inside the `attributeId == CURRENT` branch. Every other
+> attribute applies its own `getConversion()` to the device's raw value. So the rating reaches **four
+> of the sixteen** — `CURRENT` directly, and `TOTAL_POWER`, `TOTAL_APPARENT_POWER` and `KWH` through
+> `PointValueAttributeMap`, which derives all three from `voltage * current`. `PF` is `cos(phase)`
+> alone and does not follow it. The row also named a method, `readAttributes`, that does not exist on
+> that class. Both corrected in the JSDoc, the hint and the handover doc.
+>
+> **And `32_A` does not work at all. D125, P1.** `ctConversionTable` has branches for seven ratings
+> and none for 32, so it returns its `-1.000` initialiser and the point reports a constant −0.001 A,
+> taking the three derived attributes negative with it. `env.properties` ships seven factors and no
+> `32A`. `CT_CODES` publishes the value regardless, so `validate` accepts it — and it was the **first
+> item** in this row's picker. It is kept in the list, because a stored point may already hold it and
+> a dropped value renders as a blank box, but relabelled "32 A (not supported)" with the consequence
+> spelled out in the hint. (Same method, smaller: the 500 A code default is 14.929 where
+> `env.properties` ships 21.173, so an install missing that property reads ~30% low.) Nothing on the gateway checks that the attribute and
 the phase agree: `CurrentSensorDataSourceDefinition.validate` checks the four locator fields one at a
 time against their own code tables and never against each other, so a whole-supply attribute on
 `PHASE_2` saves and is then simply never routed. The hint says so, because a read-only field cannot.

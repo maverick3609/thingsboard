@@ -46,3 +46,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `96be19bbb9` feat(gateway): follow the gateway's 5.1.3 rules, and take back what it fixed
 - [ ] `d439911113` feat(gateway): lay out the mesh controller, whose attribute table 34 classes share
 - [ ] `c51bc5c7bf` fix(gateway): undo two row-13 decisions the review took apart, and one bad row
+- [ ] `bbe49ab250` fix(gateway): refuse a layout that retypes a secret

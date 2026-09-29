@@ -48,3 +48,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `c51bc5c7bf` fix(gateway): undo two row-13 decisions the review took apart, and one bad row
 - [ ] `bbe49ab250` fix(gateway): refuse a layout that retypes a secret
 - [ ] `2467eb1cb9` feat(gateway): lay out the ping source, whose rules the stack's own form has backwards
+- [ ] `7fe38586ef` feat(gateway): lay out PoE lighting, whose point type is a 500 waiting to happen

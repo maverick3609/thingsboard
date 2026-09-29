@@ -2185,6 +2185,20 @@ spec fails if one of them ever starts with `dsEdit.`.
 field worth editing.** Sixteen attributes over two enums (eleven per-phase, five whole-supply), both
 loaded into the same shared `ATTRIBUTE_CODES` table, plus `phaseId` and `ctId`. `phaseId` is routing —
 `CurrentSensorDataSourceRT` keys `attributePhaseMap` on it — so it is read-only like `attributeId`.
+**`FREQUENCY` is not a measurement. D128, P2.** `CurrentSensorDataSourceRT
+.updateCalculatedDataPoints` answers it with `new Random().doubles(49.9, 50.1).findFirst()
+.orElse(50)` — a fresh random sample every update, with no input from the device, stored and
+historised exactly like the fifteen real readings beside it. A supply that has actually drifted to
+48 Hz reports as healthy, and an alarm on the point can only fire by chance. Labelled "Frequency
+(simulated)", the same treatment `32_A` got: the value stays because a provisioned point may hold
+it, and the label stops it being read as a reading.
+
+**And deleting a phase's last point NPEs the mesh listener. D129, P3.** `powerSensor:83` and
+`powerSensorExtended:146` both put the `try` *inside* the `forEach` lambda, so the null
+`attributePhaseMap.get(...)` that follows removing a phase's last point throws out of the listener
+method entirely, taking the other phases' updates in that frame with it. `provisionedPoints` removes
+the Add button but not Delete, so this is reachable from Cortex.
+
 `ctId` is **calibration**, and an installer has to be able to correct it, so it is left editable —
 the only editable non-permission field on any provisioned mesh point. The CT list is also reordered:
 the enum publishes `120_A` after `1200_A`, which reads as a defect on a picker an installer uses to
@@ -2308,6 +2322,15 @@ Add button, so there is no form to be empty. It was replaced with the rule that 
 provisioned locator never marks a field `required` that it also hides or disables, since a disabled
 control is left out of Angular's validation entirely and there is no Add path to seed a default from.
 The new version checks every provisioned type rather than one.
+
+**One of these ten layouts is probably dead today, and that is D127's third consequence.** Both
+mesh extender model types exist and are distinct — `MESH_EXTENDER_MESH_NODE.PL` and
+`MESH_EXTENDER.PL` — and the mapping registers on `fromClass()`. Since the provisioner builds a
+`MeshExtenderPointLocatorVO`, a provisioned mesh extender mesh node's points serialise as
+`MESH_EXTENDER.PL`, and Cortex keys the locator form on `pointLocator.modelType`. So those points
+open the mesh *device* form and `GATEWAY_FORM_LAYOUTS['MESH_EXTENDER_MESH_NODE.PL']` is never
+reached. The layout stays: it becomes correct the moment the gateway is fixed, and one unused entry
+costs nothing.
 
 **Two findings on the two types that do not create their points like the other eight**, filed as
 D126 and D127. `CreateStudentAssetTagMeshNodeVO` calls `setAttributeId` twice, the second time with

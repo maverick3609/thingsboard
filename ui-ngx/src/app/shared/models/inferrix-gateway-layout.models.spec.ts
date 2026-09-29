@@ -1542,8 +1542,15 @@ describe('gateway form layouts', () => {
     expect(GATEWAY_FORM_LAYOUTS['CURRENT_SENSOR.DS'].rows).toEqual([['address', 'location']]);
     const point = GATEWAY_FORM_LAYOUTS['CURRENT_SENSOR.PL'];
     // Sixteen attributes over two enums, both loaded into the one shared `ATTRIBUTE_CODES` table.
+    // These counts and orderings are regression guards over our own table, not proof against the
+    // gateway: nothing here can detect an attribute the enum has and we never transcribed.
     expect(point.options.attributeId.length).toBe(16);
     expect(point.options.attributeId.map(item => item.value)).toContain('TOTAL_POWER');
+    // The gateway answers FREQUENCY with `new Random().doubles(49.9, 50.1)`, so the label says so.
+    // Same treatment as `32_A`: the value stays because a point may hold it, the label stops it
+    // being read as a reading. D128.
+    expect(point.options.attributeId.find(item => item.value === 'FREQUENCY').label)
+      .toBe('Frequency (simulated)');
     // `ctId` scales every reading through `CTConversionUtil.ctConversionTable`, so it is the one
     // field an installer has to be able to correct. `phaseId` is routing and stays locked.
     expect(point.readonly).toEqual(['attributeId', 'dataType', 'phaseId']);

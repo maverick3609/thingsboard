@@ -1273,6 +1273,12 @@ const MOKO_BAND_ATTRIBUTES: FormSelectItem[] = [
  * the installation: the first eleven are per-phase, the last five are the whole supply. All sixteen
  * are NUMERIC.
  *
+ * **`FREQUENCY` is not a measurement.** `CurrentSensorDataSourceRT.updateCalculatedDataPoints`
+ * answers it with `new Random().doubles(49.9, 50.1).findFirst().orElse(50)` — a fresh random number
+ * every update, with no input from the device. It is labelled "Frequency (simulated)" for the same
+ * reason `32_A` is labelled unsupported: the gateway offers it, a provisioned point may already hold
+ * it, and the only thing a layout can do is stop it being read as a reading. **D128.**
+ *
  * The last five have no label in **any** bundle -- `dsEdit.inferrixSensors.currentSensor.attribute
  * .{totalPower,totalApparentPower,PF,KWH,frequency}` match zero properties files in the whole stack,
  * while the eleven per-phase keys are in both the English and French ones (D116). So the words below
@@ -1295,7 +1301,7 @@ const CURRENT_SENSOR_ATTRIBUTES: FormSelectItem[] = [
   {value: 'TOTAL_APPARENT_POWER', label: 'Total apparent power'},
   {value: 'PF', label: 'Power factor'},
   {value: 'KWH', label: 'Energy (kWh)'},
-  {value: 'FREQUENCY', label: 'Frequency'}
+  {value: 'FREQUENCY', label: 'Frequency (simulated)'}
 ];
 
 /**
@@ -2652,7 +2658,8 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     hints: {
       attributeId: 'What this point reads from the current sensor. The gateway creates one point '
         + 'per attribute and phase when the sensor joins the mesh, so there is nothing to choose '
-        + 'here.',
+        + 'here. Frequency is the exception to all of this: the gateway makes it up, returning a '
+        + 'random value between 49.9 and 50.1 rather than anything the device reported.',
       phaseId: 'Which phase this reading comes from, chosen when the point was provisioned. The '
         + 'last five attributes are whole-supply readings and belong on All phases; the gateway '
         + 'does not check the pairing, it just stops routing the reading.',

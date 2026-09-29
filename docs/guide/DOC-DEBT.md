@@ -58,3 +58,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `0e34efd130` feat(gateway): lay out system attributes, the last type the Add menu offers
 - [ ] `eada1f7d7c` feat(gateway): lay out the thermostat, and prove the mesh attribute table moves
 - [ ] `169c4ce882` fix(gateway): the Add menu is not complete, and a dead branch misread three ways
+- [ ] `951c0e94ca` fix(gateway): timerValue's two rules fail differently, and a title it had not earned

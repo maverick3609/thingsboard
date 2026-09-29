@@ -734,7 +734,18 @@ const NON_IMAGE_DATA_TYPES: FormSelectItem[] = [
  * `getStartValue`. The gateway's own webapp reaches the same conclusion from the other end -- its
  * `dataTypeChange` falls through to an empty attribute-type list for MULTISTATE, which is a data
  * type you cannot finish choosing. Dropping it here says so before the operator picks it.
- * Measured: MULTISTATE saves 201 either way (D107).
+ * Measured: MULTISTATE saves 201 either way, and so does IMAGE, which the published enum also
+ * carries and which has no runtime either (D107).
+ *
+ * **A point that already holds one of the two is not damaged by this, and not repairable either.**
+ * Narrowing `options` cannot rewrite a stored value: `clearIllegalGatedValues` iterates
+ * `gatedOptions` and never looks at `options`, and a gate value its table does not list returns
+ * early rather than clearing. So the value stays in the control, survives `getRawValue()` and saves
+ * back unchanged. What the operator sees is two blank boxes -- the data type has no matching item,
+ * and `attributeType`'s gate has no row for MULTISTATE or IMAGE, so it renders a select with
+ * nothing in it -- and no way to choose their way out. That is the honest cost of refusing to offer
+ * a type the gateway cannot run, and it is cosmetic: nothing is lost and nothing is silently
+ * changed.
  */
 const SYSTEM_ATTRIBUTE_DATA_TYPES: FormSelectItem[] =
   NON_IMAGE_DATA_TYPES.filter(item => item.value !== 'MULTISTATE');

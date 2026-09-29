@@ -52,3 +52,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `344b7b47d5` feat(gateway): lay out scripting, and bring sendEmpty back for a worse case
 - [ ] `5bbcfa7926` fix(gateway): pair every floor above zero with required, and admit the tsc check was not one
 - [ ] `6a5b11d825` fix(gateway): the blanket locator data-type rule is not blanket
+- [ ] `b64e505a4c` fix(gateway): send an empty script too, and make sendEmpty and defaults a pair

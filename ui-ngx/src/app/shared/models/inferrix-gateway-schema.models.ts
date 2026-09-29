@@ -292,6 +292,15 @@ export const schemaToFormProperties = (doc: GatewaySchemaDocument, family: strin
   // is in `DatapointService.validate`, the funnel every create and every update passes through, so
   // it is not a property of any one type and does not belong in a per-type layout. A form that let
   // the select stand empty would post null and collect a 422 for a field the operator can see.
+  //
+  // It is not universal, and an earlier version of this comment said it was. `locatorDataTypeIsDeclared`
+  // reads `vo.getPointLocator().getDataTypeId()` -- the VO *after* `toVO`, not the submitted JSON --
+  // so it can only fail where `toVO` maps the field through. Measured on 5.1.3: `SCRIPTING.PL` with
+  // no `dataType` is a 422 `Invalid value`, because its `toVO` sets what arrived; `PING.PL` with no
+  // `dataType` is a 201 reading back BINARY, because its `getDataTypeId()` is a hard constant and
+  // `toVO` never touches the field. `POE_LIGHTING.PL` is the same, deriving its type from
+  // `pointType`. The rule stays here rather than in 59 layouts; on the two that compute their own
+  // type it is inert, and both of those disable or hide the control anyway.
   return family === 'pointLocator'
     ? properties.map(property =>
         property.id === 'dataType' ? {...property, required: true} : property)

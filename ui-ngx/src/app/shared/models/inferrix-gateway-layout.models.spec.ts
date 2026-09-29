@@ -1410,18 +1410,20 @@ describe('gateway form layouts', () => {
     // PEOPLE_COUNT_CAMERA, and CURRENT_SENSOR outside this set). `readonly` is where the
     // provisioner calls `setSettable(attribute.isSettable())` over an enum that has `true` entries
     // but `toVO` drops the field on a fresh VO (D109). `editable` is where `toVO` copies it, which
-    // is `MODBUS_CONTROLLER` alone.
+    // is `MODBUS_CONTROLLER` and the two light controllers whose provisioner sets the flag from the
+    // attribute's own definition.
     const shown = (layout): string =>
       (layout.hidden ?? []).includes('settable') ? 'hidden'
         : (layout.readonly ?? []).includes('settable') ? 'readonly' : 'editable';
     const byMode: {[mode: string]: string[]} = {};
     meshPoints.forEach(([modelType, layout]) =>
       (byMode[shown(layout)] = byMode[shown(layout)] ?? []).push(modelType));
-    expect(byMode.editable).toEqual(['MODBUS_CONTROLLER.PL']);
+    expect(byMode.editable.sort()).toEqual(['LIGHT_CONTROLLER_V4.PL', 'LIGHT_RELAY_CONTROLLER.PL',
+      'MODBUS_CONTROLLER.PL']);
     expect(byMode.readonly.sort()).toEqual(['4DI_2DO_CARD.PL', 'PEOPLE_COUNTER.PL',
       'THERMOSTAT.PL', 'VAV_CONTROLLER.PL']);
-    expect(byMode.hidden.length).toBe(21);
-    expect(byMode.hidden.length + byMode.readonly.length + byMode.editable.length).toBe(26);
+    expect(byMode.hidden.length).toBe(23);
+    expect(byMode.hidden.length + byMode.readonly.length + byMode.editable.length).toBe(30);
     // A flag that is hidden is never also read-only, and one that is shown always carries a hint
     // saying who decides it.
     meshPoints.forEach(([modelType, layout]) => {
@@ -1450,9 +1452,10 @@ describe('gateway form layouts', () => {
     });
   });
 
-  it('carries the four attribute names that are not their constant names', () => {
+  it('carries the five attribute names that are not their constant names', () => {
     // The code table is built from `attributeName`; `GET /v2/export-code/sensors/*` publishes
-    // `Enum::name`. Four of the 114 differ, and two of the four have spaces in them. D115.
+    // `Enum::name`. Five of the 135 differ, two of the five have spaces in them, and the fifth
+    // collides with a name other types use for something else. D115, widened by D121.
     const values = (modelType: string): string[] =>
       GATEWAY_FORM_LAYOUTS[modelType].options.attributeId.map(item => item.value);
     expect(values('THERMOSTAT.PL')).toContain('ENERGY_SAVING_MODE');
@@ -1468,6 +1471,34 @@ describe('gateway form layouts', () => {
     const card = GATEWAY_FORM_LAYOUTS['4DI_2DO_CARD.PL'].options.attributeId;
     expect(card.map(item => item.value)).toContain('D01_STATUS');
     expect(card.find(item => item.value === 'D01_STATUS').label).toBe('DO1 status');
+    // The relay controller's dim value goes on the wire as `STATUS` (D121), and its DI status is
+    // labelled ours rather than the gateway's, because the gateway gives it the lux value's key and
+    // two identical entries in one picker is worse than one deviation (D122).
+    const relay = GATEWAY_FORM_LAYOUTS['LIGHT_RELAY_CONTROLLER.PL'].options.attributeId;
+    expect(relay.map(item => item.value)).toContain('STATUS');
+    expect(relay.map(item => item.value)).not.toContain('DIM_VALUE');
+    expect(relay.find(item => item.value === 'STATUS').label).toBe('Dim value');
+    expect(new Set(relay.map(item => item.label)).size).toBe(relay.length);
+    // The V4 list is the seven its locator VO's table actually holds, not the eleven a 2.0 node
+    // reports: measured, everything outside the seven is a 422. D123.
+    const v4 = GATEWAY_FORM_LAYOUTS['LIGHT_CONTROLLER_V4.PL'].options.attributeId;
+    expect(v4.length).toBe(7);
+    expect(v4.map(item => item.value)).not.toContain('BURN_HOURS');
+  });
+
+  it('gives the four light controller sources the mesh shape plus a poll period', () => {
+    ['LIGHT_CONTROLLER_V4', 'LIGHT_DI_CONTROLLER', 'LIGHT_RELAY_CONTROLLER', 'MOKO_BAND']
+      .forEach(type => {
+        const layout = GATEWAY_FORM_LAYOUTS[`${type}.DS`];
+        expect(layout.provisionedPoints).withContext(type).toBe(true);
+        expect(layout.readonly).withContext(type).toEqual(['address']);
+        // The poll period is pinned under the address row; `quantize` and `anchorNode` are left to
+        // the mapper, both being checkboxes.
+        expect(layout.rows).withContext(type).toEqual([['address', 'location'], ['timePeriod']]);
+        expect(layout.hints.timePeriod).withContext(type).toBeTruthy();
+        // No default and no floor: the mapper already seeds every `timePeriod` with five minutes.
+        expect(layout.defaults).withContext(type).toBeUndefined();
+      });
   });
 
   it('gives every mesh attribute a value and a label, and no duplicates', () => {
@@ -1483,9 +1514,10 @@ describe('gateway form layouts', () => {
       });
       expect(new Set(items.map(item => item.value)).size).withContext(modelType).toBe(items.length);
     });
-    // 104 across the 24 batched, plus the thermostat's 9 and the mesh controller's 1. The current
-    // sensor's 16 are counted by its own spec below, because its point form is not this one.
-    expect(total).toBe(114);
+    // 104 across the 24 mesh devices, the thermostat's 9, the mesh controller's 1, and the four
+    // light controllers' 7 + 2 + 8 + 4. The current sensor's 16 are counted by its own spec below,
+    // because its point form is not this one.
+    expect(total).toBe(135);
   });
 
   it('gives the current sensor the family source and a point form of its own', () => {

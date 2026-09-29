@@ -261,7 +261,7 @@ consulted.
 | 19 | the 24 remaining mesh device types | their locators | **done** — 2026-09-30; batched at the user's direction; **D115-D117** filed and D109 widened; needs an on-screen pass |
 | 19a | `CURRENT_SENSOR` | `CURRENT_SENSOR.PL` | **done** — 2026-09-30; the 27th member of the mesh family, added after the row-19 review; family source, own point form (`phaseId`, `ctId`); needs an on-screen pass |
 | 20 | the 9 `*_MESH_NODE` types | their locators | **done** — 2026-09-30; one batch of ten with `VIRTUAL_MESH_NODE`, which was refactored into it; reverses row 12's read-only `settable`; needs an on-screen pass |
-| 21 | the 4 light controllers | their locators | planned — `LIGHT_CONTROLLER_V4`, `LIGHT_DI_CONTROLLER`, `LIGHT_RELAY_CONTROLLER`, `MOKO_BAND`; the mesh-device shape plus `quantize`/`timePeriod` |
+| 21 | the 4 light controllers | their locators | **done** — 2026-09-30; the mesh-device point form exactly, over a source with a poll period; **D121-D124** filed, two of them P1/P2 on the gateway's own provisioning; needs an on-screen pass |
 | 22 | the 3 asset tags | their locators | planned — `ASSET_TRACKING_BAND`, `LED_ASSET_TAG`, `STUDENT_ASSET_TAG`; `address` alone |
 | 23 | the 2 Modbus slave shapes | their locators | planned — `MODBUS_SLAVE_DEVICE` and `…_POLLING`, which is the same three fields plus the polling pair |
 | 24 | `VIRTUAL_SWITCH.DS` | `VIRTUAL_SWITCH.PL` | planned — the one type left in a shape of its own |
@@ -2263,6 +2263,55 @@ which is why it stays hidden.
 
 *Verified:* 132 layout, 41 schema, 14 form and 17 service specs green, and
 `tsc -p src/tsconfig.app.json` exit 0. The on-screen pass is owed with rows 6–19a.
+
+### 21 — the four light controllers (done, 2026-09-30)
+
+`LIGHT_CONTROLLER_V4`, `LIGHT_DI_CONTROLLER`, `LIGHT_RELAY_CONTROLLER` and `MOKO_BAND`. The band is a
+wristband rather than a light, but it is commissioned by the same light-commissioning run and
+publishes the same two schemas, so it belongs in the row.
+
+The point form is the mesh device family's exactly, so `meshDevicePoint` serves all four unchanged.
+The source is the mesh device shape plus `quantize` and `timePeriod`, so `lightControllerSource`
+reuses `meshDeviceSource` and pins the poll period under the address row. Neither polling field needs
+anything else: the mapper already seeds every `timePeriod` with five minutes, and `quantize` carries a
+schema description it renders as a hint.
+
+**Two of the four are the first `editable` dispositions outside `MODBUS_CONTROLLER`.**
+`LightControllerV4PointLocatorVO` and `LightRelayControllerPointLocatorVO` both inherit the honest
+accessor, both models' `toVO` copies `settable`, and both `Create*VO` set it from the attribute's own
+definition. The other two override `isSettable()` to a hard `false`.
+
+**Four findings, all the gateway's, all filed and all measured.**
+
+- **D121 (P2)** — `RelayControllerAttributes.DIM_VALUE` declares `attributeName` `"STATUS"`. A fifth
+  instance of D115, and the worst, because `STATUS` is a real attribute name on the thermostat and
+  several sensor tags. Measured: `STATUS` is a 201 whose `configurationDescription` reads *"Dim
+  Value"*; `DIM_VALUE` is a 422. Our list carries `STATUS` as the value under the label "Dim value".
+- **D122 (P3)** — `RelayControllerAttributes.DI_STATUS` points at the *lux value's* translation key,
+  so the gateway labels two different attributes "Lux Value". Measured: a `DI_STATUS` point reads
+  back `configurationDescription: "Lux Value"`. Ours says "DI status" — the one place in the file
+  where our label is deliberately not the gateway's, because two identical entries in one picker is
+  worse than one deviation.
+- **D123 (P1)** — a V4 node's attributes depend on its firmware: `LedControllerVersionHandler
+  Definition` picks one of three enums (7, 8 or 11 attributes), while the locator VO's static
+  initialiser loads only the first. So the gateway provisions points its own validator refuses.
+  Measured: `DIM_VALUE` 201, `PIR_TRIGGER_COUNT` / `SWITCH_STATUS` / `BURN_HOURS` each 422. The ids
+  collide too — `PIR_TRIGGER_COUNT` is 8 in the 1.3 enum and 9 in the 2.0 one, where 8 is
+  `SWITCH_STATUS` — so a firmware upgrade silently re-points stored points. Our list is the seven
+  that work; a point provisioned on newer firmware renders with an empty attribute box, which is the
+  gateway's gap showing through rather than ours.
+- **D124 (P2)** — `LightControllerV4PointLocatorVO.isSettable()` answers `super.isSettable() ||
+  DIM_VALUE.isSettable()` for the dim value, and the right-hand side is a constant `true`. Measured:
+  POSTing `settable: false` on a `DIM_VALUE` point reads back `true`. The field stays editable,
+  because it is a real choice for the other six, and the hint says the dim value is writable whatever
+  the box shows.
+
+*Measured against 5.1.3, every probe row deleted:* all four sources POST 201 with the five fields;
+`LIGHT_RELAY_CONTROLLER` with `settable: true` reads back **true**, `LIGHT_DI_CONTROLLER` and
+`MOKO_BAND` read back **false** — which is the disposition rule holding on the wire.
+
+*Verified:* 133 layout, 41 schema, 14 form and 17 service specs green, and
+`tsc -p src/tsconfig.app.json` exit 0. The on-screen pass is owed with rows 6–20.
 
 ## Per-type components
 

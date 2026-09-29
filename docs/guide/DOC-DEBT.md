@@ -64,3 +64,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `d54333675d` fix(gateway): the mesh family is 26 types, not 24, and seven thermostat attributes are settable
 - [ ] `e9f611fa6f` fix(gateway): our own save erases settable, and nine smaller corrections
 - [ ] `dbdf604258` feat(gateway): add the current sensor, and read settable from the provisioner too
+- [ ] `0ba773d9de` feat(gateway): lay out the ten mirrored mesh nodes, and let one be written to

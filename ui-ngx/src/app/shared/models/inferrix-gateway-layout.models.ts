@@ -784,6 +784,31 @@ const meshDeviceSource = (device: string): GatewayFormLayout => ({
 });
 
 /**
+ * The four light controller sources: the mesh device shape plus a poll period.
+ *
+ * `LIGHT_CONTROLLER_V4`, `LIGHT_DI_CONTROLLER`, `LIGHT_RELAY_CONTROLLER` and `MOKO_BAND` declare
+ * `quantize` and `timePeriod` over the family's three, so they reuse {@link meshDeviceSource} and
+ * pin the poll period under the address row rather than letting the schema's order scatter it.
+ *
+ * Neither polling field needs an option list or a default: the mapper already seeds `timePeriod`
+ * with five minutes for any model that declares it, and `quantize` carries a schema description the
+ * mapper renders as its own hint. `quantize` is left to the mapper's order for the reason
+ * `anchorNode` is -- it is a checkbox, and pairing one with a composite control puts a control and
+ * its label on two different baselines.
+ */
+const lightControllerSource = (device: string): GatewayFormLayout => {
+  const base = meshDeviceSource(device);
+  return {
+    ...base,
+    hints: {
+      ...base.hints,
+      timePeriod: `How often the gateway polls this ${device} for the attributes it did not push.`
+    },
+    rows: [['address', 'location'], ['timePeriod']]
+  };
+};
+
+/**
  * The point form those same devices share: one attribute of the device, provisioned when it joins.
  *
  * `attributeId` and `dataType` are read-only on every one of them, because the mesh chooses both.
@@ -796,18 +821,24 @@ const meshDeviceSource = (device: string): GatewayFormLayout => ({
  * not whether the VO overrides `isSettable()` -- that is only half the story -- but whether the
  * flag can ever hold anything but `false`, which takes both the VO **and** the provisioner:
  *
- * - **`hidden`** (22 of the 27) -- the flag is `false` and stays `false`, so a checkbox would be a
- *   lie. Nineteen get there by overriding `isSettable()` to a hard `false`. The other three --
- *   MESH_CONTROLLER, PEOPLE_COUNT_CAMERA, CURRENT_SENSOR -- inherit the honest accessor but their
- *   attribute enums carry no settable flag at all and their `Create*VO` never calls `setSettable`,
- *   so nothing on the gateway has a `true` to put there.
+ * - **`hidden`** -- the flag is `false` and stays `false`, so a checkbox would be a lie. Most get
+ *   there by overriding `isSettable()` to a hard `false`. Five inherit the honest accessor instead
+ *   but their attribute enums carry no settable flag at all and their `Create*VO` never calls
+ *   `setSettable`, so nothing on the gateway has a `true` to put there: MESH_CONTROLLER,
+ *   PEOPLE_COUNT_CAMERA, CURRENT_SENSOR, LIGHT_DI_CONTROLLER and MOKO_BAND -- of which the last two
+ *   do override to a hard `false` as well.
  * - **`readonly`** (4DI_2DO_CARD, PEOPLE_COUNTER, THERMOSTAT, VAV_CONTROLLER) -- the provisioner
  *   calls `locatorVO.setSettable(attribute.isSettable())` and the enum has entries that answer
  *   `true` (the card's two digital outputs, the counter's `RESET`, four thermostat attributes, the
  *   VAV's two analogue outputs). The flag is real and worth reading; the platform cannot change it,
  *   because `toVO` builds a fresh VO and copies `attributeId` and `dataType` alone, so a REST write
  *   erases it (**D109**).
- * - **`editable`** (MODBUS_CONTROLLER alone) -- `toVO` copies `settable`, so it is a real choice.
+ * - **`editable`** (MODBUS_CONTROLLER, LIGHT_CONTROLLER_V4, LIGHT_RELAY_CONTROLLER) -- `toVO`
+ *   copies `settable`, so it is a real choice. On `LIGHT_CONTROLLER_V4` it is a real choice for six
+ *   of its seven attributes: `LightControllerV4PointLocatorVO.isSettable()` answers
+ *   `super.isSettable() || DIM_VALUE.isSettable()` for the dim value, and the right-hand side is a
+ *   constant `true`, so that one attribute is writable whatever the box says. Measured: POSTing
+ *   `settable: false` on a `DIM_VALUE` point reads back `true`. **D124**, and the hint says so.
  *
  * D109's erase is six types wide by construction -- the four above plus MESH_CONTROLLER and
  * PEOPLE_COUNT_CAMERA, which inherit the same accessor -- but it only loses information on the
@@ -1129,6 +1160,61 @@ const WATER_LEAKAGE_DETECTOR_ATTRIBUTES: FormSelectItem[] = [
   {value: 'HEARTBEAT', label: 'Heartbeat'},
   {value: 'BATTERY', label: 'Battery'},
   {value: 'LEAKAGE', label: 'Leakage'}
+];
+
+/**
+ * The four light controller attribute lists.
+ *
+ * Two of them carry a deviation, and both are the gateway's doing rather than a choice:
+ *
+ * - **`LIGHT_RELAY_CONTROLLER`'s dim value goes on the wire as `STATUS`.**
+ *   `RelayControllerAttributes.DIM_VALUE` declares `attributeName` `"STATUS"`, so that is the only
+ *   value the REST path takes -- a fifth instance of D115 and the worst of them, because `STATUS` is
+ *   a real attribute name on the thermostat and several sensor tags too. **D121.**
+ * - **`DI_STATUS` is labelled "DI status" rather than the gateway's "Lux Value".** That constant
+ *   points at `dsEdit.inferrixSensors.attribute.iws.luxValue`, the key the *lux value* already uses,
+ *   so repeating the gateway's word here would put two identical entries in one picker with no way
+ *   to tell which is the digital input. The one place in this file where our label is deliberately
+ *   not the gateway's. **D122.**
+ *
+ * `LIGHT_CONTROLLER_V4` carries a third, which is a narrowing rather than a rename: the list is the
+ * **seven** of `LedControllerV4Attributes`, although a node on 1.3 firmware reports eight and one on
+ * 2.0 reports eleven. `LightControllerV4PointLocatorVO`'s static initialiser loads only the first
+ * enum, so `validate` refuses the rest -- measured, `PIR_TRIGGER_COUNT`, `SWITCH_STATUS` and
+ * `BURN_HOURS` are each a 422. A point provisioned on newer firmware renders with an empty attribute
+ * box; the alternative is four entries that are guaranteed 422s. **D123.**
+ */
+const LIGHT_CONTROLLER_V4_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'DIM_VALUE', label: 'Dim value'},
+  {value: 'PIR_CONNECTED', label: 'PIR connected'},
+  {value: 'PIR_ACTIVATED', label: 'PIR activated'},
+  {value: 'LAST_COMMAND', label: 'Last command'},
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'LUX_BATTERY', label: 'Lux sensor battery'},
+  {value: 'LUX_VALUE', label: 'Lux value'}
+];
+
+const LIGHT_DI_CONTROLLER_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'LAST_COMMAND', label: 'Last command'},
+  {value: 'HEARTBEAT', label: 'Heartbeat'}
+];
+
+const LIGHT_RELAY_CONTROLLER_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'STATUS', label: 'Dim value'},
+  {value: 'PIR_CONNECTED', label: 'PIR connected'},
+  {value: 'PIR_ACTIVATED', label: 'PIR activated'},
+  {value: 'LAST_COMMAND', label: 'Last command'},
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'LUX_BATTERY', label: 'Lux sensor battery'},
+  {value: 'LUX_VALUE', label: 'Lux value'},
+  {value: 'DI_STATUS', label: 'DI status'}
+];
+
+const MOKO_BAND_ATTRIBUTES: FormSelectItem[] = [
+  {value: 'HEARTBEAT', label: 'Heartbeat'},
+  {value: 'BROADCASTING_ENABLED', label: 'Broadcast enabled'},
+  {value: 'CHARGING', label: 'Charging status'},
+  {value: 'BATTERY', label: 'Battery status'}
 ];
 
 /**
@@ -2554,6 +2640,28 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
   'VAV_CONTROLLER.PL': meshDevicePoint(VAV_CONTROLLER_ATTRIBUTES, 'VAV controller', 'readonly'),
   'WATER_LEAKAGE_DETECTOR.DS': meshDeviceSource('leak detector'),
   'WATER_LEAKAGE_DETECTOR.PL': meshDevicePoint(WATER_LEAKAGE_DETECTOR_ATTRIBUTES, 'leak detector', 'hidden'),
+
+  /**
+   * The four light controllers: the mesh device point form exactly, over a source that adds a poll
+   * period. `MOKO_BAND` is a wristband rather than a light, but it is commissioned by the same
+   * light-commissioning run and publishes the same two schemas, so it belongs in this row.
+   *
+   * `LIGHT_CONTROLLER_V4` and `LIGHT_RELAY_CONTROLLER` are the first two `editable` dispositions
+   * outside `MODBUS_CONTROLLER`: both `toVO` methods copy `settable` and both `Create*VO` set it
+   * from the attribute's own definition, so the flag is a real choice rather than a display. The
+   * other two override `isSettable()` to a hard `false`.
+   */
+  'LIGHT_CONTROLLER_V4.DS': lightControllerSource('light controller'),
+  'LIGHT_CONTROLLER_V4.PL':
+    meshDevicePoint(LIGHT_CONTROLLER_V4_ATTRIBUTES, 'light controller', 'editable'),
+  'LIGHT_DI_CONTROLLER.DS': lightControllerSource('DI controller'),
+  'LIGHT_DI_CONTROLLER.PL':
+    meshDevicePoint(LIGHT_DI_CONTROLLER_ATTRIBUTES, 'DI controller', 'hidden'),
+  'LIGHT_RELAY_CONTROLLER.DS': lightControllerSource('relay controller'),
+  'LIGHT_RELAY_CONTROLLER.PL':
+    meshDevicePoint(LIGHT_RELAY_CONTROLLER_ATTRIBUTES, 'relay controller', 'editable'),
+  'MOKO_BAND.DS': lightControllerSource('wristband'),
+  'MOKO_BAND.PL': meshDevicePoint(MOKO_BAND_ATTRIBUTES, 'wristband', 'hidden'),
 
   /**
    * One value the platform holds, as a point.

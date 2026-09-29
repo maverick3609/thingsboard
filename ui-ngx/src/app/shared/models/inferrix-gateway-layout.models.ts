@@ -978,11 +978,12 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
       privPassphrase: {by: 'snmpVersion', values: ['v3']}
     },
     hints: {
-      authPassphrase: 'Required once an authentication protocol other than None is chosen. Leave it '
-        + 'empty on an edit to keep the stored one — the gateway never sends a passphrase back, so an '
-        + 'empty box means unchanged, not cleared.',
+      authPassphrase: 'Required once an authentication protocol other than None is chosen. The gateway '
+        + 'never sends a passphrase back, so an empty box means unchanged rather than cleared — it '
+        + 'restores whatever it already holds, and there is no way to blank a stored one. To stop '
+        + 'using it, set the protocol back to None.',
       privPassphrase: 'Required once a privacy protocol other than None is chosen. Empty means '
-        + 'unchanged on an edit, as above.'
+        + 'unchanged, as above; set the protocol to None to stop using it.'
     },
     defaults: {snmpVersion: 'v2c', port: 161, trapPort: 162, timeout: 1000, retries: 2,
       authProtocol: 'NONE', privProtocol: 'NONE'},
@@ -1272,11 +1273,15 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * `timeFormat` is only consulted when the timestamp node is textual: a `long` is taken as epoch
    * millis whatever is in here, and a textual node with no format is a parse event rather than a value.
    *
-   * `dataType` is seeded because nothing validates it on this locator -- an absent one stores `-1` and
-   * reads back `null`, the **D65** silence -- and `settable`, `relinquishable` and `ignoreIfMissing`
-   * are hidden because no code reads any of them. `isSettable()` is a hard `false`, `toVO` never looks
-   * at `relinquishable`, and `ignoreIfMissing` is stored, serialised, mapped and then read by nothing
-   * at all: the missing-value branch it documents raises the parse event either way (**D77**).
+   * `dataType` is seeded because an absent one used to store `-1` and read back `null` -- the **D65**
+   * silence, now a 422 instead, which is why the mapper requires it on every locator and a seed is what
+   * keeps that refusal from being the operator's introduction to the rule.
+   *
+   * Only `relinquishable` is still hidden for the reason all three once were: `toVO` never looks at it.
+   * `settable` and `ignoreIfMissing` were the same kind of dead field until stack 5.1.3 --
+   * `isSettable()` was a hard `false`, and `ignoreIfMissing` was stored, serialised, mapped and read by
+   * nothing, with the missing-value branch it documents raising the parse event either way. **D76** and
+   * **D77** made both live, so both are shown.
    */
   'HTTP_JSON_RETRIEVER.PL': {
     hidden: ['relinquishable', 'configurationDescription'],

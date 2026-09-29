@@ -1407,6 +1407,14 @@ would have made a stored one impossible to clear. Measured on 5.1.3: `bearerToke
 blank** — so an empty box means unchanged, as it does for the other three credentials on this
 gateway. The third Open decision below is settled by that, not by us.
 
+What the change is **not** is pure gain, and the first draft of this section read as if it were. A
+`password`-typed field has its empty value dropped on an edit as well as an add, so a stored bearer
+token can no longer be cleared from Cortex — and not from the gateway either: `SecretFields.merge`
+restores the stored value for null **or blank**, on every write, by design. The textarea did allow
+clearing. The way to stop a token being used is `bearerAuth: false`, which leaves it stored and
+unused; the same is true of the two SNMP passphrases and their protocols, and both hints now say so.
+Losing that is worth the masking and the D79 fix it comes with, but it is a loss.
+
 **`SNMP.DS` lost its `sendEmpty` workaround.** Row 8 had to send `contextName: ""` while omitting
 `engineId`, because the two refused opposite things. D69 made absent and blank both mean "not set"
 on both fields — measured 201 with the pair omitted and 201 with both `""`. The two passphrases

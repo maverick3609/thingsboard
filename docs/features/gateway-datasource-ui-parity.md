@@ -260,7 +260,7 @@ consulted.
 | 18 | `THERMOSTAT.DS` | `THERMOSTAT.PL` | **done** — 2026-09-29; **D108-D113** filed, D108 a P1 general to all 34 mesh locator types that supersedes D90; needs an on-screen pass |
 | 19 | the 24 remaining mesh device types | their locators | **done** — 2026-09-30; batched at the user's direction; **D115-D117** filed and D109 widened; needs an on-screen pass |
 | 19a | `CURRENT_SENSOR` | `CURRENT_SENSOR.PL` | **done** — 2026-09-30; the 27th member of the mesh family, added after the row-19 review; family source, own point form (`phaseId`, `ctId`); needs an on-screen pass |
-| 20 | the 9 `*_MESH_NODE` types | their locators | **done** — 2026-09-30; one batch of ten with `VIRTUAL_MESH_NODE`, which was refactored into it; reverses row 12's read-only `settable`; needs an on-screen pass |
+| 20 | the 9 `*_MESH_NODE` types | their locators | **done** — 2026-09-30; one batch of ten with `VIRTUAL_MESH_NODE`, which was refactored into it; **D126-D127** filed; its attempted reversal of row 12 was withdrawn the same day; needs an on-screen pass |
 | 21 | the 4 light controllers | their locators | **done** — 2026-09-30; the mesh-device point form exactly, over a source with a poll period; **D121-D124** filed, two of them P1/P2 on the gateway's own provisioning; needs an on-screen pass |
 | 22 | the 3 asset tags | their locators | planned — `ASSET_TRACKING_BAND`, `LED_ASSET_TAG`, `STUDENT_ASSET_TAG`; `address` alone |
 | 23 | the 2 Modbus slave shapes | their locators | planned — `MODBUS_SLAVE_DEVICE` and `…_POLLING`, which is the same three fields plus the polling pair |
@@ -2275,33 +2275,56 @@ and paired on one row because they are one fact.
 hid two members of the mesh device family until the row-18 review. Checked from the Java, not by
 name, as that review required.
 
-**This row reverses a row-12 decision.** `VIRTUAL_MESH_NODE.PL` had `settable` read-only, on the
-reasoning that the radio decides it. The Java says otherwise on all ten: every
-`*MeshNodePointLocatorModel.toVO` copies `settable`, and `MeshControllerNodesDataSourceRT
-.setPointValue` is a real write path — it builds a mesh command from the locator's `type`, sends it
-to `CONTROLLER_CONTROL_COMMANDS` with confirmation, retries three times with exponential backoff, and
-commits the value locally only once the controller answers. Meanwhile every `Create*MeshNode*VO`
-hardcodes `setSettable(false)`. So if this form cannot change the flag, nothing can, and a mirrored
-point stays unwritable for the life of the install even where the far side would accept the write. It
-is now editable, with a hint saying the far side still has to accept it.
+**This row tried to reverse a row-12 decision and was wrong. The reversal is withdrawn.**
 
-That reversal also took a spec with it. *"Gives a provisioned source nothing for an operator to fill
-in"* asserted that a provisioned locator has **no** editable field, reasoning that an Add form would
-otherwise take no input. The rule was already false when it was written — `MODBUS_CONTROLLER.PL`
-leaves `settable` editable and its source is provisioned — and it is the wrong rule anyway, because
-`provisionedPoints` removes the Add button, so there is no form to be empty. It was replaced with the
-rule that actually has to hold: a provisioned locator never marks a field `required` that it also
-hides or disables, since a disabled control is left out of Angular's validation entirely and there is
-no Add path to seed a default from. The new version checks every provisioned type rather than one.
+The attempt: `VIRTUAL_MESH_NODE.PL` had `settable` read-only on the reasoning that the radio decides
+it, and row 20 made it editable, arguing that every `Create*MeshNode*VO` hardcodes
+`setSettable(false)`, so if this form could not change the flag nothing could.
+
+**That argument was false, and the row-20 review took it apart.** The `Create*VO` path creates only
+the heartbeat point. The mirrored points are created by the *runtime*, and eight of the ten RTs
+override `createDataPoint` with `locatorVO.setSettable(data.isSettable())` — the radio deciding it,
+which is exactly what row 12 said. Measured: of 57 live `*_MESH_NODE.PL` points, **18 carry
+`settable: true`**, and every one is a digital output. "A DO is writable because it is a DO" was
+right.
+
+**Editable was destructive as well as wrong.** The dialog posts the whole `pointLocator` and `toVO`
+copies the field, so a save with the box unticked overwrites a flag the radio set. Measured on a
+probe point: `PUT` with `settable: false` on a point reading back `true` answers **200** and reads
+back **false**, permanently — `MeshControllerNodesDataSourceRT.dataPointDoseNotExist` only re-creates
+an `attributeId` with no point at all, so nothing restores it. And the flag is not only a UI gate:
+`BACnetPublishedPoint.getObjectType(dataTypeId, isSettable)` picks the BACnet object type the gateway
+republishes to third-party BMS clients from it, and `CpmUtility` and `ScriptDataSourceRT` gate
+scripted writes on it. One mis-tick would have changed what a third-party BMS sees.
+
+`settable` is read-only again, shown rather than hidden because the flag is worth reading, with a
+hint naming the radio as its source and the BACnet republish as its other consumer.
+
+What the reversal correctly took with it, and which stays: the spec *"gives a provisioned source
+nothing for an operator to fill in"* asserted that a provisioned locator has **no** editable field.
+That rule was already false when it was written — `MODBUS_CONTROLLER.PL` leaves `settable` editable
+on a provisioned source — and it is the wrong rule anyway, because `provisionedPoints` removes the
+Add button, so there is no form to be empty. It was replaced with the rule that does have to hold: a
+provisioned locator never marks a field `required` that it also hides or disables, since a disabled
+control is left out of Angular's validation entirely and there is no Add path to seed a default from.
+The new version checks every provisioned type rather than one.
+
+**Two findings on the two types that do not create their points like the other eight**, filed as
+D126 and D127. `CreateStudentAssetTagMeshNodeVO` calls `setAttributeId` twice, the second time with
+`attribute.getType().getDataTypeId()` — a data type id — so every student asset tag mesh node point
+is stored under the wrong attribute id; it also never sets `type`, which is a non-null contract on
+that locator. `CreateMeshExtenderMeshNodeDataSourceVO` builds a `MeshExtenderPointLocatorVO`, the
+mesh *device* locator, onto a mesh *node* source.
 
 *Measured against 5.1.3, every probe row deleted:* the source POSTs 201 with `controllerAddress` and
 `publisherId` alone; `publisherId: 0` is a **422** naming `publisherId`, as `validate` says; a point
 with `settable: true` saves and reads back **true**, and a `PUT` preserves it — which is what
-distinguishes this family from the mesh device family, where the same field reads back false.
+distinguishes this family from the mesh device family, where the same field reads back false, and
+which is also why an editable checkbox here was dangerous rather than merely useless.
 `configurationDescription` reads back `"Unknown"` for an attribute id the gateway has no name for,
 which is why it stays hidden.
 
-*Verified:* 132 layout, 41 schema, 14 form and 17 service specs green, and
+*Verified:* 133 layout, 41 schema, 14 form and 17 service specs green, and
 `tsc -p src/tsconfig.app.json` exit 0. The on-screen pass is owed with rows 6–19a.
 
 ### 21 — the four light controllers (done, 2026-09-30)

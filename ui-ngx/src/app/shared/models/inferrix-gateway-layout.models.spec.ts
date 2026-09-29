@@ -134,21 +134,29 @@ describe('gateway form layouts', () => {
     'META_MESH_NODE', 'MODBUS_MESH_NODE', 'POE_LIGHTING_MESH_NODE', 'SNMP_MESH_NODE',
     'STUDENT_ASSET_TAG_MESH_NODE', 'VIRTUAL_MESH_NODE'];
 
-  it('locks the three fields a mesh node reports and leaves settable open', () => {
+  it('locks all four fields a mesh node reports, settable included', () => {
     // `attributeId` and `type` are the node's own attribute and its wire encoding, `dataType` is how
     // the gateway stores it. A node reports all three; it does not take them.
     //
-    // `settable` is the exception, and it is a reversal of row 12. Every one of the ten
-    // `*MeshNodePointLocatorModel.toVO` copies it, and
-    // `MeshControllerNodesDataSourceRT.setPointValue` is a real write path -- a confirmed mesh
-    // command built from the locator's `type`, retried three times, committed locally only on the
-    // controller's answer. Every `Create*MeshNode*VO` hardcodes `setSettable(false)`, so if this
-    // form cannot change it, nothing can.
+    // `settable` is the fourth, and row 20 briefly got this wrong by making it editable. The
+    // argument was that every `Create*MeshNode*VO` hardcodes `setSettable(false)`, so nothing else
+    // could turn it on -- but that path creates only the heartbeat point. The mirrored points come
+    // from the runtime, and eight of the ten RTs call `locatorVO.setSettable(data.isSettable())`,
+    // which is the radio deciding it. Measured: 18 of the 57 live `*_MESH_NODE.PL` points carry
+    // `settable: true`, every one a digital output.
+    //
+    // Editable was destructive as well as wrong: the dialog posts the whole locator and `toVO`
+    // copies the field, so a `PUT` with `false` permanently clobbers a `true` the radio set --
+    // measured 200, reads back false, and nothing re-creates a point that still exists. Read-only
+    // round-trips the stored value instead. The flag also picks the BACnet object type the gateway
+    // republishes to third-party clients, so the blast radius is wider than this form.
     meshNodeTypes.forEach(type => {
       const point = GATEWAY_FORM_LAYOUTS[`${type}.PL`];
-      expect(point.readonly).withContext(type).toEqual(['attributeId', 'dataType', 'type']);
-      expect(point.readonly).withContext(type).not.toContain('settable');
+      expect(point.readonly).withContext(type)
+        .toEqual(['attributeId', 'dataType', 'type', 'settable']);
       expect(point.hidden).withContext(type).toContain('relinquishable');
+      // Shown, because the flag is worth reading; explained, because a disabled box needs a reason.
+      expect(point.hidden).withContext(type).not.toContain('settable');
       expect(point.hints.settable).withContext(type).toBeTruthy();
     });
   });

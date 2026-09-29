@@ -918,16 +918,38 @@ const meshNodeSource = (protocol: string): GatewayFormLayout => ({
  * it. A mesh node does not take a new value for any of the three -- it reports them -- so all three
  * are shown and none is editable, which is what the gateway's own form does.
  *
- * **`settable` is editable, and this is a change.** Row 12 made it read-only on
- * `VIRTUAL_MESH_NODE.PL`, reasoning that the radio decides it. The Java says otherwise on all ten:
- * every `*MeshNodePointLocatorModel.toVO` copies `settable`, and
- * `MeshControllerNodesDataSourceRT.setPointValue` is a real write path -- it builds a mesh command
- * from the locator's `type`, sends it to `CONTROLLER_CONTROL_COMMANDS` with confirmation, retries
- * three times with exponential backoff, and commits the value locally only once the controller
- * answers. Meanwhile every `Create*MeshNode*VO` hardcodes `setSettable(false)`, so if the platform
- * cannot change it, nothing can, and a mirrored point is read-only for the life of the install even
- * where the far side would accept a write. `DataPointDao` writes `getPointLocator().isSettable()`
- * over the point's own, so the flag here is the live copy.
+ * **`settable` is read-only with them, and that is row 12's position, restored.** Row 20 made it
+ * editable on the argument that every `Create*MeshNode*VO` hardcodes `setSettable(false)`, so that
+ * if this form could not change the flag nothing could. That argument was wrong, and the row-20
+ * review took it apart: the `Create*VO` path creates only the heartbeat point. **The mirrored points
+ * are created by the runtime**, and eight of the ten RTs override `createDataPoint` with
+ *
+ * ```java
+ * locatorVO.setType(AttributeDataType.getDataTypes(data.getTypeId()));
+ * locatorVO.setSettable(data.isSettable());
+ * ```
+ *
+ * `data.isSettable()` is the radio deciding it, which is exactly what row 12 said. Measured on the
+ * live gateway: of 57 `*_MESH_NODE.PL` points, **18 carry `settable: true`**, and every one is a
+ * digital output -- "DO 2 - Status", "DO 3 - Status", and so on. A DO is writable because it is a DO.
+ *
+ * Editable was also **destructive**, because this dialog's save posts the whole `pointLocator` and
+ * `toVO` copies the field. Measured: a `PUT` with `settable: false` on a point that read back `true`
+ * answers 200 and reads back `false`, permanently -- `MeshControllerNodesDataSourceRT
+ * .dataPointDoseNotExist` only re-creates an `attributeId` that has no point at all, so nothing
+ * restores a clobbered flag. Read-only round-trips the stored value instead, and the radio's answer
+ * survives every save.
+ *
+ * The blast radius is wider than this form, which is the other reason not to offer the edit:
+ * `BACnetPublishedPoint.getObjectType(dataTypeId, isSettable)` picks the **BACnet object type** the
+ * gateway republishes to third-party BMS clients from this flag, and `CpmUtility` and
+ * `ScriptDataSourceRT` gate scripted writes on it. `DataPointDao` writes
+ * `getPointLocator().isSettable()` over the point's own, so the flag here is the live copy.
+ *
+ * `MeshControllerNodesDataSourceRT.setPointValue` is a real write path -- a mesh command built from
+ * the locator's `type`, sent to `CONTROLLER_CONTROL_COMMANDS` with confirmation, retried three times
+ * with exponential backoff, committed locally only once the controller answers. That is what makes
+ * the flag worth *showing*. It was never an argument for letting the platform set it.
  *
  * `relinquishable` is hidden because `toVO` never reads it on any of the ten: a value typed there is
  * discarded in the mapper, before the gateway sees the point at all.
@@ -940,15 +962,16 @@ const meshNodeSource = (protocol: string): GatewayFormLayout => ({
  */
 const meshNodePoint = (protocol: string): GatewayFormLayout => ({
   hidden: ['relinquishable', 'configurationDescription'],
-  readonly: ['attributeId', 'dataType', 'type'],
+  readonly: ['attributeId', 'dataType', 'type', 'settable'],
   hints: {
     attributeId: `What this point reads from the ${protocol} node. The gateway creates one point `
       + 'per attribute when the node is mirrored, so there is nothing to choose here.',
     type: 'How the value is encoded on the wire. The mesh command that writes this point is built '
       + 'from it, which is why it is the node\'s to report and not ours to change.',
-    settable: 'Whether the platform may write this attribute back over the mesh. The gateway '
-      + 'creates every mirrored point unwritable, so this is the only place it can be turned on — '
-      + 'and it only works if the far side accepts the write.'
+    settable: 'Whether the node accepts a write to this attribute. The radio reports it when the '
+      + 'point is mirrored — a digital output is writable because it is a digital output — and the '
+      + 'gateway picks the BACnet object type it republishes from it too, so it is not the '
+      + 'platform\'s to change.'
   },
   // `settable` is left to the mapper's own order under the three: pairing a checkbox with a select
   // puts a control and its label on two different baselines.

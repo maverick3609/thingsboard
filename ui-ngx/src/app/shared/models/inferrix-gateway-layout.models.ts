@@ -621,10 +621,16 @@ const BINARY_ONLY: FormSelectItem[] = [{value: 'BINARY', label: 'Binary'}];
 /**
  * `PoeLightingPointLocatorVO.PointType`, written out because the schema publishes the field as a
  * bare `{"type": "string"}` -- no enum, no description -- while `toVO` does
- * `PointType.valueOf(pointType)` on it. The labels are the enum's own `value()` strings; the values
- * are the constant names, which is what the wire takes. Measured: the display name "Channel Level"
+ * `PointType.valueOf(pointType)` on it. The values are the constant names, which is what the wire
+ * takes. The labels are sentence-cased from the enum's own `value()` strings ("Channel Level",
+ * "Power On Setting") rather than copied from them. Measured: the display name "Channel Level"
  * is a 400, an unknown name is a 400, and an omitted one is a **500**.
  */
+const POE_LIGHTING_POINT_TYPES: FormSelectItem[] = [
+  {value: 'CHANNEL_LEVEL', label: 'Channel level'},
+  {value: 'POWER_ON_SETTING', label: 'Power-on setting'}
+];
+
 /**
  * The three `ContextUpdateEvent` constants `ScriptingDataSourceDefinition.commonValidation` accepts.
  * The schema publishes all five; `NONE` and `CRON` are refused *"Invalid value"* on this type
@@ -634,11 +640,6 @@ const SCRIPTING_UPDATE_EVENTS: FormSelectItem[] = [
   {value: 'UPDATE', label: 'Update'},
   {value: 'CHANGE', label: 'Change'},
   {value: 'LOGGED', label: 'Logged'}
-];
-
-const POE_LIGHTING_POINT_TYPES: FormSelectItem[] = [
-  {value: 'CHANNEL_LEVEL', label: 'Channel level'},
-  {value: 'POWER_ON_SETTING', label: 'Power-on setting'}
 ];
 
 const NON_IMAGE_DATA_TYPES: FormSelectItem[] = [
@@ -1608,9 +1609,10 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * is not a configuration the gateway can act on, it is a source that can never reach anything.
    *
    * `connectionTimeoutSeconds` is hidden because **nothing reads it**. It is declared on the VO
-   * with a default of 10, serialised, mapped both ways by `PoeLightingDataSourceModel`, and never
-   * referenced again anywhere in the tree -- unlike `retries`, which `PoeLightingDataSourceRT`
-   * checks on every attempt. A knob that stores a value and changes no behaviour is worse than no
+   * with a default of 10, serialised, mapped both ways by `PoeLightingDataSourceModel`, and written
+   * once more by the discovery path (`PoeLightingService` sets it to 10) -- but never *read*
+   * anywhere in the tree, unlike `retries`, which `PoeLightingDataSourceRT` checks on every
+   * attempt. A knob that stores a value and changes no behaviour is worse than no
    * knob, and the field keeps its stored value because a data source saves with `PATCH`.
    *
    * `alarmLevels` really has rows on this type -- communication failure and device failure, both
@@ -1686,8 +1688,18 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * carries what `META.PL` carries, and `SCRIPTING.PL` is two fields.
    *
    * **`scriptPermissions` is hidden for the same reason as on `META.PL`, and needs one more
-   * thing here.** It names the groups the script runs *as*, and an absent value means no groups,
-   * which is the confined engine — the right thing for a form reachable from a browser to ask for.
+   * thing here.** It names the groups the script runs *as*, and asking for none is the right thing
+   * for a form reachable from a browser to do.
+   *
+   * What it sends is `""`, and `""` is **not** "no groups". `new ScriptPermissions("")` splits on
+   * comma and gets a set holding one empty string — `MetaPointLocatorModel`'s own comment calls
+   * that "a group nobody holds", which is why *it* tests `isBlank` and builds the empty set
+   * instead. Two consequences, both accepted here because neither has a fix on this side: the
+   * permission set is junk rather than empty (harmless — `Permissions.permissionContains` returns
+   * false on an empty query and skips an empty part, so it can never match), and **every save
+   * through Cortex overwrites whatever groups the source was given in the gateway's own webapp**,
+   * because the read never returns them and there is nothing to send back. It fails in the safe
+   * direction — a script loses privileges rather than gains them — and it is recorded in D101.
    * But `ScriptDataSourceModel.toVO` calls `new ScriptPermissions(scriptPermissions)` unguarded,
    * and that constructor does `groups.split(",")`, so an **absent or null value is an HTTP 500**
    * rather than a default. Measured twice over: an add omitting the key crashes, and so does a

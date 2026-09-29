@@ -1722,8 +1722,9 @@ stored token, and the read carries it anyway. The field stays a plain box and th
 the weight.
 
 **`connectionTimeoutSeconds` is hidden because nothing reads it.** Declared on the VO with a default
-of 10, serialised, mapped both ways, and never referenced again in the tree — where `retries`, the
-only other tuning field, is checked by the runtime on every attempt. **D98.** A data source saves
+of 10, serialised, mapped both ways, and written once more by the discovery path — but never *read*
+anywhere in the tree, where `retries`, the only other tuning field, is checked by the runtime on
+every attempt. **D98.** A data source saves
 with `PATCH`, so hiding the field keeps whatever is stored.
 
 **Three defaults for `retries`, and we seed the VO's.** The VO initialises 2, the REST model 0, and
@@ -1782,13 +1783,30 @@ through untouched, which is what keeps `META.PL`'s "a hidden field is carried th
 > holds that merge in place, because two layout decisions rest on it.
 
 **`scriptPermissions` stays hidden, for row 7's reason.** It names the groups the script runs *as*,
-and an absent value means no groups, which is the confined engine — the right thing for a form
-reachable from a browser to ask for. Hiding it and sending `""` are not in tension: the first is the
-security decision, the second is the crash.
+and asking for none is the right thing for a form reachable from a browser to do. Hiding it and
+sending `""` are not in tension: the first is the security decision, the second is the crash.
+
+> **But `""` is not "no groups", and this row said it was.** `new ScriptPermissions("")` splits on
+> comma and yields a set holding one empty string. The gateway's own `MetaPointLocatorModel` comment
+> calls that *"a group nobody holds"* and tests `isBlank` to avoid it — another check scripting is
+> missing. Harmless in itself: `Permissions.permissionContains` returns false on an empty query part,
+> so the junk group can never match. The consequence that is **not** harmless, and that nothing here
+> recorded until the review found it: since the read never returns the stored groups and `toVO`
+> overwrites them from what was sent, **every save through Cortex replaces a scripting source's
+> permission groups with `{""}`**. A source configured in the gateway's own webapp loses its groups
+> the first time anyone edits it from the platform.
+>
+> There is no fix on this side — the value cannot be read, so it cannot be sent back — and the
+> failure is in the safe direction, a script losing privileges rather than gaining them. It is now
+> part of D101, where the gateway can fix it: publish the groups in `fromVO`, or accept an absent key
+> as "unchanged" the way `SecretFields.merge` already does for credentials.
 
 **`updateEvent` publishes five values and takes three.** `commonValidation` switches on it and
-refuses `NONE` and `CRON` — measured, both 422 *"Invalid value"* — although `META.PL` accepts both
-on the same enum. The list is narrowed to the three, and the default carries the VO's `UPDATE`,
+refuses `NONE` and `CRON` — measured, both 422 *"Invalid value"*. An earlier draft added "although
+`META.PL` accepts both on the same enum", which is wrong: META's `updateEvent` is an `ExportCodes`
+table (`NONE`, the six time periods, `CRON`) and scripting's is the `ContextUpdateEvent` enum
+(`UPDATE`, `CHANGE`, `LOGGED`, `NONE`, `CRON`). Two token names coincide; the value sets and the
+mechanisms are different, and META's `contextUpdateEvent` is a third table again. The list is narrowed to the three, and the default carries the VO's `UPDATE`,
 which the REST model leaves null and `validate` then refuses. **D102.**
 
 **The rule this form cannot express.** A source that is not polling, has no cron pattern, and has no
@@ -1827,8 +1845,9 @@ compiled on every save; `logSize`/`logCount` are primitives on the model that lo
 5 (**D103**); `settable` is hidden because `isSettable()` is a hard false though `toVO` still copies
 it; `dataType` is a real choice here, unlike PoE's derived one.
 
-*Verified:* 109 layout and 14 form specs green; every rule above measured against 5.1.3, probe rows
-deleted. The on-screen pass is owed with rows 6–15.
+*Verified:* 112 layout and 14 form specs green, and `tsc -p src/tsconfig.app.json` exit 0; every
+rule above measured against 5.1.3, probe rows deleted. The on-screen pass is owed with rows
+6–15.
 
 ## Per-type components
 

@@ -44,3 +44,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `6688788e45` fix(gateway): make a hint on a disabled field readable, and correct four claims
 - [ ] `cbcd72a748` fix(gateway): stop escaping a hint nothing renders as HTML
 - [ ] `96be19bbb9` feat(gateway): follow the gateway's 5.1.3 rules, and take back what it fixed
+- [ ] `d439911113` feat(gateway): lay out the mesh controller, whose attribute table 34 classes share

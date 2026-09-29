@@ -1423,6 +1423,19 @@ clearing. The way to stop a token being used is `bearerAuth: false`, which leave
 unused; the same is true of the two SNMP passphrases and their protocols, and both hints now say so.
 Losing that is worth the masking and the D79 fix it comes with, but it is a loss.
 
+**And the override was wrong in both eras, differently — which closed a hole in the descriptor.**
+The review's reading, that a textarea "rendered the token in the clear while the dialog silently
+treated it as a secret", conflates them: before 5.1.3 the mapper typed the field `text`, so `keep()`
+did *not* treat it as a secret and the clearing worked, and the exposure was real — the read carried
+the token and a plain multiline box painted it on screen. After 5.1.3 the mapper types it `password`
+and there is nothing left to expose, but `keep()` reads secrecy off the *mapper*, never off
+`layout.types`, so the override left a plain box that dropped its empty value: a control that looks
+clearable and is not. Both halves are the same defect — a layout must not retype a secret — and
+nothing stopped one. `laidOutType` now refuses it, beside the refusal that already protects a
+delegated field's editor. The existing spec that a layout never *names* `password` is the other
+direction and stays; a spec cannot cover this one, because it cannot see which fields the schema
+marked `writeOnly`.
+
 **`SNMP.DS` lost its `sendEmpty` workaround.** Row 8 had to send `contextName: ""` while omitting
 `engineId`, because the two refused opposite things. D69 made absent and blank both mean "not set"
 on both fields — measured 201 with the pair omitted and 201 with both `""`. The two passphrases

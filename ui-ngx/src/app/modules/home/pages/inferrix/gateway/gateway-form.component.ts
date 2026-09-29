@@ -277,11 +277,18 @@ export class GatewayFormComponent implements ControlValueAccessor, OnChanges {
    * becoming a `textarea`. Refusing anything else is what keeps a layout from replacing a delegated
    * field's editor with a control that cannot hold its value: `build` types the control from what
    * this returns, so an array turned into a textarea would lose its rows on the first keystroke.
+   *
+   * A `password` is refused for the second reason: the dialog's `keep()` reads secrecy off the
+   * *mapper's* type, not off this one, so a layout that retyped a secret would paint it into a
+   * plain box that still behaves like a secret -- shown on screen wherever the gateway returns a
+   * value, and silently unclearable, because an emptied secret is dropped rather than sent. The
+   * layouts may not name `password` either; that direction is a spec, this one is here because a
+   * spec cannot see which fields the schema marked `writeOnly`.
    */
   private laidOutType(property: FormProperty): FormPropertyType {
     const type = own(this.layout?.types, property.id);
     return type && RENDERED_TYPES.includes(type) && RENDERED_TYPES.includes(property.type)
-      ? type : property.type;
+      && property.type !== FormPropertyType.password ? type : property.type;
   }
 
   /**

@@ -84,6 +84,15 @@ describe('gateway form layout mechanics', () => {
     expect(form.delegatedProperties.context).toBeTruthy();
   });
 
+  it('ignores a type that would take the masking off a secret', () => {
+    // `keep()` in the dialog decides what is a secret from the mapper's type, so a retyped password
+    // is still treated as one: emptied and it is dropped rather than sent, which makes a plain box
+    // that cannot be cleared and shows the value wherever the gateway returns it.
+    form.properties = [property('privateKey', FormPropertyType.password)];
+    build({types: {privateKey: FormPropertyType.textarea}});
+    expect(shownProperty('privateKey').type).toBe(FormPropertyType.password);
+  });
+
   it('leaves a field alone when the layout names no type for it', () => {
     build();
     expect(shownProperty('script').type).toBe(FormPropertyType.text);

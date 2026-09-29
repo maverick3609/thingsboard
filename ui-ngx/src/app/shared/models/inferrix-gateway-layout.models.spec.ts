@@ -1418,18 +1418,28 @@ describe('gateway form layouts', () => {
     // PEOPLE_COUNT_CAMERA, and CURRENT_SENSOR outside this set). `readonly` is where the
     // provisioner calls `setSettable(attribute.isSettable())` over an enum that has `true` entries
     // but `toVO` drops the field on a fresh VO (D109). `editable` is where `toVO` copies it, which
-    // is `MODBUS_CONTROLLER` and the two light controllers whose provisioner sets the flag from the
-    // attribute's own definition.
+    // is `MODBUS_CONTROLLER` alone, which is also the only type nothing else writes the flag for.
     const shown = (layout): string =>
       (layout.hidden ?? []).includes('settable') ? 'hidden'
         : (layout.readonly ?? []).includes('settable') ? 'readonly' : 'editable';
     const byMode: {[mode: string]: string[]} = {};
     meshPoints.forEach(([modelType, layout]) =>
       (byMode[shown(layout)] = byMode[shown(layout)] ?? []).push(modelType));
-    expect(byMode.editable.sort()).toEqual(['LIGHT_CONTROLLER_V4.PL', 'LIGHT_RELAY_CONTROLLER.PL',
-      'MODBUS_CONTROLLER.PL']);
-    expect(byMode.readonly.sort()).toEqual(['4DI_2DO_CARD.PL', 'PEOPLE_COUNTER.PL',
-      'THERMOSTAT.PL', 'VAV_CONTROLLER.PL']);
+    // One editable in the whole family, and it earns it: `ModbusControllerAttributes` carries no
+    // settable argument and no provisioner, upgrade or event listener sets the flag for that type,
+    // so the form is the only source there is. Everything else that shows the flag shows it locked.
+    expect(byMode.editable).toEqual(['MODBUS_CONTROLLER.PL']);
+    expect(byMode.readonly.sort()).toEqual(['4DI_2DO_CARD.PL', 'LIGHT_CONTROLLER_V4.PL',
+      'LIGHT_RELAY_CONTROLLER.PL', 'PEOPLE_COUNTER.PL', 'THERMOSTAT.PL', 'VAV_CONTROLLER.PL']);
+    // The two light controllers are read-only for a different reason from the other four, and the
+    // difference matters: their `toVO` copies `settable`, so it round-trips rather than being erased
+    // (D109). They are locked because the flag comes from the attribute enum -- what the attribute
+    // is, not what the device supports -- and because it picks the BACnet object type the gateway
+    // republishes to third-party clients. Row 20 made the opposite call on the mesh node family and
+    // had to withdraw it; this is that lesson applied before the same mistake.
+    ['LIGHT_CONTROLLER_V4.PL', 'LIGHT_RELAY_CONTROLLER.PL'].forEach(modelType =>
+      expect(GATEWAY_FORM_LAYOUTS[modelType].hints.settable).withContext(modelType)
+        .toContain('BACnet'));
     expect(byMode.hidden.length).toBe(23);
     expect(byMode.hidden.length + byMode.readonly.length + byMode.editable.length).toBe(30);
     // A flag that is hidden is never also read-only, and one that is shown always carries a hint

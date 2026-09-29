@@ -827,18 +827,34 @@ const lightControllerSource = (device: string): GatewayFormLayout => {
  *   `setSettable`, so nothing on the gateway has a `true` to put there: MESH_CONTROLLER,
  *   PEOPLE_COUNT_CAMERA, CURRENT_SENSOR, LIGHT_DI_CONTROLLER and MOKO_BAND -- of which the last two
  *   do override to a hard `false` as well.
- * - **`readonly`** (4DI_2DO_CARD, PEOPLE_COUNTER, THERMOSTAT, VAV_CONTROLLER) -- the provisioner
- *   calls `locatorVO.setSettable(attribute.isSettable())` and the enum has entries that answer
- *   `true` (the card's two digital outputs, the counter's `RESET`, seven thermostat attributes, the
- *   VAV's two analogue outputs). The flag is real and worth reading; the platform cannot change it,
- *   because `toVO` builds a fresh VO and copies `attributeId` and `dataType` alone, so a REST write
- *   erases it (**D109**).
- * - **`editable`** (MODBUS_CONTROLLER, LIGHT_CONTROLLER_V4, LIGHT_RELAY_CONTROLLER) -- `toVO`
- *   copies `settable`, so it is a real choice. On `LIGHT_CONTROLLER_V4` it is a real choice for six
- *   of its seven attributes: `LightControllerV4PointLocatorVO.isSettable()` answers
- *   `super.isSettable() || DIM_VALUE.isSettable()` for the dim value, and the right-hand side is a
- *   constant `true`, so that one attribute is writable whatever the box says. Measured: POSTing
- *   `settable: false` on a `DIM_VALUE` point reads back `true`. **D124**, and the hint says so.
+ * - **`readonly-erased`** (4DI_2DO_CARD, PEOPLE_COUNTER, THERMOSTAT, VAV_CONTROLLER) -- the
+ *   provisioner calls `locatorVO.setSettable(attribute.isSettable())` and the enum has entries that
+ *   answer `true` (the card's two digital outputs, the counter's `RESET`, seven thermostat
+ *   attributes, the VAV's two analogue outputs). The flag is real and worth reading; the platform
+ *   cannot change it, because `toVO` builds a fresh VO and copies `attributeId` and `dataType`
+ *   alone, so a REST write erases it (**D109**).
+ * - **`readonly`** (LIGHT_CONTROLLER_V4, LIGHT_RELAY_CONTROLLER) -- the provisioner sets it the same
+ *   way, but `toVO` **does** copy it, so it round-trips instead of being erased. It is read-only all
+ *   the same, and that is a deliberate narrowing of what the gateway allows: `attribute.isSettable()`
+ *   describes what the attribute *is*, not what this particular device supports, so there is no case
+ *   where an operator knows better. `Upgrade5` re-derives `DI_STATUS`'s flag from the enum the same
+ *   way, which is the gateway's own team treating it as enum-derived. And the flag is not only a UI
+ *   gate -- `BACnetPublishedPoint.getObjectType(dataTypeId, isSettable)` picks the BACnet object type
+ *   the gateway republishes to third-party clients from it -- so letting an operator contradict the
+ *   enum would change what someone else's BMS sees. The row-20 lesson, applied before it could be
+ *   repeated.
+ * - **`editable`** (MODBUS_CONTROLLER alone) -- `toVO` copies `settable` **and nothing else ever
+ *   writes it**: `ModbusControllerAttributes` carries no settable argument, and no provisioner,
+ *   upgrade or event listener sets it for this type. The form is the only source, so an operator's
+ *   statement is the only statement there is. (The Modbus *slave* types are different and not this
+ *   row's: `ModbusControllerQueriesDaoEventListener` sets their flag from `attribute.isWriteable()`,
+ *   so they will be read-only when they are laid out.)
+ *
+ * On `LIGHT_CONTROLLER_V4` the flag is a lie for one attribute whichever way it is shown:
+ * `LightControllerV4PointLocatorVO.isSettable()` answers `super.isSettable() ||
+ * DIM_VALUE.isSettable()` for the dim value, and the right-hand side is a constant `true`. Measured:
+ * POSTing `settable: false` on a `DIM_VALUE` point reads back `true`. **D124**, and the hint says
+ * so.
  *
  * D109's erase is six types wide by construction -- the four above plus MESH_CONTROLLER and
  * PEOPLE_COUNT_CAMERA, which inherit the same accessor -- but it only loses information on the
@@ -848,11 +864,12 @@ const lightControllerSource = (device: string): GatewayFormLayout => {
  * be a value invented for a form nobody opens.
  */
 const meshDevicePoint = (attributes: FormSelectItem[], device: string,
-                         settable: 'hidden' | 'readonly' | 'editable'): GatewayFormLayout => ({
+                         settable: 'hidden' | 'readonly' | 'readonly-erased' | 'editable')
+    : GatewayFormLayout => ({
   hidden: settable === 'hidden'
     ? ['settable', 'relinquishable', 'configurationDescription']
     : ['relinquishable', 'configurationDescription'],
-  readonly: settable === 'readonly'
+  readonly: settable === 'readonly' || settable === 'readonly-erased'
     ? ['attributeId', 'dataType', 'settable']
     : ['attributeId', 'dataType'],
   // `dataType` keeps the four non-image types rather than being narrowed to the two or three this
@@ -873,10 +890,16 @@ const meshDevicePoint = (attributes: FormSelectItem[], device: string,
     ...(settable === 'editable'
       ? {settable: `Whether the platform may write this attribute back to the ${device}.`}
       : {}),
-    ...(settable === 'readonly'
+    ...(settable === 'readonly-erased'
       ? {settable: 'Whether the mesh accepts a write to this attribute. The gateway sets it from the '
           + 'attribute\'s own definition when it creates the point, and the platform cannot change '
           + 'it — see the note on D109 before relying on it staying put.'}
+      : {}),
+    ...(settable === 'readonly'
+      ? {settable: 'Whether a write to this attribute is accepted. The gateway sets it from the '
+          + 'attribute\'s own definition — which describes what the attribute is, not what this '
+          + 'particular device supports — and it also picks the BACnet object type the gateway '
+          + 'republishes to other systems from it, so it is not ours to change.'}
       : {})
   },
   rows: [['attributeId', 'dataType']]
@@ -2580,7 +2603,7 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * should have published.
    */
   '4DI_2DO_CARD.DS': meshDeviceSource('I/O card'),
-  '4DI_2DO_CARD.PL': meshDevicePoint(CARD_4DI_2DO_ATTRIBUTES, 'I/O card', 'readonly'),
+  '4DI_2DO_CARD.PL': meshDevicePoint(CARD_4DI_2DO_ATTRIBUTES, 'I/O card', 'readonly-erased'),
   'CURRENT_SENSOR.DS': meshDeviceSource('current sensor'),
 
   /**
@@ -2657,7 +2680,7 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
   'PAPER_TOWEL_LEVEL_SENSOR.DS': meshDeviceSource('paper-towel sensor'),
   'PAPER_TOWEL_LEVEL_SENSOR.PL': meshDevicePoint(PAPER_TOWEL_LEVEL_SENSOR_ATTRIBUTES, 'paper-towel sensor', 'hidden'),
   'PEOPLE_COUNTER.DS': meshDeviceSource('people counter'),
-  'PEOPLE_COUNTER.PL': meshDevicePoint(PEOPLE_COUNTER_ATTRIBUTES, 'people counter', 'readonly'),
+  'PEOPLE_COUNTER.PL': meshDevicePoint(PEOPLE_COUNTER_ATTRIBUTES, 'people counter', 'readonly-erased'),
   'PEOPLE_COUNT_CAMERA.DS': meshDeviceSource('camera'),
   'PEOPLE_COUNT_CAMERA.PL': meshDevicePoint(PEOPLE_COUNT_CAMERA_ATTRIBUTES, 'camera', 'hidden'),
   'SENSOR_TAG_IAQ.DS': meshDeviceSource('air-quality tag'),
@@ -2688,7 +2711,7 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
   'SOAP_DISPENSER_SENSOR.DS': meshDeviceSource('soap-dispenser sensor'),
   'SOAP_DISPENSER_SENSOR.PL': meshDevicePoint(SOAP_DISPENSER_SENSOR_ATTRIBUTES, 'soap-dispenser sensor', 'hidden'),
   'VAV_CONTROLLER.DS': meshDeviceSource('VAV controller'),
-  'VAV_CONTROLLER.PL': meshDevicePoint(VAV_CONTROLLER_ATTRIBUTES, 'VAV controller', 'readonly'),
+  'VAV_CONTROLLER.PL': meshDevicePoint(VAV_CONTROLLER_ATTRIBUTES, 'VAV controller', 'readonly-erased'),
   'WATER_LEAKAGE_DETECTOR.DS': meshDeviceSource('leak detector'),
   'WATER_LEAKAGE_DETECTOR.PL': meshDevicePoint(WATER_LEAKAGE_DETECTOR_ATTRIBUTES, 'leak detector', 'hidden'),
 
@@ -2697,20 +2720,22 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * period. `MOKO_BAND` is a wristband rather than a light, but it is commissioned by the same
    * light-commissioning run and publishes the same two schemas, so it belongs in this row.
    *
-   * `LIGHT_CONTROLLER_V4` and `LIGHT_RELAY_CONTROLLER` are the first two `editable` dispositions
-   * outside `MODBUS_CONTROLLER`: both `toVO` methods copy `settable` and both `Create*VO` set it
-   * from the attribute's own definition, so the flag is a real choice rather than a display. The
-   * other two override `isSettable()` to a hard `false`.
+   * `LIGHT_CONTROLLER_V4` and `LIGHT_RELAY_CONTROLLER` are the only two `readonly` dispositions
+   * whose flag is not erased on save: both `toVO` methods copy `settable`, unlike the four mesh
+   * device types where D109 drops it. They were briefly `editable` on that basis and the row-20
+   * lesson corrected it -- the flag comes from the attribute enum and drives the BACnet object type
+   * the gateway republishes, so it is not the platform's to contradict. The other two override
+   * `isSettable()` to a hard `false`.
    */
   'LIGHT_CONTROLLER_V4.DS': lightControllerSource('light controller'),
   'LIGHT_CONTROLLER_V4.PL':
-    meshDevicePoint(LIGHT_CONTROLLER_V4_ATTRIBUTES, 'light controller', 'editable'),
+    meshDevicePoint(LIGHT_CONTROLLER_V4_ATTRIBUTES, 'light controller', 'readonly'),
   'LIGHT_DI_CONTROLLER.DS': lightControllerSource('DI controller'),
   'LIGHT_DI_CONTROLLER.PL':
     meshDevicePoint(LIGHT_DI_CONTROLLER_ATTRIBUTES, 'DI controller', 'hidden'),
   'LIGHT_RELAY_CONTROLLER.DS': lightControllerSource('relay controller'),
   'LIGHT_RELAY_CONTROLLER.PL':
-    meshDevicePoint(LIGHT_RELAY_CONTROLLER_ATTRIBUTES, 'relay controller', 'editable'),
+    meshDevicePoint(LIGHT_RELAY_CONTROLLER_ATTRIBUTES, 'relay controller', 'readonly'),
   'MOKO_BAND.DS': lightControllerSource('wristband'),
   'MOKO_BAND.PL': meshDevicePoint(MOKO_BAND_ATTRIBUTES, 'wristband', 'hidden'),
 

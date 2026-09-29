@@ -2339,10 +2339,32 @@ reuses `meshDeviceSource` and pins the poll period under the address row. Neithe
 anything else: the mapper already seeds every `timePeriod` with five minutes, and `quantize` carries a
 schema description it renders as a hint.
 
-**Two of the four are the first `editable` dispositions outside `MODBUS_CONTROLLER`.**
+**Two of the four were briefly made `editable`, and that was the row-20 mistake starting again.**
 `LightControllerV4PointLocatorVO` and `LightRelayControllerPointLocatorVO` both inherit the honest
-accessor, both models' `toVO` copies `settable`, and both `Create*VO` set it from the attribute's own
-definition. The other two override `isSettable()` to a hard `false`.
+accessor and both models' `toVO` copies `settable`, so an edit sticks — which is exactly what made
+the mesh node version destructive. Corrected the same day, before the row-21 review ran:
+
+- `settable` here comes from `attribute.isSettable()`, a constant on the attribute enum. It describes
+  what the attribute **is**, not what this particular device supports, so there is no case where an
+  operator knows better. `Upgrade5` re-derives `DI_STATUS`'s flag from the enum the same way, which
+  is the gateway's own team treating it as enum-derived.
+- The flag is not only a UI gate. `BACnetPublishedPoint.getObjectType(dataTypeId, isSettable)` picks
+  the BACnet object type the gateway republishes to third-party BMS clients, and `CpmUtility` and
+  `ScriptDataSourceRT` gate scripted writes on it. An operator contradicting the enum changes what
+  someone else's system sees.
+
+So both are `readonly` — but read-only in a **different sense** from the four mesh device types, and
+the factory now distinguishes them. Those four are `readonly-erased`: `toVO` drops the field, so a
+save erases it (D109), and their hint says so. These two round-trip it correctly. Same control, two
+different truths behind it, and the hint that claims the wrong one is a lie either way.
+
+`MODBUS_CONTROLLER` remains the **only** `editable` in the family, and it earns it: its attribute
+enum carries no settable argument and no provisioner, upgrade or event listener writes the flag for
+that type, so the form is the only source there is. The Modbus *slave* types are not like it —
+`ModbusControllerQueriesDaoEventListener` sets their flag from `attribute.isWriteable()`, so they
+will be read-only when row 23 lays them out. Recorded here so that row does not have to rediscover it.
+
+The other two light controllers override `isSettable()` to a hard `false` and stay hidden.
 
 **Four findings, all the gateway's, all filed and all measured.**
 

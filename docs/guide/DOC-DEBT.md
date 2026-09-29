@@ -68,3 +68,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `436a11e652` feat(gateway): lay out the four light controllers, and the gateway's own gaps in them
 - [ ] `677c601d78` fix(gateway): a CT rating that cannot work, and two claims that overstated what ctId does
 - [ ] `416d36e281` fix(gateway): the missing labels are in no bundle, and the thermostat has seven
+- [ ] `9a589efecb` fix(gateway): withdraw row 20's settable reversal, which was wrong and destructive

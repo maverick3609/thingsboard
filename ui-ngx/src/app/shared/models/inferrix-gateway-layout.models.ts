@@ -2035,14 +2035,26 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    *
    * `startValue` is `required` because all four branches require it, and it takes the same
    * `dataType` gate as `VIRTUAL.PL` -- two words for a binary point, free text for everything else.
-   * `timerValue` is gated on the timer type, and that costs it **both** of the rules it wants.
-   * `required` on a gated field fires while the row is hidden, making the form permanently
-   * unsubmittable for the other three types; a `min` does the same as soon as the operator types a
-   * zero and then switches type, because a closed gate keeps its control's value. Two specs say so
-   * and both are right. All that is left is the default -- the floor itself, 1, chosen to keep the
-   * box off the single value the gateway is guaranteed to refuse rather than to guess at a duration
-   * -- and the hint. An operator who deliberately clears it to zero still meets the 422, and that
-   * refusal names `timerAttribute.timerValue`, which is D106's whole point.
+   * `timerValue` is gated on the timer type, and carries neither of the rules it wants -- for two
+   * different reasons, which an earlier version of this comment ran together.
+   *
+   * **`min: 1` is refused because a hidden `timerValue` is not empty, it is zero.** The field is a
+   * `private int` on `SystemAttributesPointLocatorModel` and `fromVO` fills it only in the TIMER
+   * branch, so every boolean, analog and alphanumeric point reads back `timerValue: 0` -- measured
+   * on four probes. A floor would therefore fail the form the moment the dialog opened, on a
+   * control the gate has hidden, for every point that is not a timer. Not "once the operator types
+   * a zero": immediately, invisibly, and with nothing on screen to correct.
+   *
+   * **`required` is refused because it would be inert, not because it would fire.** The control
+   * always holds a value -- 0 from the model on an edit, 1 from the default on an add -- and
+   * {@link GatewayFormLayout.min}'s own note above says why that is not enough: Angular's
+   * `Validators.required` treats `0` as a value. The standing rule that a `required` gated field can
+   * strand the form is real, but it is not what rules `required` out here.
+   *
+   * So the floor is carried by the default, 1, chosen to keep a new box off the single value the
+   * gateway is guaranteed to refuse rather than to guess at a duration -- and by the hint. An
+   * operator who deliberately types a zero still meets the 422, and that refusal names
+   * `timerAttribute.timerValue`, which is D106's whole point.
    *
    * `relinquishable` is hidden -- `toVO` never reads it and it reads back null -- and
    * `configurationDescription` is the attribute type's own name. `settable` stays: `isSettable()`

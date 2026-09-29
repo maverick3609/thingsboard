@@ -1138,11 +1138,12 @@ describe('gateway form layouts', () => {
 
   const sysAttrPoint = GATEWAY_FORM_LAYOUTS['SYSTEM_ATTRIBUTES.PL'];
 
-  it('marks the system attributes source worked through, and it is not a polling one', () => {
-    // `SystemAttributesDataSourceVO` extends `DataSourceVO` directly, not `PollingDataSourceVO`, so
-    // unlike the other empty entries this one is not even the poll period -- measured, the created
-    // source reads back ten common fields and no period at all. The entry exists to say the type was
-    // read; an absent one would keep the old renderer.
+  it('marks the system attributes source worked through', () => {
+    // An empty entry says the type was read and keeps the form on this renderer; an absent one would
+    // fall back to the old one. It cannot say more than that: `VIRTUAL.DS` is `{}` too and *is* a
+    // polling source. What is true of this one -- `SystemAttributesDataSourceVO` extends
+    // `DataSourceVO` directly, so it has no poll period at all, measured on the created source -- is
+    // a fact about the schema, not about the layout, and no assertion here can reach it.
     expect(GATEWAY_FORM_LAYOUTS['SYSTEM_ATTRIBUTES.DS']).toEqual({});
   });
 
@@ -1201,9 +1202,11 @@ describe('gateway form layouts', () => {
   it('shows the timer count on the timer type alone, and seeds it rather than requiring it', () => {
     // `startTimer` multiplies it by 1000 and `validate` refuses `<= 0` -- measured, 422 *"Must be
     // greater than zero"* on `timerAttribute.timerValue` for a zero, and 201 storing 30 for a valid
-    // one. Neither `required` nor `min` may carry that rule here: both fire on a control the gate has
-    // hidden, because a closed gate keeps its value, and the form would be unsubmittable for the
-    // other three types with nothing on screen to fix. The seed is the floor itself.
+    // one. Neither rule may carry it here, for two different reasons. `min` because the field is a
+    // primitive `int` that `fromVO` fills only in the TIMER branch, so every non-timer point reads
+    // back 0 -- measured -- and a floor would fail the form on open, on a hidden control, with
+    // nothing to correct. `required` because it would be inert: the control is never empty, and
+    // `Validators.required` treats 0 as a value. The seed is the floor itself.
     expect(sysAttrPoint.visibleWhen.timerValue)
       .toEqual({by: 'attributeType', values: ['TIMER_ATTRIBUTE']});
     expect(sysAttrPoint.required).not.toContain('timerValue');

@@ -1953,17 +1953,28 @@ both. **D106.** It is the reason the two client-side rules on this type are not 
 are the only place those rules can be stated where the operator can act on them.
 
 **`timerValue` is the one field in the sequence that may carry neither of its rules.** The gateway
-refuses `<= 0`, so it wants `required` and `min: 1`. It can have neither, because it is gated on the
-timer type and two standing invariants say so — `required` on a gated field fires while the row is
-hidden and makes the form permanently unsubmittable for the other three types, and `min` does the
-same as soon as someone types a zero and then switches type, because a closed gate keeps its
-control's value. Both specs are right and neither was bent. What is left is the default, set to the
-floor itself, and the hint. An operator who deliberately clears the box to zero still meets the 422,
-and that 422 is D106.
+refuses `<= 0`, so it wants `required` and `min: 1`, and it can have neither — for two different
+reasons that an earlier version of this section ran together as one.
 
-> Both invariants were written earlier in this sequence for reasons that had nothing to do with each
-> other — one from `PING.PL.timeout`, one from `HTTP_JSON_RETRIEVER`. Meeting a field that trips both
-> is what showed they compose: a gated field cannot express a floor at all, only seed one.
+`min: 1` is refused because a hidden `timerValue` is not empty, it is **zero**. The field is a
+`private int` on the model and `fromVO` fills it only in the TIMER branch, so every boolean, analog
+and alphanumeric point reads back `timerValue: 0` — measured on four probes. A floor would fail the
+form the moment the dialog opened, on a control the gate has hidden, for every point that is not a
+timer. Not "once someone types a zero and switches type": immediately, and with nothing on screen to
+correct.
+
+`required` is refused because it would be **inert**, not because it would fire. The control always
+holds a value — 0 on an edit, 1 from the default on an add — and `Validators.required` treats 0 as a
+value, which the layout's own `min` documentation says in as many words. The standing rule that a
+`required` gated field can strand the form is real; it is simply not what rules `required` out here.
+
+So the floor is carried by the default and the hint. An operator who deliberately types a zero still
+meets the 422, and that 422 is D106.
+
+> Two invariants written earlier in this sequence for unrelated reasons — one from `PING.PL.timeout`,
+> one from `HTTP_JSON_RETRIEVER` — both point at this field, and the first draft of this section
+> credited them with a single mechanism. The review took it apart: the two rules fail differently,
+> and the `min` case is worse than was claimed, not the same.
 
 `settable` stays visible, which no other locator in the last five rows managed: `isSettable()`
 answers the stored field and `toVO` copies it, measured honoured. A system attribute nobody can write
@@ -2318,9 +2329,11 @@ and wrong, or stale, and are recorded there too. D73 is deliberately not fixed a
   startValue: null` — a point that behaves as a boolean starting at zero. `dataTypeId` is checked
   this way three lines above.
 
-- **D106 (P2)** — every refusal this type produces names a VO path the REST model flattened away:
-  `booleanAttribute.startValue` and `timerAttribute.timerValue` against a model carrying `startValue`
-  and `timerValue`. Measured, both. A client cannot place either message on the field that is wrong.
+- **D106 (P2)** — every refusal the point locator's own rules produce names a VO path the REST model
+  flattened away: `booleanAttribute.startValue` and `timerAttribute.timerValue` against a model
+  carrying `startValue` and `timerValue`, plus `dataTypeId` against `dataType`. Measured. A client
+  cannot place any of them on the field that is wrong. The source-type check is the one exception —
+  `dataSourceId` is a real model field.
 
 - **D107 (P2)** — the REST path accepts attribute-type / data-type pairings both of the gateway's own
   front ends forbid, and the pairing decides the value class the runtime stores. Measured 201 for

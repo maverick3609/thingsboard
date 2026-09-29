@@ -57,3 +57,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `4c93e576ca` fix(gateway): default the PoE timeout Cortex hides, and say why the two required fields are right
 - [ ] `0e34efd130` feat(gateway): lay out system attributes, the last type the Add menu offers
 - [ ] `eada1f7d7c` feat(gateway): lay out the thermostat, and prove the mesh attribute table moves
+- [ ] `169c4ce882` fix(gateway): the Add menu is not complete, and a dead branch misread three ways

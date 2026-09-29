@@ -55,3 +55,5 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `b64e505a4c` fix(gateway): send an empty script too, and make sendEmpty and defaults a pair
 - [ ] `794dfb0dbf` fix(gateway): five sentences that were not true, one with a consequence
 - [ ] `4c93e576ca` fix(gateway): default the PoE timeout Cortex hides, and say why the two required fields are right
+- [ ] `0e34efd130` feat(gateway): lay out system attributes, the last type the Add menu offers
+- [ ] `eada1f7d7c` feat(gateway): lay out the thermostat, and prove the mesh attribute table moves

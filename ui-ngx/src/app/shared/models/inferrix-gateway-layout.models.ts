@@ -649,10 +649,15 @@ const THERMOSTAT_ATTRIBUTES: FormSelectItem[] = [
 /**
  * The start-value gate shared by `VIRTUAL.PL` and `SYSTEM_ATTRIBUTES.PL`.
  *
- * Both parse the field from free text for every data type but binary, where the only two values
- * that mean anything are the two words. `BinaryValue.parseBinary` takes `"1"` as well and answers
- * ZERO for everything else, but the gateway's own two forms offer exactly this pair, and a list
- * that silently turns a typo into "false" is worse than one with two items in it.
+ * Both take the field as free text for every data type but binary, where the only two values that
+ * mean anything are the two words. They do **not** share a parser, which matters for what the list
+ * is protecting against: a virtual point's start value is read by `VirtualDataSourceRT` through
+ * `createRuntime`, so it goes through `BinaryValue.parseBinary`, which accepts `"1"` and answers
+ * ZERO for everything else; a system attribute's is read by
+ * `SystemAttributesDataSourceRT.addDataPointImpl` through `BooleanAttributeRT.getStartValue`, which
+ * is `Boolean.parseBoolean` -- so there `"1"` is **false**, not one. Measured: `startValue: "1"` on
+ * a BINARY system attribute saves 201. Either way an unrecognised word is silently false, and the
+ * gateway's own two forms offer exactly this pair, so a two-item list is the honest control.
  */
 const BINARY_START_VALUE: GatewayGatedOptions = {
   by: 'dataType',
@@ -721,12 +726,15 @@ const NON_IMAGE_DATA_TYPES: FormSelectItem[] = [
  * The three of those a system attribute has a runtime for.
  *
  * There is no `MultistateAttributeRT`: the four attribute types answer a binary, a numeric or an
- * alphanumeric value and nothing else, so a MULTISTATE point would parse its start value as one
- * (`createRuntime` does handle it) and then store the wrong class on the first write. The gateway's
- * own webapp reaches the same conclusion from the other end -- its `dataTypeChange` falls through
- * to an empty attribute-type list for MULTISTATE, which is a data type you cannot finish choosing.
- * Dropping it here says so before the operator picks it. Measured: MULTISTATE saves 201 either way
- * (D107).
+ * alphanumeric value and nothing else, so a MULTISTATE point is the wrong class from its **first**
+ * sample, not from its first write. `createRuntime` does parse a multistate start value, but it
+ * hands it to `SystemAttributesPointLocatorRT.currentValue`, which nothing in the gateway reads --
+ * only `VirtualDataSourceRT` reads that field, on its own locator. What a system-attribute point
+ * actually starts on comes from `addDataPointImpl`, through the attribute runtime's own
+ * `getStartValue`. The gateway's own webapp reaches the same conclusion from the other end -- its
+ * `dataTypeChange` falls through to an empty attribute-type list for MULTISTATE, which is a data
+ * type you cannot finish choosing. Dropping it here says so before the operator picks it.
+ * Measured: MULTISTATE saves 201 either way (D107).
  */
 const SYSTEM_ATTRIBUTE_DATA_TYPES: FormSelectItem[] =
   NON_IMAGE_DATA_TYPES.filter(item => item.value !== 'MULTISTATE');
@@ -2003,15 +2011,21 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * `toVO`'s four-case `switch` sets none of the four attribute objects either. Measured: a point
    * with no `attributeType` and no `startValue` saves **201** and reads back
    * `attributeType: null, startValue: null` -- a locator that then behaves as a boolean starting at
-   * zero, because `getAttribute()` falls through to `default -> booleanAttribute`. `required` plus
-   * the default is what keeps the form off that path. D105.
+   * false, because `getAttribute()` falls through to `default -> booleanAttribute` and the value it
+   * starts on is `BooleanAttributeRT.getStartValue`, i.e. `Boolean.parseBoolean(null)`. `required`
+   * plus the default is what keeps the form off that path. D105.
    *
    * **The attribute type and the data type have to agree**, because the attribute type is what
    * decides the value class the runtime produces, and only the gateway's two front ends know it --
    * measured, a NUMERIC point with a `BOOLEAN_ATTRIBUTE` is a 201 (D107). Both halves of the
    * pairing live in {@link SYSTEM_ATTRIBUTE_TYPES} and {@link SYSTEM_ATTRIBUTE_DATA_TYPES}. The gate
-   * clears `attributeType` when the data type moves under it, which is why the field is `required`:
-   * the operator is left with one item to pick rather than a silent null.
+   * clears `attributeType` whenever the stored value is not in the list the data type selects, which
+   * is why the field is `required`: the operator is left with one item to pick rather than a silent
+   * null. **Two triggers, not one** -- the operator changing the data type, and opening a row the
+   * gateway already accepted in a pairing this list refuses (D107), where the first touch of any
+   * control clears it. The second is deliberate: that pairing is wrong on the gateway too, and
+   * `required` then blocks the save rather than writing it back. Opening and saving without
+   * touching anything is unaffected, because the form patches with `{emitEvent: false}`.
    *
    * **Every refusal this type produces names a field the form does not have.** `validate` reports
    * against the VO's nested paths -- `booleanAttribute.startValue`, `timerAttribute.timerValue` --

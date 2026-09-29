@@ -255,7 +255,8 @@ consulted.
 | 14 | `PING.DS` | `PING.PL` | **done** — 2026-09-29; **D93-D95** filed, all three small; needs an on-screen pass |
 | 15 | `POE_LIGHTING.DS` | `POE_LIGHTING.PL` | **done** — 2026-09-29; **D96-D100** filed, the first a credential readable two ways; needs an on-screen pass |
 | 16 | `SCRIPTING.DS` | `SCRIPTING.PL` | **done** — 2026-09-29; **D101-D103** filed, the first a 500 on reading a row and writing it back; needs an on-screen pass |
-| 17 | `SYSTEM_ATTRIBUTES.DS` | `SYSTEM_ATTRIBUTES.PL` | **done** — 2026-09-29; **D105-D107** filed, the last a pairing rule only the gateway's two front ends know; **the Add menu is now complete**; needs an on-screen pass |
+| 17 | `SYSTEM_ATTRIBUTES.DS` | `SYSTEM_ATTRIBUTES.PL` | **done** — 2026-09-29; **D105-D107** filed, the last a pairing rule only the gateway's two front ends know; needs an on-screen pass |
+| — | `OPC.DS` | `OPC.PL` | **addable and not done** — deferred by the user on 2026-09-29; the one type on the Add menu without a layout |
 | 18 | `THERMOSTAT.DS` | `THERMOSTAT.PL` | **done** — 2026-09-29; **D108-D113** filed, D108 a P1 general to all 34 mesh locator types that supersedes D90; needs an on-screen pass |
 | … | the other 45 types | | provisioned-only: no Add form, an edit form like rows 13 and 18 |
 | last | the 13 types with no stack form | | left on the generic schema form — see Open decisions |
@@ -265,9 +266,13 @@ endpoint the Add menu reads — returns **16**, measured on 5.1.3, and the 16 ar
 definition classes whose `isEnabled()` returns true. The other 47 of the 63 published types exist
 only because something on the gateway creates them: the mesh provisioner, a platform integration, a
 light-commissioning run. Row 13 was the first of those, and it needed `provisionedPoints` and no add
-path at all. With row 17 the addable list is finished: **every type the Add menu offers has a
-layout**, and what is left is a long tail that each need an edit form only. OPC was skipped by
-the user on 2026-09-29.
+path at all. After row 17 the addable list is **15 of the 16**: every type the Add menu offers has a
+layout except `OPC.DS`, which the user deferred on 2026-09-29 and which is still on the menu. What
+is left besides it is a long tail that each need an edit form only.
+
+> An earlier version of this paragraph, the row-17 cell above and the row-17 commit subject all said
+> the Add menu was complete, two lines above the sentence recording that OPC had been skipped.
+> Measured: `GET /v2/data-source-types` returns 16 and `OPC.DS` is among them. Corrected 2026-09-29.
 
 Order 3–11 set by the user on 2026-09-25: the protocols a real installation is wired with come
 before the two that happen to be live on the bench gateway.
@@ -1918,9 +1923,18 @@ validator. Cortex carries the same table as `gatedOptions` on `attributeType`, b
 
 **MULTISTATE is a data type you cannot finish choosing.** There is no `MultistateAttributeRT` at all,
 so no attribute type is valid for it — the webapp falls through to an empty list and the Java helper
-to an empty array. `createRuntime` *does* parse a multistate start value, which makes such a point
-start correctly and then go wrong on the first write, which is the worst of the available failures.
-It is dropped from the data-type list here rather than offered with nothing behind it.
+to an empty array. `createRuntime` *does* parse a multistate start value, but it hands it to
+`SystemAttributesPointLocatorRT.currentValue`, and nothing in the gateway reads that field; only
+`VirtualDataSourceRT` reads its own locator's. What a system-attribute point starts on comes from
+`addDataPointImpl`, through the attribute runtime's `getStartValue`. So a MULTISTATE point is the
+wrong class from its **first sample**, not from its first write. It is dropped from the data-type
+list here rather than offered with nothing behind it.
+
+> The "starts correctly, then goes wrong on the first write" reading was written into four places on
+> 2026-09-29 and corrected the same day: the dead `currentValue` path is what made `createRuntime`
+> look like the seeding path. The same dead path is why D105 first named `BinaryValue.parseBinary`
+> where the live call is `Boolean.parseBoolean` — same outcome, different function — and why the
+> shared start-value gate's comment claimed one parser for two types that do not share one.
 
 **An unknown attribute type is not refused, it is skipped.** `ExportCodes.getId` answers -1 for a
 name it does not carry — the 2026-09-27 note's shape again — and three chains keyed on that id have
@@ -2312,6 +2326,10 @@ and wrong, or stale, and are recorded there too. D73 is deliberately not fixed a
   front ends forbid, and the pairing decides the value class the runtime stores. Measured 201 for
   NUMERIC with a `BOOLEAN_ATTRIBUTE` and for MULTISTATE, which has no valid attribute type at all.
   `AttributeTypeVO.getAttributeTypes(dataTypeId)` already encodes the rule and has zero callers.
+
+- **D114 (P2)** — an analog system attribute accepts a non-numeric `startValue` (measured 201) and
+  `AnalogAttributeRT.getStartValue()` then does a bare `Double.parseDouble` when the point starts.
+  The guarded version of that parse exists in `createRuntime`, on the branch nothing calls.
 
 - **D108 (P1, supersedes D90)** — `MeshPointLocatorVO.ATTRIBUTE_CODES` is one mutable `public
   static` field shared by 34 subclasses, each reassigning it in a static initialiser that runs once,

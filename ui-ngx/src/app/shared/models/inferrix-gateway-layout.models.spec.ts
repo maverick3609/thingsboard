@@ -1178,10 +1178,12 @@ describe('gateway form layouts', () => {
   });
 
   it('drops the data type no attribute type can serve, keeping the other three', () => {
-    // There is no `MultistateAttributeRT`. `createRuntime` does parse a multistate start value, so a
-    // MULTISTATE point starts correctly and then stores the wrong class on the first write -- and
-    // the webapp reaches the same place from the other end, falling through to an empty
-    // attribute-type list. Measured: MULTISTATE is a 201 with any attribute type or none.
+    // There is no `MultistateAttributeRT`, so a MULTISTATE point is the wrong class from its first
+    // sample. `createRuntime` does parse a multistate start value, but it hands it to
+    // `SystemAttributesPointLocatorRT.currentValue`, which nothing reads -- the value the point
+    // starts on comes from `addDataPointImpl` via the attribute runtime's `getStartValue`. The
+    // webapp reaches the same place from the other end, falling through to an empty attribute-type
+    // list. Measured: MULTISTATE is a 201 with any attribute type or none.
     expect(sysAttrPoint.options.dataType.map(item => item.value))
       .toEqual(['BINARY', 'NUMERIC', 'ALPHANUMERIC']);
   });
@@ -1216,6 +1218,31 @@ describe('gateway form layouts', () => {
     // `configurationDescription` is the attribute type's own name, measured "Boolean Attribute".
     expect(sysAttrPoint.hidden).toEqual(['relinquishable', 'configurationDescription']);
     expect(sysAttrPoint.hints.settable).toContain('constant');
+  });
+
+  it('lets a gated field be required, and says what that costs', () => {
+    // `SYSTEM_ATTRIBUTES.PL` is the only layout that names a field in both, and it names two. The
+    // pair has a consequence worth pinning rather than forbidding: `clearIllegalGatedValues` runs on
+    // every `valueChanges` and nulls a gated control whose stored value is not in the list its gate
+    // selects, so opening a row the gateway accepted in a pairing we refuse (D107) and touching any
+    // control blanks the field. `required` then blocks the save instead of writing the bad pairing
+    // back, which is the outcome we want. Opening and saving untouched is unaffected: the form
+    // patches with `{emitEvent: false}`.
+    //
+    // This is not a licence to combine them freely. A gated field that is required must be one
+    // where clearing is the right answer to an illegal stored value -- never one where the value is
+    // merely unrecognised, which is why `startValue` has an `unlisted` fallback and is only gated
+    // where the list is exhaustive.
+    const gatedAndRequired = Object.entries(GATEWAY_FORM_LAYOUTS)
+      .filter(([, layout]) => (layout.required ?? [])
+        .some(id => Object.keys(layout.gatedOptions ?? {}).includes(id)))
+      .map(([modelType]) => modelType);
+    expect(gatedAndRequired).toEqual(['SYSTEM_ATTRIBUTES.PL']);
+    // And a gated field that is required is never also hidden by a `visibleWhen` gate, which would
+    // make the form unsubmittable with nothing on screen to correct.
+    gatedAndRequired.forEach(modelType => (GATEWAY_FORM_LAYOUTS[modelType].required ?? [])
+      .forEach(id => expect(Object.keys(GATEWAY_FORM_LAYOUTS[modelType].visibleWhen ?? {}))
+        .withContext(`${modelType}.${id}`).not.toContain(id)));
   });
 
   const thermostat = GATEWAY_FORM_LAYOUTS['THERMOSTAT.DS'];

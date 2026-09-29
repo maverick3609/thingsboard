@@ -121,7 +121,10 @@ describe('gateway form layouts', () => {
       // Current sensor. Both are real enums in the schema, so the renderer already narrows them;
       // these lists relabel (`PHASE_1` reads as Phase 1, `32_A` as 32 A) and, for `ctId`, reorder
       // by rating. Same membership as the schema publishes -- neither drops a value.
-      'phaseId', 'ctId']);
+      'phaseId', 'ctId',
+      // Virtual switch. A real enum in the schema; the list relabels its last two constants, which
+      // the gateway gives one translation key and which carry different wire values.
+      'gradeType']);
     Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
       [...Object.keys(layout.options ?? {}), ...Object.keys(layout.gatedOptions ?? {})]
         .forEach(id => expect(scalars.has(id)).withContext(`${modelType}.${id}`).toBe(true));
@@ -1630,5 +1633,52 @@ describe('gateway form layouts', () => {
     // It belongs on a source: a locator is saved as part of its point, so there is no dialog for
     // the flag to disable.
     unsavable.forEach(modelType => expect(modelType.endsWith('.DS')).toBe(true));
+  });
+  // --- row 24: the virtual switch ---------------------------------------------------------------
+
+  it('shows a virtual switch the three fields that are its address, and locks them', () => {
+    const ds = GATEWAY_FORM_LAYOUTS['VIRTUAL_SWITCH.DS'];
+    // The source mirrors a `virtualSwitches` record: VirtualSwitchService.updateDataSource rewrites
+    // it from that record on every edit of the switch, so an edit here is overwritten.
+    expect(ds.readonly).toEqual(['uid', 'gradeType', 'grade']);
+    expect(ds.provisionedPoints).toBe(true);
+    // Savable, unlike the Modbus slave shapes -- toVO copies all three -- so no unsavable flag.
+    expect(ds.unsavable).toBeUndefined();
+    // The schema composes AbstractPollingDataSourceModel through an annotation, but the model
+    // extends AbstractDataSourceModel and the VO extends DataSourceVO. Neither field exists on
+    // either, and FAIL_ON_UNKNOWN_PROPERTIES is off, so both are dropped in silence. D138.
+    expect(ds.hidden).toEqual(['quantize', 'timePeriod']);
+  });
+
+  it('keeps both of the grade type enum\'s "none" values, told apart by their wire number', () => {
+    const items = GATEWAY_FORM_LAYOUTS['VIRTUAL_SWITCH.DS'].options.gradeType;
+    // Same membership as the schema publishes -- narrowing would hide a level the gateway accepts.
+    expect(items.map(item => item.value)).toEqual(['SITE', 'BUILDING', 'FLOOR', 'ZONE', 'ROOM',
+      'GROUP', 'NULL', 'NULL_ZERO']);
+    // NULL is 255 and NULL_ZERO is 0, and setPointValue broadcasts that number. The gateway gives
+    // both the one key `lightCommissioning.settings.gradeType.null`, so its own words would put two
+    // identical entries in the picker.
+    expect(items.find(item => item.value === 'NULL').label).toBe('None (255)');
+    expect(items.find(item => item.value === 'NULL_ZERO').label).toBe('None (0)');
+    expect(new Set(items.map(item => item.label)).size).toBe(items.length);
+  });
+
+  it('hides the virtual switch point\'s only editable field, because nothing reads it', () => {
+    const point = GATEWAY_FORM_LAYOUTS['VIRTUAL_SWITCH.PL'];
+    // controlCommand is read and written by the REST model and by nothing else in the gateway. The
+    // command issued comes from the set value: setPointValue switches on the integer and broadcasts
+    // a brightness per case. D140. Safe to hide because the dialog spreads the stored model first.
+    expect(point.hidden).toContain('controlCommand');
+    // toVO hardcodes `setSettable(true)` and `setDataTypeId(MULTISTATE)`, so both are read and
+    // thrown away. Shown anyway: both are true statements about the point. D139.
+    expect(point.readonly).toEqual(['dataType', 'settable']);
+    expect(point.hints.settable).toContain('Always true');
+    expect(point.hints.dataType).toContain('Always multistate');
+    // The one field toVO does not carry at all.
+    expect(point.hidden).toContain('relinquishable');
+    // No options on dataType: the schema's five values are already an enum, and narrowing it to the
+    // one the gateway forces would be a claim about the other four that the layout cannot make --
+    // a stored point is MULTISTATE because toVO wrote it, not because the type refuses the rest.
+    expect(point.options).toBeUndefined();
   });
 });

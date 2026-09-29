@@ -1,6 +1,8 @@
 # Gateway data sources: matching the stack's own configuration UI
 
-**Status:** planned, not started. Phase G7.
+**Status:** the type-by-type pass is **complete** — all 24 rows of the sequence below are done
+as of 2026-09-30. What is still owed is the on-screen pass over rows 6-24, which no browser
+tooling has been available for, and the dialog save-path decision noted at the end. Phase G7.
 **Measured against:** stack 5.1.0 on `192.168.221.7:8443`, gateway `Inferrix Gateway 155`
 (`86d5e330-b735-11f1-b695-2b2fc11a4c69`), live schema document read 2026-09-24.
 
@@ -264,7 +266,7 @@ consulted.
 | 21 | the 4 light controllers | their locators | **done** — 2026-09-30; the mesh-device point form exactly, over a source with a poll period; **D121-D124** filed, two of them P1/P2 on the gateway's own provisioning; needs an on-screen pass |
 | 22 | the 3 asset tags | their locators | **done** — 2026-09-30; `address` alone on the source, the mesh device point form; `LED_ASSET_TAG` is the plainest D109 case in the file; needs an on-screen pass |
 | 23 | the 2 Modbus slave shapes | their locators | **done** — 2026-09-30; neither is in the Add menu and **neither source can be saved at all** (D131), so the form opens read-only with the reason on it; new `unsavable` layout key; D131-D133 filed |
-| 24 | `VIRTUAL_SWITCH.DS` | `VIRTUAL_SWITCH.PL` | planned — the one type left in a shape of its own |
+| 24 | `VIRTUAL_SWITCH.DS` | `VIRTUAL_SWITCH.PL` | **done** — 2026-09-30; a light-commissioning broadcast mirrored as a source; the point form is inert and its one field is hidden; D134-D140 filed |
 | last | the 13 types with no stack form | | left on the generic schema form — see Open decisions |
 
 **The "remaining ~40" this table used to carry was the wrong shape.** `/v2/data-source-types` — the
@@ -2521,6 +2523,50 @@ update, which is unambiguous to read, but reading is not measuring and the doc s
 
 *Verified:* 136 layout, 41 schema, 14 form, 13 model and 17 service specs green, and
 `tsc -p src/tsconfig.app.json` exit 0. The on-screen pass is owed with rows 6–22.
+
+### 24 — the virtual switch (done, 2026-09-30)
+
+The last of the 148 model types, and the one that turned out not to be a data source at all.
+
+The record lives in the `virtualSwitches` table.
+`VirtualSwitchService.createDataSourceAndDatapoint` makes a data source and one `Command` point to
+mirror it, and `updateDataSource` rewrites that source from the record whenever the switch is
+edited — so `uid`, `gradeType` and `grade` are copies, and an edit through the data source form is
+overwritten the next time anyone saves the switch. They are shown and locked, with hints saying
+where the real field is.
+
+They are worth showing because they are the entire behaviour. `VirtualSwitchDataSourceRT.setPointValue`
+broadcasts with `vo.getGradeType().value()` and `vo.getGrade()` — which level of the location
+hierarchy, and which id within it. The source is the address.
+
+`quantize` and `timePeriod` are hidden. The schema composes `AbstractPollingDataSourceModel`
+through a `@Schema(allOf = ...)` annotation, but the model extends `AbstractDataSourceModel` and the
+VO extends `DataSourceVO` — neither is the polling type, there is no setter for either field, and
+`FAIL_ON_UNKNOWN_PROPERTIES` is off, so both are dropped in silence. `timePeriod` is marked
+**required** in the component the annotation pulls in, so a form that showed it would demand a value
+that goes nowhere. D138.
+
+The grade type list is written out from the enum because its last two constants,
+`NULL` (wire value 255) and `NULL_ZERO` (0), share one translation key. Labelling both "None" the
+way the gateway does would put two identical entries in one picker while the choice between them
+changes what goes out on the mesh. "None (255)" and "None (0)" are ours — the second label deviation
+in the whole exercise, after `DI_STATUS`. D136.
+
+**The point form is inert, and the layout says so by hiding its only editable field.**
+`VirtualSwitchPointLocatorModel.toVO` hardcodes `setSettable(true)` and
+`setDataTypeId(DataTypes.MULTISTATE)`, so the two writable fields the schema publishes are read and
+thrown away (D139) — both are shown locked, because both are true statements about the point.
+`controlCommand` is the third, and a search for `getControlCommand` across the whole gateway, tests
+excluded, returns two hits, both inside the REST model's own `fromVO` and `toVO`. Nothing reads it:
+the command issued comes from the set *value*, which `setPointValue` switches on to pick a
+brightness (D140). Offering an operator a command that is never issued is worse than showing
+nothing, so it is hidden — safe because the dialog spreads the stored model before the rendered
+fields, so a value a point already holds is carried through the save untouched.
+
+*Verified:* 139 layout, 41 schema, 14 form, 13 model and 17 service specs green, and
+`tsc -p src/tsconfig.app.json` exit 0. Nothing was written to the live gateway for this row: the
+whole of it is readable from the Java and the published schema, and there is no virtual switch on
+the instance to round-trip. The on-screen pass is owed with rows 6-23.
 
 ## Per-type components
 

@@ -1484,6 +1484,31 @@ const MODBUS_SLAVE_POINT: GatewayFormLayout = {
   rows: [['deviceAttributeId', 'pointNumber'], ['dataType', 'pollingInterval']]
 };
 
+/**
+ * The location hierarchy level a virtual switch's `grade` counts in.
+ *
+ * Written out rather than left to the renderer for the usual two reasons. `NULL_ZERO` humanises as
+ * "Null zero", and more to the point the enum's last two constants are not the same thing: `NULL`
+ * carries the wire value 255 and `NULL_ZERO` carries 0, and
+ * `VirtualSwitchDataSourceRT.setPointValue` broadcasts that number
+ * (`vo.getGradeType().value()`). The gateway gives both the one translation key
+ * `lightCommissioning.settings.gradeType.null`, so its own words would put two identical entries in
+ * the picker -- the D122 shape again. Labelling them by what goes on the wire is the only way to
+ * tell them apart.
+ *
+ * Same membership as the schema publishes; nothing is dropped.
+ */
+const VIRTUAL_SWITCH_GRADE_TYPES: FormSelectItem[] = [
+  {value: 'SITE', label: 'Site'},
+  {value: 'BUILDING', label: 'Building'},
+  {value: 'FLOOR', label: 'Floor'},
+  {value: 'ZONE', label: 'Zone'},
+  {value: 'ROOM', label: 'Room'},
+  {value: 'GROUP', label: 'Group'},
+  {value: 'NULL', label: 'None (255)'},
+  {value: 'NULL_ZERO', label: 'None (0)'}
+];
+
 export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
 
   /**
@@ -1533,6 +1558,77 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * so the type is marked as worked through -- a type with no entry keeps the old renderer.
    */
   'VIRTUAL.DS': {},
+
+  /**
+   * A virtual switch: a light-commissioning broadcast dressed as a data source.
+   *
+   * Not in the Add menu -- `VirtualSwitchDataSourceDefinition.isEnabled()` is `false` -- because the
+   * source is a *mirror*. The record lives in the `virtualSwitches` table and
+   * `VirtualSwitchService.createDataSourceAndDatapoint` makes the source and its single `Command`
+   * point when the switch is created; `updateDataSource` rewrites the source from the record
+   * whenever the switch is edited. So `uid`, `gradeType` and `grade` are copies: editing them here
+   * changes the copy, and the next edit of the switch puts them back. Read-only, and the hints say
+   * where the real field is.
+   *
+   * They are worth showing because they are the whole behaviour. `setPointValue` broadcasts with
+   * `vo.getGradeType().value()` and `vo.getGrade()` -- which level of the hierarchy, and which id
+   * within it. The point carries nothing; the source is the address.
+   *
+   * `quantize` and `timePeriod` are hidden because they are not real. The schema composes
+   * `AbstractPollingDataSourceModel` through a `@Schema(allOf = ...)` annotation, but
+   * `VirtualSwitchDataSourceModel extends AbstractDataSourceModel` and
+   * `VirtualSwitchDataSourceVO extends DataSourceVO` -- neither is the polling type. With
+   * `FAIL_ON_UNKNOWN_PROPERTIES` off, both fields are dropped in silence, and `timePeriod` is
+   * marked **required** in the component the annotation pulls in, so a form that showed it would
+   * demand a value that goes nowhere. **D138.**
+   */
+  'VIRTUAL_SWITCH.DS': {
+    provisionedPoints: true,
+    hidden: ['quantize', 'timePeriod'],
+    readonly: ['uid', 'gradeType', 'grade'],
+    options: {gradeType: VIRTUAL_SWITCH_GRADE_TYPES},
+    hints: {
+      uid: 'The switch\'s own identifier, copied from the light-commissioning record. Change it '
+        + 'there: an edit here is overwritten the next time that record is saved.',
+      gradeType: 'Which level of the location hierarchy this switch broadcasts to. Sent as the '
+        + 'level\'s own number, which is why the two "None" entries differ.',
+      grade: 'Which id at that level the broadcast is addressed to. Copied from the '
+        + 'light-commissioning record with the rest.'
+    },
+    rows: [['uid'], ['gradeType', 'grade']]
+  },
+
+  /**
+   * The one point a virtual switch has, which carries no configuration at all.
+   *
+   * `VirtualSwitchPointLocatorModel.toVO` hardcodes both fields the schema offers --
+   * `vo.setSettable(true)` and `vo.setDataTypeId(DataTypes.MULTISTATE)` -- so a submitted value for
+   * either is read and thrown away. Shown rather than hidden because both are true statements about
+   * the point: it is settable, and setting it takes a multistate. **D139.**
+   *
+   * `controlCommand` is hidden because it does nothing. It is read and written by
+   * `VirtualSwitchPointLocatorModel` and by nothing else in the gateway -- no runtime, no data
+   * source, no publisher reads it, which a stack-wide search for `getControlCommand` confirms. The
+   * command that is actually issued comes from the **set value**:
+   * `VirtualSwitchDataSourceRT.setPointValue` switches on
+   * `valueTime.getValue().getIntegerValue()` and broadcasts a brightness per case (1-4 for 10-40%,
+   * 10 for full, 11 for off, 12 for half). The schema's description -- "Multistate control command
+   * the virtual switch issues when this point is set" -- describes what it was meant to do.
+   * **D140.** Hiding it is safe because the dialog spreads the stored model before the rendered
+   * fields, so the value a point already holds is carried through the save untouched.
+   *
+   * `relinquishable` is hidden for the stronger reason that `toVO` does not carry it.
+   */
+  'VIRTUAL_SWITCH.PL': {
+    hidden: ['relinquishable', 'configurationDescription', 'controlCommand'],
+    readonly: ['dataType', 'settable'],
+    hints: {
+      dataType: 'Always multistate. The gateway sets it on every save whatever is sent, because a '
+        + 'switch command is a state rather than a measurement.',
+      settable: 'Always true, and set by the gateway rather than stored: writing to this point is '
+        + 'the only thing it is for.'
+    }
+  },
 
   /**
    * One node on the Wirepas mesh, as a data source.

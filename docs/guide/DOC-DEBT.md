@@ -72,3 +72,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `5076202e10` fix(gateway): lock the light controllers' settable before it repeats row 20
 - [ ] `6ab9a34bf0` fix(gateway): say that the current sensor's frequency is invented, and file three more
 - [ ] `9db5457513` feat(gateway): lay out the three asset tags, checking settable's source first
+- [ ] `9edb565005` feat(gateway): lay out the two Modbus slave shapes, which cannot be saved at all

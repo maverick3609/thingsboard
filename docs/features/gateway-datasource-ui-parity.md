@@ -1721,22 +1721,47 @@ secrecy off the mapper, so masking without the matching empty-drop would let a c
 stored token, and the read carries it anyway. The field stays a plain box and the finding carries
 the weight.
 
-**`connectionTimeoutSeconds` is hidden because nothing reads it.** Declared on the VO with a default
-of 10, serialised, mapped both ways, and written once more by the discovery path — but never *read*
-anywhere in the tree, where `retries`, the only other tuning field, is checked by the runtime on
-every attempt. **D98.** A data source saves
-with `PATCH`, so hiding the field keeps whatever is stored.
+**`connectionTimeoutSeconds` is hidden because nothing reads it**, and the decisive evidence is not
+the absence of a reference — it is `PoeLightingService`'s `new RestTemplate()`, built with no
+`ClientHttpRequestFactory`, so the only HTTP client the module owns has no configurable timeout for
+the field to feed. It is nonetheless declared on the VO with a default of 10, mapped both ways,
+written once more by discovery, and **offered to the operator as an editable box in the gateway's
+own editor** — which is the part of **D98** worth reading, since anyone checking it will find the
+field plainly visible there.
+
+Hiding it does not strand a value set in that editor, but not for the reason first written here. An
+earlier draft said "a data source saves with `PATCH`, so hiding the field keeps whatever is stored";
+the mechanism Cortex actually relies on is the explicit send — `pick` copies the key off the read
+model and `keep` passes it through, because `empty` is `null || undefined || ''` and a stored `0` or
+`10` is none of those. The `PATCH` merge is a second belt behind that, not the first.
+
+It is **defaulted although it is hidden**, which was missing until the review and looks redundant
+until you line the two tuning fields up: they have the identical three-way split — VO 10, REST model
+0, discovery 10 — so an add that dropped the key stored 0, and the next person to open that source
+in the gateway's own form read a timeout of 0 where every other source reads 10. Cortex should not
+write a value into a field it refuses to show.
 
 **Three defaults for `retries`, and we seed the VO's.** The VO initialises 2, the REST model 0, and
 the discovery path sets 3. Measured: a POST omitting the field stores 0, which means the first
 failure is the last. The VO's own initialiser is what a form building a fresh source should start
 from, so the layout seeds 2 and the disagreement is **D99**.
 
-**Stricter than the gateway, deliberately, and said so.** `ipAddress` and `token` are `required` and
-`channelId` has a floor of 1, none of which the gateway checks. This is the thing row 11 got wrong
-on `valuePointer` — but the test it failed was whether an empty value is a *configuration*. There, a
-write-only point with no pointer was one. Here an empty address or token is a source that can never
-reach anything, and channel 0 is a channel no controller has.
+**Stricter than the gateway — and than its own UI — deliberately.** `ipAddress` and `token` are
+`required` and `channelId` has a floor of 1. The gateway checks none of them, and its own editor
+leaves the first two optional as well, though it does mark `channelId` required. This is the thing
+row 11 got wrong on `valuePointer`, so the justification has to be the mechanism and not the
+omission: `HttpHeaders.setBearerAuth` has no null check, so a null token ships `Authorization:
+Bearer null` and a blank one ships `Authorization: Bearer `, on every call the module makes. An
+empty token is not a configuration that means something else — it is a source whose every request
+fails authentication. That is the test `valuePointer` failed, where a write-only point with no
+pointer genuinely was a configuration. Channel 0 is a channel no controller has.
+
+> **The lockout risk is closed by a placeholder, which is a dependency rather than a guarantee.**
+> `required: ['token']` could have made every discovered row unsaveable from Cortex. It does not,
+> because discovery takes the token from `systemSettingsDao.getValue(POE_LIGHTING_TOKEN)` and that
+> key's definition supplies the literal default `"your-token-here"` — so a discovered source always
+> carries something. If that placeholder is ever dropped, this `required` becomes a lockout on every
+> row the gateway made. Written down so the next person to touch either end can see the coupling.
 
 `alarmLevels` finally earns the Advanced group it has sat in since G7.1: this is the first type in
 the sequence with real event types — communication failure and device failure, both URGENT.

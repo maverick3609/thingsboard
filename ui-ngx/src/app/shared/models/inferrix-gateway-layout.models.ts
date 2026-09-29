@@ -689,6 +689,12 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    *
    * `relinquishable` is hidden because `VirtualMeshNodePointLocatorModel.toVO` never reads it: a
    * value typed there is discarded in the mapper, before the gateway sees the point at all.
+   *
+   * `dataType` read-only is the one place the mapper's blanket `required` on a locator's data type
+   * cannot bite: a disabled control is left out of Angular's validation entirely, so the rule is inert
+   * here. It does not matter, because `provisionedPoints` on the data source removes the Add button --
+   * there is no path through this form that could post an empty one -- and an edit carries the stored
+   * type in from `fromVO`. If that data source ever gains an Add button, this needs a default.
    */
   'VIRTUAL_MESH_NODE.PL': {
     hidden: ['relinquishable', 'configurationDescription'],
@@ -879,8 +885,11 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * the script's first 40 characters. `scriptEngine` is hidden for the opposite reason — it is a
    * one-value enum, so there is nothing to choose, and it still has to be *sent*: the model maps it
    * through `ExportCodes.getId`, which answers `-1` for an absent value, and `-1` is not the
-   * JavaScript engine. It is defaulted rather than dropped for that reason, and the same goes for
-   * `dataType`, whose own `getId` answers `-1` just as quietly (filed as a stack open item).
+   * JavaScript engine. Since stack 5.1.3 the gateway defaults it itself (**D66**, measured: an omitted
+   * `scriptEngine` reads back `JAVASCRIPT`), so the default here is belt-and-braces and the thing that
+   * keeps this form working against an older gateway. `dataType` was the same quiet `-1`; that one is
+   * now **refused** rather than stored (**D65**), which is why the mapper marks every locator's data
+   * type required.
    *
    * **`scriptPermissions` is hidden, and that is a security decision rather than a tidiness one.**
    * It names the groups the script runs *as*, and `NashornScriptEngineDefinition.createEngine` reads
@@ -945,7 +954,6 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
   'SNMP.DS': {
     advanced: ['retries', 'timeout', 'trapPort', 'maxRequestVars', 'localAddress',
       'engineId', 'contextEngineId'],
-    sendEmpty: ['contextName'],
     options: {snmpVersion: SNMP_VERSIONS, authProtocol: SNMP_AUTH_PROTOCOLS,
       privProtocol: SNMP_PRIV_PROTOCOLS},
     visibleWhen: {
@@ -965,6 +973,13 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
       // passphrase box on a v3 source with no authentication, which is the rarer wrong thing.
       authPassphrase: {by: 'snmpVersion', values: ['v3']},
       privPassphrase: {by: 'snmpVersion', values: ['v3']}
+    },
+    hints: {
+      authPassphrase: 'Required once an authentication protocol other than None is chosen. Leave it '
+        + 'empty on an edit to keep the stored one — the gateway never sends a passphrase back, so an '
+        + 'empty box means unchanged, not cleared.',
+      privPassphrase: 'Required once a privacy protocol other than None is chosen. Empty means '
+        + 'unchanged on an edit, as above.'
     },
     defaults: {snmpVersion: 'v2c', port: 161, trapPort: 162, timeout: 1000, retries: 2,
       authProtocol: 'NONE', privProtocol: 'NONE'},
@@ -1140,6 +1155,11 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * accepted, `10.0.0.0/8` is refused with *"Integer parsing error in '0/8'"*.
    */
   'HTTP_RECEIVER.DS': {
+    // No hint on either list, although both now have a rule worth stating: an empty one is refused
+    // (stack 5.1.3) rather than accepted and then dropping every request. An array is delegated to
+    // `tb-dynamic-form`, which renders an array container with a title and no hint channel at all --
+    // see the spec that forbids the attempt. The seeded rows are what keeps an operator away from
+    // the rule; the gateway's refusal names the field if they get there anyway.
     defaults: {ipWhiteList: ['*.*.*.*'], deviceIdWhiteList: ['*']}
   },
 
@@ -1214,7 +1234,6 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    */
   'HTTP_JSON_RETRIEVER.DS': {
     advanced: ['setPointUrl'],
-    types: {bearerToken: FormPropertyType.textarea},
     required: ['url', 'timeoutSeconds', 'retries'],
     // `required` alone would not stop the value D78 is about: Angular counts `0` as an answer, and the
     // gateway's rules are `timeoutSeconds > 0` and `retries >= 0`.
@@ -1225,10 +1244,8 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     // an explicit row lands where its first field falls, and the schema declares `bearerToken` before
     // the `bearerAuth` that reveals it -- so left alone the box appears above its own switch.
     //
-    // It is also the first explicit row here to pair two types `PAIRABLE_TYPES` excludes -- a toggle
-    // beside a two-row textarea -- which `pack` allows because an explicit row is honoured
-    // unconditionally. Chosen over the alternative it replaces rather than because it reads well, and
-    // the first thing to look at on the on-screen pass this type owes. With the gate closed the row
+    // The pairing is a toggle beside a password box, which `PAIRABLE_TYPES` would allow on its own;
+    // `pack` honours an explicit row unconditionally either way. With the gate closed the row
     // collapses to the switch alone.
     rows: [['url'], ['timeoutSeconds', 'retries'], ['bearerAuth', 'bearerToken']]
   },
@@ -1259,11 +1276,16 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * at all: the missing-value branch it documents raises the parse event either way (**D77**).
    */
   'HTTP_JSON_RETRIEVER.PL': {
-    hidden: ['settable', 'relinquishable', 'ignoreIfMissing', 'configurationDescription'],
-    advanced: ['setPointName'],
+    hidden: ['relinquishable', 'configurationDescription'],
     required: ['valuePointer'],
     options: {dataType: NON_IMAGE_DATA_TYPES},
+    visibleWhen: {setPointName: {by: 'settable', values: [true]}},
     hints: {
+      settable: 'Lets the platform write this point back to the server it was read from. It needs a '
+        + 'Set point JSON key here and a Set point URL on the data source; without both, the gateway '
+        + 'refuses the point on its next save.',
+      setPointName: 'The JSON key the written value is sent under: the gateway POSTs '
+        + '{"<key>": <value>} to the data source\'s Set point URL.',
       valuePointer: 'Where the value is in the response, as a JSON Pointer: /data/0/temp. It has to '
         + 'start with a slash.',
       valueFormat: 'Numeric points: a number pattern, such as #.## — used only when the value arrives '
@@ -1272,13 +1294,19 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
       timePointer: 'Where that value\'s own timestamp is, as a JSON Pointer: /data/0/ts. Left empty, '
         + 'each value is stamped with the time of the poll.',
       timeFormat: 'Only read when the timestamp arrives as text: a date pattern, such as '
-        + 'yyyy-MM-dd HH:mm:ss. A number is taken as milliseconds since the epoch.'
+        + 'yyyy-MM-dd HH:mm:ss. A number is taken as milliseconds since the epoch.',
+      ignoreIfMissing: 'When the value pointer finds nothing in a response, leave the point alone '
+        + 'instead of raising a parse alarm. The poll still counts as parsed. For a response whose '
+        + 'shape varies between polls.'
     },
     defaults: {dataType: 'NUMERIC'},
     // Data type first, because it decides what the two format fields mean. `valueFormat` takes a row
     // of its own so that the timestamp pair stays a pair: left to fall where it likes it would take
-    // `timePointer` with it and leave `timeFormat` on its own.
-    rows: [['dataType', 'valuePointer'], ['valueFormat'], ['timePointer', 'timeFormat']]
+    // `timePointer` with it and leave `timeFormat` on its own. The two switches share the last row;
+    // `setPointName` joins `settable` for the same reason `bearerToken` joins its own toggle on the
+    // data source, and the row collapses to one control while the gate is closed.
+    rows: [['dataType', 'valuePointer'], ['valueFormat'], ['timePointer', 'timeFormat'],
+      ['ignoreIfMissing'], ['settable', 'setPointName']]
   },
 
   /**
@@ -1315,47 +1343,40 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
   /**
    * One monitored value, named by an id the gateway will not enumerate.
    *
-   * `monitorId` is the only field `InternalPointLocatorModel.toVO` reads -- it builds a fresh VO and
-   * sets that one property -- so everything else here is decorative and `dataType` is {@link readonly}
-   * rather than a dropdown that would lie. A submitted type is dropped and the VO's own `NUMERIC`
-   * stored, so nothing created through REST can be anything else (**D84**) -- while the live
-   * `hardware.name` point *is* `ALPHANUMERIC`, because `maybeCreatePoints` sets that one xid's type in
-   * Java, on every boot. Seeded `NUMERIC`, which is what an add will store. Not on an edit:
-   * `gatewayFormDefaults` is called from the add paths only, so an existing point shows the type it
-   * actually has -- and the hint is then the sole warning that saving it resets that type to `NUMERIC`.
+   * Both fields are real since stack 5.1.3. `InternalPointLocatorModel.toVO` copies the data type now
+   * (**D84**), so the dropdown is a dropdown -- it was {@link readonly} while the mapper discarded it
+   * and kept the VO's `NUMERIC`, which also meant a `PUT` on the gateway's own ALPHANUMERIC
+   * `internal_name_hardware` point reset it. Measured: `ALPHANUMERIC` now reads back `ALPHANUMERIC`.
    *
-   * It is {@link required} because an absent id is a 422 -- `getMonitor(null)` throws inside the
-   * validator's `try` -- while a **wrong** id is accepted 201 and then reads nothing for ever, because
-   * `getMonitor` answers an unknown id with null rather than an exception and the `catch` never fires
-   * (**D85**). Nothing on this side can tell the two apart, which is the other reason the hint spells
-   * out what an id looks like: `GET /v2/stack-monitor` lists 98 monitors by translated name and
-   * **omits the id** (**D83**), so there is no list to pick from and no way to check one short of
-   * saving it.
+   * `IMAGE` is off the list even so, and this one is ours rather than the gateway's:
+   * `InternalDataSourceRT.doPoll` writes a monitor's value through two branches, `Number` and
+   * `String`, so an image point can be saved -- measured 201 -- and will never hold a value. The same
+   * shape as the three locators **D82** closed, on a type D82 did not reach, filed as **D89**.
    *
-   * Seeded with the monitor `InternalPointLocatorVO` itself starts on. Safe to put a device-side id in
-   * this table because that one is not optional: `StackMonitoringService` is a plain `@Component` and
-   * creates it in its constructor, unconditionally, and `internal-ds` compiles against that class -- so
-   * a gateway with this data source type has the monitor. Measured resolving to "Waiting High Priority
-   * Threads". A new point is therefore savable as it opens, and shows the shape of an id at the same
-   * time, which given D83 is the only teaching material there is.
+   * `monitorId` is {@link required} because the gateway refuses both an absent id and one no monitor
+   * answers to (**D85**, measured 422 *"No monitor with id …"*), and it is a picker rather than a text
+   * box because `GET /v2/stack-monitor` publishes each monitor's id alongside its translated name
+   * (**D83**). Both were the reverse a day ago: a wrong id saved 201 and read nothing for ever, and
+   * the 98-row monitor list carried no id to pick from. {@link InternalPointFormComponent} fills the
+   * list; the seeded default is what the form falls back to when the gateway cannot be reached.
    */
   'INTERNAL.PL': {
     hidden: ['settable', 'relinquishable', 'configurationDescription'],
-    readonly: ['dataType'],
     required: ['monitorId'],
+    options: {dataType: NON_IMAGE_DATA_TYPES},
     hints: {
-      monitorId: 'The monitor\'s id, which is not the name the Stack Monitor page shows. They look '
-        + 'like java.lang.Runtime.freeMemory, com.inferrix.stack.dao.DataPointDao.COUNT or '
-        + 'stack.system.uptime. An id no monitor answers to is accepted and then reads nothing, so '
-        + 'check the value after the first poll.',
-      dataType: 'Always Numeric on a point saved from here: the gateway rebuilds the locator and keeps '
-        + 'only the monitor id, so it cannot be told that a monitor reports text.'
+      monitorId: 'Which monitored value this point reads. The list comes from the gateway; where it '
+        + 'is empty the gateway could not be reached and this is the id itself, which is not the name '
+        + 'the Stack Monitor page shows — they look like java.lang.Runtime.freeMemory or '
+        + 'com.inferrix.stack.dao.DataPointDao.COUNT.',
+      dataType: 'How the value is stored. Numeric for a count, a size or a load; Alphanumeric for a '
+        + 'monitor that reports text, such as the hardware name.'
     },
     defaults: {monitorId: 'com.inferrix.stack.rt.maint.WorkItemMonitor.highPriorityWaiting',
       dataType: 'NUMERIC'},
-    // Schema order puts `dataType` first, which would open the form on a greyed box and push the one
-    // field that carries the meaning below it. A row each rather than a pair: an id is 60-odd
-    // characters and half a line cuts it off mid-package.
+    // Schema order puts `dataType` first, which would open the form on the secondary field. A row each
+    // rather than a pair: an id is 60-odd characters and half a line cuts it off mid-package, and the
+    // picker shows the name rather than the id only once the gateway has answered.
     rows: [['monitorId'], ['dataType']]
   }
 };

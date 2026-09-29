@@ -488,11 +488,18 @@ describe('gateway form layouts', () => {
         .toEqual({by: 'snmpVersion', values: ['v3']}));
   });
 
-  it('sends an empty context name on v3, because absent is the one value refused', () => {
-    // Measured on 5.1.x: `contextName` absent is 422 "Required value", `""` is 201, and `engineId`
-    // is the other way round -- absent is fine, `""` is 422 `validate.minLength`. So one of the two
-    // is named here and the other must not be.
-    expect(snmp.sendEmpty).toEqual(['contextName']);
+  it('sends neither v3 optional field, because stack 5.1.3 accepts both absent and blank', () => {
+    // It used to need `sendEmpty: ['contextName']`: absent was 422 "Required value" while `""` was
+    // 201, and `engineId` refused the opposite -- absent fine, `""` a 422 `validate.minLength`. D69
+    // made blank count as absent on both, measured 201 with the pair omitted and 201 with both `""`,
+    // so the workaround is gone and nothing here may put it back.
+    expect(snmp.sendEmpty).toBeUndefined();
+    // The two passphrases now carry the rule the gateway enforces (D70): a protocol other than NONE
+    // requires one. Not `required`, because both are gated -- a closed gate with a required empty
+    // control would dead-end the save with nothing on screen to fix.
+    expect(snmp.hints.authPassphrase).toContain('Required');
+    expect(snmp.hints.privPassphrase).toContain('Required');
+    expect(snmp.required).toBeUndefined();
   });
 
   const mqtt = GATEWAY_FORM_LAYOUTS['MQTT.DS'];
@@ -597,7 +604,11 @@ describe('gateway form layouts', () => {
     // nothing validates `dataType` on any of the three, so an IMAGE point saves 201 and then fails
     // every poll for ever. `HTTP_RECEIVER.PL` is deliberately absent: `PointValue.stringToValue` has a
     // real `DataTypes.IMAGE` branch, so a receiver point can carry one.
-    ['VIRTUAL.PL', 'META.PL', 'SNMP.PL', 'HTTP_JSON_RETRIEVER.PL'].forEach(modelType =>
+    // `INTERNAL.PL` joined the list once its data type started reaching storage at all (D84):
+    // `InternalDataSourceRT.doPoll` writes a monitor value through a `Number` branch and a `String`
+    // branch and has nothing that can produce an image. Measured 201, so this one is ours to refuse --
+    // filed as D89.
+    ['VIRTUAL.PL', 'META.PL', 'SNMP.PL', 'HTTP_JSON_RETRIEVER.PL', 'INTERNAL.PL'].forEach(modelType =>
       expect(GATEWAY_FORM_LAYOUTS[modelType].options.dataType.map(item => item.value))
         .withContext(modelType)
         .toEqual(['BINARY', 'MULTISTATE', 'NUMERIC', 'ALPHANUMERIC']));
@@ -798,28 +809,37 @@ describe('gateway form layouts', () => {
     expect(retriever.advanced).toEqual(['setPointUrl']);
   });
 
-  it('leaves the bearer token clearable, and gates it on the switch that sends it', () => {
-    // Deliberately not a password, unlike every other credential here. The schema does not mark it
-    // `writeOnly`, so the read carries the token and the box is always populated -- and `keep()` drops
-    // an empty password rather than sending it, which would make a stored token impossible to remove.
-    expect(retriever.types.bearerToken).toBe(FormPropertyType.textarea);
+  it('says nothing about the bearer token\'s type, and gates it on the switch that sends it', () => {
+    // It was a textarea on purpose: the schema did not mark it `writeOnly`, so the read carried the
+    // token, and typing it `password` would have masked a value `keep()` then dropped when emptied --
+    // making a stored token impossible to remove. D79 marked it `writeOnly`, so the mapper types it
+    // `password` on its own and the empty-drop is exactly right: the read no longer carries it and
+    // blank means unchanged, which is what `SecretFields.merge` does for all four credentials on this
+    // gateway. Measured: the token is absent from `GET /v2/data-source/{xid}`. A layout type here
+    // would now be overriding the schema rather than compensating for it.
+    expect(retriever.types).toBeUndefined();
     expect(retriever.visibleWhen.bearerToken).toEqual({by: 'bearerAuth', values: [true]});
   });
 
   it('requires a retriever point\'s pointer and seeds its data type', () => {
     // `pollPoints` collects only the points whose `valuePointer` is non-null, so a point saved without
-    // one is silently never read. Nothing validates `dataType` on this locator, so an absent one
-    // stores -1 and reads back null.
+    // one is silently never read. The data type used to store -1 and read back null; since D65 it is
+    // refused outright, which is why the mapper marks it required for every locator and the seed here
+    // is what stops that refusal being the operator's first contact with the rule.
     expect(retrieverPoint.required).toEqual(['valuePointer']);
     expect(retrieverPoint.defaults).toEqual({dataType: 'NUMERIC'});
   });
 
-  it('hides the three retriever locator fields no code reads', () => {
-    // `isSettable()` is a hard false, `toVO` never reads `relinquishable`, and `ignoreIfMissing` is
-    // stored and mapped and then read by nothing: the branch it documents raises the parse event
-    // either way.
-    expect(retrieverPoint.hidden)
-      .toEqual(['settable', 'relinquishable', 'ignoreIfMissing', 'configurationDescription']);
+  it('hides only the retriever locator field no code reads, now that two are read', () => {
+    // `relinquishable` is still discarded in `toVO`. The other two were hidden for the same reason and
+    // are not any more: D76 made `isSettable()` answer the stored field, which is the only entrance to
+    // a fully-written set-point path, and D77 made `ignoreIfMissing` suppress the parse event it was
+    // always meant to suppress. Measured: `settable: true` without a `setPointName` is a 422 naming
+    // `setPointName`, which is what the hint and the gate are for.
+    expect(retrieverPoint.hidden).toEqual(['relinquishable', 'configurationDescription']);
+    expect(retrieverPoint.visibleWhen.setPointName).toEqual({by: 'settable', values: [true]});
+    expect(retrieverPoint.hints.settable).toContain('Set point URL');
+    expect(retrieverPoint.advanced).toBeUndefined();
   });
 
   const internal = GATEWAY_FORM_LAYOUTS['INTERNAL.DS'];
@@ -834,14 +854,13 @@ describe('gateway form layouts', () => {
     expect(internal.provisionedPoints).toBeUndefined();
   });
 
-  it('disables the internal point\'s data type, because the gateway drops what it is sent', () => {
-    // `InternalPointLocatorModel.toVO` builds a fresh VO and sets `monitorId` alone, so a submitted
-    // data type never reaches storage and the VO's own NUMERIC is kept. Measured: a point posted
-    // ALPHANUMERIC reads back NUMERIC. A dropdown here would be a lie, and the seed shows what will
-    // really be stored.
-    expect(internalPoint.readonly).toEqual(['dataType']);
+  it('offers the internal point\'s data type, now that the gateway keeps what it is sent', () => {
+    // It was {@link readonly} while `InternalPointLocatorModel.toVO` built a fresh VO and set
+    // `monitorId` alone -- a submitted type never reached storage, and a PUT on the gateway's own
+    // ALPHANUMERIC point reset it. D84 made the model copy it like the other 53. Measured:
+    // ALPHANUMERIC reads back ALPHANUMERIC.
+    expect(internalPoint.readonly).toBeUndefined();
     expect(internalPoint.defaults.dataType).toBe('NUMERIC');
-    expect(internalPoint.options).toBeUndefined();
   });
 
   it('requires a monitor id and seeds one that exists', () => {

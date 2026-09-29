@@ -278,7 +278,17 @@ export const schemaToFormProperties = (doc: GatewaySchemaDocument, family: strin
   if (!schema) {
     return [];
   }
-  return propertiesOf(schema, doc, 0, new Set<string>());
+  const properties = propertiesOf(schema, doc, 0, new Set<string>());
+  // Every one of the 62 point locators declares `dataType`, none of them marks it required, and since
+  // stack 5.1.3 a point whose locator carries a type `DataTypes` does not declare is refused --
+  // including an omitted one, which resolves to -1, and an unset one, which is UNKNOWN (0). The check
+  // is in `DatapointService.validate`, the funnel every create and every update passes through, so
+  // it is not a property of any one type and does not belong in a per-type layout. A form that let
+  // the select stand empty would post null and collect a 422 for a field the operator can see.
+  return family === 'pointLocator'
+    ? properties.map(property =>
+        property.id === 'dataType' ? {...property, required: true} : property)
+    : properties;
 };
 
 /**

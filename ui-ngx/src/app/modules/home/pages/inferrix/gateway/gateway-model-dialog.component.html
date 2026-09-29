@@ -91,6 +91,16 @@
                               [disabled]="data.readonly" [(ngModel)]="locatorValues"
                               [ngModelOptions]="{standalone: true}"></tb-meta-point-form>
         }
+        <!--
+          `INTERNAL.PL` names one of the gateway's own monitored values, and the id it names is not
+          the name the Stack Monitor page shows.
+        -->
+        @case ('INTERNAL.PL') {
+          <tb-internal-point-form [properties]="data.locatorProperties"
+                                  [layout]="data.locatorLayout" [deviceId]="data.deviceId"
+                                  [disabled]="data.readonly" [(ngModel)]="locatorValues"
+                                  [ngModelOptions]="{standalone: true}"></tb-internal-point-form>
+        }
         @default {
           <tb-gateway-form [properties]="data.locatorProperties" [layout]="data.locatorLayout"
                            [disabled]="data.readonly" [(ngModel)]="locatorValues"

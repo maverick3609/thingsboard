@@ -1355,6 +1355,81 @@ acted on and one rejected with a reason.
    the defence is the sink and no longer the data. Anyone giving a hint an HTML sink later breaks it.
    The spec that asserted the escaping now asserts the description arrives verbatim, and says why.
 
+## What the 5.1.3 cut changed here
+
+The gateway closed D65-D88 on 2026-09-29. Eight of them are rules a form has to follow, so this is
+not only a ledger update. Everything below was **re-probed live against 5.1.3** on the team's local
+instance, which is back at its 21 sources / 106 points.
+
+**A locator's data type is now mandatory, on all 62 types.** `DatapointService.validate` refuses a
+locator whose `dataTypeId` is not in `DataTypes.CODES` (**D65**) — an omitted one resolves to `-1`,
+an unset one is `UNKNOWN` (0), and both are a 422 *"Invalid value"* against `dataType`. Every locator
+in the document declares the field and **none of them marks it required**, so the rule cannot come
+from the schema, and with 62 types it does not belong in a per-type layout either. It went into the
+mapper, on the family: `schemaToFormProperties` marks `dataType` required when `family` is
+`pointLocator`. Two layouts sit on top of it without conflict — `MODBUS.PL` hides the field, and a
+hidden field has no control to validate (Modbus derives the type from the register range anyway);
+`VIRTUAL_MESH_NODE.PL` disables it, and Angular leaves a disabled control out of validation
+entirely, which is inert rather than wrong because that source has `provisionedPoints` and so no Add
+button at all.
+
+**`INTERNAL.PL` got its two fields back.** `toVO` copies the data type now (**D84**), so the
+dropdown is a real dropdown rather than the disabled box that row 12 shipped — measured, an
+ALPHANUMERIC point reads back ALPHANUMERIC. And `GET /v2/stack-monitor` publishes each monitor's id
+(**D83**), so `monitorId` is a **picker** rather than an id typed from memory:
+`InternalPointFormComponent`, the third per-type component, 80 lines on the same `runtimeOptions()`
+hook the other two use. A wrong id is also refused now (**D85**, measured 422 *"No monitor with id
+…"*), which is what makes the picker a convenience rather than the only defence.
+
+**`IMAGE` is off the internal list too, and that one is ours.** D82 refused it on the three locators
+whose runtime throws; `INTERNAL.PL` was not one, because until D84 its submitted type was discarded.
+Now that it is kept, an IMAGE internal point saves 201 and can never hold a value —
+`InternalDataSourceRT.doPoll` has a `Number` branch and a `String` branch and nothing else. Filed as
+**D89**; the dropdown is narrowed in the meantime.
+
+**`HTTP_JSON_RETRIEVER.PL` lost two of its four hidden fields.** `isSettable()` answers the stored
+field (**D76**), which is the only entrance to a set-point path that was already fully written, and
+`ignoreIfMissing` now suppresses the parse event it always existed to suppress (**D77**). Both are
+shown. `setPointName` is gated on `settable` rather than required, because the invariant against a
+required field behind a closed gate is the right one — the gateway's refusal names it, and the field
+is on screen at exactly the moment the rule applies. Measured: `settable: true` with no
+`setPointName` is a 422 naming `setPointName`, and with one but no `setPointUrl` on the source it is
+*"The data source has no set point URL, so this point cannot be settable"* — which the hint says
+first.
+
+**The bearer token is a password now, and the layout says nothing about it.** D79 marked it
+`writeOnly`, so the mapper types it and `keep()` protects it. The textarea override that row 11
+shipped existed only because the schema did *not* mark it: the read carried the token, so masking it
+would have made a stored one impossible to clear. Measured on 5.1.3: `bearerToken` is absent from
+`GET /v2/data-source/{xid}`, and `SecretFields.merge` restores the stored value for null **or
+blank** — so an empty box means unchanged, as it does for the other three credentials on this
+gateway. The third Open decision below is settled by that, not by us.
+
+**`SNMP.DS` lost its `sendEmpty` workaround.** Row 8 had to send `contextName: ""` while omitting
+`engineId`, because the two refused opposite things. D69 made absent and blank both mean "not set"
+on both fields — measured 201 with the pair omitted and 201 with both `""`. The two passphrases
+carry a hint rather than `required`, for the gate reason above: D70 requires one once a protocol
+other than NONE is chosen, checked on the *merged* VO so an ordinary edit that omits an unchanged
+passphrase still passes.
+
+**Two things that need no change here, recorded so the next reader does not re-derive them.** D74
+confirms our whitelist seeds are the VO's own defaults (`*.*.*.*`, `*`), and D75 refuses an emptied
+list — which cannot be said in the UI, because an array is delegated to `tb-dynamic-form` and its
+array container has a title and no hint channel. D66 defaults `scriptEngine` server-side; the
+layout keeps its own default, which is now what lets this form work against an older gateway.
+
+**Three findings were mine and wrong.** D68 was fixed on 2026-09-22, five days before I filed it —
+I measured a `PUT` against an older jar, which is the same mistake in a different direction to every
+"read the Java first" note in this document. D72's central claim that the MQTT enum labels are
+missing is wrong: eleven of thirteen are present. D67's first table row is wrong:
+`dsEdit.meta.event.none` exists. The pattern in all three is a measurement or a grep taken as
+conclusive without the source beside it.
+
+**D73 stays a 400 on purpose, and the reason it existed is gone.** A `PATCH` carrying a polymorphic
+member still fails; the workaround it was filed to justify is unnecessary now that D68's fix makes a
+read-modify-write `PUT` safe. The verb asymmetry this feature works to is unchanged — sources
+`PATCH`, points and publishers `PUT` — but the reason to prefer `PATCH` for a secret is not.
+
 ## Per-type components
 
 Settled 2026-09-25, after the question was raised directly: **is one renderer for 148 model types
@@ -1433,9 +1508,12 @@ pass that rows 6-11 are already owed.
 
 ## Handed over
 
-Defects found in the gateway's own webapp while matching its forms. Written up in
-`inferrixstack-webapp/docs/2026-09-25-webapp-open-items.md`; nothing in that repository was
-changed.
+**Closed by the gateway on 2026-09-29, in stack `eb391cb75` (5.1.3).** Every finding D65-D88 is
+resolved or answered in one cut; each of the six specs carries a Resolution section. Three fixes
+went into core rather than onto the type that exposed them (D65, D81, D86), which is the right call
+and the reason this feature files findings at all. What changed on this side is recorded under
+[What the 5.1.3 cut changed here](#what-the-513-cut-changed-here). Three of the findings were mine
+and wrong, or stale, and are recorded there too. D73 is deliberately not fixed and D89 is new.
 
 - **D65 (P2)** — `DataTypes.CODES.getId(null)` answers `-1`, and **53 locator models** convert
   `dataType` through it with no guard. A locator posted without one is accepted 201 and stores `-1`,

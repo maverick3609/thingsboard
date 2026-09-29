@@ -245,6 +245,25 @@ describe('inferrix-gateway-schema.models', () => {
     });
   });
 
+  describe('the locator data type', () => {
+
+    it('is required on every point locator, and on nothing else', () => {
+      // Stack 5.1.3 refuses a point whose locator carries a data type `DataTypes` does not declare,
+      // in `DatapointService.validate` -- the funnel every create and every update passes through.
+      // An omitted `dataType` resolves to -1 and an unset one is UNKNOWN (0); neither is in the code
+      // table, and both are measured 422 *"Invalid value"* against `dataType`. All 62 locators
+      // declare the field and none of them marks it required, so the rule cannot come from the
+      // schema and does not belong in a per-type layout either.
+      const locator = schemaToFormProperties(doc, 'pointLocator', 'MODBUS.PL')
+        .find(property => property.id === 'dataType');
+      expect(locator.required).toBe(true);
+      // Not applied to a family that has no locator. `alarmLevels` and the rest keep what the schema
+      // said, and a data source that happened to carry a `dataType` would keep it too.
+      schemaToFormProperties(doc, 'dataSource', 'MODBUS_IP.DS')
+        .forEach(property => expect(property.required).withContext(property.id).toBeFalsy());
+    });
+  });
+
   describe('the type mapping', () => {
 
     const mapped = (schema: any) => schemaToFormProperties(

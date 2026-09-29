@@ -14,6 +14,14 @@ export interface GatewayAbout {
 
 /** `GET /v2/stack-monitor` — a bare array, not a page. */
 export interface GatewayMonitorValue {
+  /**
+   * The id a point locator names, added by stack 5.1.3 (D83).
+   *
+   * Not derivable from `name`, which is translated -- "Schedules" is
+   * `com.inferrix.stack.dao.ScheduleDao.COUNT` -- so before this field existed the monitor list
+   * could be displayed and not picked from.
+   */
+  id?: string;
   name?: string;
   value?: any;
 }

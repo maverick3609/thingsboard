@@ -1634,8 +1634,13 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * it refuses to show. A knob that stores a value and changes no behaviour is worse than no
    * knob, and the field keeps its stored value because a data source saves with `PATCH`.
    *
-   * `alarmLevels` really has rows on this type -- communication failure and device failure, both
-   * URGENT -- which is the first time in the sequence it is worth the Advanced group it sits in.
+   * `alarmLevels` really has rows on this type -- communication failure and device failure. Not the
+   * first type in the sequence to declare event types (`ModbusDataSourceVO` declares three, and
+   * MQTT, SNMP, BACnet and META each declare at least one), and their URGENT level is not
+   * distinctive either: the two-argument `createEventType` already defaults to URGENT, and only
+   * `IGNORE_SAME_MESSAGE` differs from the default duplicate handling. What is true is narrower --
+   * this is the first type *instantiated on the bench gateway* whose `alarmLevels` reads back
+   * non-empty, where VIRTUAL, MESH_CONTROLLER, INTERNAL and PING all read `[]`.
    */
   'POE_LIGHTING.DS': {
     hidden: ['connectionTimeoutSeconds'],

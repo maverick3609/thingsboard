@@ -1676,8 +1676,8 @@ address, because `InetAddress.getByName` resolves either and the label does not 
 a point on `example.invalid` saves 201. The timeout hint names the floor rather than the refusal, so
 the rule reads as a property of the field instead of an error waiting to happen.
 
-*Verified:* layout, schema and form specs green (99 / 41 / 13); every rule above measured against
-5.1.3 on the local instance and every probe row deleted. The on-screen pass is owed with rows 6–13.
+*Verified:* layout, schema and form specs green (112 / 41 / 14) and `tsc -p src/tsconfig.app.json`
+exit 0; every rule above measured against 5.1.3 on the local instance and every probe row deleted. The on-screen pass is owed with rows 6–13.
 
 ### 15 — `POE_LIGHTING.DS` / `POE_LIGHTING.PL` (done, 2026-09-29)
 
@@ -1763,11 +1763,18 @@ pointer genuinely was a configuration. Channel 0 is a channel no controller has.
 > carries something. If that placeholder is ever dropped, this `required` becomes a lockout on every
 > row the gateway made. Written down so the next person to touch either end can see the coupling.
 
-`alarmLevels` finally earns the Advanced group it has sat in since G7.1: this is the first type in
-the sequence with real event types — communication failure and device failure, both URGENT.
+`alarmLevels` is non-empty here — communication failure and device failure. An earlier draft called
+this "the first type in the sequence with real event types", which is false: `ModbusDataSourceVO`
+declares three and Modbus is row 3, and MQTT, SNMP, BACnet and META each declare at least one. Their
+URGENT level is not distinctive either — the two-argument `createEventType` already defaults to
+URGENT, and only `IGNORE_SAME_MESSAGE` differs from the default duplicate handling. What the row
+actually measured, and all it supports, is that this is the first type **instantiated on the bench
+gateway** whose `alarmLevels` reads back non-empty, where VIRTUAL, MESH_CONTROLLER, INTERNAL and
+PING all read `[]`.
 
-*Verified:* 104 layout specs green; every rule above measured against 5.1.3 on the local instance,
-probe rows deleted. The on-screen pass is owed with rows 6–14.
+*Verified:* 112 layout specs green and `tsc -p src/tsconfig.app.json` exit 0; every rule above
+measured against 5.1.3 on the local instance, probe rows deleted. The on-screen pass is owed with
+rows 6–14.
 
 ### 16 — `SCRIPTING.DS` / `SCRIPTING.PL` (done, 2026-09-29)
 
@@ -2119,7 +2126,10 @@ and wrong, or stale, and are recorded there too. D73 is deliberately not fixed a
 - **D99 (P3)** — neither `validate` overload has a body, and `retries` has three different defaults
   (VO 2, REST model 0, discovery 3).
 - **D100 (P3)** — the create response reports `settable: false` for a point whose stored locator is
-  `settable: true`; a GET immediately after disagrees with it.
+  `settable: true`; a GET immediately after disagrees with it. Both halves measured here: the create
+  response carried top-level `"settable": false` beside `pointLocator.settable: true`, and
+  `GET /v2/data-point/{xid}` on the same row answered `settable: true`. (Row 15/16's review saw the
+  first half and flagged that it had not run the second; it had been run.)
 
 **Filed 2026-09-29, from row 16.** In
 `Inferrix-stack/docs/specs/2026-09-29-scripting-rest-surface.md`.

@@ -1624,11 +1624,21 @@ if (StringUtils.isEmpty(pl.getIpAddress())) {
 }
 ```
 
-Measured, all five: an empty address is 422 *"Required value"*; an omitted address the same; `-5`,
-`0` and an omitted timeout are each 422 *"Cannot be 0"*. So `required: ['ipAddress']` and
-`min: {timeout: 1}` are the gateway's own rules moved forward to where the operator can see them,
-not a Cortex invention — which is the distinction row 11 got wrong on `valuePointer` and had to back
-out. The `else if` and the message that says "0" for a negative are **D93** and **D94**.
+Measured, all six: an empty address is 422 *"Required value"*; an omitted address the same; `-5`,
+`0`, `null` and an omitted timeout are each 422 *"Cannot be 0"*. So `required` and `min` here are the
+gateway's own rules moved forward to where the operator can see them, not a Cortex invention — which
+is the distinction row 11 got wrong on `valuePointer` and had to back out. The `else if` and the
+message that says "0" for a negative are **D93** and **D94**.
+
+> **`timeout` needs both halves, and the first version of this row gave it only `min`.** Angular's
+> `minValidator` returns `null` — valid — for an empty control, so a floor on its own passes an
+> untouched box; the null then lands on the REST model's primitive `int` as 0, which is the value
+> the floor exists to refuse. The **add** path survived by luck: `keep()` drops the empty value and
+> `save()` spreads the seeded `1000` underneath. The **edit** path did not — `keep()` keeps the
+> null, and the operator meets the 422 that `min` was supposed to have moved forward. Row 11 had
+> already settled this on `timeoutSeconds`; the rule is now a spec — *a floor above zero is always
+> paired with `required`* — and a floor of exactly 0 is exempt, since a null becoming 0 is the floor
+> being met.
 
 > **The stack's own form has the pair backwards.** Its ping point form marks *timeout* `required`
 > and leaves *ipAddress* unmarked — the reverse of the two rules the validator enforces. This is
@@ -1644,13 +1654,16 @@ so `settable` and `relinquishable` are hidden; measured, both submitted true rea
 The published `settable` description names the locators that ignore the field and leaves `PING.PL`
 out of the list — **D95**.
 
-**Why `dataType` gets a default here and `MESH_CONTROLLER.PL` does not.** Both disable it, and a
-disabled control is left out of Angular's validation, so the mapper's blanket `required` on a
-locator data type is inert in both. The difference is the Add button: a mesh controller source has
-none (`provisionedPoints`), so no path through that form can post an empty type. A ping source has
-one, so `gatewayFormDefaults` has to seed what the control cannot supply. This is the case
-`VIRTUAL_MESH_NODE.PL`'s comment anticipated — *"if that data source ever gains an Add button, this
-needs a default"* — met for the first time.
+**Why `dataType` gets a default here — and the reason first written down was wrong.** The first
+draft of this section said the default was what keeps the blanket `required` on a locator data type
+from refusing a new point, since this source has an Add button where `MESH_CONTROLLER.PL` has none.
+That sentence concedes the premise that kills it: a disabled control is left out of Angular's
+validation, so the blanket rule is inert here whether or not a value is present, and there is
+nothing for a default to prevent. Measured afterwards: a `PING.PL` point posted with **no
+`dataType` key at all** reads back `BINARY`, and so does one posted `NOT_A_TYPE`, because
+`PingPointLocatorModel.toVO` never reads the field. The default's real job is smaller and worth
+keeping — it gives the disabled select an item to show, instead of a greyed empty box on a field
+whose whole purpose is to tell the operator what the point yields.
 
 **One label, shared.** `humanise` renders `ipAddress` as "Ip address"; the stack's own string is
 "IP address", and `POE_LIGHTING.PL` carries the same field, so it went in `FIELD_LABELS` rather than
@@ -1856,6 +1869,28 @@ guard is the part worth a test, and it has one.
 
 Every data type, unlike `VIRTUAL.PL`'s numeric-only attraction target: a script reads a binary
 point as usefully as a numeric one.
+
+### The tree did not compile for three commits, and the checks in this document did not notice
+
+Found by row 14's review, 2026-09-29. `363d3e15fd` removed `keep()`'s third parameter and fixed the
+call at `gateway-model-dialog.component.ts:209` but not the one at `:216`, which passes a locator
+layout. From that commit through `7fe38586ef` — row 14, row 15 and two doc commits — `ng build`
+would have failed. `344b7b47d5` repaired it by accident, restoring the third parameter for
+`SCRIPTING.DS.scriptPermissions`.
+
+Two things let it through, and both are worth fixing rather than noting:
+
+**The type check being run was not a type check.** Every "tsc clean" in this document was
+`npx tsc -p tsconfig.app.json --noEmit` run from `ui-ngx/`. There is no `ui-ngx/tsconfig.app.json` —
+`angular.json` points `architect.build.options.tsConfig` at **`src/tsconfig.app.json`**. The command
+answered `error TS5058: The specified path does not exist`, and the `grep -iE "inferrix|gateway"`
+filter wrapped around it swallowed that line along with everything else. A command that cannot fail
+visibly is not a check. **The invocation is `npx tsc -p src/tsconfig.app.json --noEmit`, and its
+exit status is the answer.**
+
+**Per-file karma does not cover for it.** `ng test --include='<one spec>'` compiles only that spec's
+import closure. No gateway spec imports `gateway-model-dialog.component.ts` — it has no spec of its
+own — so 104 green specs said nothing about the file the build was failing on.
 
 ## Our own known gaps
 

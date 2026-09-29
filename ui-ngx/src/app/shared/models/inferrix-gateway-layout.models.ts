@@ -1559,10 +1559,12 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * reachable or not can be. Measured: a point submitted `dataType: NUMERIC` saves 201 and reads
    * back `BINARY`.
    *
-   * Unlike `MESH_CONTROLLER.PL`, this data source has an Add button, so the default is what keeps
-   * the mapper's blanket `required` on a locator's data type from refusing a new point: a disabled
-   * control is left out of Angular's validation, and `gatewayFormDefaults` seeds the value the
-   * control cannot supply.
+   * The default is there so the disabled box reads "Binary" rather than empty. It is **not** what
+   * gets a new point past the mapper's blanket `required` on a locator data type -- nothing is,
+   * because a disabled control is left out of Angular's validation entirely, so that rule is inert
+   * here whether or not a value is present. Nor does the gateway need the key: measured, a point
+   * posted with no `dataType` at all reads back `BINARY`, and so does one posted `NOT_A_TYPE`,
+   * because `PingPointLocatorModel.toVO` never reads the field.
    *
    * `settable` is hidden because `isSettable()` is false by construction -- `PingDataSourceRT`'s
    * `setPointValue` is an empty method -- and `relinquishable` with it, since `toVO` never reads
@@ -1578,7 +1580,12 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     hidden: ['settable', 'relinquishable', 'configurationDescription'],
     readonly: ['dataType'],
     options: {dataType: BINARY_ONLY},
-    required: ['ipAddress'],
+    // Both, and `timeout` needs both halves. Angular's `min` validator returns null -- valid -- for
+    // an empty control, so a floor on its own passes an untouched box; the null then lands on the
+    // model's primitive `int` as 0, which is the value the floor exists to refuse. The add path
+    // survives by luck (the empty value is dropped and the seeded 1000 shows through), the edit path
+    // does not. Row 11 settled this on the same shape: `required` and `min` are companions.
+    required: ['ipAddress', 'timeout'],
     min: {timeout: 1},
     hints: {
       ipAddress: 'What to ping. A host name works as well as an address — the gateway resolves it '

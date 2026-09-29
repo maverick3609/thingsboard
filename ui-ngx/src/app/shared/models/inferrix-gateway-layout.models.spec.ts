@@ -723,15 +723,29 @@ describe('gateway form layouts', () => {
     expect(GATEWAY_FORM_LAYOUTS['PING.DS']).toEqual({});
   });
 
-  it('fixes a ping point to binary, and defaults it because this type has an Add button', () => {
+  it('fixes a ping point to binary, and defaults it so the disabled box is not empty', () => {
     // `getDataTypeId()` returns `DataTypes.BINARY` and `PingPointLocatorModel.toVO` copies
     // `ipAddress` and `timeout` alone, so a submitted type is not read at all -- measured, a point
-    // sent `NUMERIC` saves 201 and reads back `BINARY`. Unlike `MESH_CONTROLLER.PL` this source has
-    // an Add button, so the default is what answers the mapper's blanket `required` on a locator's
-    // data type: a disabled control is left out of validation and cannot supply the value itself.
+    // sent `NUMERIC` saves 201 and reads back `BINARY`, and so does one sent no `dataType` at all.
+    // The default is cosmetic: it gives the disabled select an item to show. It is not what gets a
+    // new point past the mapper's blanket `required`, which is inert on a disabled control either
+    // way.
     expect(pingPoint.readonly).toEqual(['dataType']);
     expect(pingPoint.options.dataType.map(item => item.value)).toEqual(['BINARY']);
     expect(pingPoint.defaults.dataType).toBe('BINARY');
+  });
+
+  it('never gives a field a floor above zero without also requiring it', () => {
+    // Angular's `minValidator` returns null -- valid -- when the control is empty, so a floor alone
+    // passes an untouched box. The null then lands on the REST model's primitive `int` as 0, which
+    // is exactly the value a floor above zero exists to refuse, and the operator meets the gateway's
+    // 422 instead of the form's own message. A floor of 0 does not need the pair: a null becoming 0
+    // is the floor being met.
+    Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
+      const required = new Set(layout.required ?? []);
+      Object.entries(layout.min ?? {}).filter(([, floor]) => floor > 0).forEach(([id]) =>
+        expect(required.has(id)).withContext(`${modelType}.${id}`).toBe(true));
+    });
   });
 
   it('carries the gateway\'s own two ping rules rather than a stricter pair', () => {
@@ -739,7 +753,7 @@ describe('gateway form layouts', () => {
     // Measured: 422 "Required value" on the address, 422 "Cannot be 0" for -5, 0 and an omitted
     // timeout alike. `min: 1` is the client-side half of the second, and the default keeps a new
     // point from opening on the value the gateway refuses.
-    expect(pingPoint.required).toEqual(['ipAddress']);
+    expect(pingPoint.required).toEqual(['ipAddress', 'timeout']);
     expect(pingPoint.min.timeout).toBe(1);
     expect(pingPoint.defaults.timeout).toBe(1000);
   });

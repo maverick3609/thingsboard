@@ -1399,6 +1399,14 @@ is on screen at exactly the moment the rule applies. Measured: `settable: true` 
 *"The data source has no set point URL, so this point cannot be settable"* — which the hint says
 first.
 
+**That second refusal has no right control to land on, and the hint is the whole mitigation.** The
+gateway files it against `setPointName`, a field the operator has filled in correctly, because a data
+point's validation response can only carry the data point's own fields — the value that is missing
+lives in the Advanced panel of the *data source* dialog. The message text names the real cause, which
+is the best the wire allows, so this is not filed as a defect on either side. A per-type point form
+could read the open source's `setPointUrl` and refuse the toggle before the round trip; that is one
+field on one type and is not worth a component until something else needs one.
+
 **The bearer token is a password now, and the layout says nothing about it.** D79 marked it
 `writeOnly`, so the mapper types it and `keep()` protects it. The textarea override that row 11
 shipped existed only because the schema did *not* mark it: the read carried the token, so masking it

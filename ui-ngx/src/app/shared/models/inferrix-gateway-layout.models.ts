@@ -619,6 +619,46 @@ const MESH_CONTROLLER_ATTRIBUTES: FormSelectItem[] = [
 const BINARY_ONLY: FormSelectItem[] = [{value: 'BINARY', label: 'Binary'}];
 
 /**
+ * The start-value gate shared by `VIRTUAL.PL` and `SYSTEM_ATTRIBUTES.PL`.
+ *
+ * Both parse the field from free text for every data type but binary, where the only two values
+ * that mean anything are the two words. `BinaryValue.parseBinary` takes `"1"` as well and answers
+ * ZERO for everything else, but the gateway's own two forms offer exactly this pair, and a list
+ * that silently turns a typo into "false" is worse than one with two items in it.
+ */
+const BINARY_START_VALUE: GatewayGatedOptions = {
+  by: 'dataType',
+  table: {BINARY: [{value: 'true', label: 'True'}, {value: 'false', label: 'False'}]},
+  unlisted: FormPropertyType.text
+};
+
+/**
+ * `attributeType`, by the data type it is legal for.
+ *
+ * The attribute type is not a label: it decides the **value class** the runtime produces.
+ * `BooleanAttributeRT` and `TimerAttributeRT` both answer a `BinaryValue`, `AnalogAttributeRT` a
+ * `NumericValue`, `AlphanumericAttributeRT` an `AlphanumericValue` -- so a point's attribute type
+ * and its data type have to agree or every write stores the wrong class. The gateway's own two
+ * front ends both know this: `AttributeTypeVO.getAttributeTypes(dataTypeId)` and the webapp's
+ * `dataTypeChange` carry the same three lists. Nothing on the REST path does -- measured, a NUMERIC
+ * point with a `BOOLEAN_ATTRIBUTE` is a 201 (D107) -- so this table is the only place the pairing
+ * is stated.
+ *
+ * No `unlisted`: the field only ever holds an enum constant, and the three keys here are exactly
+ * the data types the locator offers.
+ */
+const SYSTEM_ATTRIBUTE_TYPES: GatewayGatedOptions = {
+  by: 'dataType',
+  table: {
+    BINARY: [{value: 'BOOLEAN_ATTRIBUTE', label: 'Boolean'},
+      {value: 'TIMER_ATTRIBUTE', label: 'Timer'}],
+    NUMERIC: [{value: 'ANALOG_ATTRIBUTE', label: 'Analog'}],
+    ALPHANUMERIC: [{value: 'ALPHANUMERIC_ATTRIBUTE', label: 'Alphanumeric'}]
+  }
+};
+
+
+/**
  * `PoeLightingPointLocatorVO.PointType`, written out because the schema publishes the field as a
  * bare `{"type": "string"}` -- no enum, no description -- while `toVO` does
  * `PointType.valueOf(pointType)` on it. The values are the constant names, which is what the wire
@@ -649,6 +689,20 @@ const NON_IMAGE_DATA_TYPES: FormSelectItem[] = [
   {value: 'ALPHANUMERIC', label: 'Alphanumeric'}
 ];
 
+/**
+ * The three of those a system attribute has a runtime for.
+ *
+ * There is no `MultistateAttributeRT`: the four attribute types answer a binary, a numeric or an
+ * alphanumeric value and nothing else, so a MULTISTATE point would parse its start value as one
+ * (`createRuntime` does handle it) and then store the wrong class on the first write. The gateway's
+ * own webapp reaches the same conclusion from the other end -- its `dataTypeChange` falls through
+ * to an empty attribute-type list for MULTISTATE, which is a data type you cannot finish choosing.
+ * Dropping it here says so before the operator picks it. Measured: MULTISTATE saves 201 either way
+ * (D107).
+ */
+const SYSTEM_ATTRIBUTE_DATA_TYPES: FormSelectItem[] =
+  NON_IMAGE_DATA_TYPES.filter(item => item.value !== 'MULTISTATE');
+
 export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
 
   /**
@@ -671,11 +725,7 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
       changeType: {by: 'dataType', table: VIRTUAL_CHANGE_TYPES},
       // A binary point starts true or false and nothing else; every other data type parses its
       // start value from free text (`VirtualPointLocatorVO.getStartValue`).
-      startValue: {
-        by: 'dataType',
-        table: {BINARY: [{value: 'true', label: 'True'}, {value: 'false', label: 'False'}]},
-        unlisted: FormPropertyType.text
-      }
+      startValue: BINARY_START_VALUE
     },
     visibleWhen: {
       values: {by: 'changeType', values: ['INCREMENT_MULTISTATE', 'RANDOM_MULTISTATE']},
@@ -1814,6 +1864,86 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     },
     defaults: {dataType: 'NUMERIC'},
     rows: [['varName', 'dataType']]
+  },
+
+  /**
+   * A system attributes data source, which is not a source of anything.
+   *
+   * `SystemAttributesDataSourceVO extends DataSourceVO` -- not `PollingDataSourceVO` -- and adds no
+   * field, so there is no poll period and nothing to lay out. Its points are values the platform
+   * holds and the operator (or a script) writes; the source is a folder for them. Same empty entry
+   * as `META.DS`, for the same reason, and measured: a created source carries only `alarmLevels`,
+   * the purge pair, `editPermission`, `enabled` and the identity fields.
+   */
+  'SYSTEM_ATTRIBUTES.DS': {},
+
+  /**
+   * One value the platform holds, as a point.
+   *
+   * Four kinds, and `attributeType` picks which. Boolean, analog and alphanumeric each hold what
+   * they are written; **timer** is the one that does something: writing `true` drops the point to
+   * false and schedules it back to true `timerValue` seconds later
+   * (`SystemAttributesDataSourceRT.startTimer`, `getTimerValue() * 1000L`), and writing `false`
+   * cancels a pending one.
+   *
+   * **A missing `attributeType` skips validation rather than failing it.** The field is a bare
+   * string over an `ExportCodes` table and `getId` answers -1 for anything it does not carry;
+   * `validate`'s four-branch `if/else if` matches none of them at -1, so nothing is checked, and
+   * `toVO`'s four-case `switch` sets none of the four attribute objects either. Measured: a point
+   * with no `attributeType` and no `startValue` saves **201** and reads back
+   * `attributeType: null, startValue: null` -- a locator that then behaves as a boolean starting at
+   * zero, because `getAttribute()` falls through to `default -> booleanAttribute`. `required` plus
+   * the default is what keeps the form off that path. D105.
+   *
+   * **The attribute type and the data type have to agree**, because the attribute type is what
+   * decides the value class the runtime produces, and only the gateway's two front ends know it --
+   * measured, a NUMERIC point with a `BOOLEAN_ATTRIBUTE` is a 201 (D107). Both halves of the
+   * pairing live in {@link SYSTEM_ATTRIBUTE_TYPES} and {@link SYSTEM_ATTRIBUTE_DATA_TYPES}. The gate
+   * clears `attributeType` when the data type moves under it, which is why the field is `required`:
+   * the operator is left with one item to pick rather than a silent null.
+   *
+   * **Every refusal this type produces names a field the form does not have.** `validate` reports
+   * against the VO's nested paths -- `booleanAttribute.startValue`, `timerAttribute.timerValue` --
+   * while the REST model flattens all four attribute objects into `startValue` and `timerValue`.
+   * Measured, both. So the client-side rules here are not a convenience: they are the only place
+   * those two rules can be stated where the operator will see them. D106.
+   *
+   * `startValue` is `required` because all four branches require it, and it takes the same
+   * `dataType` gate as `VIRTUAL.PL` -- two words for a binary point, free text for everything else.
+   * `timerValue` is gated on the timer type, and that costs it **both** of the rules it wants.
+   * `required` on a gated field fires while the row is hidden, making the form permanently
+   * unsubmittable for the other three types; a `min` does the same as soon as the operator types a
+   * zero and then switches type, because a closed gate keeps its control's value. Two specs say so
+   * and both are right. All that is left is the default -- the floor itself, 1, chosen to keep the
+   * box off the single value the gateway is guaranteed to refuse rather than to guess at a duration
+   * -- and the hint. An operator who deliberately clears it to zero still meets the 422, and that
+   * refusal names `timerAttribute.timerValue`, which is D106's whole point.
+   *
+   * `relinquishable` is hidden -- `toVO` never reads it and it reads back null -- and
+   * `configurationDescription` is the attribute type's own name. `settable` stays: `isSettable()`
+   * answers the stored field and `toVO` copies it, and a point nobody can write is a constant.
+   */
+  'SYSTEM_ATTRIBUTES.PL': {
+    hidden: ['relinquishable', 'configurationDescription'],
+    options: {dataType: SYSTEM_ATTRIBUTE_DATA_TYPES},
+    gatedOptions: {attributeType: SYSTEM_ATTRIBUTE_TYPES, startValue: BINARY_START_VALUE},
+    visibleWhen: {timerValue: {by: 'attributeType', values: ['TIMER_ATTRIBUTE']}},
+    required: ['attributeType', 'startValue'],
+    hints: {
+      attributeType: 'What the point does with a value written to it. Boolean, analog and '
+        + 'alphanumeric hold it. Timer drops the point to false and brings it back to true after '
+        + 'the number of seconds below. Which of these is offered follows the data type.',
+      startValue: 'What the point reads before anything writes to it.',
+      timerValue: 'How many seconds the point stays false after it is set. The gateway refuses '
+        + 'zero.',
+      settable: 'Whether the point can be written from the platform. A system attribute nobody can '
+        + 'write is a constant.'
+    },
+    // `dataTypeId = DataTypes.BINARY` and `attributeTypeId = Types.BOOLEAN_ATTRIBUTE` are the VO's
+    // own initialisers, and the pair is legal. `timerValue` carries its floor as a default because
+    // it may not carry `required` or `min`.
+    defaults: {dataType: 'BINARY', attributeType: 'BOOLEAN_ATTRIBUTE', timerValue: 1},
+    rows: [['dataType', 'attributeType'], ['startValue', 'timerValue']]
   }
 };
 

@@ -255,7 +255,7 @@ consulted.
 | 14 | `PING.DS` | `PING.PL` | **done** — 2026-09-29; **D93-D95** filed, all three small; needs an on-screen pass |
 | 15 | `POE_LIGHTING.DS` | `POE_LIGHTING.PL` | **done** — 2026-09-29; **D96-D100** filed, the first a credential readable two ways; needs an on-screen pass |
 | 16 | `SCRIPTING.DS` | `SCRIPTING.PL` | **done** — 2026-09-29; **D101-D103** filed, the first a 500 on reading a row and writing it back; needs an on-screen pass |
-| … | `SYSTEM_ATTRIBUTES` | | the last one the Add menu offers |
+| 17 | `SYSTEM_ATTRIBUTES.DS` | `SYSTEM_ATTRIBUTES.PL` | **done** — 2026-09-29; **D105-D107** filed, the last a pairing rule only the gateway's two front ends know; **the Add menu is now complete**; needs an on-screen pass |
 | … | the other 46 types | | provisioned-only: no Add form, an edit form like row 13's |
 | last | the 13 types with no stack form | | left on the generic schema form — see Open decisions |
 
@@ -264,8 +264,9 @@ endpoint the Add menu reads — returns **16**, measured on 5.1.3, and the 16 ar
 definition classes whose `isEnabled()` returns true. The other 47 of the 63 published types exist
 only because something on the gateway creates them: the mesh provisioner, a platform integration, a
 light-commissioning run. Row 13 was the first of those, and it needed `provisionedPoints` and no add
-path at all. So the work left is **three more addable types** and a long tail that each need an
-edit form only. OPC was skipped by the user on 2026-09-29.
+path at all. With row 17 the addable list is finished: **every type the Add menu offers has a
+layout**, and what is left is a long tail that each need an edit form only. OPC was skipped by
+the user on 2026-09-29.
 
 Order 3–11 set by the user on 2026-09-25: the protocols a real installation is wired with come
 before the two that happen to be live on the bench gateway.
@@ -1881,6 +1882,74 @@ it; `dataType` is a real choice here, unlike PoE's derived one.
 rule above measured against 5.1.3, probe rows deleted. The on-screen pass is owed with rows
 6–15.
 
+### 17 — `SYSTEM_ATTRIBUTES.DS` / `SYSTEM_ATTRIBUTES.PL` (done, 2026-09-29)
+
+The last type the Add menu offers, and the smallest source in the sequence: `SystemAttributesDataSourceVO`
+extends `DataSourceVO` directly rather than `PollingDataSourceVO`, so there is not even a poll period
+— ten common fields and nothing else. `validate(vo, result)` is an empty method. The layout is `{}`,
+the fourth in the sequence, and it means the same thing the other three do: the type was read, and
+the renderer is ours rather than the old one.
+
+Everything here is on the point. One point is one value the platform holds, and `attributeType` says
+what it does with a value written to it: boolean, analog and alphanumeric hold it, **timer** drops
+the point to false and schedules it back to true `timerValue` seconds later.
+
+**The attribute type is a typing decision wearing a label's clothes.** Each of the four has a runtime
+that answers a fixed value class — `BooleanAttributeRT` and `TimerAttributeRT` a `BinaryValue`,
+`AnalogAttributeRT` a `NumericValue`, `AlphanumericAttributeRT` an `AlphanumericValue` — and
+`SystemAttributesDataSourceRT.setPointValue` stores whatever `update()` hands back. So the attribute
+type and the point's data type have to agree, or every write stores the wrong class. Both of the
+gateway's own front ends know this and carry the same three lists:
+`AttributeTypeVO.getAttributeTypes(dataTypeId)` in the Java and `dataTypeChange` in the webapp. The
+REST path knows none of it — measured, a NUMERIC point with a `BOOLEAN_ATTRIBUTE` is a 201. **D107.**
+
+The Java helper is the odd part: it is public, correct, and **called from nowhere**. Filing D107
+costs the gateway three lines because the rule is already written; it just never reached the
+validator. Cortex carries the same table as `gatedOptions` on `attributeType`, by `dataType`.
+
+**MULTISTATE is a data type you cannot finish choosing.** There is no `MultistateAttributeRT` at all,
+so no attribute type is valid for it — the webapp falls through to an empty list and the Java helper
+to an empty array. `createRuntime` *does* parse a multistate start value, which makes such a point
+start correctly and then go wrong on the first write, which is the worst of the available failures.
+It is dropped from the data-type list here rather than offered with nothing behind it.
+
+**An unknown attribute type is not refused, it is skipped.** `ExportCodes.getId` answers -1 for a
+name it does not carry — the 2026-09-27 note's shape again — and three chains keyed on that id have
+no default between them: the validator's `if/else if`, `toVO`'s `switch` and `fromVO`'s. So a point
+sent no `attributeType` saves 201, stores none of the four attribute objects, and reads back
+`attributeType: null, startValue: null`. It then behaves as a boolean starting at zero, because
+`getAttribute()` ends `default -> booleanAttribute`. Three lines above the chain, `dataTypeId` *is*
+checked this way. **D105**, and the reason `attributeType` is `required` here rather than merely
+defaulted: the gate clears the field when the data type moves under it, and a cleared field must not
+be submittable.
+
+**Every message this type can produce names a field the form has not got.** `validate` reports
+against the VO's nested paths — `booleanAttribute.startValue`, `timerAttribute.timerValue` — while
+the REST model flattens all four attribute objects into `startValue` and `timerValue`. Measured,
+both. **D106.** It is the reason the two client-side rules on this type are not a convenience: they
+are the only place those rules can be stated where the operator can act on them.
+
+**`timerValue` is the one field in the sequence that may carry neither of its rules.** The gateway
+refuses `<= 0`, so it wants `required` and `min: 1`. It can have neither, because it is gated on the
+timer type and two standing invariants say so — `required` on a gated field fires while the row is
+hidden and makes the form permanently unsubmittable for the other three types, and `min` does the
+same as soon as someone types a zero and then switches type, because a closed gate keeps its
+control's value. Both specs are right and neither was bent. What is left is the default, set to the
+floor itself, and the hint. An operator who deliberately clears the box to zero still meets the 422,
+and that 422 is D106.
+
+> Both invariants were written earlier in this sequence for reasons that had nothing to do with each
+> other — one from `PING.PL.timeout`, one from `HTTP_JSON_RETRIEVER`. Meeting a field that trips both
+> is what showed they compose: a gated field cannot express a floor at all, only seed one.
+
+`settable` stays visible, which no other locator in the last five rows managed: `isSettable()`
+answers the stored field and `toVO` copies it, measured honoured. A system attribute nobody can write
+is a constant, and that is a legitimate thing to want, so it is a choice rather than a hidden false.
+
+*Verified:* 119 layout, 41 schema, 14 form and 17 service specs green, and
+`tsc -p src/tsconfig.app.json` exit 0; every rule above measured against 5.1.3 and every probe row
+deleted, the instance back at 12 sources. The on-screen pass is owed with rows 6–16.
+
 ## Per-type components
 
 Settled 2026-09-25, after the question was raised directly: **is one renderer for 148 model types
@@ -2145,6 +2214,21 @@ and wrong, or stale, and are recorded there too. D73 is deliberately not fixed a
   `script` is omitted, which is a 500 in the Nashorn source constructor. A **blank** script is legal
   and stored, so this is a missing null check rather than a missing requirement — the same one as
   D101, twelve lines up the same method, and one the meta module already has.
+
+- **D105 (P2)** — an omitted or unknown `attributeType` on `SYSTEM_ATTRIBUTES.PL` skips the point
+  validator rather than failing it: `ExportCodes.getId` answers -1 and neither the validator's
+  `if/else if` nor `toVO`'s `switch` has a default. Measured 201, reading back `attributeType: null,
+  startValue: null` — a point that behaves as a boolean starting at zero. `dataTypeId` is checked
+  this way three lines above.
+
+- **D106 (P2)** — every refusal this type produces names a VO path the REST model flattened away:
+  `booleanAttribute.startValue` and `timerAttribute.timerValue` against a model carrying `startValue`
+  and `timerValue`. Measured, both. A client cannot place either message on the field that is wrong.
+
+- **D107 (P2)** — the REST path accepts attribute-type / data-type pairings both of the gateway's own
+  front ends forbid, and the pairing decides the value class the runtime stores. Measured 201 for
+  NUMERIC with a `BOOLEAN_ATTRIBUTE` and for MULTISTATE, which has no valid attribute type at all.
+  `AttributeTypeVO.getAttributeTypes(dataTypeId)` already encodes the rule and has zero callers.
 
 - **W11 (P1)** — a multistate virtual point cannot be configured at all. The template switches on
   `'MULTISTATE'`, a case its own dropdown can never emit (it emits `INCREMENT_MULTISTATE`), so the

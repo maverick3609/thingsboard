@@ -114,7 +114,10 @@ describe('gateway form layouts', () => {
       'attributeId',
       // PoE lighting. A `String` on the REST model over a Java enum, written out here rather than
       // narrowed: the schema publishes a bare `string` and `toVO` calls `valueOf` on it unguarded.
-      'pointType']);
+      'pointType',
+      // System attributes. A `String` on the REST model over an `ExportCodes` table, where an
+      // unrecognised name resolves to -1 and skips validation rather than failing it (D105).
+      'attributeType']);
     Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
       [...Object.keys(layout.options ?? {}), ...Object.keys(layout.gatedOptions ?? {})]
         .forEach(id => expect(scalars.has(id)).withContext(`${modelType}.${id}`).toBe(true));
@@ -1131,5 +1134,87 @@ describe('gateway form layouts', () => {
     // And a layout that names one itself is left alone.
     expect(gatewayFormDefaults('MODBUS_IP.DS', polling).timePeriod)
       .toEqual({timePeriod: 5, timePeriodType: 'MINUTES'});
+  });
+
+  const sysAttrPoint = GATEWAY_FORM_LAYOUTS['SYSTEM_ATTRIBUTES.PL'];
+
+  it('marks the system attributes source worked through, and it is not a polling one', () => {
+    // `SystemAttributesDataSourceVO` extends `DataSourceVO` directly, not `PollingDataSourceVO`, so
+    // unlike the other empty entries this one is not even the poll period -- measured, the created
+    // source reads back ten common fields and no period at all. The entry exists to say the type was
+    // read; an absent one would keep the old renderer.
+    expect(GATEWAY_FORM_LAYOUTS['SYSTEM_ATTRIBUTES.DS']).toEqual({});
+  });
+
+  it('requires an attribute type, because an unknown one is not refused but skipped', () => {
+    // `attributeType` is a bare string over an `ExportCodes` table and `ExportCodes.getId` answers
+    // **-1** for a name it does not carry, which matches no branch of either the validator's
+    // `if/else if` or `toVO`'s `switch`. Measured: a point sent no `attributeType` and no
+    // `startValue` saves 201 and reads back both null -- and then behaves as a boolean starting at
+    // zero, because `getAttribute()` falls through to `default -> booleanAttribute`. D105.
+    expect(sysAttrPoint.required).toEqual(['attributeType', 'startValue']);
+    expect(sysAttrPoint.defaults.attributeType).toBe('BOOLEAN_ATTRIBUTE');
+    expect(sysAttrPoint.defaults.dataType).toBe('BINARY');
+  });
+
+  it('offers only the attribute types that match the data type, as the gateway itself does', () => {
+    // The attribute type decides the value class the runtime answers -- `BooleanAttributeRT` and
+    // `TimerAttributeRT` a `BinaryValue`, `AnalogAttributeRT` a `NumericValue`,
+    // `AlphanumericAttributeRT` an `AlphanumericValue` -- so the two fields have to agree or every
+    // write stores the wrong class. `AttributeTypeVO.getAttributeTypes(dataTypeId)` and the webapp's
+    // `dataTypeChange` carry exactly these three lists; the REST path carries none of it, measured
+    // 201 for NUMERIC with a `BOOLEAN_ATTRIBUTE`. D107.
+    expect(sysAttrPoint.gatedOptions.attributeType.by).toBe('dataType');
+    expect(Object.entries(sysAttrPoint.gatedOptions.attributeType.table)
+      .map(([dataType, items]) => [dataType, items.map(item => item.value)]))
+      .toEqual([
+        ['BINARY', ['BOOLEAN_ATTRIBUTE', 'TIMER_ATTRIBUTE']],
+        ['NUMERIC', ['ANALOG_ATTRIBUTE']],
+        ['ALPHANUMERIC', ['ALPHANUMERIC_ATTRIBUTE']]
+      ]);
+    // No fallback: the field holds an enum constant on every data type the locator offers, so a
+    // select with nothing in it is the right answer to a gate value that should not arise.
+    expect(sysAttrPoint.gatedOptions.attributeType.unlisted).toBeUndefined();
+  });
+
+  it('drops the data type no attribute type can serve, keeping the other three', () => {
+    // There is no `MultistateAttributeRT`. `createRuntime` does parse a multistate start value, so a
+    // MULTISTATE point starts correctly and then stores the wrong class on the first write -- and
+    // the webapp reaches the same place from the other end, falling through to an empty
+    // attribute-type list. Measured: MULTISTATE is a 201 with any attribute type or none.
+    expect(sysAttrPoint.options.dataType.map(item => item.value))
+      .toEqual(['BINARY', 'NUMERIC', 'ALPHANUMERIC']);
+  });
+
+  it('gives the start value the same two words as a virtual point, from one table', () => {
+    // Both parse it out of free text for every data type but binary. Shared rather than copied: two
+    // tables that must agree are a table that will not.
+    expect(sysAttrPoint.gatedOptions.startValue)
+      .toBe(GATEWAY_FORM_LAYOUTS['VIRTUAL.PL'].gatedOptions.startValue);
+    expect(sysAttrPoint.gatedOptions.startValue.by).toBe('dataType');
+    expect(sysAttrPoint.gatedOptions.startValue.table.BINARY.map(item => item.value))
+      .toEqual(['true', 'false']);
+  });
+
+  it('shows the timer count on the timer type alone, and seeds it rather than requiring it', () => {
+    // `startTimer` multiplies it by 1000 and `validate` refuses `<= 0` -- measured, 422 *"Must be
+    // greater than zero"* on `timerAttribute.timerValue` for a zero, and 201 storing 30 for a valid
+    // one. Neither `required` nor `min` may carry that rule here: both fire on a control the gate has
+    // hidden, because a closed gate keeps its value, and the form would be unsubmittable for the
+    // other three types with nothing on screen to fix. The seed is the floor itself.
+    expect(sysAttrPoint.visibleWhen.timerValue)
+      .toEqual({by: 'attributeType', values: ['TIMER_ATTRIBUTE']});
+    expect(sysAttrPoint.required).not.toContain('timerValue');
+    expect(sysAttrPoint.min).toBeUndefined();
+    expect(sysAttrPoint.defaults.timerValue).toBe(1);
+  });
+
+  it('keeps a system attribute writable, and hides the two fields the gateway fixes', () => {
+    // Unlike every other locator worked through so far, `isSettable()` answers the stored field and
+    // `toVO` copies it -- measured, `settable: true` is honoured -- so hiding it would turn every
+    // point into a constant. `relinquishable` is never read and reads back null, and
+    // `configurationDescription` is the attribute type's own name, measured "Boolean Attribute".
+    expect(sysAttrPoint.hidden).toEqual(['relinquishable', 'configurationDescription']);
+    expect(sysAttrPoint.hints.settable).toContain('constant');
   });
 });

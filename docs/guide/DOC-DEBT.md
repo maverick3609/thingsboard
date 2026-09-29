@@ -51,3 +51,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `7fe38586ef` feat(gateway): lay out PoE lighting, whose point type is a 500 waiting to happen
 - [ ] `344b7b47d5` feat(gateway): lay out scripting, and bring sendEmpty back for a worse case
 - [ ] `5bbcfa7926` fix(gateway): pair every floor above zero with required, and admit the tsc check was not one
+- [ ] `6a5b11d825` fix(gateway): the blanket locator data-type rule is not blanket

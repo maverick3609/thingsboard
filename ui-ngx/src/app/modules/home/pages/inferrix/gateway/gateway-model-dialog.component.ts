@@ -206,7 +206,7 @@ export class GatewayModelDialogComponent
     // id, and any field a newer gateway added that this schema mapper skipped -- survives the
     // round trip. A save that sent only the rendered fields would silently reset the rest.
     const saved: any = {...this.data.model,
-      ...this.keep(this.values, this.data.properties),
+      ...this.keep(this.values, this.data.properties, this.data.layout),
       name: identity.name};
     if (identity.xid) {
       saved.xid = identity.xid;
@@ -250,20 +250,33 @@ export class GatewayModelDialogComponent
    * Only password-typed properties are treated this way. An ordinary text field cleared on purpose
    * is a real edit and must reach the gateway as one.
    *
-   * There was a `sendEmpty` escape hatch here for the opposite case -- a field the gateway wants the
-   * key of rather than a value. It had one user, `SNMP.DS.contextName`, whose v3 rule was that an
-   * absent key is 422 while `""` is accepted; stack 5.1.3 made absent and blank both mean "not set"
-   * (D69) and the last user went with it, so the mechanism went too rather than sit here unexercised.
+   * A layout's {@link GatewayFormLayout.sendEmpty} names the fields that have to be sent even when
+   * empty, because the gateway wants the key rather than a value. It had one user,
+   * `SNMP.DS.contextName`, until D69 made absent and blank both mean "not set" -- and then
+   * `SCRIPTING.DS.scriptPermissions`, where an absent key is not a 422 but an **HTTP 500**:
+   * `new ScriptPermissions(null)` does `groups.split(",")` (D101). The mechanism was deleted and
+   * restored on the same day, which is the argument for keeping it: this is a shape the gateway
+   * produces more than once.
    */
-  private keep(values: {[id: string]: any}, properties: FormProperty[]): {[id: string]: any} {
+  private keep(values: {[id: string]: any}, properties: FormProperty[],
+               layout?: GatewayFormLayout): {[id: string]: any} {
     const secrets = new Set((properties ?? [])
       .filter(property => property.type === FormPropertyType.password)
       .map(property => property.id));
+    const sendEmpty = new Set(layout?.sendEmpty ?? []);
     const kept: {[id: string]: any} = {};
     Object.keys(values ?? {}).forEach(id => {
       const value = values[id];
       const empty = value === null || value === undefined || value === '';
       if (empty && secrets.has(id)) {
+        return;
+      }
+      // Before the add-drop and on an edit alike, because the value this replaces is a null the
+      // *gateway itself* handed back: a scripting source reads `scriptPermissions: null`, and
+      // spreading that straight back is the 500 this exists for. A stored non-empty value is not
+      // touched -- it falls through to `kept[id] = value` below.
+      if (empty && sendEmpty.has(id)) {
+        kept[id] = '';
         return;
       }
       if (empty && this.isAdd) {

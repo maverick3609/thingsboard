@@ -114,6 +114,22 @@ export interface GatewayFormLayout {
   required?: string[];
 
   /**
+   * Fields whose empty value must still be sent on an add, because the gateway wants the key rather
+   * than a value.
+   *
+   * The add drops every empty field so that a model's Java field initialisers apply -- which is what
+   * makes a Modbus source's four timeouts work. This names the fields where that is wrong.
+   *
+   * Deleted on 2026-09-29 when D69 took its last user, `SNMP.DS.contextName`, and restored the same
+   * day for a worse one: `SCRIPTING.DS.scriptPermissions` is not merely refused when absent, it is an
+   * **HTTP 500**. `ScriptDataSourceModel.toVO` calls `new ScriptPermissions(scriptPermissions)` and
+   * that constructor does `groups.split(",")` with no null check, so an add that drops the key
+   * crashes the request (D101). Named per field rather than inferred, because there is no signal in
+   * the schema for it -- `required` is not set, and the empty value is legal.
+   */
+  sendEmpty?: string[];
+
+  /**
    * What a field means, where the schema does not say.
    *
    * The mapper already fills `FormProperty.hint` from the property's `description`, and the template
@@ -609,6 +625,17 @@ const BINARY_ONLY: FormSelectItem[] = [{value: 'BINARY', label: 'Binary'}];
  * are the constant names, which is what the wire takes. Measured: the display name "Channel Level"
  * is a 400, an unknown name is a 400, and an omitted one is a **500**.
  */
+/**
+ * The three `ContextUpdateEvent` constants `ScriptingDataSourceDefinition.commonValidation` accepts.
+ * The schema publishes all five; `NONE` and `CRON` are refused *"Invalid value"* on this type
+ * (measured). Labels are the gateway's own words for them.
+ */
+const SCRIPTING_UPDATE_EVENTS: FormSelectItem[] = [
+  {value: 'UPDATE', label: 'Update'},
+  {value: 'CHANGE', label: 'Change'},
+  {value: 'LOGGED', label: 'Logged'}
+];
+
 const POE_LIGHTING_POINT_TYPES: FormSelectItem[] = [
   {value: 'CHANNEL_LEVEL', label: 'Channel level'},
   {value: 'POWER_ON_SETTING', label: 'Power-on setting'}
@@ -1642,6 +1669,98 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     },
     defaults: {pointType: 'CHANNEL_LEVEL', channelId: 1, settable: true},
     rows: [['pointType', 'channelId']]
+  },
+
+  /**
+   * A scripting data source: one JavaScript body, the points it reads, and what makes it run.
+   *
+   * The mirror of `META`. There the script is on the point and the data source is empty; here the
+   * script is on the **source** and each point is one variable the script writes. So this layout
+   * carries what `META.PL` carries, and `SCRIPTING.PL` is two fields.
+   *
+   * **`scriptPermissions` is hidden for the same reason as on `META.PL`, and needs one more
+   * thing here.** It names the groups the script runs *as*, and an absent value means no groups,
+   * which is the confined engine — the right thing for a form reachable from a browser to ask for.
+   * But `ScriptDataSourceModel.toVO` calls `new ScriptPermissions(scriptPermissions)` unguarded,
+   * and that constructor does `groups.split(",")`, so an **absent or null value is an HTTP 500**
+   * rather than a default. Measured twice over: an add omitting the key crashes, and so does a
+   * `PATCH` of a source's own unmodified body, because the read hands back
+   * `scriptPermissions: null`. `sendEmpty` turns both into `""`. The sibling
+   * `MetaPointLocatorModel` already guards this with a null check, which is why `META.PL` needs
+   * nothing. Filed as **D101**.
+   *
+   * **`updateEvent` publishes five values and accepts three.** `commonValidation` switches on it
+   * and answers *"Invalid value"* for `NONE` and `CRON` — measured — so the list is narrowed to
+   * what the gateway takes. The VO's own initialiser is `UPDATE`, and the REST model leaves the
+   * field null, which is refused *"Required value"*; the default carries it.
+   *
+   * **The rule this form cannot express** is the one on `polling`: a source that is not polling,
+   * has no cron pattern and has no context variable flagged for update is refused
+   * *"scripting.validate.mustUpdate"* — because nothing would ever run it. That reads three fields,
+   * one of them on the points below, and a layout has no word for it. The hint says it instead.
+   *
+   * `script` is a bare `{"type": "string"}` again, so it needs the same `textarea` `META.PL` needs.
+   * It is compiled on every save: a syntax error is a 422 naming `script`.
+   */
+  'SCRIPTING.DS': {
+    hidden: ['scriptPermissions'],
+    advanced: ['executionDelaySeconds', 'logLevel', 'logSize', 'logCount', 'historicalSetting'],
+    sendEmpty: ['scriptPermissions'],
+    types: {script: FormPropertyType.textarea},
+    options: {updateEvent: SCRIPTING_UPDATE_EVENTS},
+    min: {executionDelaySeconds: 0},
+    hints: {
+      script: 'JavaScript, compiled by the gateway every time this source is saved — a syntax '
+        + 'error is refused here rather than at the next poll. Each point below is a variable this '
+        + 'script assigns to.',
+      updateEvent: 'Which kind of change to a context point re-runs the script.',
+      polling: 'Run the script on the polling interval as well. Something has to make the script '
+        + 'run: with this off, the source needs either a cron pattern or a point below with '
+        + '"Re-run the script" on, and the gateway refuses it otherwise.',
+      historicalSetting: 'Let the script see historical values as well as the current ones.',
+      logSize: 'Megabytes per script log file before it is rotated.',
+      logCount: 'How many rotated script log files to keep.'
+    },
+    // What `new ScriptDataSourceVO()` holds. The REST model declares `logSize` and `logCount` as
+    // primitives, so a source created without them logs into a 0 MB file and keeps none of them --
+    // measured, a POST omitting both reads back `0.0` and `0`.
+    defaults: {updateEvent: 'UPDATE', logLevel: 'NONE', logSize: 1, logCount: 5,
+      executionDelaySeconds: 0, scriptPermissions: ''},
+    rows: [['polling', 'updateEvent'], ['logLevel', 'executionDelaySeconds'],
+      ['logSize', 'logCount']]
+  },
+
+  /**
+   * One variable a script writes, as a point.
+   *
+   * `varName` is the name the script assigns to, and it carries three separate rules, all in
+   * `ScriptingDataSourceDefinition.validate` and all measured: blank is *"Required value"*, a name
+   * that is not a JavaScript identifier is *"Invalid value"*, and one already used by another point
+   * **or by a context variable on the source** is *"Duplicate variable name: …"*. Only the first is
+   * expressible here; the hint carries the other two, because the gateway's refusal arrives after
+   * the operator has written the script that uses the name.
+   *
+   * `dataType` is a real choice on this locator -- `toVO` maps it and an omitted one is refused --
+   * unlike `POE_LIGHTING.PL`, where it is derived. IMAGE is narrowed away as everywhere else.
+   *
+   * `settable` is hidden because `ScriptPointLocatorVO.isSettable()` returns a hard `false` while
+   * `toVO` still copies the field, so a submitted `true` is stored where nothing reads it --
+   * measured, it reads back `false`. `relinquishable` is not copied at all and reads back null, and
+   * `configurationDescription` is the variable name again.
+   */
+  'SCRIPTING.PL': {
+    hidden: ['settable', 'relinquishable', 'configurationDescription'],
+    options: {dataType: NON_IMAGE_DATA_TYPES},
+    required: ['varName'],
+    hints: {
+      varName: 'The variable this point is written to in the script. It has to be a valid '
+        + 'JavaScript name, and no other point on this source — or context variable on it — may '
+        + 'already use it.',
+      contextUpdate: 'Re-run the script when this point changes. This is also one of the three '
+        + 'things that can make the source run at all, alongside polling and a cron pattern.'
+    },
+    defaults: {dataType: 'NUMERIC'},
+    rows: [['varName', 'dataType']]
   }
 };
 

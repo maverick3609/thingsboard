@@ -254,7 +254,8 @@ consulted.
 | 13 | `MESH_CONTROLLER.DS` | `MESH_CONTROLLER.PL` | **done** — 2026-09-29; **D90-D92** filed, D90 general to 34 mesh locator types and D92 to every type the Add menu offers; needs an on-screen pass |
 | 14 | `PING.DS` | `PING.PL` | **done** — 2026-09-29; **D93-D95** filed, all three small; needs an on-screen pass |
 | 15 | `POE_LIGHTING.DS` | `POE_LIGHTING.PL` | **done** — 2026-09-29; **D96-D100** filed, the first a credential readable two ways; needs an on-screen pass |
-| … | `SCRIPTING`, `SYSTEM_ATTRIBUTES` | | the last two the Add menu offers |
+| 16 | `SCRIPTING.DS` | `SCRIPTING.PL` | **done** — 2026-09-29; **D101-D103** filed, the first a 500 on reading a row and writing it back; needs an on-screen pass |
+| … | `SYSTEM_ATTRIBUTES` | | the last one the Add menu offers |
 | … | the other 46 types | | provisioned-only: no Add form, an edit form like row 13's |
 | last | the 13 types with no stack form | | left on the generic schema form — see Open decisions |
 
@@ -1729,6 +1730,73 @@ the sequence with real event types — communication failure and device failure,
 *Verified:* 104 layout specs green; every rule above measured against 5.1.3 on the local instance,
 probe rows deleted. The on-screen pass is owed with rows 6–14.
 
+### 16 — `SCRIPTING.DS` / `SCRIPTING.PL` (done, 2026-09-29)
+
+The mirror of `META`: there the script is on the point and the data source is empty, here the script
+is on the **source** and each point is one variable the script writes. So this row carries what row
+7 put on `META.PL`, and the point layout is two fields.
+
+**The type cannot be round-tripped, and that is the row's headline.** `ScriptDataSourceModel.toVO`
+calls `new ScriptPermissions(scriptPermissions)`, whose constructor does `groups.split(",")` with no
+null check. `scriptPermissions` is optional in the schema, so:
+
+| request | result |
+|---|---|
+| a create that omits the key | **500** |
+| the same with `""` | 201 — and the row reads back `scriptPermissions: **null**` |
+| `GET` that row and `PATCH` its own body back | **500** |
+
+An edit form reads a row and writes it back. The gateway hands it a null and then crashes on it.
+**D101**, and the fix is already written in the sibling `MetaPointLocatorModel`, which null-checks
+the same call — which is why row 7 could hide the field and do nothing else.
+
+**`sendEmpty` is back, four commits after it was deleted.** It went this morning because D69 took
+its only user, `SNMP.DS.contextName`; it is back this afternoon because `scriptPermissions` is a
+worse case of the same shape — there an absent key was a 422, here it is a 500. The deletion was
+still right on the evidence available, and the restoration is the argument for keeping the
+mechanism: this is a shape the gateway produces more than once.
+
+One thing changed on the way back. The old branch only fired on an **add**, because the only known
+case was an add-time 422. Here the null arrives on the **edit** path, from the gateway's own read,
+so the check now runs before the add-drop and on both paths. A stored non-empty value still falls
+through untouched, which is what keeps `META.PL`'s "a hidden field is carried through a save" true.
+
+> **The deleted spec was wrong, and it is not coming back.** It forbade naming a field in both
+> `sendEmpty` and `hidden`, reasoning that "a hidden field has no control to be empty". The plumbing
+> says otherwise: `pick` copies every schema property present on the model, and
+> `GatewayFormComponent` merges its rendered controls **over** the value it was written rather than
+> emitting them alone, so a hidden key reaches `keep()` on both paths. There is now a form spec that
+> holds that merge in place, because two layout decisions rest on it.
+
+**`scriptPermissions` stays hidden, for row 7's reason.** It names the groups the script runs *as*,
+and an absent value means no groups, which is the confined engine — the right thing for a form
+reachable from a browser to ask for. Hiding it and sending `""` are not in tension: the first is the
+security decision, the second is the crash.
+
+**`updateEvent` publishes five values and takes three.** `commonValidation` switches on it and
+refuses `NONE` and `CRON` — measured, both 422 *"Invalid value"* — although `META.PL` accepts both
+on the same enum. The list is narrowed to the three, and the default carries the VO's `UPDATE`,
+which the REST model leaves null and `validate` then refuses. **D102.**
+
+**The rule this form cannot express.** A source that is not polling, has no cron pattern, and has no
+context variable flagged for update is refused *"scripting.validate.mustUpdate"* — nothing would
+ever run it. That reads three fields, one of them on the points below, and a layout has no word for
+it; the `polling` hint says it instead. Same shape as `META.PL`'s context requirement, and handled
+the same way.
+
+**Three rules on one field.** `varName` must be present, must be a JavaScript identifier, and must
+not collide with another point's name *or with a context variable on the source*. Measured as three
+distinct refusals. Only the first is expressible, so the hint carries the other two — they matter
+before the operator writes the script that uses the name, not after.
+
+The rest is ordinary: `script` is a bare string that needs the same textarea `META.PL` needs and is
+compiled on every save; `logSize`/`logCount` are primitives on the model that lose the VO's 1.0 and
+5 (**D103**); `settable` is hidden because `isSettable()` is a hard false though `toVO` still copies
+it; `dataType` is a real choice here, unlike PoE's derived one.
+
+*Verified:* 109 layout and 14 form specs green; every rule above measured against 5.1.3, probe rows
+deleted. The on-screen pass is owed with rows 6–15.
+
 ## Per-type components
 
 Settled 2026-09-25, after the question was raised directly: **is one renderer for 148 model types
@@ -1953,6 +2021,17 @@ and wrong, or stale, and are recorded there too. D73 is deliberately not fixed a
   (VO 2, REST model 0, discovery 3).
 - **D100 (P3)** — the create response reports `settable: false` for a point whose stored locator is
   `settable: true`; a GET immediately after disagrees with it.
+
+**Filed 2026-09-29, from row 16.** In
+`Inferrix-stack/docs/specs/2026-09-29-scripting-rest-surface.md`.
+
+- **D101 (P1)** — `ScriptDataSourceModel.toVO` calls `new ScriptPermissions(scriptPermissions)`
+  unguarded and that constructor splits the string, so an absent key is an HTTP 500 — including on a
+  `PATCH` of a row's own body, because the read hands back `null`. `MetaPointLocatorModel` already
+  guards the same call; two other callers do not.
+- **D102 (P2)** — `updateEvent` publishes five enum values and `commonValidation` accepts three.
+- **D103 (P3)** — `logSize` and `logCount` are primitives on the REST model, so a create that omits
+  them stores 0 and 0 instead of the VO's 1.0 and 5.
 
 - **W11 (P1)** — a multistate virtual point cannot be configured at all. The template switches on
   `'MULTISTATE'`, a case its own dropdown can never emit (it emits `INCREMENT_MULTISTATE`), so the

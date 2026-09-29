@@ -93,6 +93,23 @@ describe('gateway form layout mechanics', () => {
     expect(shownProperty('privateKey').type).toBe(FormPropertyType.password);
   });
 
+  it('carries a hidden field\'s value through an edit, rather than dropping it', () => {
+    // What lets a layout hide a field and still have the dialog send it -- `SCRIPTING.DS` hides
+    // `scriptPermissions` for the security reason and names it in `sendEmpty` because the gateway
+    // answers an absent one with a 500. That only works because this component merges its rendered
+    // controls *over* the value it was written, instead of emitting them alone.
+    build();
+    form.writeValue({script: 'return 1;', context: [], scriptPermissions: 'superadmin'});
+    let emitted: any = null;
+    form.registerOnChange((value: any) => emitted = value);
+    // `scriptPermissions` has no control at all here -- it is not among this form's properties,
+    // which is exactly the position a hidden field is in.
+    form.form.get('script').setValue('return 2;');
+    expect(emitted).withContext('the form emitted nothing').toBeTruthy();
+    expect(emitted.scriptPermissions).toBe('superadmin');
+    expect(emitted.script).toBe('return 2;');
+  });
+
   it('leaves a field alone when the layout names no type for it', () => {
     build();
     expect(shownProperty('script').type).toBe(FormPropertyType.text);

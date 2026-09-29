@@ -800,6 +800,59 @@ describe('gateway form layouts', () => {
     expect(poe.required).toEqual(['ipAddress', 'token']);
   });
 
+  const scripting = GATEWAY_FORM_LAYOUTS['SCRIPTING.DS'];
+  const scriptPoint = GATEWAY_FORM_LAYOUTS['SCRIPTING.PL'];
+
+  it('sends an empty scriptPermissions, because an absent one is a 500', () => {
+    // `ScriptDataSourceModel.toVO` calls `new ScriptPermissions(scriptPermissions)` and that
+    // constructor does `groups.split(",")` with no null check. Measured: an add omitting the key is
+    // a 500, and so is a PATCH of a source's own unmodified body, because the read hands back
+    // `scriptPermissions: null`. The sibling `MetaPointLocatorModel` guards it, which is why
+    // `META.PL` hides the same field and needs nothing. D101.
+    expect(scripting.sendEmpty).toEqual(['scriptPermissions']);
+    expect(scripting.defaults.scriptPermissions).toBe('');
+  });
+
+  it('may name a hidden field in sendEmpty, because the value is carried not dropped', () => {
+    // A spec used to forbid this pair on the reasoning that "a hidden field has no control to be
+    // empty". The plumbing says otherwise: `pick` copies every schema property present on the
+    // model, and `GatewayFormComponent` merges its rendered controls *over* the value it was
+    // written rather than emitting them alone, so a hidden key reaches `keep()` on both paths.
+    // Hiding `scriptPermissions` is the security decision `META.PL` documents; sending `""` is what
+    // keeps the gateway from crashing on it.
+    expect(scripting.hidden).toEqual(['scriptPermissions']);
+    expect(scripting.sendEmpty).toContain('scriptPermissions');
+  });
+
+  it('offers the three update events the scripting validator accepts, not the five published', () => {
+    // `commonValidation` switches on `updateEvent` and answers "Invalid value" for NONE and CRON --
+    // measured. The REST model leaves the field null, which is refused "Required value", so the
+    // default carries the VO's own initialiser.
+    expect(scripting.options.updateEvent.map(item => item.value))
+      .toEqual(['UPDATE', 'CHANGE', 'LOGGED']);
+    expect(scripting.defaults.updateEvent).toBe('UPDATE');
+  });
+
+  it('seeds the scripting log defaults the REST model loses', () => {
+    // `new ScriptDataSourceVO()` sets logLevel NONE, logSize 1.0 and logCount 5; the model declares
+    // the last two as primitives, so a POST omitting them reads back 0.0 and 0 -- a log file rotated
+    // at zero megabytes, none of them kept.
+    expect(scripting.defaults.logLevel).toBe('NONE');
+    expect(scripting.defaults.logSize).toBe(1);
+    expect(scripting.defaults.logCount).toBe(5);
+  });
+
+  it('requires a scripting point\'s variable name and leaves its two other rules to the hint', () => {
+    // `ScriptingDataSourceDefinition.validate` refuses a blank name "Required value", a non-identifier
+    // "Invalid value", and one already used by another point or a context variable
+    // "Duplicate variable name". Only the first is expressible in a layout.
+    expect(scriptPoint.required).toEqual(['varName']);
+    expect(scriptPoint.hints.varName).toContain('JavaScript name');
+    // Unlike PoE the data type is a real choice here: `toVO` maps it and an omitted one is refused.
+    expect(scriptPoint.options.dataType.map(item => item.value)).not.toContain('IMAGE');
+    expect(scriptPoint.defaults.dataType).toBe('NUMERIC');
+  });
+
   it('never names a field in both required and readonly', () => {
     // `readonly` disables the control, and Angular leaves a disabled control out of validation
     // entirely -- so the pair reads as a rule and enforces nothing. Same family as the `advanced` and

@@ -602,6 +602,18 @@ const MESH_CONTROLLER_ATTRIBUTES: FormSelectItem[] = [
 /** The data type that one attribute reports, and the only one its conversion can produce. */
 const BINARY_ONLY: FormSelectItem[] = [{value: 'BINARY', label: 'Binary'}];
 
+/**
+ * `PoeLightingPointLocatorVO.PointType`, written out because the schema publishes the field as a
+ * bare `{"type": "string"}` -- no enum, no description -- while `toVO` does
+ * `PointType.valueOf(pointType)` on it. The labels are the enum's own `value()` strings; the values
+ * are the constant names, which is what the wire takes. Measured: the display name "Channel Level"
+ * is a 400, an unknown name is a 400, and an omitted one is a **500**.
+ */
+const POE_LIGHTING_POINT_TYPES: FormSelectItem[] = [
+  {value: 'CHANNEL_LEVEL', label: 'Channel level'},
+  {value: 'POWER_ON_SETTING', label: 'Power-on setting'}
+];
+
 const NON_IMAGE_DATA_TYPES: FormSelectItem[] = [
   {value: 'BINARY', label: 'Binary'},
   {value: 'MULTISTATE', label: 'Multistate'},
@@ -1549,6 +1561,87 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     },
     defaults: {dataType: 'BINARY', timeout: 1000},
     rows: [['ipAddress', 'timeout']]
+  },
+
+  /**
+   * A PoE lighting controller, reached over its own HTTP API.
+   *
+   * `ipAddress` and `token` are the whole connection: `PoeLightingService.createHeaders` does
+   * `headers.setBearerAuth(token)` and every call is `restTemplate.exchange(baseUrl + …)`. Neither
+   * is validated anywhere -- `PoeLightingDataSourceDefinition.validate` is an empty method, and so
+   * is its point overload -- so `required` here is **stricter than the gateway**, which this
+   * feature otherwise avoids. It is justified on the same ground row 11 failed on: an empty value
+   * is not a configuration the gateway can act on, it is a source that can never reach anything.
+   *
+   * `connectionTimeoutSeconds` is hidden because **nothing reads it**. It is declared on the VO
+   * with a default of 10, serialised, mapped both ways by `PoeLightingDataSourceModel`, and never
+   * referenced again anywhere in the tree -- unlike `retries`, which `PoeLightingDataSourceRT`
+   * checks on every attempt. A knob that stores a value and changes no behaviour is worse than no
+   * knob, and the field keeps its stored value because a data source saves with `PATCH`.
+   *
+   * `alarmLevels` really has rows on this type -- communication failure and device failure, both
+   * URGENT -- which is the first time in the sequence it is worth the Advanced group it sits in.
+   */
+  'POE_LIGHTING.DS': {
+    hidden: ['connectionTimeoutSeconds'],
+    advanced: ['retries'],
+    required: ['ipAddress', 'token'],
+    min: {retries: 0},
+    hints: {
+      token: 'The API token the controller accepts, sent as a bearer token on every call. A '
+        + 'controller found by discovery is given the one in the gateway\'s PoE lighting system '
+        + 'settings, so a source added here is the place to use a different one.',
+      retries: 'How many further attempts a failed set is given. Zero means the first failure is '
+        + 'the last. The gateway\'s own discovery uses three.'
+    },
+    // What `new PoeLightingDataSourceVO()` holds. The REST model initialises the field to 0
+    // instead, so a source created without it retries nothing -- measured, a POST omitting
+    // `retries` stores 0. Discovery sets 3; the VO's own answer is 2, and that is the one a form
+    // building a fresh source should start from.
+    defaults: {retries: 2},
+    rows: [['ipAddress', 'token']]
+  },
+
+  /**
+   * One channel of a PoE lighting controller, as a point.
+   *
+   * `pointType` decides everything else: `getDataTypeId()` is a switch on it -- `CHANNEL_LEVEL` is
+   * NUMERIC, `POWER_ON_SETTING` is BINARY -- and `getConfigurationDescription()` prints it beside
+   * the channel. It arrives as a bare string with no enum, and `toVO` calls `valueOf` on it
+   * unguarded, so the list is not a narrowing of the gateway's own choices but the only thing
+   * standing between an operator and a 500. The gateway's own form gives up differently: it renders
+   * `pointType` **read-only**, because nothing there adds a point by hand.
+   *
+   * `dataType` is hidden rather than disabled, which is a first. Every other locator in the
+   * sequence either takes the submitted type or fixes it at one value; here it is derived from
+   * another field on the same form, and the layout language has no way to say that. A disabled box
+   * would show `NUMERIC` while the operator selects Power-on setting, which is worse than showing
+   * nothing. Hidden is safe for the mapper's blanket `required`: `build` filters hidden properties
+   * out before `addControl`, so there is no control to fail validation -- and the gateway fills the
+   * field itself, measured, including when a submitted `ALPHANUMERIC` is discarded for `NUMERIC`.
+   *
+   * `settable` is live here -- `PoeLightingPointLocatorVO.isSettable()` answers the stored field and
+   * `toVO` copies it -- so it is shown, and it defaults on, because every point the gateway's own
+   * discovery creates is settable and a lighting channel that cannot be set is a light nobody can
+   * switch. `relinquishable` is hidden: `toVO` never reads it, and it reads back null.
+   */
+  'POE_LIGHTING.PL': {
+    hidden: ['dataType', 'relinquishable', 'configurationDescription'],
+    options: {pointType: POE_LIGHTING_POINT_TYPES},
+    required: ['channelId'],
+    // `createDataPoints` numbers channels `for (int i = 1; i <= numChannels; i++)`, so the
+    // controller's own first channel is 1 and a zero is a channel no device has.
+    min: {channelId: 1},
+    hints: {
+      pointType: 'Channel level is the dimming level the channel is driven to, stored as a number. '
+        + 'Power-on setting is what the channel does when the controller powers up, stored as on '
+        + 'or off.',
+      channelId: 'Which channel on the controller, numbered from 1 as the controller numbers them.',
+      settable: 'Whether this point can be written from the platform. Every point the gateway '
+        + 'creates for a discovered controller is writable; a point that is not can only be read.'
+    },
+    defaults: {pointType: 'CHANNEL_LEVEL', channelId: 1, settable: true},
+    rows: [['pointType', 'channelId']]
   }
 };
 

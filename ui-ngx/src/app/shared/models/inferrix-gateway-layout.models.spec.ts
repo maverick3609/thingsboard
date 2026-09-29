@@ -110,8 +110,11 @@ describe('gateway form layouts', () => {
       'qosType', 'publishQosType', 'publishTopicType', 'subscribeTopicType',
       // Mesh controller. A `String` on the REST model over an `ExportCodes` table, written out here
       // rather than narrowed from the schema -- the schema says `string` and the gateway's own check
-      // reads a table 37 classes share (D90).
-      'attributeId']);
+      // reads a table 34 classes share (D90).
+      'attributeId',
+      // PoE lighting. A `String` on the REST model over a Java enum, written out here rather than
+      // narrowed: the schema publishes a bare `string` and `toVO` calls `valueOf` on it unguarded.
+      'pointType']);
     Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
       [...Object.keys(layout.options ?? {}), ...Object.keys(layout.gatedOptions ?? {})]
         .forEach(id => expect(scalars.has(id)).withContext(`${modelType}.${id}`).toBe(true));
@@ -746,6 +749,55 @@ describe('gateway form layouts', () => {
     // point can never be written; `toVO` reads neither field. Measured: both submitted true, the
     // point reads back `settable: false` and `relinquishable: null`.
     expect(pingPoint.hidden).toEqual(['settable', 'relinquishable', 'configurationDescription']);
+  });
+
+  const poe = GATEWAY_FORM_LAYOUTS['POE_LIGHTING.DS'];
+  const poePoint = GATEWAY_FORM_LAYOUTS['POE_LIGHTING.PL'];
+
+  it('writes the PoE point types out, because the schema publishes a bare string', () => {
+    // `pointType` is `{"type": "string"}` with no enum, and `PoeLightingPointLocatorModel.toVO`
+    // calls `PointType.valueOf(pointType)` on it unguarded. Measured: an omitted value is a **500**,
+    // an unknown name a 400, and the enum's own display string "Channel Level" a 400 -- the wire
+    // takes the constant name. The list is the only thing between an operator and that 500.
+    expect(poePoint.options.pointType.map(item => item.value))
+      .toEqual(['CHANNEL_LEVEL', 'POWER_ON_SETTING']);
+    expect(poePoint.defaults.pointType).toBe('CHANNEL_LEVEL');
+  });
+
+  it('hides the PoE data type, because it is derived from the field beside it', () => {
+    // `getDataTypeId()` is a switch on `pointType`: CHANNEL_LEVEL is NUMERIC, POWER_ON_SETTING is
+    // BINARY. A disabled box would show one while the operator picks the other, and the layout
+    // language cannot express a derivation. `build` filters hidden properties out before
+    // `addControl`, so the mapper's blanket `required` on a locator data type has no control to
+    // fail. Measured: a point submitted ALPHANUMERIC stores NUMERIC, and one omitting the field
+    // stores the type its point type implies.
+    expect(poePoint.hidden).toEqual(['dataType', 'relinquishable', 'configurationDescription']);
+    expect(poePoint.options.dataType).toBeUndefined();
+    expect(poePoint.defaults.dataType).toBeUndefined();
+  });
+
+  it('keeps settable on a PoE point, and defaults it on', () => {
+    // Unlike `PING.PL` this locator's `isSettable()` answers a stored field and `toVO` copies it --
+    // measured, `settable: true` reads back true. `PoeLightingService.createDataPoints` passes true
+    // for both point types on every discovered channel.
+    expect(poePoint.hidden).not.toContain('settable');
+    expect(poePoint.defaults.settable).toBe(true);
+  });
+
+  it('hides the PoE connection timeout, which nothing on the gateway reads', () => {
+    // Declared on the VO with a default of 10, serialised, mapped both ways, and never referenced
+    // again in the tree -- unlike `retries`, which the runtime checks on every attempt.
+    expect(poe.hidden).toEqual(['connectionTimeoutSeconds']);
+    expect(poe.defaults.connectionTimeoutSeconds).toBeUndefined();
+    expect(poe.defaults.retries).toBe(2);
+  });
+
+  it('requires the two PoE fields the gateway does not validate at all', () => {
+    // Both `PoeLightingDataSourceDefinition.validate` overloads are empty methods, so this is
+    // stricter than the gateway -- allowed here because an empty address or token is not a
+    // configuration, it is a source that can never reach anything. `createHeaders` does
+    // `setBearerAuth(token)` and every call is `baseUrl + path`.
+    expect(poe.required).toEqual(['ipAddress', 'token']);
   });
 
   it('never names a field in both required and readonly', () => {

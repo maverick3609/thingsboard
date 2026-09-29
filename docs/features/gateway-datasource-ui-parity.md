@@ -253,7 +253,8 @@ consulted.
 | 12 | `INTERNAL.DS` | `INTERNAL.PL` | **done** — 2026-09-28; **D83-D87** filed, one of them general to every create; needs an on-screen pass |
 | 13 | `MESH_CONTROLLER.DS` | `MESH_CONTROLLER.PL` | **done** — 2026-09-29; **D90-D92** filed, D90 general to 34 mesh locator types and D92 to every type the Add menu offers; needs an on-screen pass |
 | 14 | `PING.DS` | `PING.PL` | **done** — 2026-09-29; **D93-D95** filed, all three small; needs an on-screen pass |
-| … | `POE_LIGHTING`, `SCRIPTING`, `SYSTEM_ATTRIBUTES` | | the last three the Add menu offers |
+| 15 | `POE_LIGHTING.DS` | `POE_LIGHTING.PL` | **done** — 2026-09-29; **D96-D100** filed, the first a credential readable two ways; needs an on-screen pass |
+| … | `SCRIPTING`, `SYSTEM_ATTRIBUTES` | | the last two the Add menu offers |
 | … | the other 46 types | | provisioned-only: no Add form, an edit form like row 13's |
 | last | the 13 types with no stack form | | left on the generic schema form — see Open decisions |
 
@@ -1664,6 +1665,70 @@ the rule reads as a property of the field instead of an error waiting to happen.
 *Verified:* layout, schema and form specs green (99 / 41 / 13); every rule above measured against
 5.1.3 on the local instance and every probe row deleted. The on-screen pass is owed with rows 6–13.
 
+### 15 — `POE_LIGHTING.DS` / `POE_LIGHTING.PL` (done, 2026-09-29)
+
+The first type in the sequence whose gateway code has **no validation at all** — both
+`PoeLightingDataSourceDefinition.validate` overloads are empty methods — and the first whose
+published schema will take a form straight into an HTTP 500.
+
+**`pointType` decides the rest of the point, and arrives as a bare string.** `getDataTypeId()` is a
+switch on it (`CHANNEL_LEVEL` → NUMERIC, `POWER_ON_SETTING` → BINARY), `getConfigurationDescription`
+prints it beside the channel, and `PoeLightingPointLocatorModel.toVO` calls
+`PointType.valueOf(pointType)` on it unguarded. The schema publishes `{"type": "string"}` with no
+enum. Measured: the two constants save 201; an **omitted** value is a **500**; an unknown one is a
+400 with no field named; and the enum's own display string "Channel Level" is a 400 as well. So the
+two-item list Cortex writes out is not a narrowing of the gateway's choices — it is what stands
+between an operator and that 500. **D97**, and the fix is already written in the sibling model in
+the same package, which types the field as the enum and says why in a comment.
+
+The gateway's own form solves it differently: it renders `pointType` **read-only**, because nothing
+there adds a PoE point by hand. Every point on a real controller is made by discovery —
+`PoeLightingService.createDataPoints` creates a Channel Level and a Power-On Setting point for each
+of the controller's channels, both settable. That is also where the default `settable: true` comes
+from: a lighting channel that cannot be set is a light nobody can switch.
+
+**`dataType` is hidden, which is a first.** Every other locator in the sequence either takes the
+submitted type, or fixes it at one value and disables it. Here it is derived from another field on
+the same form, and the layout language cannot say that — a disabled box would read `NUMERIC` while
+the operator selects Power-on setting. Hiding is safe for the mapper's blanket `required` on a
+locator data type, because `build` filters hidden properties out *before* `addControl`: there is no
+control to fail validation. Measured, the gateway fills the field either way, and discards a
+submitted `ALPHANUMERIC` for the `NUMERIC` the point type implies.
+
+**The token is readable, and the obvious fix would not fix it.** `token` is the controller's bearer
+credential — `PoeLightingService.createHeaders` does `setBearerAuth(token)` — published with no
+`writeOnly`, so it reads back in the clear. That alone is D79's shape. What makes it **D96** and P1
+is the second copy: `getConnectionDescription()` returns `ipAddress + ":" + token`, a `readOnly`
+string every client renders in its data source list. Marking the field `writeOnly` would leave the
+credential fully readable through the description. Both have to change together.
+
+Cortex cannot mitigate this from its side. A layout may not type a field `password` — `keep()` reads
+secrecy off the mapper, so masking without the matching empty-drop would let a cleared box wipe a
+stored token, and the read carries it anyway. The field stays a plain box and the finding carries
+the weight.
+
+**`connectionTimeoutSeconds` is hidden because nothing reads it.** Declared on the VO with a default
+of 10, serialised, mapped both ways, and never referenced again in the tree — where `retries`, the
+only other tuning field, is checked by the runtime on every attempt. **D98.** A data source saves
+with `PATCH`, so hiding the field keeps whatever is stored.
+
+**Three defaults for `retries`, and we seed the VO's.** The VO initialises 2, the REST model 0, and
+the discovery path sets 3. Measured: a POST omitting the field stores 0, which means the first
+failure is the last. The VO's own initialiser is what a form building a fresh source should start
+from, so the layout seeds 2 and the disagreement is **D99**.
+
+**Stricter than the gateway, deliberately, and said so.** `ipAddress` and `token` are `required` and
+`channelId` has a floor of 1, none of which the gateway checks. This is the thing row 11 got wrong
+on `valuePointer` — but the test it failed was whether an empty value is a *configuration*. There, a
+write-only point with no pointer was one. Here an empty address or token is a source that can never
+reach anything, and channel 0 is a channel no controller has.
+
+`alarmLevels` finally earns the Advanced group it has sat in since G7.1: this is the first type in
+the sequence with real event types — communication failure and device failure, both URGENT.
+
+*Verified:* 104 layout specs green; every rule above measured against 5.1.3 on the local instance,
+probe rows deleted. The on-screen pass is owed with rows 6–14.
+
 ## Per-type components
 
 Settled 2026-09-25, after the question was raised directly: **is one renderer for 148 model types
@@ -1872,6 +1937,22 @@ and wrong, or stale, and are recorded there too. D73 is deliberately not fixed a
   (`MESH_SWITCH.PL`, `MESH_UART.PL`, `INTERNAL.PL`) and omits `PING.PL`, which also overrides
   `isSettable()` to false. The list is the only place the wire says this, so an incomplete one is
   worse than none.
+
+**Filed 2026-09-29, from row 15.** In
+`Inferrix-stack/docs/specs/2026-09-29-poe-lighting-rest-surface.md`.
+
+- **D96 (P1)** — the PoE controller's bearer `token` is published without `writeOnly` and reads back
+  in the clear, *and* `getConnectionDescription()` returns `ipAddress + ":" + token`, so marking the
+  field `writeOnly` would leave the credential readable through a `readOnly` display string. Both
+  have to change together.
+- **D97 (P2)** — `pointType` is a bare string with `valueOf` called on it: omitted is a **500**,
+  unknown is a 400 naming no field. The sibling mesh-node model already types it as the enum and
+  documents why.
+- **D98 (P2)** — `connectionTimeoutSeconds` is stored and mapped and read by nothing.
+- **D99 (P3)** — neither `validate` overload has a body, and `retries` has three different defaults
+  (VO 2, REST model 0, discovery 3).
+- **D100 (P3)** — the create response reports `settable: false` for a point whose stored locator is
+  `settable: true`; a GET immediately after disagrees with it.
 
 - **W11 (P1)** — a multistate virtual point cannot be configured at all. The template switches on
   `'MULTISTATE'`, a case its own dropdown can never emit (it emits `INCREMENT_MULTISTATE`), so the

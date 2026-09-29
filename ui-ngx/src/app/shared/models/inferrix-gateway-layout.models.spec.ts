@@ -664,15 +664,18 @@ describe('gateway form layouts', () => {
     expect(controller.provisionedPoints).toBe(true);
   });
 
-  it('refuses a mesh address the gateway refuses, including the one it defaults to', () => {
-    // `validate` rejects 0 and -1, and `MeshControllerDataSourceModel.address` initialises to -1, so
-    // an omitted address is a 422 rather than a default. Measured: all three answer "Invalid value"
-    // against `address`.
-    expect(controller.required).toEqual(['address']);
-    expect(controller.min).toEqual({address: 1});
-    // And it stays editable: disabling what the mesh assigns would make the type unaddable by hand,
-    // which is not this feature's call to make.
-    expect(controller.readonly).toBeUndefined();
+  it('does not let the mesh address be retyped, because the mesh files records under it', () => {
+    // `deleteRelationalData` keys `deviceCache.addRemoveDevices` and
+    // `MeshNodeInfoService.deleteByAddress` on `vo.getAddress()`, so an edited address orphans the
+    // mesh-node row under the old one. And the gateway does not mean the type to be created by hand
+    // at all: `MeshControllerDataSourceDefinition.isEnabled()` returns false, and a source created
+    // through REST gets no points, because `createDataPoints` runs only from `CreateMeshControllerVO`.
+    expect(controller.readonly).toEqual(['address']);
+    // Not *also* required with a floor: a disabled control is left out of Angular's validation, so
+    // the pair would read as a rule and enforce nothing. The gateway's rule (0 and -1 refused, and
+    // the model's own initialiser is -1) is written in the comment instead.
+    expect(controller.required).toBeUndefined();
+    expect(controller.min).toBeUndefined();
   });
 
   it('writes the mesh controller\'s one attribute out rather than trusting the gateway to check', () => {
@@ -687,6 +690,13 @@ describe('gateway form layouts', () => {
     // BINARY. Nothing on the gateway refuses another type.
     expect(controllerPoint.options.dataType.map(item => item.value)).toEqual(['BINARY']);
     expect(controllerPoint.defaults.dataType).toBe('BINARY');
+  });
+
+  it('leaves a provisioned mesh controller point nothing to edit', () => {
+    // What `provisionedPoints` already claims of every locator field on a provisioned point, and what
+    // `readonly`'s own description gives as its example -- "the attribute a point reads". The option
+    // lists stay: a disabled select still needs its item to render a label.
+    expect(controllerPoint.readonly).toEqual(['attributeId', 'dataType']);
   });
 
   it('hides the two mesh controller locator fields toVO never copies', () => {
@@ -869,12 +879,19 @@ describe('gateway form layouts', () => {
     expect(retriever.visibleWhen.bearerToken).toEqual({by: 'bearerAuth', values: [true]});
   });
 
-  it('requires a retriever point\'s pointer and seeds its data type', () => {
-    // `pollPoints` collects only the points whose `valuePointer` is non-null, so a point saved without
-    // one is silently never read. The data type used to store -1 and read back null; since D65 it is
-    // refused outright, which is why the mapper marks it required for every locator and the seed here
-    // is what stops that refusal being the operator's first contact with the rule.
-    expect(retrieverPoint.required).toEqual(['valuePointer']);
+  it('does not require a retriever point\'s pointer, because a write-only point has none', () => {
+    // It was required while `settable` was hidden, and that matched the gateway. Unhiding `settable`
+    // opened the case it gets wrong: measured 201 for `settable: true` with a set point key and no
+    // `valuePointer` at all. A layout cannot say "required unless that switch is on", and a refusal
+    // the gateway does not make would leave a legitimate point unsaveable.
+    expect(retrieverPoint.required).toBeUndefined();
+    expect(retrieverPoint.hints.valuePointer).toContain('never read');
+  });
+
+  it('seeds a retriever point\'s data type', () => {
+    // The data type used to store -1 and read back null; since D65 it is refused outright, which is
+    // why the mapper marks it required for every locator and the seed here is what stops that refusal
+    // being the operator's first contact with the rule.
     expect(retrieverPoint.defaults).toEqual({dataType: 'NUMERIC'});
   });
 

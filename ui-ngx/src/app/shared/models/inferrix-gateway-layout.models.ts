@@ -1292,7 +1292,12 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    */
   'HTTP_JSON_RETRIEVER.PL': {
     hidden: ['relinquishable', 'configurationDescription'],
-    required: ['valuePointer'],
+    // `valuePointer` is **not** required, although a point without one is never read: `pollPoints`
+    // collects only the points whose pointer is non-null. Unhiding `settable` opened the case that
+    // makes an unconditional rule wrong -- a write-only point, `settable` on with a set point key and
+    // no pointer at all, which the gateway accepts (measured 201, `valuePointer` stored null). A
+    // layout cannot say "required unless that switch is on", and inventing a refusal the gateway does
+    // not make would leave a legitimate point unsaveable. The hint carries it instead.
     options: {dataType: NON_IMAGE_DATA_TYPES},
     visibleWhen: {setPointName: {by: 'settable', values: [true]}},
     hints: {
@@ -1302,7 +1307,8 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
       setPointName: 'The JSON key the written value is sent under: the gateway POSTs '
         + '{"<key>": <value>} to the data source\'s Set point URL.',
       valuePointer: 'Where the value is in the response, as a JSON Pointer: /data/0/temp. It has to '
-        + 'start with a slash.',
+        + 'start with a slash. A point with no pointer is never read — leave it empty only for a '
+        + 'point that exists to be written.',
       valueFormat: 'Numeric points: a number pattern, such as #.## — used only when the value arrives '
         + 'as text. Binary points: the text that means 0, with anything else reading as 1. Ignored for '
         + 'the other types.',
@@ -1317,11 +1323,17 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     defaults: {dataType: 'NUMERIC'},
     // Data type first, because it decides what the two format fields mean. `valueFormat` takes a row
     // of its own so that the timestamp pair stays a pair: left to fall where it likes it would take
-    // `timePointer` with it and leave `timeFormat` on its own. The two switches share the last row;
-    // `setPointName` joins `settable` for the same reason `bearerToken` joins its own toggle on the
-    // data source, and the row collapses to one control while the gate is closed.
+    // `timePointer` with it and leave `timeFormat` on its own.
+    //
+    // The set-point pair is named `setPointName` first **to put it last**, and that is the whole
+    // reason for the order: `pack` seats an explicit row where its *first* member falls in schema
+    // order, and `settable` is the second property the schema declares. Naming the switch first would
+    // have landed the pair at the top, between the pointer and the formats -- which is what an earlier
+    // draft of this comment claimed it did not. The cost is that the row reads key-then-switch rather
+    // than switch-then-key; with the gate closed it is the switch alone, which is the common case, and
+    // it is on the on-screen pass's list.
     rows: [['dataType', 'valuePointer'], ['valueFormat'], ['timePointer', 'timeFormat'],
-      ['ignoreIfMissing'], ['settable', 'setPointName']]
+      ['setPointName', 'settable']]
   },
 
   /**
@@ -1407,23 +1419,33 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * makes and the runtime has no use for. The live source on the team's instance is exactly this shape
    * -- address 11, one BINARY `HEARTBEAT` point.
    *
-   * `address` is {@link required} with a floor of 1. `MeshControllerDataSourceDefinition.validate`
-   * refuses `0` and `-1`, and the model's own initialiser **is** `-1`, so an omitted address is a 422
-   * rather than a default (measured: 0, -1 and omitted all answer *"Invalid value"* against
-   * `address`). Left editable although the mesh assigns it, which is what the gateway's own form does:
-   * disabling it would make the type unaddable by hand, and Cortex does not otherwise decide which
-   * sources an operator may create.
+   * `address` is {@link readonly}, which is the case {@link GatewayFormLayout.readonly}'s own
+   * description gives as its example -- "a mesh node's radio address". An earlier draft left it
+   * editable to keep the type addable by hand; three things say that was wrong. The gateway does not
+   * mean this type to be created at all (`MeshControllerDataSourceDefinition.isEnabled()` returns
+   * **false**, the flag whose interface javadoc is *"so that it could be listed in the dropdown
+   * selection menu"*); a source created through REST gets **no points**, because `createDataPoints`
+   * runs only from `CreateMeshControllerVO` and never from the REST path, and `provisionedPoints`
+   * then removes the only button that could add one; and `deleteRelationalData` keys
+   * `deviceCache.addRemoveDevices` and `MeshNodeInfoService.deleteByAddress` on `vo.getAddress()`, so
+   * an edited address orphans the mesh-node row filed under the old one.
+   *
+   * It is **not** also {@link required} with a floor of 1, although that is the gateway's rule --
+   * `validate` refuses `0` and `-1` and the model's own initialiser **is** `-1`, so an omitted address
+   * is a 422 rather than a default (measured: 0, -1 and omitted all answer *"Invalid value"* against
+   * `address`). Angular leaves a disabled control out of validation entirely, so the pair would read
+   * as a rule and enforce nothing, which is what the `required`/`readonly` spec forbids. The rule
+   * lives here instead, and it is the first thing to restore if this type ever becomes addable.
    *
    * `anchorNode` and `location` are both live -- `MeshControllerDataSourceRT` hands all three to
    * `MeshControllerMeshActionListener`, and `location` is the model's name for the VO's `zone`.
    */
   'MESH_CONTROLLER.DS': {
     provisionedPoints: true,
-    required: ['address'],
-    min: {address: 1},
+    readonly: ['address'],
     hints: {
-      address: 'The node address the mesh assigned this controller. Changing it points the source at '
-        + 'a different node; the gateway refuses 0 and -1.',
+      address: 'The node address the mesh assigned this controller. It identifies the node the '
+        + 'gateway files this source and its mesh records under, so it is not editable here.',
       anchorNode: 'Anchor nodes are the fixed reference points the mesh measures position against. '
         + 'The gateway registers this one as an anchor when the source starts.',
       location: 'A free-text zone or place, stored as the node\'s zone and shown wherever the mesh '
@@ -1438,7 +1460,7 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * One attribute of a mesh controller, as a point -- and there is one attribute.
    *
    * **The gateway cannot tell a wrong attribute from a right one, and this is why the list is ours.**
-   * `MeshPointLocatorVO` declares a single `public static ExportCodes ATTRIBUTE_CODES`, and **37**
+   * `MeshPointLocatorVO` declares a single `public static ExportCodes ATTRIBUTE_CODES`, and **34**
    * subclasses reassign that one field from their own static initialiser -- mesh extender, mesh
    * switch, every sensor tag, the thermostats, the light controllers. There is one table, and the
    * last class to initialise wins. `MeshControllerDataSourceDefinition.validate` checks
@@ -1462,11 +1484,18 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    */
   'MESH_CONTROLLER.PL': {
     hidden: ['settable', 'relinquishable', 'configurationDescription'],
+    // Both describe the radio rather than anything the platform chooses, which is what
+    // {@link GatewayFormLayout.readonly} is for -- its description names "the attribute a point
+    // reads" as the example -- and what {@link GatewayFormLayout.provisionedPoints} already claims of
+    // every locator field on a provisioned point. The lists stay: a disabled select still needs its
+    // item to render a label rather than the raw constant.
+    readonly: ['attributeId', 'dataType'],
     options: {attributeId: MESH_CONTROLLER_ATTRIBUTES, dataType: BINARY_ONLY},
     defaults: {attributeId: 'HEARTBEAT', dataType: 'BINARY'},
     hints: {
-      attributeId: 'What this point reads from the controller. A mesh controller reports one '
-        + 'attribute, its heartbeat, so there is nothing else to choose.'
+      attributeId: 'What this point reads from the controller. The gateway creates this point when '
+        + 'the controller joins the mesh, and a mesh controller reports one attribute — its '
+        + 'heartbeat — so there is nothing to choose and nothing to change.'
     },
     rows: [['attributeId', 'dataType']]
   }

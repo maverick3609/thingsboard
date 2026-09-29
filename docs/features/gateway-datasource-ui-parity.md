@@ -251,7 +251,7 @@ consulted.
 | 10 | `HTTP_RECEIVER.DS` | `HTTP_RECEIVER.PL` | **done** — 2026-09-28; **D74-D75** filed; needs an on-screen pass |
 | 11 | `HTTP_JSON_RETRIEVER.DS` | `HTTP_JSON_RETRIEVER.PL` | **done** — 2026-09-28; **D76-D81** filed, one of them general to all 18 polling types; needs an on-screen pass |
 | 12 | `INTERNAL.DS` | `INTERNAL.PL` | **done** — 2026-09-28; **D83-D87** filed, one of them general to every create; needs an on-screen pass |
-| 13 | `MESH_CONTROLLER.DS` | `MESH_CONTROLLER.PL` | **done** — 2026-09-29; **D90-D91** filed, and D90 is general to 34 mesh locator types; needs an on-screen pass |
+| 13 | `MESH_CONTROLLER.DS` | `MESH_CONTROLLER.PL` | **done** — 2026-09-29; **D90-D92** filed, D90 general to 34 mesh locator types and D92 to every type the Add menu offers; needs an on-screen pass |
 | … | the remaining ~40 | | mostly four to eight fields |
 | last | the 13 types with no stack form | | left on the generic schema form — see Open decisions |
 
@@ -1444,12 +1444,29 @@ that: address 11, one BINARY `HEARTBEAT` point. So `provisionedPoints` is on, fo
 wrong on `INTERNAL.DS` and right here: the Add button could only ever offer a second point for the
 one attribute that exists.
 
-**`address` is required with a floor of 1, and that is not defensive.** `validate` refuses `0` and
-`-1`, and `MeshControllerDataSourceModel.address` **initialises to `-1`** — so an omitted address is
-a 422 rather than a default. Measured: `0`, `-1` and omitted all answer *"Invalid value"* against
-`address`. Left editable although the mesh assigns it, which is what the gateway's own form does:
-disabling it would make the type unaddable by hand, and refusing to create a source is not a
-decision this layer should be taking on the operator's behalf. The hint says what changing it does.
+**`address` is read-only, after the review took the first version apart.** It shipped editable, on
+the argument that disabling it would make the type unaddable by hand and that refusing to create a
+source is not this layer's decision. Three things say otherwise, and the review found all three.
+`MeshControllerDataSourceDefinition.isEnabled()` returns **false** — the flag whose interface javadoc
+is *"so that it could be listed in the dropdown selection menu"* — so the gateway has already taken
+that decision. A source created through REST gets **no points**, because `createDataPoints` runs only
+from `CreateMeshControllerVO` on the mesh-join path, and `provisionedPoints` then removes the only
+button that could add one: the path being defended produces a source that can never hold a point.
+And `deleteRelationalData` keys `deviceCache.addRemoveDevices` and
+`MeshNodeInfoService.deleteByAddress` on `vo.getAddress()`, so an edited address orphans the
+mesh-node row filed under the old one — a harm `VIRTUAL_MESH_NODE.DS`'s `controllerAddress` does not
+have, which is what makes read-only the consistent choice rather than an arbitrary one.
+
+The gateway's own rule is still worth writing down: `validate` refuses `0` and `-1` and the model
+**initialises `address` to `-1`**, so an omitted one is a 422 rather than a default (measured: all
+three answer *"Invalid value"*). It is in the layout's comment rather than in `required`/`min`,
+because a disabled control is left out of Angular's validation and the pair would read as a rule and
+enforce nothing — which is exactly what the `required`/`readonly` spec added on 2026-09-28 forbids.
+
+That the Add menu offers this type at all is **D92**: `DataSourceDefinitionModel` publishes `type`,
+`name` and `pointLocatorType` and not `isEnabled()`, and 48 definition classes in the tree return
+false from it. One field on one model, the same shape as D83, and Cortex cannot filter its own menu
+without it.
 
 **`anchorNode` and `location` are both live.** `MeshControllerDataSourceRT` hands the address, the
 anchor flag and the zone to `MeshControllerMeshActionListener`; `location` is the model's name for
@@ -1472,6 +1489,12 @@ only refusal available; it is a convenience, not a boundary, because anything po
 `BINARY`, while the definition checks only that the submitted type *exists*. A numeric mesh
 controller point would be a point the mesh writes a binary value into.
 
+**Both locator fields are read-only.** `provisionedPoints`' own description already claims that of
+every locator field on a provisioned point, and `readonly`'s description gives "the attribute a point
+reads" as its example; the first version of this row marked neither, which the review caught as a
+contradiction with both. The option lists stay, because a disabled select still needs its item to
+render a label rather than the raw constant.
+
 **`settable` and `relinquishable` are hidden, and this is the pre-D84 shape again.**
 `MeshControllerPointLocatorModel.toVO` builds a fresh VO and copies `attributeId` and `dataType`
 alone, while `fromVO` inherits the base and reports `settable` back. Measured: `settable: true`
@@ -1486,6 +1509,28 @@ back. 94 layout and 41 schema specs green. Every probe row deleted; the instance
 sources and 106 points — **12 rather than 21 because the nine `ZZ …` SNMP rows left behind by row 8
 were mine and are now gone**, which closes one of the cleanup items this document has been carrying.
 On-screen pass owed with rows 6-12.
+
+**What the adversarial review found, and what it changed.** Six findings, all six acted on, and two
+of them undid decisions this row shipped.
+
+1. *The `HTTP_JSON_RETRIEVER.PL` row comment described a layout `pack` does not produce* — the high
+   one, and it was my own documented rule I had failed to apply: an explicit row lands where its
+   **first** member falls in schema order, and `settable` is the second property the schema declares.
+   `['settable', 'setPointName']` therefore sat near the top, between the pointer and the formats,
+   while the comment claimed it was last. Fixed by naming the row `['setPointName', 'settable']`,
+   which is the only way to seat it last; the cost is that the row reads key-then-switch.
+2. *`required: ['valuePointer']` had become stricter than the gateway* — on a path this same commit
+   opened. With `settable` hidden the rule matched; unhiding it made a **write-only** point
+   unsaveable from Cortex, and the gateway accepts one (measured 201, `settable` on with a set point
+   key and no pointer at all). Dropped to a hint. Inventing a refusal the gateway does not make is
+   the mirror of the mistake this feature exists to avoid.
+3. *`MESH_CONTROLLER.PL` marked nothing read-only*, contradicting both `provisionedPoints`' own
+   description and `readonly`'s. Both fields are read-only now.
+4. *The hand-add path this row defended produces an unusable source* — see `address` above.
+5. *The read-only argument was arbitrary as written* — three concrete tiebreakers, all pointing the
+   same way, and D92 came out of the third.
+6. *The layout comment said 37 subclasses; it is 34* — the doc and the commit message had it right,
+   the code comment did not.
 
 ## Per-type components
 
@@ -1672,6 +1717,9 @@ and wrong, or stale, and are recorded there too. D73 is deliberately not fixed a
   `attributeId: "BATTERY"`, which only the mesh extender declares.
 - **D91 (P3)** — `MeshControllerPointLocatorModel.toVO` drops `settable` and `relinquishable` while
   the read reports them, the shape D84 closed on `INTERNAL.PL`.
+- **D92 (P2)** — `DataSourceDefinitionModel` does not publish `isEnabled()`, so a client cannot tell
+  which of the types it is handed are meant to be offered; 48 definition classes return false, and a
+  hand-created `MESH_CONTROLLER.DS` is accepted and can never hold a point.
 
   Both written up in `Inferrix-stack/docs/specs/2026-09-29-mesh-controller-rest-surface.md`.
 

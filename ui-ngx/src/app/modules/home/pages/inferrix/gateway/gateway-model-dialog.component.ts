@@ -271,6 +271,11 @@ export class GatewayModelDialogComponent
       if (empty && secrets.has(id)) {
         return;
       }
+      // After the secret check, which means a field that is ever published `writeOnly` **and** named
+      // in `sendEmpty` is dropped rather than sent blank. Nothing is in both today and the order is
+      // the right one -- a secret must never be posted empty -- but a layout that put a field in
+      // both would get the secret rule, silently.
+      //
       // Before the add-drop and on an edit alike, because the value this replaces is a null the
       // *gateway itself* handed back: a scripting source reads `scriptPermissions: null`, and
       // spreading that straight back is the 500 this exists for. A stored non-empty value is not

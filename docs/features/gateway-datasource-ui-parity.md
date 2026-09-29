@@ -1802,6 +1802,26 @@ not collide with another point's name *or with a context variable on the source*
 distinct refusals. Only the first is expressible, so the hint carries the other two — they matter
 before the operator writes the script that uses the name, not after.
 
+**A second field on this type crashes when absent, and it is the most obvious one.** Open Add, fill
+in nothing, Save: the source posts with no `script`, `commonValidation` compiles a null, and the
+gateway 500s. Found by row 15/16's review. The fix is *not* `required`, which was the reviewer's
+first suggestion and which the measurement refuses — `script: ""` saves 201, so an empty script is a
+stub the gateway is happy to store and requiring one would forbid it. It is `sendEmpty`, exactly as
+for `scriptPermissions`, which makes two fields on one type with the same shape and settles whether
+that mechanism earns its place. **D104**, and like D101 it is a null check the meta module already
+has: a meta point posted with no script is a clean 422 *"Required value"*.
+
+> **`sendEmpty` and `defaults` are a pair, which nothing was enforcing.** The review's sharpest
+> point. `pick()` copies a key from the model only when the model carries it, and on an add the
+> model is `gatewayFormDefaults(type)` — so a `sendEmpty` id that is not also a `defaults` key never
+> reaches `keep()` on an add, the branch never fires, and the 500 is back. `scriptPermissions`
+> worked only because it happened to be seeded. That coupling is now a spec.
+>
+> Second-order and latent: `keep()` tests the secret set **before** `sendEmpty`, so a field ever
+> published `writeOnly` and also named in `sendEmpty` would be dropped rather than sent blank.
+> Nothing is in both today, and the order is the right one — a secret must never be posted empty —
+> but the comment now says so.
+
 The rest is ordinary: `script` is a bare string that needs the same textarea `META.PL` needs and is
 compiled on every save; `logSize`/`logCount` are primitives on the model that lose the VO's 1.0 and
 5 (**D103**); `settable` is hidden because `isSettable()` is a hard false though `toVO` still copies
@@ -2067,6 +2087,10 @@ and wrong, or stale, and are recorded there too. D73 is deliberately not fixed a
 - **D102 (P2)** — `updateEvent` publishes five enum values and `commonValidation` accepts three.
 - **D103 (P3)** — `logSize` and `logCount` are primitives on the REST model, so a create that omits
   them stores 0 and 0 instead of the VO's 1.0 and 5.
+- **D104 (P1)** — `commonValidation` hands `service.compile(vo.getScript(), false)` a null when
+  `script` is omitted, which is a 500 in the Nashorn source constructor. A **blank** script is legal
+  and stored, so this is a missing null check rather than a missing requirement — the same one as
+  D101, twelve lines up the same method, and one the meta module already has.
 
 - **W11 (P1)** — a multistate virtual point cannot be configured at all. The template switches on
   `'MULTISTATE'`, a case its own dropdown can never emit (it emits `INCREMENT_MULTISTATE`), so the

@@ -817,13 +817,36 @@ describe('gateway form layouts', () => {
   const scripting = GATEWAY_FORM_LAYOUTS['SCRIPTING.DS'];
   const scriptPoint = GATEWAY_FORM_LAYOUTS['SCRIPTING.PL'];
 
+  it('seeds every sendEmpty field, because the add path only sees what the model carries', () => {
+    // `pick` copies a key from the model only when the model has it, and on an add the model is
+    // `gatewayFormDefaults(type)`. A `sendEmpty` id that is not also a `defaults` key never reaches
+    // `keep()` on an add, so the branch does not fire and the gateway gets the absent key it
+    // crashes on. The two are a pair; nothing else enforces it.
+    Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
+      (layout.sendEmpty ?? []).forEach(id =>
+        expect(Object.prototype.hasOwnProperty.call(layout.defaults ?? {}, id))
+          .withContext(`${modelType}.${id}`).toBe(true));
+    });
+  });
+
+  it('sends an empty script rather than requiring one, because blank is legal and absent is a 500', () => {
+    // `commonValidation` hands `service.compile(vo.getScript(), false)` whatever arrived. Measured:
+    // no `script` key is a 500 in the Nashorn source constructor, `script: ""` is a 201. So the
+    // field belongs in `sendEmpty`, not in `required` -- requiring it would refuse a stub source the
+    // gateway stores happily. `MetaPointLocatorVO.validate` answers the same omission 422
+    // "Required value", which is the check scripting is missing. D104.
+    expect(scripting.sendEmpty).toContain('script');
+    expect(scripting.required).toBeUndefined();
+    expect(scripting.defaults.script).toBe('');
+  });
+
   it('sends an empty scriptPermissions, because an absent one is a 500', () => {
     // `ScriptDataSourceModel.toVO` calls `new ScriptPermissions(scriptPermissions)` and that
     // constructor does `groups.split(",")` with no null check. Measured: an add omitting the key is
     // a 500, and so is a PATCH of a source's own unmodified body, because the read hands back
     // `scriptPermissions: null`. The sibling `MetaPointLocatorModel` guards it, which is why
     // `META.PL` hides the same field and needs nothing. D101.
-    expect(scripting.sendEmpty).toEqual(['scriptPermissions']);
+    expect(scripting.sendEmpty).toContain('scriptPermissions');
     expect(scripting.defaults.scriptPermissions).toBe('');
   });
 

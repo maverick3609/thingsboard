@@ -1707,12 +1707,22 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * one of them on the points below, and a layout has no word for it. The hint says it instead.
    *
    * `script` is a bare `{"type": "string"}` again, so it needs the same `textarea` `META.PL` needs.
-   * It is compiled on every save: a syntax error is a 422 naming `script`.
+   * It is compiled on every save: a syntax error is a 422 naming `script`. An **absent** one is a
+   * 500, because `commonValidation` hands `service.compile(vo.getScript(), false)` a null -- and
+   * the sibling `MetaPointLocatorVO.validate` answers the same omission with a 422 *"Required
+   * value"*, so this is the second place on this type where META has the check and scripting does
+   * not (D104). It is in `sendEmpty` rather than `required` because `script: ""` is **accepted**:
+   * measured, an empty script saves 201 and an absent one crashes, so requiring it would refuse a
+   * stub source the gateway is happy to store.
    */
   'SCRIPTING.DS': {
     hidden: ['scriptPermissions'],
     advanced: ['executionDelaySeconds', 'logLevel', 'logSize', 'logCount', 'historicalSetting'],
-    sendEmpty: ['scriptPermissions'],
+    // Both for the same reason and both measured: an absent key crashes the request while a blank
+    // one is stored. Every id here is also a key of `defaults` below, which is what puts it on the
+    // model an add starts from -- `pick` copies a key only when the model carries it, so without
+    // the seed this branch never runs and the 500 is back.
+    sendEmpty: ['scriptPermissions', 'script'],
     types: {script: FormPropertyType.textarea},
     options: {updateEvent: SCRIPTING_UPDATE_EVENTS},
     min: {executionDelaySeconds: 0},
@@ -1732,7 +1742,7 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     // primitives, so a source created without them logs into a 0 MB file and keeps none of them --
     // measured, a POST omitting both reads back `0.0` and `0`.
     defaults: {updateEvent: 'UPDATE', logLevel: 'NONE', logSize: 1, logCount: 5,
-      executionDelaySeconds: 0, scriptPermissions: ''},
+      executionDelaySeconds: 0, scriptPermissions: '', script: ''},
     rows: [['polling', 'updateEvent'], ['logLevel', 'executionDelaySeconds'],
       ['logSize', 'logCount']]
   },

@@ -829,7 +829,7 @@ const lightControllerSource = (device: string): GatewayFormLayout => {
  *   do override to a hard `false` as well.
  * - **`readonly`** (4DI_2DO_CARD, PEOPLE_COUNTER, THERMOSTAT, VAV_CONTROLLER) -- the provisioner
  *   calls `locatorVO.setSettable(attribute.isSettable())` and the enum has entries that answer
- *   `true` (the card's two digital outputs, the counter's `RESET`, four thermostat attributes, the
+ *   `true` (the card's two digital outputs, the counter's `RESET`, seven thermostat attributes, the
  *   VAV's two analogue outputs). The flag is real and worth reading; the platform cannot change it,
  *   because `toVO` builds a fresh VO and copies `attributeId` and `dataType` alone, so a REST write
  *   erases it (**D109**).
@@ -1227,9 +1227,11 @@ const MOKO_BAND_ATTRIBUTES: FormSelectItem[] = [
  * the installation: the first eleven are per-phase, the last five are the whole supply. All sixteen
  * are NUMERIC.
  *
- * The last five have no English label anywhere -- their keys are in `i18n_fr.properties` and in no
- * other bundle (D116), so the words below are ours. `PF` and `KWH` are spelled out for the same
- * reason: nothing on the gateway would have spelled them out for us.
+ * The last five have no label in **any** bundle -- `dsEdit.inferrixSensors.currentSensor.attribute
+ * .{totalPower,totalApparentPower,PF,KWH,frequency}` match zero properties files in the whole stack,
+ * while the eleven per-phase keys are in both the English and French ones (D116). So the words below
+ * are ours, and `PF` and `KWH` are spelled out for the same reason: nothing on the gateway would
+ * have spelled them out for us.
  */
 const CURRENT_SENSOR_ATTRIBUTES: FormSelectItem[] = [
   {value: 'CURRENT', label: 'Current'},
@@ -1250,6 +1252,10 @@ const CURRENT_SENSOR_ATTRIBUTES: FormSelectItem[] = [
   {value: 'FREQUENCY', label: 'Frequency'}
 ];
 
+/**
+ * The four phases. `phase1`, `phase2` and `phase3` have keys in both bundles; `phaseAll` has one in
+ * neither, so "All phases" is ours by necessity rather than by choice (D116's shape again).
+ */
 const CURRENT_SENSOR_PHASES: FormSelectItem[] = [
   {value: 'PHASE_1', label: 'Phase 1'},
   {value: 'PHASE_2', label: 'Phase 2'},

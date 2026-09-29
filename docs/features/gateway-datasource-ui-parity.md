@@ -1359,6 +1359,12 @@ acted on and one rejected with a reason.
    `Modules/internal-ds/.../i18n_en.properties:9` is `dsEdit.internal=Internal Datasource`; the French
    is in `i18n_fr.properties` where it belongs. Both clauses dropped here and in the handed-over specs,
    and every other row was re-grepped for the same mistake — there were exactly two.
+   **That last clause is no longer true, and the row-19a review found the third (2026-09-30).** Row 19a
+   claimed the current sensor's five all-phase keys "are in `i18n_fr.properties` and in no other
+   bundle". They are in no bundle at all — zero matches across every properties file in the stack. It
+   is the same mistake running the other way: an English-bundle *absence* explained by a French-bundle
+   *presence* that was inferred from the neighbouring per-phase keys and never grepped. Corrected in
+   four places. The rule this keeps proving: grep the key, not the key next to it.
 6. *The `createPointsPattern` hint did not say the whole id must match* — `InternalDataSourceRT` uses
    `matcher(id).matches()`, so `COUNT` on its own creates nothing and reports nothing. Both worked
    examples in the hint happened to be anchored, which hid it. One clause added.
@@ -2170,8 +2176,9 @@ six need.
 
 Twenty of the 130 attributes have no English bundle entry, so `configurationDescription` hands those
 back as a raw translation key — the whole VAV controller bar two, the thermostat's `STATUS`, and all
-five of the current sensor's all-phase attributes, whose keys are in `i18n_fr.properties` and in no
-other bundle. **D116**, which is D111 counted properly. Our labels for those twenty are ours, and a
+five of the current sensor's all-phase attributes, whose keys are in **no bundle at all** — they
+match zero properties files in the whole stack, while the eleven per-phase keys are in both English
+and French. **D116**, which is D111 counted properly. Our labels for those twenty are ours, and a
 spec fails if one of them ever starts with `dsEdit.`.
 
 **A `CURRENT_SENSOR.PL` was added after the review, and it is the one point in this family with a
@@ -2638,8 +2645,10 @@ and wrong, or stale, and are recorded there too. D73 is deliberately not fixed a
 - **D116 (P3)** — 20 of the 130 mesh attribute descriptions have no English bundle entry, so
   `configurationDescription` returns the raw key against a schema documenting it as pre-translated.
   The VAV controller loses seven of its nine; the thermostat loses `STATUS`; the current sensor loses
-  all five all-phase attributes, whose keys exist in `i18n_fr.properties` and nowhere else — so the
-  French install is the only one that reads them. D111 counted properly.
+  all five all-phase attributes, whose keys exist in no bundle at all — zero matches across every
+  properties file in the stack, where the eleven per-phase keys are in both English and French.
+  `dsEdit.inferrixSensors.currentSensor.phaseAll` is missing the same way, so the "All phases" label
+  is ours by necessity too. D111 counted properly.
 
 - **D120 (P1)** — `DUSTBIN_LEVEL_SENSOR` and `SOAP_DISPENSER_SENSOR` can never hold a data point:
   their definitions' point `validate` tests `dsvo instanceof DistanceSensorDataSourceVO` and neither

@@ -66,3 +66,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `dbdf604258` feat(gateway): add the current sensor, and read settable from the provisioner too
 - [ ] `0ba773d9de` feat(gateway): lay out the ten mirrored mesh nodes, and let one be written to
 - [ ] `436a11e652` feat(gateway): lay out the four light controllers, and the gateway's own gaps in them
+- [ ] `677c601d78` fix(gateway): a CT rating that cannot work, and two claims that overstated what ctId does

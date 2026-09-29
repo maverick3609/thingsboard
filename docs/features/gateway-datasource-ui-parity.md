@@ -260,7 +260,11 @@ consulted.
 | 18 | `THERMOSTAT.DS` | `THERMOSTAT.PL` | **done** — 2026-09-29; **D108-D113** filed, D108 a P1 general to all 34 mesh locator types that supersedes D90; needs an on-screen pass |
 | 19 | the 24 remaining mesh device types | their locators | **done** — 2026-09-30; batched at the user's direction; **D115-D117** filed and D109 widened; needs an on-screen pass |
 | 19a | `CURRENT_SENSOR` | `CURRENT_SENSOR.PL` | **done** — 2026-09-30; the 27th member of the mesh family, added after the row-19 review; family source, own point form (`phaseId`, `ctId`); needs an on-screen pass |
-| … | the other 21 types | | provisioned-only, nine other shapes: mesh nodes, asset tags, light controllers, Modbus slaves |
+| 20 | the 9 `*_MESH_NODE` types | their locators | **next** — one batch: `controllerAddress` + `publisherId`, the shape `VIRTUAL_MESH_NODE.DS` already carries |
+| 21 | the 4 light controllers | their locators | planned — `LIGHT_CONTROLLER_V4`, `LIGHT_DI_CONTROLLER`, `LIGHT_RELAY_CONTROLLER`, `MOKO_BAND`; the mesh-device shape plus `quantize`/`timePeriod` |
+| 22 | the 3 asset tags | their locators | planned — `ASSET_TRACKING_BAND`, `LED_ASSET_TAG`, `STUDENT_ASSET_TAG`; `address` alone |
+| 23 | the 2 Modbus slave shapes | their locators | planned — `MODBUS_SLAVE_DEVICE` and `…_POLLING`, which is the same three fields plus the polling pair |
+| 24 | `VIRTUAL_SWITCH.DS` | `VIRTUAL_SWITCH.PL` | planned — the one type left in a shape of its own |
 | last | the 13 types with no stack form | | left on the generic schema form — see Open decisions |
 
 **The "remaining ~40" this table used to carry was the wrong shape.** `/v2/data-source-types` — the

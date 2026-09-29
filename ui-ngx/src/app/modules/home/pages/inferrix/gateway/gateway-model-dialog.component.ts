@@ -206,7 +206,7 @@ export class GatewayModelDialogComponent
     // id, and any field a newer gateway added that this schema mapper skipped -- survives the
     // round trip. A save that sent only the rendered fields would silently reset the rest.
     const saved: any = {...this.data.model,
-      ...this.keep(this.values, this.data.properties, this.data.layout),
+      ...this.keep(this.values, this.data.properties),
       name: identity.name};
     if (identity.xid) {
       saved.xid = identity.xid;
@@ -250,17 +250,15 @@ export class GatewayModelDialogComponent
    * Only password-typed properties are treated this way. An ordinary text field cleared on purpose
    * is a real edit and must reach the gateway as one.
    *
-   * A layout's {@link GatewayFormLayout.sendEmpty} names the fields that have to be sent even when
-   * empty, because the gateway wants the key rather than a value. `SNMP.DS.contextName` is one:
-   * on v3 an absent key is 422 `"Required value"` while `""` is accepted, so the add-drop above
-   * refuses a form the operator filled in correctly.
+   * There was a `sendEmpty` escape hatch here for the opposite case -- a field the gateway wants the
+   * key of rather than a value. It had one user, `SNMP.DS.contextName`, whose v3 rule was that an
+   * absent key is 422 while `""` is accepted; stack 5.1.3 made absent and blank both mean "not set"
+   * (D69) and the last user went with it, so the mechanism went too rather than sit here unexercised.
    */
-  private keep(values: {[id: string]: any}, properties: FormProperty[],
-               layout?: GatewayFormLayout): {[id: string]: any} {
+  private keep(values: {[id: string]: any}, properties: FormProperty[]): {[id: string]: any} {
     const secrets = new Set((properties ?? [])
       .filter(property => property.type === FormPropertyType.password)
       .map(property => property.id));
-    const sendEmpty = new Set(layout?.sendEmpty ?? []);
     const kept: {[id: string]: any} = {};
     Object.keys(values ?? {}).forEach(id => {
       const value = values[id];
@@ -269,12 +267,6 @@ export class GatewayModelDialogComponent
         return;
       }
       if (empty && this.isAdd) {
-        if (!sendEmpty.has(id)) {
-          return;
-        }
-        // The key, with the empty value the gateway asked for rather than the null a control that
-        // was never touched holds -- a null is refused by the same validator.
-        kept[id] = '';
         return;
       }
       kept[id] = value;

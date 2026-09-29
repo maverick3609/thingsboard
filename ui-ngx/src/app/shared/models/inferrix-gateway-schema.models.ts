@@ -283,7 +283,7 @@ export const schemaToFormProperties = (doc: GatewaySchemaDocument, family: strin
     return [];
   }
   const properties = propertiesOf(schema, doc, 0, new Set<string>());
-  // Every one of the 62 point locators declares `dataType`, none of them marks it required, and since
+  // Every one of the 61 point locators declares `dataType`, none of them marks it required, and since
   // stack 5.1.3 a point whose locator carries a type `DataTypes` does not declare is refused --
   // including an omitted one, which resolves to -1, and an unset one, which is UNKNOWN (0). The check
   // is in `DatapointService.validate`, the funnel every create and every update passes through, so

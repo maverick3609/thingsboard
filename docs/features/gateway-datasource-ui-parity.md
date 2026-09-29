@@ -1294,7 +1294,8 @@ monitor. One live measurement would not have been enough to claim that.
 adding a pattern, a malformed regex a clean 422 naming `createPointsPattern`, point add 201 on the
 seeded monitor, point edit 200 on `PUT` carrying the hidden fields and the disabled data type back. 90
 layout and 40 schema specs green. Six probe rows and one probe source deleted; the instance is back to
-21 sources and 106 points, and the live internal source and its 23 points were not touched. On-screen
+21 sources and 106 points as it then stood, and the live internal source and its 23 points were not
+touched. (That baseline is 12 since row 13 deleted the nine `ZZ …` SNMP rows row 8 had left.) On-screen
 pass owed with rows 6-11; first item on this row's list is the point form, where `pack` would have
 paired `dataType` with `monitorId` and the layout deliberately does not — a full-width row each, so a
 61-character monitor id is not cut off, at the cost of a wide greyed select below it. Second item is
@@ -1359,13 +1360,14 @@ acted on and one rejected with a reason.
 
 The gateway closed D65-D88 on 2026-09-29. Eight of them are rules a form has to follow, so this is
 not only a ledger update. Everything below was **re-probed live against 5.1.3** on the team's local
-instance, which is back at its 21 sources / 106 points.
+instance, which is back where it started -- 21 sources / 106 points at the time, 12 / 106 once row 13
+cleared the nine `ZZ …` rows row 8 had left behind.
 
-**A locator's data type is now mandatory, on all 62 types.** `DatapointService.validate` refuses a
+**A locator's data type is now mandatory, on all 61 types.** `DatapointService.validate` refuses a
 locator whose `dataTypeId` is not in `DataTypes.CODES` (**D65**) — an omitted one resolves to `-1`,
 an unset one is `UNKNOWN` (0), and both are a 422 *"Invalid value"* against `dataType`. Every locator
 in the document declares the field and **none of them marks it required**, so the rule cannot come
-from the schema, and with 62 types it does not belong in a per-type layout either. It went into the
+from the schema, and with 61 types it does not belong in a per-type layout either. It went into the
 mapper, on the family: `schemaToFormProperties` marks `dataType` required when `family` is
 `pointLocator`. Two layouts sit on top of it without conflict — `MODBUS.PL` hides the field, and a
 hidden field has no control to validate (Modbus derives the type from the register range anyway);
@@ -1377,8 +1379,8 @@ button at all.
 dropdown is a real dropdown rather than the disabled box that row 12 shipped — measured, an
 ALPHANUMERIC point reads back ALPHANUMERIC. And `GET /v2/stack-monitor` publishes each monitor's id
 (**D83**), so `monitorId` is a **picker** rather than an id typed from memory:
-`InternalPointFormComponent`, the third per-type component, 80 lines on the same `runtimeOptions()`
-hook the other two use. A wrong id is also refused now (**D85**, measured 422 *"No monitor with id
+`InternalPointFormComponent`, 85 lines, the fifth component extending `GatewayFormComponent` and the
+fourth on a locator, using the same `runtimeOptions()` hook the others do. A wrong id is also refused now (**D85**, measured 422 *"No monitor with id
 …"*), which is what makes the picker a convenience rather than the only defence.
 
 **`IMAGE` is off the internal list too, and that one is ours.** D82 refused it on the three locators
@@ -1476,10 +1478,12 @@ the VO's `zone`, which is worth knowing when reading the Java next to the wire.
 declares one `public static ExportCodes ATTRIBUTE_CODES` and **34 subclasses reassign that one
 field** from their own static initialisers — every sensor tag, the thermostats, the light
 controllers, the mesh extender and switch, and the controller. Each replaces the table rather than
-adding to it, so the process holds exactly one attribute table: whichever class initialised last.
+adding to it, so the 34 of them share one table: whichever initialised last. (There are two tables in
+all -- `MeshControllerNodesPointLocatorVO` declares its own, shadowing the parent's, and two further
+subclasses race for that one. The 34 is only right because of the shadow.)
 `MeshControllerDataSourceDefinition.validate` reads it through inheritance, and so does
 `fromVO`. Measured on 5.1.3: a `MESH_CONTROLLER.PL` point saved **201** with
-`attributeId: "BATTERY"` — an attribute only the mesh extender declares — and read back as
+`attributeId: "BATTERY"` — which `MeshControllerAttributes` does not declare — and read back as
 `"BATTERY"`. Filed as **D90**, and it is general to all 34. A one-option list on this side is the
 only refusal available; it is a convenience, not a boundary, because anything posting to
 `/v2/data-point` directly still gets its 201.
@@ -1530,7 +1534,26 @@ of them undid decisions this row shipped.
 5. *The read-only argument was arbitrary as written* — three concrete tiebreakers, all pointing the
    same way, and D92 came out of the third.
 6. *The layout comment said 37 subclasses; it is 34* — the doc and the commit message had it right,
-   the code comment did not.
+   the code comment did not. 36 classes assign one of the two tables; 34 assign the base's.
+
+A second pass on the same commits found six more, five of them prose and one of them dead code.
+*"An attribute only the mesh extender declares"* was wrong in four places — `BATTERY` is declared by
+**21** attribute enums in the tree; the conclusion survives because the reviewer narrowed the live
+table by probe to exactly `MeshExtenderAttributes`, but the sentence did not. *"62 point locators"*
+was wrong three times: the live document publishes **61** locator families and 63 data source
+families, which is where 62 came from by drift — and the substantive half held, all 61 declare
+`dataType` and none marks it required. `InternalPointFormComponent` is the **fifth** component
+extending `GatewayFormComponent`, not the third, and 85 lines rather than 80. The `bearerToken`
+comment rewritten on 2026-09-28 claimed `PAIRABLE_TYPES` would allow a toggle beside a password box
+on its own — it would not, a `switch` is not in that list, and the sentence it replaced was closer to
+true. And two "21 sources" baselines survived in this document while row 13 contradicted them at the
+bottom of it.
+
+The dead code: removing `sendEmpty: ['contextName']` left the whole **`sendEmpty` mechanism** with no
+users — the interface field, its twelve-line doc, the branch in `keep()` and a spec guard. All four
+are gone. It existed for exactly one field and D69 closed the rule it worked around; the reason it
+existed is recorded in `keep()`'s own comment so that the next person to meet an absent-versus-blank
+gateway does not have to rediscover it.
 
 ## Per-type components
 
@@ -1714,7 +1737,7 @@ and wrong, or stale, and are recorded there too. D73 is deliberately not fixed a
 - **D90 (P1)** — `MeshPointLocatorVO.ATTRIBUTE_CODES` is one `public static` field that 34 mesh
   locator subclasses reassign from their own static initialisers, so every mesh type validates its
   attribute against whichever class loaded last. Measured: a `MESH_CONTROLLER.PL` point accepts
-  `attributeId: "BATTERY"`, which only the mesh extender declares.
+  `attributeId: "BATTERY"`, which `MeshControllerAttributes` does not declare.
 - **D91 (P3)** — `MeshControllerPointLocatorModel.toVO` drops `settable` and `relinquishable` while
   the read reports them, the shape D84 closed on `INTERNAL.PL`.
 - **D92 (P2)** — `DataSourceDefinitionModel` does not publish `isEnabled()`, so a client cannot tell

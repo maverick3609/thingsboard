@@ -493,11 +493,13 @@ describe('gateway form layouts', () => {
   });
 
   it('sends neither v3 optional field, because stack 5.1.3 accepts both absent and blank', () => {
-    // It used to need `sendEmpty: ['contextName']`: absent was 422 "Required value" while `""` was
-    // 201, and `engineId` refused the opposite -- absent fine, `""` a 422 `validate.minLength`. D69
-    // made blank count as absent on both, measured 201 with the pair omitted and 201 with both `""`,
-    // so the workaround is gone and nothing here may put it back.
-    expect(snmp.sendEmpty).toBeUndefined();
+    // It used to need a `sendEmpty: ['contextName']` escape hatch: absent was 422 "Required value"
+    // while `""` was 201, and `engineId` refused the opposite -- absent fine, `""` a 422
+    // `validate.minLength`. D69 made blank count as absent on both, measured 201 with the pair
+    // omitted and 201 with both `""`. That was the mechanism's only user, so the mechanism went with
+    // it; `(snmp as any).sendEmpty` is checked here rather than typed because the key no longer
+    // exists on the interface.
+    expect((snmp as any).sendEmpty).toBeUndefined();
     // The two passphrases now carry the rule the gateway enforces (D70): a protocol other than NONE
     // requires one. Not `required`, because both are gated -- a closed gate with a required empty
     // control would dead-end the save with nothing on screen to fix.
@@ -746,15 +748,6 @@ describe('gateway form layouts', () => {
   it('hides the two MQTT locator fields the gateway derives or never reads', () => {
     // `isSettable()` answers `publishTopic != null && length > 0`, and a valid point always has one.
     expect(mqttPoint.hidden).toEqual(['settable', 'relinquishable', 'configurationDescription']);
-  });
-
-  it('never names a field in both sendEmpty and hidden', () => {
-    // A hidden field has no control to be empty; naming it in both says one of the two is wrong.
-    Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) => {
-      const hidden = new Set(layout.hidden ?? []);
-      (layout.sendEmpty ?? []).forEach(id =>
-        expect(hidden.has(id)).withContext(`${modelType}.${id}`).toBe(false));
-    });
   });
 
   it('gates no field on a field that is itself gated', () => {

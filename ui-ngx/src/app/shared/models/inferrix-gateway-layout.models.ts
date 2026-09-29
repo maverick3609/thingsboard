@@ -99,18 +99,6 @@ export interface GatewayFormLayout {
    */
   types?: {[id: string]: FormPropertyType};
   /**
-   * Fields whose empty value must still be sent on an add, because the gateway wants the key rather
-   * than a value.
-   *
-   * The add drops every empty field so that a model's Java field initialisers apply — which is what
-   * makes a Modbus source's four timeouts work. `SNMP.DS.contextName` is the exception the rule
-   * needs: on v3 an absent key is refused `"Required value"` while `""` is accepted (measured on
-   * `inferrix-stack-v5.1.x`), so dropping it turns a correctly filled form into a 422 on a field the
-   * operator deliberately left blank. Named per field rather than inferred, because there is no
-   * signal in the schema for it: `required` is not set on it, and the empty value is legal.
-   */
-  sendEmpty?: string[];
-  /**
    * Fields the form refuses to submit empty, because the gateway cannot accept an empty one.
    *
    * Adds to whatever the schema already marks `required`, never subtracts — so this cannot weaken a
@@ -1259,9 +1247,9 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     // an explicit row lands where its first field falls, and the schema declares `bearerToken` before
     // the `bearerAuth` that reveals it -- so left alone the box appears above its own switch.
     //
-    // The pairing is a toggle beside a password box, which `PAIRABLE_TYPES` would allow on its own;
-    // `pack` honours an explicit row unconditionally either way. With the gate closed the row
-    // collapses to the switch alone.
+    // The pairing rests entirely on the explicit row: `PAIRABLE_TYPES` is [text, password, number,
+    // select] and a `switch` is not in it, so left alone `pack` would flush the toggle to a row of its
+    // own and leave the box above it. With the gate closed the row collapses to the switch alone.
     rows: [['url'], ['timeoutSeconds', 'retries'], ['bearerAuth', 'bearerToken']]
   },
 
@@ -1466,9 +1454,11 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * last class to initialise wins. `MeshControllerDataSourceDefinition.validate` checks
    * `MeshControllerPointLocatorVO.ATTRIBUTE_CODES.isValidId(...)`, which resolves to that shared
    * field. Measured on 5.1.3: a `MESH_CONTROLLER.PL` point saved **201** with
-   * `attributeId: "BATTERY"`, an attribute only the mesh extender declares, and read back as
-   * `"BATTERY"` -- so `fromVO`'s lookup is reading the wrong table too. Filed as **D90**. A one-option
-   * list written out here is the only thing on this side that refuses it.
+   * `attributeId: "BATTERY"`, which `MeshControllerAttributes` does not declare, and read back as
+   * `"BATTERY"` -- so `fromVO`'s lookup is reading the wrong table too. The review narrowed the live
+   * table further by probe: `HEARTBEAT` and `BATTERY` accepted, twenty other attribute names refused,
+   * which is `MeshExtenderAttributes` exactly. Filed as **D90**. Writing the list out here is the only
+   * thing on this side that refuses anything.
    *
    * `dataType` is `BINARY` alone for the same reason the attribute list has one entry:
    * `HEARTBEAT`'s conversion is `value -> new BinaryValue(value.getBooleanValue())`, and the

@@ -59,6 +59,9 @@ export const GATEWAY_ADVANCED_GROUP = 'Advanced';
 const FIELD_LABELS: {[property: string]: string} = {
   timePeriod: 'Polling interval',
   timeout: 'Timeout (ms)',
+  // `humanise` lowercases the initialism to "Ip address". The stack's own label is this one, and
+  // it is the label on every locator that carries the field (`PING.PL`, `POE_LIGHTING.PL`).
+  ipAddress: 'IP address',
   offset: 'Offset (0-based)',
   discardDataDelay: 'Discard data delay (ms)',
   registerCount: 'Number of registers',

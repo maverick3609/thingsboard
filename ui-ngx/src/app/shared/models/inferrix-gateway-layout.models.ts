@@ -1493,6 +1493,62 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
         + 'heartbeat — so there is nothing to choose and nothing to change.'
     },
     rows: [['attributeId', 'dataType']]
+  },
+
+  /**
+   * A ping data source, which is nothing but how often the gateway pings.
+   *
+   * No overrides, and field-identical to `VIRTUAL.DS`: `PingDataSourceVO` adds not one field to
+   * `PollingDataSourceVO`, so the whole type is the poll period plus the two the mapper already
+   * puts under Advanced. The gateway's own form agrees -- name, XID, polling interval and its unit,
+   * edit permission, and nothing else. Present so the type is marked as worked through.
+   *
+   * `alarmLevels` is always `[]` here, because `getEventCodes()` returns null and `addEventTypes`
+   * adds none -- measured on a created source. It is left where {@link GATEWAY_ADVANCED_FIELDS}
+   * puts it rather than hidden, because `VIRTUAL.DS` is in exactly the same position and this is a
+   * property of the two types' event tables, not of this row.
+   */
+  'PING.DS': {},
+
+  /**
+   * One address the gateway pings, as a point.
+   *
+   * The whole locator is `ipAddress` and `timeout`; everything else the schema lists is fixed by
+   * construction. `PingPointLocatorVO.getDataTypeId()` returns `DataTypes.BINARY` with nothing
+   * reading a submitted type -- `PingPointLocatorModel.toVO` copies the two fields and no more --
+   * so the data type is read-only on one item with a default, which is what a point that is
+   * reachable or not can be. Measured: a point submitted `dataType: NUMERIC` saves 201 and reads
+   * back `BINARY`.
+   *
+   * Unlike `MESH_CONTROLLER.PL`, this data source has an Add button, so the default is what keeps
+   * the mapper's blanket `required` on a locator's data type from refusing a new point: a disabled
+   * control is left out of Angular's validation, and `gatewayFormDefaults` seeds the value the
+   * control cannot supply.
+   *
+   * `settable` is hidden because `isSettable()` is false by construction -- `PingDataSourceRT`'s
+   * `setPointValue` is an empty method -- and `relinquishable` with it, since `toVO` never reads
+   * either. Measured: both submitted true, the point reads back `settable: false` and
+   * `relinquishable: null`.
+   *
+   * Both remaining fields are `required`, which is the gateway's own rule rather than a stricter
+   * one: `PingDataSourceDefinition.validate` refuses an empty address and a timeout of `<= 0`.
+   * `min` carries the second half, because the refusal is a 422 the operator would otherwise only
+   * meet on save -- and an omitted timeout is a zero, so it is refused too.
+   */
+  'PING.PL': {
+    hidden: ['settable', 'relinquishable', 'configurationDescription'],
+    readonly: ['dataType'],
+    options: {dataType: BINARY_ONLY},
+    required: ['ipAddress'],
+    min: {timeout: 1},
+    hints: {
+      ipAddress: 'What to ping. A host name works as well as an address — the gateway resolves it '
+        + 'on every poll — and the point is on when the host answers, off when it does not.',
+      timeout: 'How long to wait for an answer before calling the host unreachable. The gateway '
+        + 'refuses zero, so a point always waits at least a millisecond.'
+    },
+    defaults: {dataType: 'BINARY', timeout: 1000},
+    rows: [['ipAddress', 'timeout']]
   }
 };
 

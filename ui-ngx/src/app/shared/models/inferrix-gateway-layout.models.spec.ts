@@ -681,10 +681,11 @@ describe('gateway form layouts', () => {
   });
 
   it('writes the mesh controller\'s one attribute out rather than trusting the gateway to check', () => {
-    // `MeshPointLocatorVO` has one `public static ATTRIBUTE_CODES` and 37 subclasses reassign it from
+    // `MeshPointLocatorVO` has one `public static ATTRIBUTE_CODES` and 34 subclasses reassign it from
     // their own static initialiser, so the last class to load decides what every mesh locator
     // validates against. Measured on 5.1.3: a MESH_CONTROLLER point saved 201 with
-    // `attributeId: "BATTERY"`, which only the mesh extender declares, and read back as "BATTERY".
+    // `attributeId: "BATTERY"` -- which this type's own table does not declare, and which the probe
+    // narrowed the live table to `MeshExtenderAttributes` for -- and read back as "BATTERY".
     // D90. A one-option list is the only refusal available on this side.
     expect(controllerPoint.options.attributeId.map(item => item.value)).toEqual(['HEARTBEAT']);
     expect(controllerPoint.defaults.attributeId).toBe('HEARTBEAT');
@@ -708,6 +709,43 @@ describe('gateway form layouts', () => {
     // `MeshPointLocatorVO.isSettable()` answers the stored field -- it is never given one. D91.
     expect(controllerPoint.hidden)
       .toEqual(['settable', 'relinquishable', 'configurationDescription']);
+  });
+
+  const pingPoint = GATEWAY_FORM_LAYOUTS['PING.PL'];
+
+  it('marks the ping data source worked through without overriding anything', () => {
+    // `PingDataSourceVO` adds no field to `PollingDataSourceVO`, so the type is the poll period plus
+    // the two the mapper already puts under Advanced -- field-identical to `VIRTUAL.DS`, and the same
+    // empty entry. An entry that is absent instead would keep the old renderer.
+    expect(GATEWAY_FORM_LAYOUTS['PING.DS']).toEqual({});
+  });
+
+  it('fixes a ping point to binary, and defaults it because this type has an Add button', () => {
+    // `getDataTypeId()` returns `DataTypes.BINARY` and `PingPointLocatorModel.toVO` copies
+    // `ipAddress` and `timeout` alone, so a submitted type is not read at all -- measured, a point
+    // sent `NUMERIC` saves 201 and reads back `BINARY`. Unlike `MESH_CONTROLLER.PL` this source has
+    // an Add button, so the default is what answers the mapper's blanket `required` on a locator's
+    // data type: a disabled control is left out of validation and cannot supply the value itself.
+    expect(pingPoint.readonly).toEqual(['dataType']);
+    expect(pingPoint.options.dataType.map(item => item.value)).toEqual(['BINARY']);
+    expect(pingPoint.defaults.dataType).toBe('BINARY');
+  });
+
+  it('carries the gateway\'s own two ping rules rather than a stricter pair', () => {
+    // `PingDataSourceDefinition.validate` refuses an empty `ipAddress` and a `timeout` of `<= 0`.
+    // Measured: 422 "Required value" on the address, 422 "Cannot be 0" for -5, 0 and an omitted
+    // timeout alike. `min: 1` is the client-side half of the second, and the default keeps a new
+    // point from opening on the value the gateway refuses.
+    expect(pingPoint.required).toEqual(['ipAddress']);
+    expect(pingPoint.min.timeout).toBe(1);
+    expect(pingPoint.defaults.timeout).toBe(1000);
+  });
+
+  it('hides the ping locator fields that are fixed by construction', () => {
+    // `isSettable()` is false and `PingDataSourceRT.setPointValue` is an empty method, so a ping
+    // point can never be written; `toVO` reads neither field. Measured: both submitted true, the
+    // point reads back `settable: false` and `relinquishable: null`.
+    expect(pingPoint.hidden).toEqual(['settable', 'relinquishable', 'configurationDescription']);
   });
 
   it('never names a field in both required and readonly', () => {

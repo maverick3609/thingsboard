@@ -252,8 +252,18 @@ consulted.
 | 11 | `HTTP_JSON_RETRIEVER.DS` | `HTTP_JSON_RETRIEVER.PL` | **done** — 2026-09-28; **D76-D81** filed, one of them general to all 18 polling types; needs an on-screen pass |
 | 12 | `INTERNAL.DS` | `INTERNAL.PL` | **done** — 2026-09-28; **D83-D87** filed, one of them general to every create; needs an on-screen pass |
 | 13 | `MESH_CONTROLLER.DS` | `MESH_CONTROLLER.PL` | **done** — 2026-09-29; **D90-D92** filed, D90 general to 34 mesh locator types and D92 to every type the Add menu offers; needs an on-screen pass |
-| … | the remaining ~40 | | mostly four to eight fields |
+| 14 | `PING.DS` | `PING.PL` | **done** — 2026-09-29; **D93-D95** filed, all three small; needs an on-screen pass |
+| … | `POE_LIGHTING`, `SCRIPTING`, `SYSTEM_ATTRIBUTES` | | the last three the Add menu offers |
+| … | the other 46 types | | provisioned-only: no Add form, an edit form like row 13's |
 | last | the 13 types with no stack form | | left on the generic schema form — see Open decisions |
+
+**The "remaining ~40" this table used to carry was the wrong shape.** `/v2/data-source-types` — the
+endpoint the Add menu reads — returns **16**, measured on 5.1.3, and the 16 are exactly the
+definition classes whose `isEnabled()` returns true. The other 47 of the 63 published types exist
+only because something on the gateway creates them: the mesh provisioner, a platform integration, a
+light-commissioning run. Row 13 was the first of those, and it needed `provisionedPoints` and no add
+path at all. So the work left is **three more addable types** and a long tail that each need an
+edit form only. OPC was skipped by the user on 2026-09-29.
 
 Order 3–11 set by the user on 2026-09-25: the protocols a real installation is wired with come
 before the two that happen to be live on the bench gateway.
@@ -1584,6 +1594,76 @@ are gone. It existed for exactly one field and D69 closed the rule it worked aro
 existed is recorded in `keep()`'s own comment so that the next person to meet an absent-versus-blank
 gateway does not have to rediscover it.
 
+### 14 — `PING.DS` / `PING.PL` (done, 2026-09-29)
+
+Chosen by the user from the four addable types left, after OPC was skipped. The smallest type in the
+whole sequence, and the first one where the gateway's validation was **stricter** than what the
+layout was about to claim.
+
+**The data source is nothing.** `PingDataSourceVO` adds no field to `PollingDataSourceVO` — it
+overrides `getConnectionDescription`, `createPointLocator`, `createDataSourceRT`, `getEventCodes`
+(null) and an empty `addEventTypes`, and that is the whole class. Its published property set is
+**identical to `VIRTUAL.DS`**, name for name and in the same order, so it takes the same empty
+layout entry: `timePeriod` required, `alarmLevels` and `quantize` under Advanced, nothing to
+override. The gateway's own form shows name, XID, polling interval with its unit, and edit
+permission — which is what the generic form already renders.
+
+`alarmLevels` comes back `[]` on a created ping source and always will, because there are no event
+types to override. It is left under Advanced rather than hidden: `VIRTUAL.DS` is in the same
+position, so that is a fact about the two types' event tables and not about this row.
+
+**The locator is two fields, and both of them have a rule.** `PingDataSourceDefinition.validate`:
+
+```java
+if (StringUtils.isEmpty(pl.getIpAddress())) {
+  result.addContextualMessage("ipAddress", "validate.required");
+} else if (pl.getTimeout() <= 0) {
+  result.addContextualMessage("timeout", "validate.not0");
+}
+```
+
+Measured, all five: an empty address is 422 *"Required value"*; an omitted address the same; `-5`,
+`0` and an omitted timeout are each 422 *"Cannot be 0"*. So `required: ['ipAddress']` and
+`min: {timeout: 1}` are the gateway's own rules moved forward to where the operator can see them,
+not a Cortex invention — which is the distinction row 11 got wrong on `valuePointer` and had to back
+out. The `else if` and the message that says "0" for a negative are **D93** and **D94**.
+
+> **The stack's own form has the pair backwards.** Its ping point form marks *timeout* `required`
+> and leaves *ipAddress* unmarked — the reverse of the two rules the validator enforces. This is
+> the fourth time (W11, W13, and the SNMP labels) that consulting the webapp alone would have
+> produced the wrong form, and the reason the sequence reads the Java first.
+
+**Everything else on the locator is fixed by construction.** `getDataTypeId()` returns
+`DataTypes.BINARY` and `PingPointLocatorModel.toVO` copies `ipAddress` and `timeout` and nothing
+else, so a submitted data type is never read — measured, a point sent `NUMERIC` saves 201 and reads
+back `BINARY`. `isSettable()` returns false and `PingDataSourceRT.setPointValue` is an empty method,
+so `settable` and `relinquishable` are hidden; measured, both submitted true read back `false` and
+`null`. That `toVO` drops them is D91's shape again, harmless here, and noted rather than re-filed.
+The published `settable` description names the locators that ignore the field and leaves `PING.PL`
+out of the list — **D95**.
+
+**Why `dataType` gets a default here and `MESH_CONTROLLER.PL` does not.** Both disable it, and a
+disabled control is left out of Angular's validation, so the mapper's blanket `required` on a
+locator data type is inert in both. The difference is the Add button: a mesh controller source has
+none (`provisionedPoints`), so no path through that form can post an empty type. A ping source has
+one, so `gatewayFormDefaults` has to seed what the control cannot supply. This is the case
+`VIRTUAL_MESH_NODE.PL`'s comment anticipated — *"if that data source ever gains an Add button, this
+needs a default"* — met for the first time.
+
+**One label, shared.** `humanise` renders `ipAddress` as "Ip address"; the stack's own string is
+"IP address", and `POE_LIGHTING.PL` carries the same field, so it went in `FIELD_LABELS` rather than
+in this type's layout. `timeout` already read "Timeout (ms)" there, which is right for this type for
+a reason worth writing down: the value is passed straight to `InetAddress.isReachable(int)`, whose
+argument is milliseconds.
+
+**The hints say what the field names do not.** The address hint says a host name works as well as an
+address, because `InetAddress.getByName` resolves either and the label does not admit it — measured,
+a point on `example.invalid` saves 201. The timeout hint names the floor rather than the refusal, so
+the rule reads as a property of the field instead of an error waiting to happen.
+
+*Verified:* layout, schema and form specs green (99 / 41 / 13); every rule above measured against
+5.1.3 on the local instance and every probe row deleted. The on-screen pass is owed with rows 6–13.
+
 ## Per-type components
 
 Settled 2026-09-25, after the question was raised directly: **is one renderer for 148 model types
@@ -1769,11 +1849,29 @@ and wrong, or stale, and are recorded there too. D73 is deliberately not fixed a
   `attributeId: "BATTERY"`, which `MeshControllerAttributes` does not declare.
 - **D91 (P3)** — `MeshControllerPointLocatorModel.toVO` drops `settable` and `relinquishable` while
   the read reports them, the shape D84 closed on `INTERNAL.PL`.
-- **D92 (P2)** — `DataSourceDefinitionModel` does not publish `isEnabled()`, so a client cannot tell
-  which of the types it is handed are meant to be offered; 48 definition classes return false, and a
-  hand-created `MESH_CONTROLLER.DS` is accepted and can never hold a point.
+- **D92 (P3, withdrawn 2026-09-29)** — filed as "a client cannot tell which data source types it is
+  meant to offer". Wrong: the endpoint it named, `/v2/data-source-definitions`, answers 404, and the
+  real one — `/v2/data-source-types`, which our own Add menu reads — is already filtered by
+  `DatasourceService.getDefinitions` on `isEnabled()` and returns **16**. I read the flag in the
+  definition classes and inferred the listing instead of calling it. What survives is smaller: a
+  `MESH_CONTROLLER.DS` created by a direct POST, bypassing the menu, is accepted and can never hold
+  a point.
 
-  Both written up in `Inferrix-stack/docs/specs/2026-09-29-mesh-controller-rest-surface.md`.
+  Both written up in `Inferrix-stack/docs/specs/2026-09-29-mesh-controller-rest-surface.md`, where
+  D92 now carries its correction.
+
+**Filed 2026-09-29, from row 14.** All three small, in
+`Inferrix-stack/docs/specs/2026-09-29-ping-rest-surface.md`.
+
+- **D93 (P3)** — `PingDataSourceDefinition.validate` uses `else if`, so a point with both fields
+  wrong is refused for the address only and the timeout is not checked until the address is fixed.
+- **D94 (P3)** — the timeout check is `<= 0` but its message key is `validate.not0`, so `-5` is
+  refused with "Cannot be 0". `validate.greaterThanZero` already exists and is used for the same
+  shape of check on `updatePeriods`.
+- **D95 (P3)** — the published `settable` description lists the locators that ignore the field
+  (`MESH_SWITCH.PL`, `MESH_UART.PL`, `INTERNAL.PL`) and omits `PING.PL`, which also overrides
+  `isSettable()` to false. The list is the only place the wire says this, so an incomplete one is
+  worse than none.
 
 - **W11 (P1)** — a multistate virtual point cannot be configured at all. The template switches on
   `'MULTISTATE'`, a case its own dropdown can never emit (it emits `INCREMENT_MULTISTATE`), so the

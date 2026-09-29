@@ -2332,8 +2332,16 @@ open the mesh *device* form and `GATEWAY_FORM_LAYOUTS['MESH_EXTENDER_MESH_NODE.P
 reached. The layout stays: it becomes correct the moment the gateway is fixed, and one unused entry
 costs nothing.
 
-**Two findings on the two types that do not create their points like the other eight**, filed as
-D126 and D127. `CreateStudentAssetTagMeshNodeVO` calls `setAttributeId` twice, the second time with
+**Three findings filed from this row**: D126 and D127 on the two types that do not create their
+points like the other eight, and **D130 (P2, latent)** on `getDataQueue`, which covers 10 of
+`AttributeDataType`'s 43 constants with no `default:` — so for the other 33 the gateway sends a write
+frame carrying a header and no value. Worth stating carefully, because it is tempting to claim this
+row mitigated it and it did not: `isSettable()` is a sound universal gate, but on this family the
+flag is set straight off the reported frame next to `type`, with nothing correlating the two, and one
+of the initiators that passes the gate is a **BACnet WriteProperty from a third-party BMS** — which
+the same flag put in the output object class. Making `settable` read-only removes the platform as a
+*source* of the flag, which is worth doing on its own, and changes nothing about D130. It is latent
+rather than live only because every `settable: true` point today is `BOOL`, which the switch covers. `CreateStudentAssetTagMeshNodeVO` calls `setAttributeId` twice, the second time with
 `attribute.getType().getDataTypeId()` — a data type id — so every student asset tag mesh node point
 is stored under the wrong attribute id; it also never sets `type`, which is a non-null contract on
 that locator. `CreateMeshExtenderMeshNodeDataSourceVO` builds a `MeshExtenderPointLocatorVO`, the

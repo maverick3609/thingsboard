@@ -4338,6 +4338,7 @@
       "delete-event-handler-title": "Delete event handler '{{name}}'?",
       "delete-event-handler-text": "Detectors that call this handler will stop notifying anyone. This cannot be undone.",
       "no-event-handlers": "This gateway has no event handlers",
+      "modbus-slave-unsavable": "The gateway creates this device from a Modbus query mapping and cannot take it back: saving would detach it from its controller. Cortex shows it and its points, and changes it only through the gateway's own interface.",
       "handler-runs-commands": "This handler runs a command on the gateway host, so Cortex shows it but will not create or change one. Use the gateway's own interface.",
       "add-alert-list": "Add alert routing",
       "delete-alert-list-title": "Delete alert routing '{{name}}'?",

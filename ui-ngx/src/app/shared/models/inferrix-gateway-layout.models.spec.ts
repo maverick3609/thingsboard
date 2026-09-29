@@ -1578,4 +1578,57 @@ describe('gateway form layouts', () => {
     // A current sensor measures, so nothing on the gateway ever has a `true` to put in `settable`.
     expect(point.hidden).toContain('settable');
   });
+  // --- row 23: the two Modbus slave device shapes -----------------------------------------------
+
+  it('marks both Modbus slave sources unsavable, and shares one layout between them', () => {
+    const ds = GATEWAY_FORM_LAYOUTS['MODBUS_SLAVE_DEVICE.DS'];
+    // The polling variant adds `quantize` and a required `timePeriod` and is otherwise the same
+    // model. Sharing the object is what keeps the two from drifting, the way BACNET_MSTP.PL shares
+    // BACNET_POINT.
+    expect(GATEWAY_FORM_LAYOUTS['MODBUS_SLAVE_DEVICE_POLLING.DS']).toBe(ds);
+    expect(GATEWAY_FORM_LAYOUTS['MODBUS_SLAVE_DEVICE_POLLING.PL'])
+      .toBe(GATEWAY_FORM_LAYOUTS['MODBUS_SLAVE_DEVICE.PL']);
+
+    // `ModbusControllerSlaveDeviceDataSourceModel.toVO` never sets `controllerId` -- the line is in
+    // the file, commented out -- and `BasicVOModel.toVO` builds a fresh VO that
+    // `DatasourceService.update` stores as-is. `controllerId` is in the serialised blob, so any
+    // write orphans the device from its controller. D131.
+    expect(ds.unsavable).toBe('inferrix.gateway.modbus-slave-unsavable');
+    expect(ds.provisionedPoints).toBe(true);
+    // Read-only as well as unsavable: the flag stops the save, these say why each field is not the
+    // operator's to set. Neither definition is in the Add menu -- both answer isEnabled() false --
+    // so every value here was assigned by ModbusControllerQueriesDaoEventListener.
+    expect(ds.readonly).toEqual(['controller', 'slaveId', 'deviceDefinition']);
+    expect(ds.hints.controller).toContain('save cannot keep');
+  });
+
+  it('locks every field of a Modbus slave point, and hides the one a save would drop', () => {
+    const point = GATEWAY_FORM_LAYOUTS['MODBUS_SLAVE_DEVICE.PL'];
+    // All five come from the device definition by way of the event listener: the attribute id and
+    // the point number index a register map that lives on the controller, the interval is the
+    // query's, the data type is the attribute's, and `settable` is `attribute.isWriteable()`.
+    expect(point.readonly)
+      .toEqual(['deviceAttributeId', 'pointNumber', 'pollingInterval', 'dataType', 'settable']);
+    // Unlike its source the point is safe to save -- the locator's `toVO` copies all five -- so
+    // this is a narrowing, not a D131 workaround.
+    expect(point.unsavable).toBeUndefined();
+    // `relinquishable` is the one field `toVO` does not carry, so offering it would take a value
+    // that cannot survive the round trip. Same reason the mesh family hides it.
+    expect(point.hidden).toContain('relinquishable');
+    // The gateway publishes no name for the attribute id: its own endpoint answers attributeType to
+    // name, and the locator stores the id, which that map does not carry. So the hint has to.
+    expect(point.hints.deviceAttributeId).toContain('no name');
+  });
+
+  it('gives unsavable only to types whose own REST surface destroys the row', () => {
+    // A guard on the new key rather than on the two rows that use it: `unsavable` disables a whole
+    // form, so it must never spread to a type that is merely provisioned. Every use needs a filed
+    // defect behind it.
+    const unsavable = Object.keys(GATEWAY_FORM_LAYOUTS)
+      .filter(modelType => GATEWAY_FORM_LAYOUTS[modelType].unsavable);
+    expect(unsavable.sort()).toEqual(['MODBUS_SLAVE_DEVICE.DS', 'MODBUS_SLAVE_DEVICE_POLLING.DS']);
+    // It belongs on a source: a locator is saved as part of its point, so there is no dialog for
+    // the flag to disable.
+    unsavable.forEach(modelType => expect(modelType.endsWith('.DS')).toBe(true));
+  });
 });

@@ -185,6 +185,7 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
     // The dialog renders this array and the point handlers below mutate it in place, so an edit
     // shows up in the table without closing and reopening the data source.
     const rows = [...points];
+    const layout = gatewayFormLayout(model.modelType);
     const children: GatewayModelChildren = {
       title: this.translate.instant('inferrix.gateway.data-points'),
       rows,
@@ -194,7 +195,7 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
       // A point carries its data source's xid, so there is nothing to attach one to until the
       // source has been saved once and the gateway has given it one.
       needsSaveFirst: !model.xid,
-      provisioned: gatewayFormLayout(model.modelType)?.provisionedPoints,
+      provisioned: layout?.provisionedPoints,
       add: () => {
         // A new locator starts on what the gateway's own VO starts on, where its layout records
         // one. Seeded onto the model rather than defaulted in the form: a value the form shows but
@@ -220,12 +221,16 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
       GatewayModelDialogComponent, {
         disableClose: true,
         panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
-        data: {title, model, properties: this.propertiesFor(model.modelType),
-          layout: gatewayFormLayout(model.modelType),
+        data: {title, model, properties: this.propertiesFor(model.modelType), layout,
           // A data source form can need a lookup of its own now, not just its points: a BACnet
           // source names one of the gateway's local devices.
           deviceId: this.deviceId,
-          readonly: this.readonly, children}
+          // A type whose own REST surface destroys the row on write opens read-only with the reason
+          // on it, rather than behind a Save button that appears to work. Same treatment an event
+          // handler that runs commands gets.
+          readonly: this.readonly || !!layout?.unsavable,
+          readonlyNote: layout?.unsavable ? this.translate.instant(layout.unsavable) : undefined,
+          children}
       }).afterClosed().subscribe(saved => {
       if (saved) {
         this.gatewayService.saveDataSource(this.deviceId, saved, {ignoreLoading: true}, create)

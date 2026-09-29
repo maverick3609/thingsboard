@@ -42,6 +42,20 @@ export interface GatewayFormLayout {
    */
   provisionedPoints?: boolean;
   /**
+   * Locale key of a note saying this model type cannot be saved from Cortex at all.
+   *
+   * The dialog then opens read-only with the note above the form, exactly as an event handler that
+   * runs commands does. This is not a stronger {@link readonly}: that one is per field, for a value
+   * the gateway owns but would still accept back. This is for a type whose own REST surface
+   * **destroys the row on any write**, so there is no body Cortex could send that would be safe --
+   * including a body that changes nothing but the name.
+   *
+   * Only ever set from a defect that has been read in the gateway's Java and written down. Enabling
+   * and disabling still work from the table, because `enable-disable` is its own route and never
+   * builds a model.
+   */
+  unsavable?: string;
+  /**
    * A fixed option list for a property the schema declares as a bare string.
    *
    * Also used to *relabel* an enum the schema already declares, where humanising its constants
@@ -827,12 +841,12 @@ const lightControllerSource = (device: string): GatewayFormLayout => {
  *   `setSettable`, so nothing on the gateway has a `true` to put there: MESH_CONTROLLER,
  *   PEOPLE_COUNT_CAMERA, CURRENT_SENSOR, LIGHT_DI_CONTROLLER and MOKO_BAND -- of which the last two
  *   do override to a hard `false` as well.
- * - **`readonly-erased`** (4DI_2DO_CARD, PEOPLE_COUNTER, THERMOSTAT, VAV_CONTROLLER) -- the
- *   provisioner calls `locatorVO.setSettable(attribute.isSettable())` and the enum has entries that
- *   answer `true` (the card's two digital outputs, the counter's `RESET`, seven thermostat
- *   attributes, the VAV's two analogue outputs). The flag is real and worth reading; the platform
- *   cannot change it, because `toVO` builds a fresh VO and copies `attributeId` and `dataType`
- *   alone, so a REST write erases it (**D109**).
+ * - **`readonly-erased`** (4DI_2DO_CARD, LED_ASSET_TAG, PEOPLE_COUNTER, THERMOSTAT, VAV_CONTROLLER)
+ *   -- the provisioner calls `locatorVO.setSettable(...)` and the enum has entries that answer
+ *   `true` (the card's two digital outputs, the counter's `RESET`, seven thermostat attributes, the
+ *   VAV's two analogue outputs, and the LED tag's `LED_STATUS`). The flag is real and worth reading;
+ *   the platform cannot change it, because `toVO` builds a fresh VO and copies `attributeId` and
+ *   `dataType` alone, so a REST write erases it (**D109**).
  * - **`readonly`** (LIGHT_CONTROLLER_V4, LIGHT_RELAY_CONTROLLER) -- the provisioner sets it the same
  *   way, but `toVO` **does** copy it, so it round-trips instead of being erased. It is read-only all
  *   the same, and that is a deliberate narrowing of what the gateway allows: `attribute.isSettable()`
@@ -856,9 +870,12 @@ const lightControllerSource = (device: string): GatewayFormLayout => {
  * POSTing `settable: false` on a `DIM_VALUE` point reads back `true`. **D124**, and the hint says
  * so.
  *
- * D109's erase is six types wide by construction -- the four above plus MESH_CONTROLLER and
- * PEOPLE_COUNT_CAMERA, which inherit the same accessor -- but it only loses information on the
- * four, because on the other two it overwrites `false` with `false`.
+ * D109's erase is seven types wide -- the five above plus MESH_CONTROLLER and PEOPLE_COUNT_CAMERA,
+ * whose `toVO` drops the field the same way -- but it only loses information on the five, because
+ * on the other two it overwrites `false` with `false`. The five are not one inherited accessor:
+ * each model writes its own `toVO`, and every one of them happens to copy `attributeId` and
+ * `dataType` and stop. That makes it a repeated omission rather than a single bug, which is why
+ * D109 is filed against the pattern and not against a line.
  *
  * No `defaults`: `provisionedPoints` means there is no Add form on any of these, so a default would
  * be a value invented for a form nobody opens.
@@ -1388,6 +1405,85 @@ const CURRENT_SENSOR_CT_RATINGS: FormSelectItem[] = [
   {value: '1200_A', label: '1200 A'}
 ];
 
+/**
+ * A Modbus slave device hanging off a Modbus controller, and its points.
+ *
+ * Neither of these two source types is in the Add menu -- both definitions answer
+ * `isEnabled() == false`, so `DatasourceService.getDefinitions` filters them out. They exist only
+ * because `ModbusControllerQueriesDaoEventListener.handleDaoEvent` creates one, with every point
+ * it will ever have, when a Modbus query mapping gains a slave. Everything on both forms is
+ * therefore a value the gateway assigned, which is why nothing here is editable.
+ *
+ * **The source cannot be saved at all, and that is the gateway's, not ours.**
+ * `ModbusControllerSlaveDeviceDataSourceModel.toVO` never sets `controllerId` -- the line is in
+ * the file, commented out -- and the polling model omits it entirely. `BasicVOModel.toVO` builds
+ * a **fresh** VO, `DatasourceResource.update` hands that straight to `service.update`, and
+ * `DatasourceService.update` replaces rather than merges. `controllerId` is in the serialised
+ * blob (`writeObject` writes it), so a write that reaches the database orphans the device from
+ * its controller permanently. Patching does not help: `@PatchModel` merges onto a model built
+ * from the stored VO, and the loss happens in `toVO` afterwards.
+ *
+ * Most writes will not even get that far. `toVO` resolves `deviceDefinition` through
+ * `ModuleManager.getDefinition`, which sees the 22 compiled-in definition classes and nothing
+ * else, while `readObject` version 2 resolves it through `ModbusDeviceDetailsDao` -- the table
+ * `/v2/modbus/device` lets an operator fill. The two look in different places, so a device type
+ * the operator defined resolves to null on the way back in, and `writeObject` then throws on
+ * `deviceDefinition.getTypeName()`.
+ *
+ * So the form is an inspector: which controller, which unit id, which register map. **D131.**
+ */
+const MODBUS_SLAVE_SOURCE: GatewayFormLayout = {
+  provisionedPoints: true,
+  unsavable: 'inferrix.gateway.modbus-slave-unsavable',
+  readonly: ['controller', 'slaveId', 'deviceDefinition'],
+  hints: {
+    controller: 'The Modbus controller this device answers behind. The gateway fills it in when '
+      + 'the query mapping is added, and it is the field a save cannot keep.',
+    slaveId: 'The unit id this device answers to on the controller\'s bus, taken from the query '
+      + 'mapping that provisioned it.',
+    deviceDefinition: 'The register map the gateway reads this device through. A save re-resolves '
+      + 'it against the compiled-in definitions only, so one defined on the gateway itself '
+      + 'resolves to nothing.'
+  },
+  rows: [['controller', 'slaveId'], ['deviceDefinition']]
+};
+
+/**
+ * A point on a Modbus slave device: which entry of the register map, and which slot within it.
+ *
+ * Every field is assigned by `ModbusControllerQueriesDaoEventListener.createDataPoints` from the
+ * device definition -- `deviceAttributeId` from `attribute.getAttributeId()`, `pointNumber` from
+ * the loop index or the `pointDetails` key, `pollingInterval` from the query's own interval,
+ * `dataTypeId` from the attribute, and `settable` from `attribute.isWriteable()`. None of them is
+ * a choice an operator is in a position to make: they name a register on a map that lives on the
+ * controller.
+ *
+ * Unlike its source, a point here **is** safe to save -- the locator's `toVO` copies all five
+ * fields it carries -- so the generic point settings (name, logging, the renderer) still work.
+ * `relinquishable` is hidden because `toVO` is the whole of what a write keeps and it is not in
+ * it, so the field would offer a value that cannot survive the round trip.
+ *
+ * `deviceAttributeId` stays a bare number because the gateway publishes no name for it:
+ * `/v2/modbus/queries/device-types/attribute/{deviceType}` answers `attributeType` to `name`, and
+ * the locator stores the **id**, which that map does not carry.
+ */
+const MODBUS_SLAVE_POINT: GatewayFormLayout = {
+  hidden: ['relinquishable', 'configurationDescription'],
+  readonly: ['deviceAttributeId', 'pointNumber', 'pollingInterval', 'dataType', 'settable'],
+  hints: {
+    deviceAttributeId: 'Which entry of the device definition\'s register map this point reads. '
+      + 'The gateway assigns the number and publishes no name for it.',
+    pointNumber: 'Which slot within that entry -- an index from 1, or the key the register map '
+      + 'gives it.',
+    pollingInterval: 'Taken from the Modbus query that provisioned this source. Every point of '
+      + 'the source carries the same value.',
+    dataType: 'Set from the register map\'s entry for this attribute.',
+    settable: 'Whether the register map marks this attribute writeable. It describes the device '
+      + 'rather than a choice, so the gateway re-derives it and the platform does not set it.'
+  },
+  rows: [['deviceAttributeId', 'pointNumber'], ['dataType', 'pollingInterval']]
+};
+
 export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
 
   /**
@@ -1690,6 +1786,27 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     defaults: {range: 'COIL_STATUS', modbusDataType: 'BINARY'},
     rows: [['slaveId', 'offset'], ['registerCount', 'charset'], ['multiplier', 'additive']]
   },
+
+
+  /** A Modbus slave device: an inspector, because a save destroys it. {@link MODBUS_SLAVE_SOURCE} */
+  'MODBUS_SLAVE_DEVICE.DS': MODBUS_SLAVE_SOURCE,
+
+  /**
+   * The same device on a source that polls. `ModbusControllerSlaveDevicePollingDataSourceModel`
+   * adds `quantize` and a required `timePeriod` over the other and is otherwise field for field
+   * the same, and both drop `controllerId` the same way -- the non-polling model has the line
+   * commented out, this one never had it. Shared rather than copied, so the two cannot drift.
+   */
+  'MODBUS_SLAVE_DEVICE_POLLING.DS': MODBUS_SLAVE_SOURCE,
+
+  /** A point on a Modbus slave device. {@link MODBUS_SLAVE_POINT} */
+  'MODBUS_SLAVE_DEVICE.PL': MODBUS_SLAVE_POINT,
+
+  /**
+   * The polling variant's point, which is the same point: the two locator models are identical
+   * apart from their class and `MODEL_TYPE` names, and the schema agrees field for field.
+   */
+  'MODBUS_SLAVE_DEVICE_POLLING.PL': MODBUS_SLAVE_POINT,
 
   /** A BACnet/IP master: which local device it speaks through, and how often. {@link BACNET_DATA_SOURCE} */
   'BACNET_IP.DS': BACNET_DATA_SOURCE,

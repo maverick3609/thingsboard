@@ -71,3 +71,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `9a589efecb` fix(gateway): withdraw row 20's settable reversal, which was wrong and destructive
 - [ ] `5076202e10` fix(gateway): lock the light controllers' settable before it repeats row 20
 - [ ] `6ab9a34bf0` fix(gateway): say that the current sensor's frequency is invented, and file three more
+- [ ] `9db5457513` feat(gateway): lay out the three asset tags, checking settable's source first

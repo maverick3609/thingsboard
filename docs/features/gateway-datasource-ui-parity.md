@@ -263,7 +263,7 @@ consulted.
 | 20 | the 9 `*_MESH_NODE` types | their locators | **done** — 2026-09-30; one batch of ten with `VIRTUAL_MESH_NODE`, which was refactored into it; **D126-D127** filed; its attempted reversal of row 12 was withdrawn the same day; needs an on-screen pass |
 | 21 | the 4 light controllers | their locators | **done** — 2026-09-30; the mesh-device point form exactly, over a source with a poll period; **D121-D124** filed, two of them P1/P2 on the gateway's own provisioning; needs an on-screen pass |
 | 22 | the 3 asset tags | their locators | **done** — 2026-09-30; `address` alone on the source, the mesh device point form; `LED_ASSET_TAG` is the plainest D109 case in the file; needs an on-screen pass |
-| 23 | the 2 Modbus slave shapes | their locators | planned — `MODBUS_SLAVE_DEVICE` and `…_POLLING`, which is the same three fields plus the polling pair |
+| 23 | the 2 Modbus slave shapes | their locators | **done** — 2026-09-30; neither is in the Add menu and **neither source can be saved at all** (D131), so the form opens read-only with the reason on it; new `unsavable` layout key; D131-D133 filed |
 | 24 | `VIRTUAL_SWITCH.DS` | `VIRTUAL_SWITCH.PL` | planned — the one type left in a shape of its own |
 | last | the 13 types with no stack form | | left on the generic schema form — see Open decisions |
 
@@ -2472,6 +2472,55 @@ raw key, confirming its D116 row.
 
 *Verified:* 133 layout, 41 schema, 14 form and 17 service specs green, and
 `tsc -p src/tsconfig.app.json` exit 0. The on-screen pass is owed with rows 6–21.
+
+### 23 — the two Modbus slave device shapes (done, 2026-09-30)
+
+`MODBUS_SLAVE_DEVICE` and `MODBUS_SLAVE_DEVICE_POLLING`, which differ by `quantize` and a required
+`timePeriod` and nothing else. Their two locators are identical apart from their class names, so this
+row is two shared layout objects rather than four.
+
+Neither source type is in the Add menu — both definitions answer `isEnabled() == false`, so
+`DatasourceService.getDefinitions` filters them out. The only thing that makes one is
+`ModbusControllerQueriesDaoEventListener.handleDaoEvent`, which creates the source *and every point it
+will ever have* when a Modbus query mapping gains a slave. Every value on both forms was therefore
+assigned by the gateway, which is why nothing on either is editable.
+
+**This row needed a new layout key, and that is a deviation from "a layout only ever hides, narrows,
+relabels, moves, locks, requires, hints or floors" that is worth stating plainly.** The reason is
+D131: `ModbusControllerSlaveDeviceDataSourceModel.toVO` never sets `controllerId` — the line is in the
+file, commented out, and the polling model never had it — while `BasicVOModel.toVO` builds a fresh VO
+and `DatasourceService.update` replaces rather than merges. `controllerId` is in the serialised blob,
+so **any** write orphans the device from its controller, including a `PATCH` that changes only the
+name. Per-field `readonly` cannot help: a disabled control still round-trips on a save, and the loss
+is server-side regardless of what we send.
+
+So `unsavable` was added — a locale key that makes the dialog open read-only with the reason printed
+above the form. It is not a stronger `readonly`; it is for a type whose own REST surface destroys the
+row on write, and a spec asserts it stays on exactly those two. It reuses the treatment an event
+handler that runs commands already gets (`readonly: this.readonly || runsCommands`, `readonlyNote`),
+so the mechanism is precedented even though the flag is new. Enabling and disabling still work from
+the table, because `/v2/data-source/enable-disable/{xid}` is its own route and never builds a model.
+
+The points are a different matter and are left savable: their `toVO` copies all five fields it
+carries, which is the D109 pattern *not* happening. Every locator field is still read-only, because
+all five are assigned from the register map — the attribute id and point number index a map that
+lives on the controller, the interval is the provisioning query's, the data type is the attribute's,
+and `settable` is `attribute.isWriteable()`. `relinquishable` is hidden, being the one field `toVO`
+does not carry.
+
+`deviceAttributeId` stays a bare number. The gateway's own
+`/v2/modbus/queries/device-types/attribute/{deviceType}` answers `attributeType` to `name` and the
+locator stores the **id**, so there is no route by which we could label it — D133, which also answers
+500 for every device type on the instance we have.
+
+*Measured against 5.1.3:* the two 500s and the empty `modbusDeviceDetails` table are live
+(`GET /v2/modbus/device` → `{"items":[],"total":0}`). **D131 and D132 are static findings and are
+written down as such** — there is no Modbus controller and no slave device on the instance, so
+nothing could be round-tripped. The path is a commented-out assignment, a fresh VO and a replacing
+update, which is unambiguous to read, but reading is not measuring and the doc says which it is.
+
+*Verified:* 136 layout, 41 schema, 14 form, 13 model and 17 service specs green, and
+`tsc -p src/tsconfig.app.json` exit 0. The on-screen pass is owed with rows 6–22.
 
 ## Per-type components
 

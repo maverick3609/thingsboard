@@ -78,3 +78,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `108568eae5` feat(gateway): pick a serial port instead of typing one, and gate the route as recon
 - [ ] `e42d992eb9` fix(gateway): Angular re-enables every field a layout disabled, and nine claims
 - [ ] `a7216e5a35` fix(gateway): a row that changed nothing, five counts, and the reviews' doc debt
+- [ ] `0e68aef393` fix(gateway): apply unsavable in the dialog, not at one of six callers

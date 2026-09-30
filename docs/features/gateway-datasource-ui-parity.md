@@ -661,7 +661,11 @@ does not exist) and a `ZZ Cortex MSTP probe` data source created through the for
 local device picker offered **only** the MS/TP probe and not the BACnet/IP one created for type 5,
 which is the transport filter working. COV timeout prefilled 60, and the saved row came back with
 `localDeviceConfig` holding the MS/TP UUID, `covSubscriptionTimeoutMinutes: 60`, `enabled: false`,
-and the picker showing the device's label again on reopen. **Add point on a source with no points
+and the picker showing the device's label again on reopen. *(The two throwaway local devices
+themselves outlived their rows — the data sources were deleted at the time but the devices were not.
+Both were removed from `Inferrix Gateway 155` on 2026-09-30, checked first for references: no data
+source named either and the gateway had no BACnet source at all. It is back to zero local devices and
+the same 12 data sources.)* **Add point on a source with no points
 rendered the BACnet locator form** — the case that is impossible without the layout's
 `pointLocatorType`, since the gateway publishes `null` and there is no sibling to copy — with all
 nine fields in order, Analog input / present-value / Numeric / multiplier 1, `writePriority` hidden

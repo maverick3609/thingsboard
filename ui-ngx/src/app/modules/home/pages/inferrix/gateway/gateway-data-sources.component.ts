@@ -17,7 +17,8 @@ import { GATEWAY_DATA_SOURCE_HIDDEN_FIELDS, GATEWAY_IDENTITY_FIELDS, GATEWAY_REP
   GatewayPage } from '@shared/models/inferrix-gateway-data.models';
 import { componentToFormProperties, GatewaySchemaDocument,
   schemaToFormProperties } from '@shared/models/inferrix-gateway-schema.models';
-import { gatewayFormDefaults, gatewayFormLayout } from '@shared/models/inferrix-gateway-layout.models';
+import { GatewayFormLayout, gatewayFormDefaults,
+  gatewayFormLayout } from '@shared/models/inferrix-gateway-layout.models';
 import { FormProperty } from '@shared/models/dynamic-form.models';
 
 /**
@@ -249,6 +250,21 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
    * Modbus locator, and offering the others would only let an operator build a point the gateway
    * refuses.
    */
+  /**
+   * Whether this locator form offered the operator a single field they could change.
+   *
+   * The same test {@link GatewayFormComponent} applies per field — the schema's own `readOnly`
+   * (which the mapper has already turned into `disabled`) or the layout naming it `readonly`, plus
+   * the layout hiding it. A type with no layout answers true for anything the schema left writable,
+   * which keeps an unworked type on the `PUT` it has always used.
+   */
+  private locatorEditable(properties: FormProperty[], layout?: GatewayFormLayout): boolean {
+    const hidden = layout?.hidden ?? [];
+    const readonly = layout?.readonly ?? [];
+    return properties.some(property => !property.disabled
+      && !hidden.includes(property.id) && !readonly.includes(property.id));
+  }
+
   private editPoint(source: GatewayDataSource, point: GatewayDataPoint,
                     rows: GatewayDataPoint[]): void {
     // See `open`: the add form lets the operator name the point, so the verb cannot be read off the
@@ -287,7 +303,19 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
       // Set here rather than left to the form: the link is what places the point, and an add
       // reaches the form before the operator has chosen anything.
       saved.dataSourceXid = source.xid;
-      this.gatewayService.saveDataPoint(this.deviceId, saved, {ignoreLoading: true}, create)
+      // A locator with nothing editable on it has nothing the operator could have changed, so
+      // sending it back is pure risk: on five model types the gateway's `toVO` builds a fresh VO
+      // and drops `settable`, erasing what its own provisioner set (D109). Left out of the body,
+      // `saveDataPoint` patches instead of putting and the stored locator is untouched.
+      //
+      // Read off the layout rather than by diffing values, because the layout is a statement about
+      // what the form *offered*: a field that was never editable cannot have been edited, so
+      // omitting it can lose nothing. Diffing would also catch a form the operator opened and
+      // closed, at the price of dropping a real edit whenever the comparison was wrong.
+      const body = create || this.locatorEditable(locatorProperties, locatorLayout)
+        ? saved
+        : {...saved, pointLocator: undefined};
+      this.gatewayService.saveDataPoint(this.deviceId, body, {ignoreLoading: true}, create)
         .subscribe({
         next: stored => {
           const at = rows.indexOf(point);

@@ -1681,4 +1681,27 @@ describe('gateway form layouts', () => {
     // a stored point is MULTISTATE because toVO wrote it, not because the type refuses the rest.
     expect(point.options).toBeUndefined();
   });
+  it('leaves nothing editable on the five types whose save would erase settable', () => {
+    // This is the layout half of the point save path. `GatewayDataSourcesComponent.editPoint` omits
+    // `pointLocator` from the body when a locator form offered no editable field, and
+    // `saveDataPoint` then patches instead of putting, so the stored locator is untouched and the
+    // `settable` these five types' `toVO` would drop survives (D109).
+    //
+    // That only works while every field really is locked. Make one of them editable and the locator
+    // goes back in the body, the `PUT` returns, and the erase comes with it -- silently, because the
+    // field an operator edited would save correctly and a different one would be lost. Hence the
+    // guard here rather than only at the call site.
+    const erased = ['4DI_2DO_CARD.PL', 'LED_ASSET_TAG.PL', 'PEOPLE_COUNTER.PL', 'THERMOSTAT.PL',
+      'VAV_CONTROLLER.PL'];
+    // Every field the mesh device locator schema publishes. Listed rather than derived so that a
+    // field the gateway adds later shows up as a failure instead of passing unnoticed.
+    const fields = ['attributeId', 'dataType', 'settable', 'relinquishable',
+      'configurationDescription'];
+    erased.forEach(modelType => {
+      const layout = GATEWAY_FORM_LAYOUTS[modelType];
+      const locked = new Set([...(layout.readonly ?? []), ...(layout.hidden ?? [])]);
+      fields.forEach(id =>
+        expect(locked.has(id)).withContext(`${modelType}.${id} must be locked or hidden`).toBe(true));
+    });
+  });
 });

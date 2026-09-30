@@ -2,7 +2,8 @@
 
 **Status:** the type-by-type pass is **complete** — all 24 rows of the sequence below are done
 as of 2026-09-30. What is still owed is the on-screen pass over rows 6-24, which no browser
-tooling has been available for, and the dialog save-path decision noted at the end. Phase G7.
+tooling has been available for. The dialog save-path question is **decided and implemented** — see
+"Saving a point that has nothing to save" below. Phase G7.
 **Measured against:** stack 5.1.0 on `192.168.221.7:8443`, gateway `Inferrix Gateway 155`
 (`86d5e330-b735-11f1-b695-2b2fc11a4c69`), live schema document read 2026-09-24.
 
@@ -2567,6 +2568,41 @@ fields, so a value a point already holds is carried through the save untouched.
 `tsc -p src/tsconfig.app.json` exit 0. Nothing was written to the live gateway for this row: the
 whole of it is readable from the Java and the published schema, and there is no virtual switch on
 the instance to round-trip. The on-screen pass is owed with rows 6-23.
+
+### Saving a point that has nothing to save (decided 2026-09-30)
+
+An open question since row 12, closed with a measurement.
+
+Cortex used to `PUT` every point update carrying the whole `pointLocator`. That is what makes the
+gateway's D109 bite: five locator models' `toVO` builds a fresh VO and copies `attributeId` and
+`dataType` alone, so the `settable` their own provisioner set is erased by the act of saving. `PATCH`
+looked unavailable because it refuses any body carrying a `pointLocator` outright — Jackson's
+`readerForUpdating` cannot merge into a polymorphic member (D73).
+
+The way through is that the two facts fit together rather than conflicting. **Measured on 5.1.3
+against a live `VIRTUAL_MESH_NODE.PL` point:** `PATCH {"name": "HEARTBEAT"}` answers 200 and the
+stored locator reads back byte-identical, every field included. A locator nobody sends is a locator
+nobody touches.
+
+So `saveDataPoint` now patches when the body has no `pointLocator` and puts when it has one, and
+`editPoint` leaves the locator out when the form offered **no editable field** — read off the layout,
+not by diffing values. The layout is a statement about what the form offered, so a field that was
+never editable cannot have been edited and omitting it can lose nothing. Diffing would also have
+caught a form the operator opened and closed unchanged, at the price of dropping a real edit whenever
+the comparison was wrong; that trade was offered and declined.
+
+This reaches all five D109 types (`4DI_2DO_CARD.PL`, `LED_ASSET_TAG.PL`, `PEOPLE_COUNTER.PL`,
+`THERMOSTAT.PL`, `VAV_CONTROLLER.PL`) plus the rest of the mesh family, whose locators are fully
+locked. A spec asserts every one of the five keeps all five of its fields locked or hidden, because
+making one editable would quietly put the locator back in the body and bring the erase with it.
+
+**It does not reach `INTERNAL.PL`,** and that is worth saying so the claim is not read too widely.
+That type leaves `monitorId` editable, so its locator is still sent and D84's reset of `dataType`
+still happens on any save. The rule is per type, not per edit: a type with one editable locator field
+sends the whole locator however little the operator changed.
+
+Nothing here fixes D109 or D84 — both are the gateway's `toVO`. What it does is stop Cortex being a
+source of either on the types where it had nothing to gain by sending the locator at all.
 
 ## Per-type components
 

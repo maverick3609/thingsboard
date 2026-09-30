@@ -359,10 +359,24 @@ export class InferrixGatewayService {
    */
   public saveDataPoint(deviceId: string, point: GatewayDataPoint,
                        config?: RequestConfig, create?: boolean): Observable<GatewayDataPoint> {
-    return (create ?? !point.xid)
-      ? this.proxy<GatewayDataPoint>(deviceId, 'POST', '/v2/data-point', point, config)
-      : this.proxy<GatewayDataPoint>(deviceId, 'PUT',
-          `/v2/data-point/${encodeURIComponent(point.xid)}`, point, config);
+    if (create ?? !point.xid) {
+      return this.proxy<GatewayDataPoint>(deviceId, 'POST', '/v2/data-point', point, config);
+    }
+    // A body with **no** `pointLocator` is the one update that can go as a `PATCH`, and it is the
+    // one that should. `PATCH` merges onto a model built from the stored VO, so a locator nobody
+    // sent is a locator nobody touched -- which matters because five locator models' `toVO` builds
+    // a fresh VO and copies `attributeId` and `dataType` alone, dropping a `settable` the gateway's
+    // own provisioner set (**D109**). A `PUT` of the same point erases it; a `PATCH` without the
+    // locator leaves it exactly as it was. Measured on 5.1.3 against a `VIRTUAL_MESH_NODE.PL`
+    // point: `PATCH {"name": …}` answers 200 and the stored locator reads back byte-identical.
+    //
+    // The caller decides when to leave it out, because only it knows whether the form offered an
+    // editable locator field -- see `GatewayDataSourcesComponent.editPoint`. Here the rule is only
+    // that the two cannot be combined: `PATCH` refuses any body carrying a `pointLocator` outright
+    // (`400 "Failed to read request"`, Jackson cannot merge into a polymorphic member), so a body
+    // that has one must go as a `PUT`.
+    return this.proxy<GatewayDataPoint>(deviceId, point.pointLocator ? 'PUT' : 'PATCH',
+      `/v2/data-point/${encodeURIComponent(point.xid)}`, point, config);
   }
 
   public setDataPointEnabled(deviceId: string, xid: string, enabled: boolean,

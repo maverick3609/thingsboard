@@ -171,6 +171,32 @@ describe('InferrixGatewayService data sources and points', () => {
     expect(request.request.body.pointLocator.modelType).toBe('MODBUS.PL');
     request.flush({...point});
   });
+
+  it('patches instead of putting when the body carries no locator', () => {
+    // The one update that can go as a `PATCH`, and the one that should. Five locator models' `toVO`
+    // builds a fresh VO and copies `attributeId` and `dataType` alone, so a `PUT` drops a `settable`
+    // the gateway's own provisioner set (D109). A `PATCH` merges onto the stored model, so a locator
+    // nobody sent is a locator nobody touched -- measured on 5.1.3 against a VIRTUAL_MESH_NODE.PL
+    // point: 200, and the stored locator reads back byte-identical.
+    //
+    // The caller decides when to leave it out, since only it knows whether the form offered an
+    // editable locator field. The service's rule is only that the two cannot be combined.
+    const point: GatewayDataPoint = {xid: 'DP_1', name: 'Heartbeat', dataSourceXid: 'DS_1'};
+    service.saveDataPoint(DEVICE, point).subscribe();
+    const request = httpMock.expectOne(proxy('/v2/data-point/DP_1'));
+    expect(request.request.method).toBe('PATCH');
+    expect(request.request.body.pointLocator).toBeUndefined();
+    request.flush({...point});
+  });
+
+  it('still posts a create, locator or not', () => {
+    // A new point has no stored locator to leave alone, so the PUT/PATCH choice never applies to it.
+    const point: GatewayDataPoint = {name: 'New', dataSourceXid: 'DS_1'} as GatewayDataPoint;
+    service.saveDataPoint(DEVICE, point).subscribe();
+    const request = httpMock.expectOne(r => r.url === proxy('/v2/data-point'));
+    expect(request.request.method).toBe('POST');
+    request.flush({...point, xid: 'DP_2'});
+  });
 });
 
 describe('gateway page mapping', () => {

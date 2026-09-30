@@ -2443,9 +2443,12 @@ The other two light controllers override `isSettable()` to a hard `false` and st
   gateway's gap showing through rather than ours.
 - **D124 (P2)** — `LightControllerV4PointLocatorVO.isSettable()` answers `super.isSettable() ||
   DIM_VALUE.isSettable()` for the dim value, and the right-hand side is a constant `true`. Measured:
-  POSTing `settable: false` on a `DIM_VALUE` point reads back `true`. The field stays editable,
-  because it is a real choice for the other six, and the hint says the dim value is writable whatever
-  the box shows.
+  POSTing `settable: false` on a `DIM_VALUE` point reads back `true`. The field is **read-only**,
+  with a hint saying the dim value is writable whatever the box shows. It was briefly left editable
+  on the grounds that it is a real choice for the other six; the row-20 lesson applies here too --
+  the flag comes from the attribute enum and picks the BACnet object type the gateway republishes, so
+  it is not the platform's to contradict, and a box that cannot change the behaviour is worse than a
+  locked one.
 
 *Measured against 5.1.3, every probe row deleted:* all four sources POST 201 with the five fields;
 `LIGHT_RELAY_CONTROLLER` with `settable: true` reads back **true**, `LIGHT_DI_CONTROLLER` and

@@ -164,7 +164,7 @@ describe('gateway form layouts', () => {
     });
   });
 
-  it('gives all ten mesh node sources one shape, and nine sources eight locators', () => {
+  it('gives all ten mesh node sources one shape, and the ten share nine locators', () => {
     // Verified against the schema document with `allOf` resolved: all ten sources declare
     // `controllerAddress` and `publisherId` and nothing else over the common eleven. Both are
     // read-only because the pair is the key every runtime matches an incoming frame against.
@@ -174,7 +174,12 @@ describe('gateway form layouts', () => {
     const sources = Object.keys(GATEWAY_FORM_LAYOUTS)
       .filter(modelType => modelType.endsWith('_MESH_NODE.DS'));
     expect(sources.length).toBe(10);
-    expect(meshNodeTypes.length).toBe(9);
+    // `meshNodeTypes` is a literal in this file, so checking its own length against a literal number
+    // proves nothing. What can drift is the table: assert that the nine named locators are exactly
+    // the `_MESH_NODE.PL` entries the table holds.
+    expect(Object.keys(GATEWAY_FORM_LAYOUTS)
+      .filter(modelType => modelType.endsWith('_MESH_NODE.PL')).sort())
+      .toEqual(meshNodeTypes.map(type => `${type}.PL`).sort());
     sources.forEach(modelType => {
       const layout = GATEWAY_FORM_LAYOUTS[modelType];
       expect(layout.provisionedPoints).withContext(modelType).toBe(true);

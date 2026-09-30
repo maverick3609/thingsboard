@@ -4,6 +4,7 @@ import { ChangeDetectorRef, DestroyRef, SimpleChanges } from '@angular/core';
 import { UntypedFormBuilder } from '@angular/forms';
 import { FormFieldSetProperty, FormProperty, FormPropertyType,
   FormSelectItem } from '@shared/models/dynamic-form.models';
+import { GATEWAY_FORM_LAYOUTS } from '@shared/models/inferrix-gateway-layout.models';
 import { GatewayFormComponent } from './gateway-form.component';
 
 /**
@@ -261,5 +262,36 @@ describe('gateway form layout mechanics', () => {
     form.setDisabledState(false);
     expect(form.form.get('script').disabled)
       .withContext('a locked field must not come back editable').toBe(true);
+  });
+
+  /**
+   * The mesh node point form, on the real layout, because its row comment used to describe an order
+   * `pack` does not produce and a row that changed nothing.
+   *
+   * Property order and types are the published schema's: `dataType` is an accepted enum so it is a
+   * select, `settable` is a boolean so it is a switch, and `type`'s enum is `toString()` garbage the
+   * mapper refuses, so it degrades to text (D148).
+   */
+  it('lays a mesh node point out in schema order, with the switch on a line of its own', () => {
+    form.properties = [
+      property('dataType', FormPropertyType.select, {items: [{value: 'NUMERIC', label: 'NUMERIC'}]}),
+      property('settable', FormPropertyType.switch),
+      property('relinquishable', FormPropertyType.switch),
+      property('configurationDescription', FormPropertyType.text),
+      property('attributeId', FormPropertyType.number),
+      property('type', FormPropertyType.text)
+    ];
+    form.layout = GATEWAY_FORM_LAYOUTS['VIRTUAL_MESH_NODE.PL'];
+    form.ngOnChanges({properties: {}, layout: {}} as unknown as SimpleChanges);
+    form.writeValue({dataType: 'NUMERIC', settable: true, attributeId: 88, type: 'BOOL'});
+
+    expect(form.rows.map(row => row.items.map(item => item.property.id)))
+      .toEqual([['dataType'], ['settable'], ['attributeId', 'type']]);
+    // Which is the point of the correction: `settable` is second, not under the other three. A switch
+    // is not in `PAIRABLE_TYPES`, so it flushes whatever was pending and takes its own row -- an
+    // explicit `['dataType']` row would have bought nothing.
+    expect(form.advancedRows).toEqual([]);
+    expect(shownProperty('relinquishable')).toBeUndefined();
+    expect(shownProperty('configurationDescription')).toBeUndefined();
   });
 });

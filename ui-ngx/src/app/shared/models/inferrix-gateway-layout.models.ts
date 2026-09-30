@@ -1001,6 +1001,22 @@ const meshNodeSource = (protocol: string): GatewayFormLayout => ({
  * here. It does not matter, because `provisionedPoints` on the data source removes the Add button --
  * there is no path through this form that could post an empty one -- and an edit carries the stored
  * type in from `fromVO`. If one of these data sources ever gains an Add button, this needs a default.
+ *
+ * **`type` renders as a disabled text box, not a select, and that is the gateway's doing.** The nine
+ * locator models type the field as `AttributeDataType` deliberately -- the Java comment says "so the
+ * published schema carries the closed value set" -- but the enum overrides `toString()`, and the
+ * schema generator renders allowed values through it, so what arrives is
+ * `["DataType{ dataTypeId= -1, length='-1'}", ...]`. `selectItems` refuses every one of those against
+ * `ENUM_VALUE`, and a select with no items falls back to a text property. The stored value is the
+ * constant name (`BOOL`), because Jackson never used `toString()`, so a disabled box shows the right
+ * thing. Filed as **D148**; if it is fixed the field becomes a select with no change here.
+ *
+ * **Two of the nine type `attributeId` as a string, so the field is not always a number.**
+ * `MeshExtenderMeshNodePointLocatorModel` publishes `string` with `enum: [HEARTBEAT, BATTERY]`, which
+ * renders as a disabled select; `StudentAssetTagMeshNodePointLocatorModel` publishes a bare `string`,
+ * which renders as a disabled text box. The other seven are `integer`. The hint says the same thing
+ * for all nine because the same thing is true for all nine -- the gateway assigns it -- and the
+ * control shape follows the schema either way.
  */
 const meshNodePoint = (protocol: string): GatewayFormLayout => ({
   hidden: ['relinquishable', 'configurationDescription'],
@@ -1015,9 +1031,16 @@ const meshNodePoint = (protocol: string): GatewayFormLayout => ({
       + 'gateway picks the BACnet object type it republishes from it too, so it is not the '
       + 'platform\'s to change.'
   },
-  // `settable` is left to the mapper's own order under the three: pairing a checkbox with a select
-  // puts a control and its label on two different baselines.
-  rows: [['attributeId', 'type'], ['dataType']]
+  // `settable` renders **second**, not last. `pack` walks the properties in schema order and puts an
+  // explicit row where its first field would have fallen, and the schema order here is `dataType`,
+  // `settable`, `attributeId`, `type` -- so the form reads: dataType alone, settable alone, then the
+  // pair. There is no layout key that reorders vertically, and `rows` only groups.
+  //
+  // A `['dataType']` row used to sit here to stop a select being paired with a checkbox. It was dead:
+  // `settable` is a boolean, so it maps to `switch`, and `switch` is not in `PAIRABLE_TYPES` -- `pack`
+  // flushes any pending field and gives a switch its own row regardless. Removed rather than kept as
+  // a comment, because a row that changes nothing is a claim about the renderer that is not true.
+  rows: [['attributeId', 'type']]
 });
 
 /**
@@ -1748,12 +1771,12 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    *
    * One shape for the sources and one for the points, verified against the schema document with
    * `allOf` resolved: all ten sources declare `controllerAddress` and `publisherId` over
-   * `AbstractDataSourceModel`'s eleven and nothing else, all ten locators declare `attributeId`,
+   * `AbstractDataSourceModel`'s eleven and nothing else, all nine locators declare `attributeId`,
    * `type` and the common four, and every one of the ten `toVO` methods copies exactly
    * `AttributeId`, `DataTypeId`, `Settable` and `Type`. No type's `validate` adds a field-level rule
    * beyond the two address checks on the source.
    *
-   * Nine sources, eight locators: `MODBUS_IP_MESH_NODE.DS` and `MODBUS_SERIAL_MESH_NODE.DS` share
+   * Ten sources, nine locators: `MODBUS_IP_MESH_NODE.DS` and `MODBUS_SERIAL_MESH_NODE.DS` share
    * `MODBUS_MESH_NODE.PL`, the same "locator is not the source's name with `.PL` on the end" shape
    * that hid two members of the mesh device family until the row-18 review.
    */

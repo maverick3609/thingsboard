@@ -5,6 +5,7 @@ import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { Router } from '@angular/router';
 import { Store } from '@ngrx/store';
+import { TranslateService } from '@ngx-translate/core';
 import { AppState } from '@core/core.state';
 import { DialogComponent } from '@shared/components/dialog.component';
 import { FormProperty, FormPropertyType } from '@shared/models/dynamic-form.models';
@@ -112,7 +113,13 @@ export interface GatewayModelDialogData {
   recipientFields?: string[];
   /** Fields carried through a save untouched, with a note saying so. */
   carriedFields?: {id: string; note: string}[];
-  /** Why this dialog is read-only, when the reason is the model rather than the user's authority. */
+  /**
+   * Why this dialog is read-only, when the reason is the model rather than the user's authority.
+   *
+   * A caller sets this for a reason of its own -- an event handler that runs commands. A reason that
+   * belongs to the *model type* comes from {@link GatewayFormLayout.unsavable} and is applied here,
+   * so it cannot be honoured by one opener and forgotten by the other five.
+   */
   readonlyNote?: string;
   /** Rows belonging to this model, edited inline. See {@link GatewayModelChildren}. */
   children?: GatewayModelChildren;
@@ -161,9 +168,21 @@ export class GatewayModelDialogComponent
               protected router: Router,
               @Inject(MAT_DIALOG_DATA) public data: GatewayModelDialogData,
               public dialogRef: MatDialogRef<GatewayModelDialogComponent, any>,
-              private fb: UntypedFormBuilder) {
+              private fb: UntypedFormBuilder,
+              private translate: TranslateService) {
     super(store, router, dialogRef);
     this.isAdd = !data.model?.xid;
+    // A model type whose own REST surface destroys the row on any write opens read-only with the
+    // reason on it, rather than behind a Save button that appears to work.
+    //
+    // Applied here rather than at each `dialog.open`, because there are six of those and the flag
+    // was honoured at one of them. `data` is the object the template reads, so folding it in is
+    // what makes every opener -- and every opener written later -- get the treatment.
+    const unsavable = data.layout?.unsavable ?? data.locatorLayout?.unsavable;
+    if (unsavable) {
+      data.readonly = true;
+      data.readonlyNote ??= this.translate.instant(unsavable);
+    }
     this.identityForm = this.fb.group({
       name: [data.model?.name ?? '', [Validators.required, Validators.maxLength(255)]],
       // The stack's own xid shape. Left blank on an add, which makes the gateway generate one --

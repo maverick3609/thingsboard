@@ -911,9 +911,19 @@ const meshDevicePoint = (attributes: FormSelectItem[], device: string,
  * The three asset tags, as data sources: the mesh address and nothing else.
  *
  * `ASSET_TRACKING_BAND`, `LED_ASSET_TAG` and `STUDENT_ASSET_TAG` declare `address` over
- * `AbstractDataSourceModel`'s eleven and no more -- not `anchorNode`, not `location`, which is why
- * they cannot reuse {@link meshDeviceSource}. A tag is carried rather than installed, so it has no
- * zone to record and is never a mesh anchor.
+ * `AbstractDataSourceModel`'s eleven and no more -- not `anchorNode`, not `location`. Their VOs
+ * extend `MeshDataSourceVO` like the rest of the family and so *have* both fields; it is the three
+ * **models** that omit them, alone among the 34 (**D147**). Nothing sets either field for these
+ * types today, so nothing is lost; whether the omission is deliberate is a guess, and a tag being
+ * carried rather than installed is the only reading that makes it one.
+ *
+ * {@link meshDeviceSource} would in fact render these three identically -- `pack` filters a row's ids
+ * against the properties it was handed, and a hint for an absent id is inert. The reason for a second
+ * function is the wording: its `address` hint is written for a device installed somewhere, and its
+ * `anchorNode` hint would start claiming a tag registers as an anchor the moment D147 is fixed.
+ *
+ * No `rows`, and that is not an omission: one field cannot be paired with anything, so `pack` gives
+ * `address` a row of its own whether or not a layout asks for it.
  */
 const assetTagSource = (tag: string): GatewayFormLayout => ({
   provisionedPoints: true,

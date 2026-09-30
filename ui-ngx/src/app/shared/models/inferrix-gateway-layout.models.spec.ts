@@ -227,6 +227,13 @@ describe('gateway form layouts', () => {
       .map(modelType => modelType.replace(/\.DS$/, '.PL'))
       .filter(modelType => GATEWAY_FORM_LAYOUTS[modelType]);
     expect(provisioned.length).toBeGreaterThan(20);
+    // The loop below is the rule. On its own it was **vacuous**: not one of the 43 provisioned
+    // locators carries `required`, so the body never ran and the spec asserted the count and nothing
+    // else. This is the falsifiable version of the same thing -- no provisioned locator marks
+    // anything required at all -- and it fails the day one does, which is the day the pairing rule
+    // starts mattering.
+    expect(provisioned.flatMap(modelType => (GATEWAY_FORM_LAYOUTS[modelType].required ?? [])
+      .map(id => `${modelType}.${id}`))).toEqual([]);
     provisioned.forEach(modelType => {
       const layout = GATEWAY_FORM_LAYOUTS[modelType];
       (layout.required ?? []).forEach(id => {
@@ -1737,5 +1744,29 @@ describe('gateway form layouts', () => {
       fields.forEach(id =>
         expect(locked.has(id)).withContext(`${modelType}.${id} must be locked or hidden`).toBe(true));
     });
+  });
+
+  it('shows an asset tag the one field it has, and locks it', () => {
+    // Nothing named these three before, which is how `assetTagSource` reached the table with its
+    // shape asserted nowhere. All three are provisioned by the mesh, so no Add button, and `address`
+    // is the whole of the form.
+    const tags = ['ASSET_TRACKING_BAND.DS', 'LED_ASSET_TAG.DS', 'STUDENT_ASSET_TAG.DS'];
+    tags.forEach(modelType => {
+      const layout = GATEWAY_FORM_LAYOUTS[modelType];
+      expect(layout).withContext(modelType).toBeTruthy();
+      expect(layout.provisionedPoints).withContext(modelType).toBe(true);
+      expect(layout.readonly).withContext(modelType).toEqual(['address']);
+      expect(Object.keys(layout.hints)).withContext(modelType).toEqual(['address']);
+      // No `rows`: one field cannot be paired, so `pack` gives it a line of its own unasked. This is
+      // the one provisioned mesh source without them, and the assertion is here so that reads as a
+      // decision rather than as something forgotten.
+      expect(layout.rows).withContext(modelType).toBeUndefined();
+      // And nothing about a zone or an anchor, because the three models do not publish either
+      // (D147) -- which is also why they do not share `meshDeviceSource`, whose hints would.
+      expect(layout.hints.anchorNode).withContext(modelType).toBeUndefined();
+      expect(layout.hints.location).withContext(modelType).toBeUndefined();
+    });
+    // A fresh object each, so a mutation of one tag's layout cannot reach another's.
+    expect(new Set(tags.map(modelType => GATEWAY_FORM_LAYOUTS[modelType])).size).toBe(3);
   });
 });

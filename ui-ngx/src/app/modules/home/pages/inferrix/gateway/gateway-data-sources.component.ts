@@ -226,11 +226,8 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
           // A data source form can need a lookup of its own now, not just its points: a BACnet
           // source names one of the gateway's local devices.
           deviceId: this.deviceId,
-          // A type whose own REST surface destroys the row on write opens read-only with the reason
-          // on it, rather than behind a Save button that appears to work. Same treatment an event
-          // handler that runs commands gets.
-          readonly: this.readonly || !!layout?.unsavable,
-          readonlyNote: layout?.unsavable ? this.translate.instant(layout.unsavable) : undefined,
+          // `layout.unsavable` is applied by the dialog itself, for every opener at once.
+          readonly: this.readonly,
           children}
       }).afterClosed().subscribe(saved => {
       if (saved) {

@@ -77,3 +77,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `e97c9d3388` fix(gateway): stop our own save erasing settable, by not sending what nothing edited
 - [ ] `108568eae5` feat(gateway): pick a serial port instead of typing one, and gate the route as recon
 - [ ] `e42d992eb9` fix(gateway): Angular re-enables every field a layout disabled, and nine claims
+- [ ] `a7216e5a35` fix(gateway): a row that changed nothing, five counts, and the reviews' doc debt

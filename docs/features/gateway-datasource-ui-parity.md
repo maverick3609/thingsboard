@@ -2346,7 +2346,12 @@ on a provisioned source — and it is the wrong rule anyway, because `provisione
 Add button, so there is no form to be empty. It was replaced with the rule that does have to hold: a
 provisioned locator never marks a field `required` that it also hides or disables, since a disabled
 control is left out of Angular's validation entirely and there is no Add path to seed a default from.
-The new version checks every provisioned type rather than one.
+
+**And the replacement was itself vacuous, which the row-20 review caught.** It looped over all 43
+provisioned locators and, inside, over each one's `required` list — and not one of the 43 carries
+`required`, so the body never executed. The assertion that ran was the count. It now also asserts the
+falsifiable form of the same claim, that no provisioned locator marks anything required at all, which
+fails the day one does — which is the day the pairing rule starts mattering.
 
 **One of these ten layouts is probably dead today, and that is D127's third consequence.** Both
 mesh extender model types exist and are distinct — `MESH_EXTENDER_MESH_NODE.PL` and
@@ -2421,6 +2426,16 @@ that type, so the form is the only source there is. The Modbus *slave* types are
 will be read-only when row 23 lays them out. Recorded here so that row does not have to rediscover it.
 
 The other two light controllers override `isSettable()` to a hard `false` and stay hidden.
+
+**Every `attributeId` result below is a D108 snapshot, and this row is where the table moved.**
+`MeshPointLocatorVO.ATTRIBUTE_CODES` is one mutable `public static` reassigned by the static
+initialiser of 36 locator subclasses, and a static initialiser runs once per JVM — so the table holds
+whichever of the 36 loaded last and does not go back. Creating and deleting a `MOKO_BAND.PL` point
+while probing this row is what put `WristBandAttributes` there, and the instance has not been
+restarted since: a `CURRENT_SENSOR.PL` that accepted `CURRENT` before this row answers 422 for it
+now. Both 422s quoted below were taken with a positive control in the same run — an attribute of the
+same type answering 201 at the same moment — which is the only thing that makes a 422 mean anything
+here. A 422 with no control in its own run proves nothing at all.
 
 **Four findings, all the gateway's, all filed and all measured.**
 
@@ -2728,14 +2743,13 @@ own — so 104 green specs said nothing about the file the build was failing on.
 Cortex-side, not the gateway's. Neither is worth a fix inside a per-type row; both want the on-screen
 pass that rows 6-11 are already owed.
 
-- **Saving a provisioned point through our own dialog erases `settable` on five mesh types.**
-  `GatewayModelDialogComponent.save` always sends the whole `pointLocator`, and `saveDataPoint` uses
-  `PUT` once the point has an `xid`, so the write goes through a `toVO` that drops the flag (D109).
-  Renaming a thermostat point turns its setpoint read-only on the gateway. The disabled control is
-  not at fault — `getRawValue()` re-sends the value it was given — so the fix is in the dialog:
-  either omit `pointLocator` when nothing in it changed, or use the `PATCH` route, which the service
-  already has and which the gateway accepts for `{name}` alone. **Not done**, because it changes the
-  save path for all 148 model types and wants deciding rather than sneaking into a review commit.
+- ~~**Saving a provisioned point through our own dialog erases `settable` on five mesh types.**~~
+  **Fixed 2026-09-30** (`e97c9d3388`), the way "Saving a point that has nothing to save" above
+  records: `editPoint` drops `pointLocator` from the body when the locator's layout left no
+  editable field, and `saveDataPoint` sends such a body as `PATCH`. Measured first, on a live
+  `VIRTUAL_MESH_NODE.PL`: `PATCH {"name": "HEARTBEAT"}` with no locator answers 200 and the stored
+  locator reads back byte-identical. The test is read off the **layout**, not off a value diff — a
+  disabled control re-sends what it was given, so a diff would never see the difference.
 
 - **The hint on a disabled toggle may have no reachable tooltip.** `settable` is the first field this
   work has marked `readonly` that renders as a boolean, and a boolean is a `mat-slide-toggle` whose
@@ -2744,6 +2758,24 @@ pass that rows 6-11 are already owed.
   disabled toggle the way it does on a disabled form field, the hint is unreadable and `readonly`
   buys nothing over `hidden` for those five types. Unverified: it needs the on-screen pass, and it is
   the first thing to look at when that pass happens.
+
+- **`tb-dynamic-form` ignores `[disabled]`, so an unworked type's form looks editable when it is
+  not.** The defeat row 23 found in our own `GatewayFormComponent` is in TB's renderer too, and for
+  the same reason: `DynamicFormComponent.setDisabledState(isDisabled)` assigns
+  `this.disabled = isDisabled`, overwriting the `@Input()`. Angular's `setUpControl` calls it with
+  `control.disabled` unconditionally — `setDisabledStateDefault` is `'always'` and nothing in `src`
+  provides `CALL_SET_DISABLED_STATE` — and a standalone `[(ngModel)]`'s own control is always
+  enabled, so `[disabled]="data.readonly"` is undone a moment after `writeValue` honoured it. Both
+  fallbacks in `gateway-model-dialog.component.html` (`:157` for a model with no layout, `:179` for
+  a locator with none) bind it that way.
+
+  **Misleading rather than unsafe:** the dialog's Save sits behind `@if (!data.readonly)`, so
+  nothing can be written, and per-property `readOnly` from the schema is re-applied by
+  `updateControlsState()`. What an operator sees is a form that accepts typing and then offers no
+  way to keep it. Not fixed: it is TB core, shared with every widget settings form in the product,
+  and the types that still reach those two fallbacks are the ones no layout has been written for —
+  each of which removes one when it lands. Worth a separate TB-core change if the fallbacks outlive
+  the rollout.
 
 - **A failed schema read leaves every Add form empty, with nothing said.** `load()` fires the schema
   request and the type request independently and swallows both errors on purpose — the list is worth

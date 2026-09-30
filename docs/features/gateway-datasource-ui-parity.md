@@ -2526,6 +2526,18 @@ handler that runs commands already gets (`readonly: this.readonly || runsCommand
 so the mechanism is precedented even though the flag is new. Enabling and disabling still work from
 the table, because `/v2/data-source/enable-disable/{xid}` is its own route and never builds a model.
 
+**Four things were checked before trusting the new key, because a flag that only looks like it
+disables a form is worse than no flag.** The Save button is genuinely gone —
+`@if (!data.readonly)` wraps it and Cancel becomes Close, so there is no submit path, not merely a
+discouraged one. The key can never be device-controlled: `gatewayFormLayout` reads the table through
+`Object.prototype.hasOwnProperty.call`, so a gateway naming its model type `constructor` gets
+`undefined` rather than a function, and the value handed to `translate.instant` is always a constant
+from this repository. The note renders through interpolation, so it is `textContent` and cannot carry
+markup. And a hidden field survives a save: controls are built only for `shown`, which excludes
+`layout.hidden`, so a hidden id never appears in `form.value`, never reaches `keep()`, and the stored
+model spread underneath it is what goes back — which is what makes hiding `controlCommand` in row 24
+safe rather than destructive.
+
 The points are a different matter and are left savable: their `toVO` copies all five fields it
 carries, which is the D109 pattern *not* happening. Every locator field is still read-only, because
 all five are assigned from the register map — the attribute id and point number index a map that

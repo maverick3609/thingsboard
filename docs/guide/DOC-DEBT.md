@@ -75,3 +75,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `9edb565005` feat(gateway): lay out the two Modbus slave shapes, which cannot be saved at all
 - [ ] `8f350f52e7` feat(gateway): lay out the virtual switch, the last of the 148 model types
 - [ ] `e97c9d3388` fix(gateway): stop our own save erasing settable, by not sending what nothing edited
+- [ ] `108568eae5` feat(gateway): pick a serial port instead of typing one, and gate the route as recon

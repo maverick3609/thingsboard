@@ -4,8 +4,18 @@
 as of 2026-09-30. What is still owed is the on-screen pass over rows 6-24, which no browser
 tooling has been available for. The dialog save-path question is **decided and implemented** — see
 "Saving a point that has nothing to save" below. Phase G7.
-**Measured against:** stack 5.1.0 on `192.168.221.7:8443`, gateway `Inferrix Gateway 155`
-(`86d5e330-b735-11f1-b695-2b2fc11a4c69`), live schema document read 2026-09-24.
+**Measured against:** stack 5.1.0, gateway `Inferrix Gateway 155`
+(`86d5e330-b735-11f1-b695-2b2fc11a4c69`), live schema document read 2026-09-24. Later rows were
+measured against 5.1.3.
+
+> **`192.168.221.7:8443` and `localhost:8080` are the same instance**, established 2026-09-30 by
+> comparing data source xids — all 12 UUIDs identical, which cannot coincide — and confirmed by
+> `/v2/utilities/gw/serial-ports` answering with this Mac's device names
+> (`/dev/cu.Bluetooth-Incoming-Port`, `/dev/cu.debug-console`, `/dev/ttyp0`). So every "live" and
+> "measured" claim in this document was made against **a stack running on the development machine**,
+> reachable both ways. That is the right thing to have measured against — it is a real 5.1.x gateway
+> answering real REST — but it is not a production edge server, and nothing here should be read as
+> having been exercised on one.
 
 Cortex builds every gateway form from the schema the gateway publishes. That is the right
 foundation and the plan does not change it — it is what makes a form exist at all for a type
@@ -663,9 +673,8 @@ which is the transport filter working. COV timeout prefilled 60, and the saved r
 `localDeviceConfig` holding the MS/TP UUID, `covSubscriptionTimeoutMinutes: 60`, `enabled: false`,
 and the picker showing the device's label again on reopen. *(The two throwaway local devices
 themselves outlived their rows — the data sources were deleted at the time but the devices were not.
-Both were removed from `Inferrix Gateway 155` on 2026-09-30, checked first for references: no data
-source named either and the gateway had no BACnet source at all. It is back to zero local devices and
-the same 12 data sources.)* **Add point on a source with no points
+Both were removed on 2026-09-30, checked first for references: no data source named either, and no
+BACnet source existed at all. Zero local devices remain and the same 12 data sources.)* **Add point on a source with no points
 rendered the BACnet locator form** — the case that is impossible without the layout's
 `pointLocatorType`, since the gateway publishes `null` and there is no sibling to copy — with all
 nine fields in order, Analog input / present-value / Numeric / multiplier 1, `writePriority` hidden

@@ -91,6 +91,14 @@ public final class InferrixGatewayRoutes {
             route("/v2/stack-monitor/" + ID, "GET"),
             route("/v2/server/network-interfaces", "GET"),
             route("/v2/server/languages", "GET"),
+            // The host's serial devices, so a Modbus serial line can be configured by picking a
+            // port instead of typing one. Needed rather than convenient: a wrong commPortId is not
+            // refused, it just produces a data source that never reads, and the names are neither
+            // guessable nor stable (/dev/ttyUSB0 moves when the adapters are re-enumerated).
+            // Read-only and parameterless, so there is nothing to inject through it -- but it is
+            // host enumeration, so /v2/utilities joins ADMIN_FAMILIES below for the same reason
+            // /v2/server is there.
+            route("/v2/utilities/gw/serial-ports", "GET"),
             // Reads only, deliberately. A PUT here takes an arbitrary settings key, and the
             // gateway's SystemSettingsService.save() never calls SystemSettingsDao.validate() --
             // so the single-key write skips the only validation that exists, and updateSettings
@@ -254,13 +262,15 @@ public final class InferrixGatewayRoutes {
      * {@code SystemSettingsResource} carries no {@code @PreAuthorize} at all, enforcement being
      * {@code ensureAdminRole} one layer down. {@code platform-integration} holds the link to this
      * platform, including the ThingsBoard URL and the tenant-admin username it connects with.
-     * {@code /v2/server} reports network interfaces. None of it is a customer user's business, and
-     * all of it is reconnaissance.
+     * {@code /v2/server} reports network interfaces and {@code /v2/utilities} the host's
+     * serial devices. None of it is a customer user's business, and all of it is
+     * reconnaissance.
      */
     private static final List<String> ADMIN_FAMILIES = List.of(
             "/v2/system-setting",
             "/v2/platform-integration",
-            "/v2/server");
+            "/v2/server",
+            "/v2/utilities");
 
     /** Event-handler routes that carry a handler model in their body. */
     private static final Pattern EVENT_HANDLER_WRITE =

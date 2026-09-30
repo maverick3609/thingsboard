@@ -492,6 +492,26 @@ export class InferrixGatewayService {
    * column is `dataPointId`, and the model's string `sourceId` exists solely because the model
    * maps that column to and from the point's xid. Asking for `sourceId` is a 500.
    */
+  // --- Host lookups -------------------------------------------------------------------------
+
+  /**
+   * The serial devices the gateway's host can see.
+   *
+   * A plain `string[]` of paths — `/dev/ttyUSB0`, `/dev/cu.usbserial-A1` — which is what
+   * `MODBUS_SERIAL.DS.commPortId` and an MS/TP local device's `commPortId` hold. Worth a lookup
+   * rather than a text box because nothing validates the value: a wrong port name saves cleanly and
+   * produces a data source that simply never reads, and the names are not stable either — a USB
+   * adapter re-enumerates to a different `ttyUSB` number when the ports are replugged.
+   *
+   * Tenant-admin only, unlike the other lookups here: `InferrixGatewayRoutes` puts `/v2/utilities`
+   * in `ADMIN_FAMILIES` because a list of the host's devices is reconnaissance, the same judgement
+   * `/v2/server/network-interfaces` already carries. A customer user is refused it by the proxy, so
+   * callers must treat an error as "no list" rather than as a failure.
+   */
+  public getSerialPorts(deviceId: string, config?: RequestConfig): Observable<string[]> {
+    return this.proxy<string[]>(deviceId, 'GET', '/v2/utilities/gw/serial-ports', null, config);
+  }
+
   // --- BACnet lookups -----------------------------------------------------------------------
 
   /**

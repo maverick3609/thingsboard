@@ -189,6 +189,18 @@ describe('InferrixGatewayService data sources and points', () => {
     request.flush({...point});
   });
 
+  it('reads the host serial ports from the utilities route', () => {
+    // `commPortId` is a device path on the gateway's host and nothing validates it: a wrong name
+    // saves cleanly and the data source never reads. The list is the gateway's answer rather than a
+    // constant, so it cannot live in a layout -- SerialDataSourceFormComponent asks for it here.
+    let ports: string[];
+    service.getSerialPorts(DEVICE).subscribe(result => ports = result);
+    const request = httpMock.expectOne(proxy('/v2/utilities/gw/serial-ports'));
+    expect(request.request.method).toBe('GET');
+    request.flush(['/dev/ttyUSB0', '/dev/ttyUSB1']);
+    expect(ports).toEqual(['/dev/ttyUSB0', '/dev/ttyUSB1']);
+  });
+
   it('still posts a create, locator or not', () => {
     // A new point has no stored locator to leave alone, so the PUT/PATCH choice never applies to it.
     const point: GatewayDataPoint = {name: 'New', dataSourceXid: 'DS_1'} as GatewayDataPoint;

@@ -1810,10 +1810,16 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * layout's choice rather than the gateway's, taken because it is the framing a Modbus serial
    * device speaks unless configured otherwise.
    *
-   * `commPortId` stays free text. The gateway does publish its ports, at
-   * `/v2/utilities/gw/serial-ports`, but that route is not in the proxy allowlist and adding one
-   * is a platform release -- so an operator types the port name their gateway reports. Recorded
-   * as a gap rather than guessed at.
+   * `commPortId` is a picker since 2026-09-30, and not through this layout: the list is the
+   * gateway's answer rather than a constant, so it comes from
+   * {@link SerialDataSourceFormComponent}'s `runtimeOptions()` over
+   * `GET /v2/utilities/gw/serial-ports`, which is now in the proxy allowlist. Worth the route
+   * because **nothing validates the value** -- a wrong device path saves cleanly and produces a
+   * source that never reads, which looks like a wiring fault rather than a typo -- and because the
+   * names are not stable, a USB adapter re-enumerating to a different `ttyUSB` number when the
+   * ports are replugged. It stays a text box for a customer user, since `/v2/utilities` is
+   * tenant-admin only in the allowlist: a list of the host's devices is reconnaissance, the
+   * judgement `/v2/server/network-interfaces` already carries.
    */
   'MODBUS_SERIAL.DS': {
     // The same tuning as MODBUS_IP.DS, minus the four socket fields a serial line has no use for,

@@ -135,6 +135,18 @@
                                       [ngModelOptions]="{standalone: true}">
           </tb-bacnet-data-source-form>
         }
+        <!--
+          `commPortId` is a device path on the gateway's host and nothing validates it: a wrong name
+          saves cleanly and the source never reads. The list is the gateway's answer rather than a
+          constant, so it cannot live in the layout.
+        -->
+        @case ('MODBUS_SERIAL.DS') {
+          <tb-serial-data-source-form [properties]="data.properties" [layout]="data.layout"
+                                      [deviceId]="data.deviceId"
+                                      [disabled]="data.readonly" [(ngModel)]="values"
+                                      [ngModelOptions]="{standalone: true}">
+          </tb-serial-data-source-form>
+        }
         @default {
           <tb-gateway-form [properties]="data.properties" [layout]="data.layout"
                            [disabled]="data.readonly" [(ngModel)]="values"

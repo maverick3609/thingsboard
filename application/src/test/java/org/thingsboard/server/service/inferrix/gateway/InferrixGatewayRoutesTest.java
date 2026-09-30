@@ -233,6 +233,7 @@ class InferrixGatewayRoutesTest {
         // ServerResource has no bare mapping -- it is email/SMS/network/restart/languages. Only the
         // two read-only members are ours, and the restart is emphatically not.
         assertTrue(InferrixGatewayRoutes.isAllowed("GET", "/v2/server/network-interfaces"));
+        assertTrue(InferrixGatewayRoutes.isAllowed("GET", "/v2/utilities/gw/serial-ports"));
         assertTrue(InferrixGatewayRoutes.isAllowed("GET", "/v2/server/languages"));
         assertFalse(InferrixGatewayRoutes.isAllowed("GET", "/v2/server"));
         // ...and they are reads.
@@ -529,6 +530,9 @@ class InferrixGatewayRoutesTest {
         assertTrue(InferrixGatewayRoutes.requiresTenantAdmin("GET", "/v2/system-setting/license-key"));
         assertTrue(InferrixGatewayRoutes.requiresTenantAdmin("GET", "/v2/system-setting/emailSmtpHost"));
         assertTrue(InferrixGatewayRoutes.requiresTenantAdmin("GET", "/v2/server/network-interfaces"));
+        // The host's serial devices are the same kind of reconnaissance as its network interfaces,
+        // so the whole /v2/utilities family is tenant-admin only rather than this one route.
+        assertTrue(InferrixGatewayRoutes.requiresTenantAdmin("GET", "/v2/utilities/gw/serial-ports"));
         // But the ordinary configuration plane stays readable by a customer user, which is the
         // whole point of having two levels rather than locking the page to tenant admins.
         assertFalse(InferrixGatewayRoutes.requiresTenantAdmin("GET", "/v2/publisher"));

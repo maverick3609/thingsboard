@@ -44,6 +44,8 @@ import { MetaPointFormComponent } from '@home/pages/inferrix/gateway/meta-point-
 import { VirtualPointFormComponent } from '@home/pages/inferrix/gateway/virtual-point-form.component';
 import { BacnetDataSourceFormComponent }
   from '@home/pages/inferrix/gateway/bacnet-data-source-form.component';
+import { SerialDataSourceFormComponent }
+  from '@home/pages/inferrix/gateway/serial-data-source-form.component';
 import { BacnetPointFormComponent }
   from '@home/pages/inferrix/gateway/bacnet-point-form.component';
 import { GatewayModelDialogComponent }
@@ -101,6 +103,7 @@ import { WidgetSettingsCommonModule }
     MetaPointFormComponent,
     VirtualPointFormComponent,
     BacnetDataSourceFormComponent,
+    SerialDataSourceFormComponent,
     BacnetPointFormComponent,
     GatewayModelDialogComponent,
     GatewayRecipientsComponent,

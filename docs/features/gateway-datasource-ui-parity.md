@@ -502,13 +502,22 @@ the gateway's own dropdowns show, so an operator there picks between `DATA_BITS_
 webapp instead — it is a plain `int` the stack never bounds, so there is no enum to read, and its
 `BAUD_RATES` constant is the thirteen rates an adapter is actually jumpered for.
 
-**`commPortId` is still a text box, and that is a gap.** The gateway does publish its ports, at
-`GET /v2/utilities/gw/serial-ports`, and the stack's own form fills a dropdown from it. That route
-is not in `InferrixGatewayRoutes`, and adding it is a platform release — so this type ships with
-the operator typing the port name their gateway reports. It is one allowlist line, one service
-method and a subclass of `GatewayFormComponent` in the shape `VirtualPointFormComponent` already
-has. Recorded here rather than guessed at: a port name this platform invented would be worse than
-an empty box.
+**`commPortId` was a text box, and is a picker since 2026-09-30.** It came out as the paragraph
+below predicted — one allowlist line, one service method and a subclass of `GatewayFormComponent`
+— and the estimate was wrong only about the allowlist line, which also needed `/v2/utilities`
+adding to `ADMIN_FAMILIES`. The list is the gateway's answer rather than a constant, so it comes from
+`SerialDataSourceFormComponent.runtimeOptions()` over `GET /v2/utilities/gw/serial-ports` and not
+from the layout's `options`. Verified against the route live: 200, a plain array of paths.
+
+Worth the release because **nothing validates the value**: a wrong device path saves cleanly, the
+source comes up, and it simply never reads — which presents as a wiring fault rather than a typo.
+The names are not stable either, a USB adapter re-enumerating to a different `ttyUSB` number when the
+ports are replugged, so an operator cannot carry one over from another install.
+
+It stays a text box for a customer user, deliberately. `/v2/utilities` is tenant-admin only in the
+allowlist, because a list of the host's devices is reconnaissance — the same judgement
+`/v2/server/network-interfaces` already carries — so the component treats an error as "no list" and
+leaves the field as it was.
 
 > Corrected while doing type 6: this paragraph originally said BACnet MS/TP needed the same picker,
 > so the two could be done together. It does not. An MS/TP data source has no serial settings at
@@ -2729,8 +2738,6 @@ pass that rows 6-11 are already owed.
   422. Raised by the row-11 review as the first default whose presence depends on that race: no poll
   period is seeded either. Wants an inline warning on the page rather than a guard on the button, since
   the same emptiness affects an edit.
-- **`commPortId` is free text** because `/v2/utilities/gw/serial-ports` is not in the proxy allowlist.
-  Carried since row 4 and wanted by rows 4 and 6.
 
 ## Handed over
 
@@ -3103,7 +3110,10 @@ From type 4, in `2026-09-25-modbus-serial-enum-nulls.md`:
   fills in.
 - **A17 (P3)** — `commPortId`, `baudRate` and the five enum-backed line settings carry no
   `description` and no `allowableValues`, although `encoding` beside them declares both.
-  `/v2/utilities/gw/serial-ports` is what a client would need to fill the first of them.
+  `/v2/utilities/gw/serial-ports` is what a client would need to fill the first of them, and is what
+  Cortex now uses — the route is in the allowlist as of 2026-09-30, so A17 is worked around rather
+  than fixed: the enum-backed settings still carry no `allowableValues`, and their lists are written
+  out in the layout by hand.
 - **A18 (P3)** — that route's summary reads "Gets all the **unused** serial ports", while
   `UtilityService.getSerialPorts` calls `getAllSerialPorts()`. The behaviour is the useful one —
   a port already bound to a data source still appears, so an edit form can show it — and the

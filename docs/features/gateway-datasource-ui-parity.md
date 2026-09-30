@@ -1,8 +1,12 @@
 # Gateway data sources: matching the stack's own configuration UI
 
 **Status:** the type-by-type pass is **complete** — all 24 rows of the sequence below are done
-as of 2026-09-30. What is still owed is the on-screen pass over rows 6-24, which no browser
-tooling has been available for. The dialog save-path question is **decided and implemented** — see
+as of 2026-09-30. What is still owed is the on-screen pass over rows 6-24, and it is blocked on two
+things at once rather than on effort: no browser tooling has connected in any session that tried
+(2026-09-30: `playwright` timed out at 30s, `chrome-devtools` closed the connection), and Cortex
+itself is unreachable — `192.168.1.77` and `192.168.1.140` both answer nothing, while the gateway
+stack on `localhost:8080` answers 401 as it should. A pass needs a reachable Cortex first; the
+gateway being up is not enough, because these forms are rendered by Cortex. The dialog save-path question is **decided and implemented** — see
 "Saving a point that has nothing to save" below. Phase G7.
 **Measured against:** stack 5.1.0, gateway `Inferrix Gateway 155`
 (`86d5e330-b735-11f1-b695-2b2fc11a4c69`), live schema document read 2026-09-24. Later rows were

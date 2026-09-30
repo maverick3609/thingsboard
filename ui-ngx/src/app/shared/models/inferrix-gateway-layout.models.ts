@@ -798,31 +798,6 @@ const meshDeviceSource = (device: string): GatewayFormLayout => ({
 });
 
 /**
- * The four light controller sources: the mesh device shape plus a poll period.
- *
- * `LIGHT_CONTROLLER_V4`, `LIGHT_DI_CONTROLLER`, `LIGHT_RELAY_CONTROLLER` and `MOKO_BAND` declare
- * `quantize` and `timePeriod` over the family's three, so they reuse {@link meshDeviceSource} and
- * pin the poll period under the address row rather than letting the schema's order scatter it.
- *
- * Neither polling field needs an option list or a default: the mapper already seeds `timePeriod`
- * with five minutes for any model that declares it, and `quantize` carries a schema description the
- * mapper renders as its own hint. `quantize` is left to the mapper's order for the reason
- * `anchorNode` is -- it is a checkbox, and pairing one with a composite control puts a control and
- * its label on two different baselines.
- */
-const lightControllerSource = (device: string): GatewayFormLayout => {
-  const base = meshDeviceSource(device);
-  return {
-    ...base,
-    hints: {
-      ...base.hints,
-      timePeriod: `How often the gateway polls this ${device} for the attributes it did not push.`
-    },
-    rows: [['address', 'location'], ['timePeriod']]
-  };
-};
-
-/**
  * The point form those same devices share: one attribute of the device, provisioned when it joins.
  *
  * `attributeId` and `dataType` are read-only on every one of them, because the mesh chooses both.
@@ -844,9 +819,12 @@ const lightControllerSource = (device: string): GatewayFormLayout => {
  * - **`readonly-erased`** (4DI_2DO_CARD, LED_ASSET_TAG, PEOPLE_COUNTER, THERMOSTAT, VAV_CONTROLLER)
  *   -- the provisioner calls `locatorVO.setSettable(...)` and the enum has entries that answer
  *   `true` (the card's two digital outputs, the counter's `RESET`, seven thermostat attributes, the
- *   VAV's two analogue outputs, and the LED tag's `LED_STATUS`). The flag is real and worth reading;
- *   the platform cannot change it, because `toVO` builds a fresh VO and copies `attributeId` and
- *   `dataType` alone, so a REST write erases it (**D109**).
+ *   VAV's two analogue outputs, and the LED tag's `LED_STATUS`). Four read `attribute.isSettable()`;
+ *   LED_ASSET_TAG alone compares the attribute's *name* to `LED_STATUS`, because
+ *   `LedAssetTagAttributes` has no settable member. The flag is real and worth reading, and a write
+ *   that carries the locator **destroys** it: `toVO` builds a fresh VO copying `attributeId` and
+ *   `dataType` alone (**D109**). What keeps it intact is that a save from this dialog omits
+ *   `pointLocator` entirely when the layout leaves no editable locator field.
  * - **`readonly`** (LIGHT_CONTROLLER_V4, LIGHT_RELAY_CONTROLLER) -- the provisioner sets it the same
  *   way, but `toVO` **does** copy it, so it round-trips instead of being erased. It is read-only all
  *   the same, and that is a deliberate narrowing of what the gateway allows: `attribute.isSettable()`
@@ -908,9 +886,16 @@ const meshDevicePoint = (attributes: FormSelectItem[], device: string,
       ? {settable: `Whether the platform may write this attribute back to the ${device}.`}
       : {}),
     ...(settable === 'readonly-erased'
-      ? {settable: 'Whether the mesh accepts a write to this attribute. The gateway sets it from the '
-          + 'attribute\'s own definition when it creates the point, and the platform cannot change '
-          + 'it — see the note on D109 before relying on it staying put.'}
+      // Two things this used to say were wrong, and it was the only warning reaching the person
+      // about to do the damage. "From the attribute's own definition" is not true of LED_ASSET_TAG:
+      // `LedAssetTagAttributes` has no settable member at all, and `CreateLedAssetTagVO` hardcodes
+      // the flag by comparing the attribute's name to `LED_STATUS`. And "the platform cannot change
+      // it" was the opposite of the truth -- the platform set it to `false` on every save, which is
+      // what `readonly-erased` names. It cannot now, because the dialog stops sending a locator it
+      // offered nothing editable on, but the hint should say what is true rather than what was hoped.
+      ? {settable: `Whether the mesh accepts a write to this attribute. The ${device} reports it `
+          + 'when the gateway provisions the point. Cortex leaves it out of a save rather than '
+          + 'sending it back, because the gateway drops the flag from any client that does send it.'}
       : {}),
     ...(settable === 'readonly'
       ? {settable: 'Whether a write to this attribute is accepted. The gateway sets it from the '
@@ -1441,11 +1426,17 @@ const MODBUS_SLAVE_SOURCE: GatewayFormLayout = {
       + 'the query mapping is added, and it is the field a save cannot keep.',
     slaveId: 'The unit id this device answers to on the controller\'s bus, taken from the query '
       + 'mapping that provisioned it.',
-    deviceDefinition: 'The register map the gateway reads this device through. A save re-resolves '
-      + 'it against the compiled-in definitions only, so one defined on the gateway itself '
-      + 'resolves to nothing.'
+    deviceDefinition: 'The register map the gateway reads this device through, taken from the '
+      + 'query mapping that provisioned it.',
+    timePeriod: 'How often the gateway polls this device. Set from the Modbus query when the source '
+      + 'was provisioned, and shown because the poll period is the one thing on this form worth '
+      + 'knowing -- not because it can be changed.'
   },
-  rows: [['controller', 'slaveId'], ['deviceDefinition']]
+  // `timePeriod` exists only on the polling variant, and `pack()` filters a row's ids against the
+  // properties it was handed -- so naming it is inert on the non-polling type and the two keep
+  // sharing one object. Without it the polling type opens with an unhinted poll-period fieldset
+  // above "which controller / which unit id", because that is where its schema puts it.
+  rows: [['controller', 'slaveId'], ['deviceDefinition'], ['timePeriod']]
 };
 
 /**
@@ -1478,8 +1469,9 @@ const MODBUS_SLAVE_POINT: GatewayFormLayout = {
     pollingInterval: 'Taken from the Modbus query that provisioned this source. Every point of '
       + 'the source carries the same value.',
     dataType: 'Set from the register map\'s entry for this attribute.',
-    settable: 'Whether the register map marks this attribute writeable. It describes the device '
-      + 'rather than a choice, so the gateway re-derives it and the platform does not set it.'
+    settable: 'Whether the register map marks this attribute writeable. The gateway reads it off '
+      + 'the map once, when it provisions the point, and nothing re-derives it afterwards -- it '
+      + 'describes the device rather than a choice, which is why it is not editable here.'
   },
   rows: [['deviceAttributeId', 'pointNumber'], ['dataType', 'pollingInterval']]
 };
@@ -1578,13 +1570,26 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * `AbstractPollingDataSourceModel` through a `@Schema(allOf = ...)` annotation, but
    * `VirtualSwitchDataSourceModel extends AbstractDataSourceModel` and
    * `VirtualSwitchDataSourceVO extends DataSourceVO` -- neither is the polling type. With
-   * `FAIL_ON_UNKNOWN_PROPERTIES` off, both fields are dropped in silence, and `timePeriod` is
-   * marked **required** in the component the annotation pulls in, so a form that showed it would
-   * demand a value that goes nowhere. **D138.**
+   * `FAIL_ON_UNKNOWN_PROPERTIES` is off, both fields are dropped in silence. **D138**, and the same
+   * wrong `allOf` is on the four light controllers (**D141**).
+   *
+   * The first version of this said a form showing `timePeriod` "would demand a value that goes
+   * nowhere", and that was wrong: it is a `$ref` to an object, so the mapper types it `fieldset`,
+   * `build` creates no control for a type outside `RENDERED_TYPES`, and the schema's `required` never
+   * reaches a validator. Showing it would have produced a dead nested control, not an unsubmittable
+   * form. Hiding it is still right -- it costs nothing and it stops a field that cannot work from
+   * looking like a setting -- but that is the reason.
+   *
+   * `alarmLevels` is hidden for a harder reason: **its Add button is an HTTP 500.**
+   * `VirtualSwitchDataSourceVO.getEventCodes()` returns `null` and `addEventTypes` is empty, while
+   * `AbstractDataSourceModel.toVO` takes `vo.getEventCodes()` and calls `eventCodes.getId(...)` once
+   * per entry with no null check. An empty array is fine; one row is a null dereference. The platform
+   * hides four of the five fields D134 resets globally, and this was the one still on screen -- so it
+   * was an array editor, on a type whose array can never hold anything, whose Add 500s. **D142.**
    */
   'VIRTUAL_SWITCH.DS': {
     provisionedPoints: true,
-    hidden: ['quantize', 'timePeriod'],
+    hidden: ['quantize', 'timePeriod', 'alarmLevels'],
     readonly: ['uid', 'gradeType', 'grade'],
     options: {gradeType: VIRTUAL_SWITCH_GRADE_TYPES},
     hints: {
@@ -1606,18 +1611,26 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * either is read and thrown away. Shown rather than hidden because both are true statements about
    * the point: it is settable, and setting it takes a multistate. **D139.**
    *
-   * `controlCommand` is hidden because it does nothing. It is read and written by
-   * `VirtualSwitchPointLocatorModel` and by nothing else in the gateway -- no runtime, no data
-   * source, no publisher reads it, which a stack-wide search for `getControlCommand` confirms. The
+   * `controlCommand` is hidden because it does nothing. **No behaviour reads it.** A stack-wide
+   * search for `getControlCommand`/`setControlCommand` finds only `VirtualSwitchPointLocatorModel`'s
+   * own `fromVO` and `toVO` -- no runtime, no data source, no publisher, and the reflective emport
+   * path that would introspect it is dead (`new JsonWriter(` occurs once, in `JsonTester`). What a
+   * getter search structurally cannot see is intra-class field access, and there is some:
+   * `VirtualSwitchPointLocatorVO.writeObject`/`readObject` persist the value. So it is stored and
+   * never acted on, which is why hiding it is safe and deleting it would need a version bump. The
    * command that is actually issued comes from the **set value**:
    * `VirtualSwitchDataSourceRT.setPointValue` switches on
-   * `valueTime.getValue().getIntegerValue()` and broadcasts a brightness per case (1-4 for 10-40%,
-   * 10 for full, 11 for off, 12 for half). The schema's description -- "Multistate control command
+   * `valueTime.getValue().getIntegerValue()` and broadcasts a brightness per case -- 32 of them, of
+   * which 1-4 are 10-40%, 10 is full, 11 is off and 12 is half **with auto mode on**, the only thing
+   * separating it from case 5. The schema's description -- "Multistate control command
    * the virtual switch issues when this point is set" -- describes what it was meant to do.
    * **D140.** Hiding it is safe because the dialog spreads the stored model before the rendered
    * fields, so the value a point already holds is carried through the save untouched.
    *
-   * `relinquishable` is hidden for the stronger reason that `toVO` does not carry it.
+   * `relinquishable` is hidden because it can never hold anything:
+   * `AbstractPointLocatorVO.isRelinquishable()` returns `null` unconditionally and this VO does not
+   * override it. Stronger than "`toVO` does not carry it", and it matters because the schema does not
+   * mark the field `readOnly`, so it would otherwise have rendered as an editable toggle.
    */
   'VIRTUAL_SWITCH.PL': {
     hidden: ['relinquishable', 'configurationDescription', 'controlCommand'],
@@ -1625,8 +1638,8 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     hints: {
       dataType: 'Always multistate. The gateway sets it on every save whatever is sent, because a '
         + 'switch command is a state rather than a measurement.',
-      settable: 'Always true, and set by the gateway rather than stored: writing to this point is '
-        + 'the only thing it is for.'
+      settable: 'Always true. It is stored, but the gateway rewrites it on every save, because '
+        + 'writing to this point is the only thing it is for.'
     }
   },
 
@@ -1723,8 +1736,9 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
         + 'attribute when the thermostat joins the mesh, so there is nothing to choose here.',
       settable: 'Whether the mesh accepts a write to this attribute. Seven of the nine are '
         + 'writable; the heartbeat and the temperature are not. The gateway sets it from the '
-        + 'attribute\'s own definition when it creates the point, and the platform cannot change it '
-        + '— see the note on D109 before relying on it staying put.'
+        + 'attribute\'s own definition when it provisions the point. Cortex leaves it out of a save '
+        + 'rather than sending it back, because the gateway drops the flag from any client that '
+        + 'does send it.'
     },
     rows: [['attributeId', 'dataType']]
   },
@@ -2986,9 +3000,24 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
   'WATER_LEAKAGE_DETECTOR.PL': meshDevicePoint(WATER_LEAKAGE_DETECTOR_ATTRIBUTES, 'leak detector', 'hidden'),
 
   /**
-   * The four light controllers: the mesh device point form exactly, over a source that adds a poll
-   * period. `MOKO_BAND` is a wristband rather than a light, but it is commissioned by the same
-   * light-commissioning run and publishes the same two schemas, so it belongs in this row.
+   * The four light controllers: the mesh device shape exactly, on both halves. `MOKO_BAND` is a
+   * wristband rather than a light, but it is commissioned by the same light-commissioning run and
+   * publishes the same two schemas, so it belongs in this row.
+   *
+   * **The source was laid out as "the mesh device shape plus a poll period" and that was wrong.**
+   * All four models carry `@Schema(allOf = {AbstractPollingDataSourceModel.class})` while extending
+   * `AbstractDataSourceModel`, and all four VOs extend `MeshDataSourceVO` -- so `quantize` and
+   * `timePeriod` are published and do not exist. `FAIL_ON_UNKNOWN_PROPERTIES` is off, so a submitted
+   * poll period is dropped without a word. A `lightControllerSource` used to pin `timePeriod` in a
+   * row of its own with a hint describing what it did, which made an empty box look like a setting:
+   * an operator could fill it in, save, reopen and find it empty again with nothing to say it never
+   * took. Deleted, and these four share `meshDeviceSource` with the rest of the family. **D141**,
+   * and it is the same defect as D138 on `VIRTUAL_SWITCH.DS` -- one wrong `allOf` on five classes.
+   *
+   * No seeded value was involved, which is worth writing down because it is the obvious guess and it
+   * is wrong: `gatewayFormDefaults` seeds five minutes only on the **Add** path, and all four
+   * definitions answer `isEnabled() == false` (confirmed against the live `/v2/data-source-types`,
+   * which offers 16 types and none of these). The field was simply always empty.
    *
    * `LIGHT_CONTROLLER_V4` and `LIGHT_RELAY_CONTROLLER` are the only two `readonly` dispositions
    * whose flag is not erased on save: both `toVO` methods copy `settable`, unlike the four mesh
@@ -2997,16 +3026,16 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * the gateway republishes, so it is not the platform's to contradict. The other two override
    * `isSettable()` to a hard `false`.
    */
-  'LIGHT_CONTROLLER_V4.DS': lightControllerSource('light controller'),
+  'LIGHT_CONTROLLER_V4.DS': meshDeviceSource('light controller'),
   'LIGHT_CONTROLLER_V4.PL':
     meshDevicePoint(LIGHT_CONTROLLER_V4_ATTRIBUTES, 'light controller', 'readonly'),
-  'LIGHT_DI_CONTROLLER.DS': lightControllerSource('DI controller'),
+  'LIGHT_DI_CONTROLLER.DS': meshDeviceSource('DI controller'),
   'LIGHT_DI_CONTROLLER.PL':
     meshDevicePoint(LIGHT_DI_CONTROLLER_ATTRIBUTES, 'DI controller', 'hidden'),
-  'LIGHT_RELAY_CONTROLLER.DS': lightControllerSource('relay controller'),
+  'LIGHT_RELAY_CONTROLLER.DS': meshDeviceSource('relay controller'),
   'LIGHT_RELAY_CONTROLLER.PL':
     meshDevicePoint(LIGHT_RELAY_CONTROLLER_ATTRIBUTES, 'relay controller', 'readonly'),
-  'MOKO_BAND.DS': lightControllerSource('wristband'),
+  'MOKO_BAND.DS': meshDeviceSource('wristband'),
   'MOKO_BAND.PL': meshDevicePoint(MOKO_BAND_ATTRIBUTES, 'wristband', 'hidden'),
 
   /**

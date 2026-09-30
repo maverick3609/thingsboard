@@ -1377,7 +1377,7 @@ describe('gateway form layouts', () => {
     .filter(([modelType]) => modelType.endsWith('.DS'))
     .filter(([, layout]) => JSON.stringify(layout.rows) === JSON.stringify([['address', 'location']]));
 
-  it('gives all 27 provisioned mesh device sources one shape', () => {
+  it('gives all 31 provisioned mesh device sources one shape', () => {
     // Measured off the schema document's `families` map, with `allOf` resolved against
     // `components.schemas` and each source paired to its locator through the Java rather than by
     // name: 27 published data source types declare `address`, `anchorNode` and `location` over the
@@ -1390,7 +1390,12 @@ describe('gateway form layouts', () => {
     // the first pass -- two because their locator is not their own name with `.PL` on the end
     // (`SENSOR_TAG_DOOR_SENSOR.DS` uses `SENSOR_TAG_DOOR.PL`, `SENSOR_TAG_STROKE_COUNT.DS` uses
     // `SENSOR_TAG_STROBE_COUNT.PL`) and one, the current sensor, because its point form differs.
-    expect(meshSources.length).toBe(27);
+    //
+    // 27 became 31 when the four light controllers joined: they had a `timePeriod` row of their own
+    // on the strength of a schema `allOf` that lies, and deleting it made them the same shape as the
+    // rest (D141). That is the count moving because the table got *more* consistent, which is the
+    // one direction this assertion cannot distinguish on its own -- hence the key-set check below.
+    expect(meshSources.length).toBe(31);
     meshSources.forEach(([modelType, layout]) => {
       expect(layout.provisionedPoints).withContext(modelType).toBe(true);
       expect(layout.readonly).withContext(modelType).toEqual(['address']);
@@ -1435,14 +1440,28 @@ describe('gateway form layouts', () => {
     expect(byMode.readonly.sort()).toEqual(['4DI_2DO_CARD.PL', 'LED_ASSET_TAG.PL',
       'LIGHT_CONTROLLER_V4.PL', 'LIGHT_RELAY_CONTROLLER.PL', 'PEOPLE_COUNTER.PL', 'THERMOSTAT.PL',
       'VAV_CONTROLLER.PL']);
-    // Five of those seven are read-only *and* erased on save -- `toVO` drops the field, so a PUT
-    // through this dialog overwrites a real value with the VO's default (D109). Two are read-only
-    // and round-trip correctly. Same disabled checkbox, two different truths, two different hints.
+    // Five of those seven are read-only *and* would be erased if the locator were sent -- `toVO`
+    // drops the field on a fresh VO (D109). Two round-trip correctly. Same disabled checkbox, two
+    // different truths, two different hints.
     const erased = ['4DI_2DO_CARD.PL', 'LED_ASSET_TAG.PL', 'PEOPLE_COUNTER.PL', 'THERMOSTAT.PL',
       'VAV_CONTROLLER.PL'];
-    erased.forEach(modelType =>
-      expect(GATEWAY_FORM_LAYOUTS[modelType].hints.settable).withContext(modelType)
-        .toContain('D109'));
+    erased.forEach(modelType => {
+      const hint = GATEWAY_FORM_LAYOUTS[modelType].hints.settable;
+      // It used to be asserted that the hint contained the string 'D109', which pointed the operator
+      // at a document in this repository that they do not have. What it has to say instead is the two
+      // things that are true: the gateway decides the flag, and Cortex does not send it back.
+      expect(hint).withContext(modelType).toContain('provisions the point');
+      // LED_ASSET_TAG is the one of the five that cannot say "the attribute's own definition":
+      // `LedAssetTagAttributes` has no settable member, and `CreateLedAssetTagVO` compares the
+      // attribute's *name* to LED_STATUS instead.
+      if (modelType === 'LED_ASSET_TAG.PL') {
+        expect(hint).not.toContain('own definition');
+      }
+      expect(hint).withContext(modelType).toContain('leaves it out of a save');
+      // And not the claim that reversed the risk it was warning about: the platform can change the
+      // flag, destructively, and what stops it is the omitted locator, not an inability.
+      expect(hint).withContext(modelType).not.toContain('cannot change');
+    });
     // The two light controllers are read-only for a different reason from the other four, and the
     // difference matters: their `toVO` copies `settable`, so it round-trips rather than being erased
     // (D109). They are locked because the flag comes from the attribute enum -- what the attribute
@@ -1516,19 +1535,25 @@ describe('gateway form layouts', () => {
     expect(v4.map(item => item.value)).not.toContain('BURN_HOURS');
   });
 
-  it('gives the four light controller sources the mesh shape plus a poll period', () => {
+  it('gives the four light controllers the mesh device shape and nothing about polling', () => {
+    // They were laid out with a `timePeriod` row, on the schema's word. The schema is wrong: all four
+    // models carry `@Schema(allOf = {AbstractPollingDataSourceModel.class})` while extending
+    // `AbstractDataSourceModel`, and all four VOs extend `MeshDataSourceVO`, so the field does not
+    // exist and a submitted value is dropped in silence. Pinning a row for it made an always-empty
+    // box look like a setting. D141, the same wrong `allOf` as D138 on VIRTUAL_SWITCH.DS.
     ['LIGHT_CONTROLLER_V4', 'LIGHT_DI_CONTROLLER', 'LIGHT_RELAY_CONTROLLER', 'MOKO_BAND']
       .forEach(type => {
         const layout = GATEWAY_FORM_LAYOUTS[`${type}.DS`];
         expect(layout.provisionedPoints).withContext(type).toBe(true);
         expect(layout.readonly).withContext(type).toEqual(['address']);
-        // The poll period is pinned under the address row; `quantize` and `anchorNode` are left to
-        // the mapper, both being checkboxes.
-        expect(layout.rows).withContext(type).toEqual([['address', 'location'], ['timePeriod']]);
-        expect(layout.hints.timePeriod).withContext(type).toBeTruthy();
-        // No default and no floor: the mapper already seeds every `timePeriod` with five minutes.
+        expect(layout.rows).withContext(type).toEqual([['address', 'location']]);
+        expect(Object.keys(layout.hints).sort()).withContext(type)
+          .toEqual(['address', 'anchorNode', 'location']);
         expect(layout.defaults).withContext(type).toBeUndefined();
       });
+    // And they are the family's own object, not a variant of it -- which is the whole of the fix.
+    expect(Object.keys(GATEWAY_FORM_LAYOUTS['MOKO_BAND.DS']).sort().join(','))
+      .toBe(Object.keys(GATEWAY_FORM_LAYOUTS['THERMOSTAT.DS']).sort().join(','));
   });
 
   it('gives every mesh attribute a value and a label, and no duplicates', () => {
@@ -1647,7 +1672,11 @@ describe('gateway form layouts', () => {
     // The schema composes AbstractPollingDataSourceModel through an annotation, but the model
     // extends AbstractDataSourceModel and the VO extends DataSourceVO. Neither field exists on
     // either, and FAIL_ON_UNKNOWN_PROPERTIES is off, so both are dropped in silence. D138.
-    expect(ds.hidden).toEqual(['quantize', 'timePeriod']);
+    // `alarmLevels` is the third, and the only one hidden for a reason worse than uselessness:
+    // `VirtualSwitchDataSourceVO.getEventCodes()` returns null while `AbstractDataSourceModel.toVO`
+    // dereferences it once per entry, so the array editor's Add button is an HTTP 500 on a type whose
+    // array can never legitimately hold anything (D142).
+    expect(ds.hidden).toEqual(['quantize', 'timePeriod', 'alarmLevels']);
   });
 
   it('keeps both of the grade type enum\'s "none" values, told apart by their wire number', () => {

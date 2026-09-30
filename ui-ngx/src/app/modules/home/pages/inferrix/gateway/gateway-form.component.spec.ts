@@ -217,4 +217,49 @@ describe('gateway form layout mechanics', () => {
     expect(reported.script).toBe('return 1;');
     expect(reported.context).toEqual([{xid: 'DP_1'}]);
   });
+  // --- the [disabled] input versus Angular's own setDisabledState ------------------------------
+
+  it('keeps a read-only form read-only when Angular says the control is enabled', () => {
+    // The order a dialog actually produces: the `[disabled]` input is applied, then `setUpControl`
+    // calls `setDisabledState` with the *control's* state. Every dialog in this feature binds this
+    // form with a standalone `[(ngModel)]`, whose own FormControl is always enabled, and
+    // `setDisabledStateDefault` is 'always' -- so Angular says `false` straight after the input said
+    // `true`. Taken literally that cancelled the input, and a read-only dialog rendered editable
+    // fields on a type Cortex refuses to save.
+    form.disabled = true;
+    build();
+    expect(form.form.disabled).toBe(true);
+
+    form.setDisabledState(false);
+    expect(form.form.disabled).withContext('Angular must not cancel the input').toBe(true);
+    // And the input itself is not overwritten, which is what made `patch()` re-confirm the wrong
+    // answer on every value change.
+    expect(form.disabled).toBe(true);
+
+    // A rebuild goes through the same applier, so it does not lose the state either.
+    build();
+    expect(form.form.disabled).toBe(true);
+  });
+
+  it('lets the control disable a form that has no disabled input', () => {
+    // The `formControlName` shape, which is how TB's own callers bind a form like this: there is no
+    // input to respect, so the control is the only source and must still work.
+    build();
+    expect(form.form.disabled).toBe(false);
+    form.setDisabledState(true);
+    expect(form.form.disabled).toBe(true);
+    form.setDisabledState(false);
+    expect(form.form.disabled).toBe(false);
+  });
+
+  it('re-disables the fields a layout locked when the form is enabled again', () => {
+    // `enable()` knows nothing of individual fields, so the per-field pass has to run after it --
+    // otherwise a layout's `readonly` would survive only until the first enable.
+    build({readonly: ['script']});
+    expect(form.form.get('script').disabled).toBe(true);
+    form.setDisabledState(true);
+    form.setDisabledState(false);
+    expect(form.form.get('script').disabled)
+      .withContext('a locked field must not come back editable').toBe(true);
+  });
 });

@@ -87,6 +87,8 @@ export class GatewayFormComponent implements ControlValueAccessor, OnChanges {
   @Input() layout: GatewayFormLayout;
   @Input() title: string;
   @Input() disabled: boolean;
+  /** What Angular's {@link setDisabledState} last said, kept out of {@link disabled}. */
+  private disabledByControl = false;
 
   /** Draws the panel's own border, for a section nested inside another form. */
   @Input() @coerceBoolean() stroked = false;
@@ -131,8 +133,8 @@ export class GatewayFormComponent implements ControlValueAccessor, OnChanges {
     if (changes.properties || changes.layout) {
       this.build();
     }
-    if (changes.disabled && !changes.disabled.firstChange) {
-      this.setDisabledState(this.disabled);
+    if (changes.disabled) {
+      this.applyDisabled();
     }
   }
 
@@ -143,9 +145,33 @@ export class GatewayFormComponent implements ControlValueAccessor, OnChanges {
   registerOnTouched(_fn: any): void {
   }
 
+  /**
+   * Angular's call, which is not a statement about this form.
+   *
+   * `setUpControl` calls it once at setup with the **control's** disabled state, and
+   * `setDisabledStateDefault` is `'always'` (`@angular/forms` 20.3.28, `forms.mjs:3188` and
+   * `:3211-3213`) with no `CALL_SET_DISABLED_STATE` provider anywhere in this app. Every dialog here
+   * binds this form with a standalone `[(ngModel)]`, whose own `FormControl` is always enabled -- so
+   * Angular says `false` a moment after the `[disabled]` input said `true`.
+   *
+   * Assigning that onto `this.disabled` is what the first version did, and it cancelled the input:
+   * `ngOnChanges` could not undo it because `firstChange` was true, and `patch()` then re-confirmed
+   * the clobbered value. A read-only dialog rendered every field the layout had not separately
+   * marked `readonly` as editable. Save was still gone -- `@if (!data.readonly)` -- so nothing could
+   * be written, but the form said the opposite of what the dialog said, which on a type Cortex
+   * refuses to save is the whole of the message.
+   *
+   * So the two are kept apart and the stricter wins. A form bound by `formControlName` instead has
+   * no `disabled` input and is governed by its control, which is what TB's own callers expect.
+   */
   setDisabledState(isDisabled: boolean): void {
-    this.disabled = isDisabled;
-    if (isDisabled) {
+    this.disabledByControl = isDisabled;
+    this.applyDisabled();
+  }
+
+  /** Disabled if either side says so. Neither one overwrites the other's answer. */
+  private applyDisabled(): void {
+    if (this.disabled || this.disabledByControl) {
       this.form.disable({emitEvent: false});
       return;
     }
@@ -226,7 +252,7 @@ export class GatewayFormComponent implements ControlValueAccessor, OnChanges {
       this.delegatedProperties[property.id] = [property];
     });
     this.layoutRows();
-    this.setDisabledState(this.disabled);
+    this.applyDisabled();
     this.cd.markForCheck();
   }
 

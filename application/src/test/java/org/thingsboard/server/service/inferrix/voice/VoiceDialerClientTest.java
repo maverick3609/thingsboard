@@ -12,10 +12,16 @@ import org.thingsboard.server.service.inferrix.voice.VoiceDialerClient.CallJob;
 import org.thingsboard.server.service.inferrix.voice.VoiceDialerClient.VoiceDialerException;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,6 +33,7 @@ class VoiceDialerClientTest {
 
     private HttpServer server;
     private final AtomicReference<String> authorization = new AtomicReference<>();
+    private final AtomicReference<String> contentType = new AtomicReference<>();
     private final AtomicReference<String> body = new AtomicReference<>();
     private volatile int status = 202;
     private volatile String answer = "{\"callId\":\"c1\"}";
@@ -36,6 +43,7 @@ class VoiceDialerClientTest {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
             authorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
+            contentType.set(exchange.getRequestHeaders().getFirst("Content-Type"));
             body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             byte[] bytes = answer.getBytes(StandardCharsets.UTF_8);
             exchange.sendResponseHeaders(status, bytes.length);
@@ -54,11 +62,34 @@ class VoiceDialerClientTest {
         return new VoiceDialerClient("http://127.0.0.1:" + server.getAddress().getPort(), "dialer-token");
     }
 
+    /** A dialer that sends the headers and the first bytes of a body, then goes silent. It counts down once the client hangs up. */
+    private static int dialerThatGoesSilent(CountDownLatch clientGone) throws IOException {
+        ServerSocket socket = new ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"));
+        Thread thread = new Thread(() -> {
+            try (socket; Socket client = socket.accept()) {
+                client.getOutputStream().write("HTTP/1.1 202 Accepted\r\nContent-Length: 100\r\n\r\nabc".getBytes(StandardCharsets.US_ASCII));
+                client.setSoTimeout(15_000); // a client that never hangs up fails the test rather than hanging it
+                while (client.getInputStream().read() >= 0) {
+                    // the request, then silence until the client gives up
+                }
+                clientGone.countDown();
+            } catch (SocketTimeoutException stillConnected) {
+                // nobody hung up
+            } catch (IOException reset) {
+                clientGone.countDown();
+            }
+        });
+        thread.setDaemon(true);
+        thread.start();
+        return socket.getLocalPort();
+    }
+
     @Test
     void submitsTheJobWithTheBearerToken() {
         client().submitCall(JOB);
 
         assertThat(authorization.get()).isEqualTo("Bearer dialer-token");
+        assertThat(contentType.get()).isEqualTo("application/json");
         JsonNode sent = JacksonUtil.toJsonNode(body.get());
         assertThat(sent.get("callId").asText()).isEqualTo("c1");
         assertThat(sent.get("to").asText()).isEqualTo("+96891234567");
@@ -88,10 +119,17 @@ class VoiceDialerClientTest {
                     .isInstanceOf(VoiceDialerException.class)
                     .hasMessage("Voice dialer refused the call (400)");
         }
+
+        // CONTRACT: only a 202 means queued
+        status = 200;
+        answer = "{\"callId\":\"c1\"}";
+        assertThatThrownBy(() -> client().submitCall(JOB))
+                .isInstanceOf(VoiceDialerException.class)
+                .hasMessage("Voice dialer refused the call (200)");
     }
 
     @Test
-    void anUnreachableDialerIsAnError() throws IOException {
+    void anUnreachableDialerIsAnError() throws Exception {
         int port;
         try (ServerSocket socket = new ServerSocket(0)) {
             port = socket.getLocalPort();
@@ -101,6 +139,32 @@ class VoiceDialerClientTest {
         assertThatThrownBy(() -> client.submitCall(JOB))
                 .isInstanceOf(VoiceDialerException.class)
                 .hasMessage("Voice dialer is unreachable");
+
+        // a dialer that sends the headers and part of the body, then goes silent: the call fails at its own
+        // timeout (HttpRequest.timeout would not cut this off) and the connection is closed behind it
+        CountDownLatch clientGone = new CountDownLatch(1);
+        VoiceDialerClient silent = new VoiceDialerClient("http://127.0.0.1:" + dialerThatGoesSilent(clientGone), "dialer-token");
+        long started = System.nanoTime();
+
+        assertThatThrownBy(() -> silent.submitCall(JOB))
+                .isInstanceOf(VoiceDialerException.class)
+                .hasMessage("Voice dialer is unreachable");
+        assertThat(Duration.ofNanos(System.nanoTime() - started)).isBetween(Duration.ofSeconds(1), Duration.ofSeconds(10));
+        assertThat(clientGone.await(5, TimeUnit.SECONDS)).isTrue();
+
+        // an interrupt is reported as one, and the caller's flag stays set
+        try (ServerSocket never = new ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"))) {
+            VoiceDialerClient waiting = new VoiceDialerClient("http://127.0.0.1:" + never.getLocalPort(), "dialer-token");
+            Thread.currentThread().interrupt();
+            try {
+                assertThatThrownBy(() -> waiting.submitCall(JOB))
+                        .isInstanceOf(VoiceDialerException.class)
+                        .hasMessage("Interrupted while calling the voice dialer");
+                assertThat(Thread.currentThread().isInterrupted()).isTrue();
+            } finally {
+                Thread.interrupted(); // cleared for the tests after this one
+            }
+        }
     }
 
     @Test
@@ -130,6 +194,8 @@ class VoiceDialerClientTest {
         assertThat(new VoiceDialerClient("not a url", "dialer-token").isConfigured()).isFalse();
         assertThat(new VoiceDialerClient("file:///etc/passwd", "dialer-token").isConfigured()).isFalse();
         assertThat(new VoiceDialerClient("http://127.0.0.1:8765", "").isConfigured()).isFalse();
+        assertThat(new VoiceDialerClient("https://127.0.0.1:8765", "dialer-token").isConfigured()).isTrue();
+        assertThat(new VoiceDialerClient("http:///v1", "dialer-token").isConfigured()).isFalse(); // no host
         assertThatThrownBy(() -> new VoiceDialerClient("not a url", "dialer-token").submitCall(JOB))
                 .isInstanceOf(VoiceDialerException.class)
                 .hasMessage("Voice dialer is not configured");

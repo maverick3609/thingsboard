@@ -9,7 +9,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.thingsboard.common.util.JacksonUtil;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -17,6 +16,10 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * The loopback client for inferrix-dialer (CONTRACT.md in that repo). A 202 from {@code /v1/calls}
@@ -69,16 +72,18 @@ public class VoiceDialerClient {
             throw new VoiceDialerException("Voice dialer is not configured");
         }
         HttpRequest request = HttpRequest.newBuilder(baseUri.resolve(path))
-                // this timer stops at the response headers, so a dialer that then stalls mid-body is not cut off;
-                // sendAsync(...).get(timeout) plus cancel(true) would bound the body as well
-                .timeout(timeout)
                 .header("Authorization", "Bearer " + token)
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(JacksonUtil.toString(body)))
                 .build();
         try {
-            return http.send(request, HttpResponse.BodyHandlers.ofString());
-        } catch (IOException | IllegalArgumentException e) { // the JDK reports a Content-Length it cannot parse as the latter
+            CompletableFuture<HttpResponse<String>> pending = http.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+            try {
+                return pending.get(timeout.toMillis(), TimeUnit.MILLISECONDS); // bounds the body too, which HttpRequest.timeout does not
+            } finally {
+                pending.cancel(true); // closes the connection when we gave up; a no-op once the answer is in
+            }
+        } catch (ExecutionException | TimeoutException | IllegalArgumentException e) {
             log.warn("Voice dialer at {} is unreachable: {}", baseUri, e.toString());
             throw new VoiceDialerException("Voice dialer is unreachable");
         } catch (InterruptedException e) {

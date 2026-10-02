@@ -79,3 +79,12 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [ ] `e42d992eb9` fix(gateway): Angular re-enables every field a layout disabled, and nine claims
 - [ ] `a7216e5a35` fix(gateway): a row that changed nothing, five counts, and the reviews' doc debt
 - [ ] `0e68aef393` fix(gateway): apply unsavable in the dialog, not at one of six callers
+- [x] `7d6f3bc9df` feat(voice): sign call tokens and add the inferrix.voice settings (V4)
+- [x] `2b2405070e` fix(voice): an unsigned or truncated token, a blank secret, or one equal to the dialer token is refused
+- [x] `7fe9be67f5` feat(voice): loopback client for inferrix-dialer
+- [x] `03876685a5` fix(voice): a dialer that stalls mid-answer now fails the call at its timeout
+- [x] `bd0254b58c` feat(voice): VOICE notification channel
+- [x] `2080f07fce` feat(voice): precheck, acknowledge as the called user, and record each call
+- [x] `b5d6ed7773` feat(voice): dialer callbacks and translate endpoint, tested end to end
+- [x] `061ebb023d` feat(voice): voice template panel with offline translate
+- [x] `5638b30b24` fix(voice): red warnings, one language list, and pins for the panel's template

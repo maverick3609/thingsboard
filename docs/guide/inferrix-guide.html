@@ -204,6 +204,7 @@ aside.danger strong{color:var(--signal-ink)}
 <li><a href="#13-rest-api-reference"><span class="n">13</span><span class="t">REST API reference</span></a></li>
 <li><a href="#14-troubleshooting"><span class="n">14</span><span class="t">Troubleshooting</span></a></li>
 <li><a href="#15-maintaining-the-fork"><span class="n">15</span><span class="t">Maintaining the fork</span></a></li>
+<li><a href="#16-voice-alarm-calls"><span class="n">16</span><span class="t">Voice alarm calls</span></a></li>
 </ol>
   </nav>
   <article>
@@ -2669,6 +2670,55 @@ file is the one that counts.</p>
 <p>The broker the platform points adopted controllers at is <strong>not</strong> configuration — it is the
 <code>inferrixController</code> sys-admin settings block, because it is edited per install at runtime. See
 <a href="#102-before-you-adopt-anything">§10.2</a>.</p>
+<h3 id="127-voice-alarm-calls">12.7 Voice alarm calls</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>YAML path</th>
+<th>Env var</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>inferrix.voice.enabled</code></td>
+<td><code>INFERRIX_VOICE_ENABLED</code></td>
+<td><code>false</code></td>
+<td><strong>Master switch.</strong> Off → no call is placed, Voice call is missing from users' notification settings, and the send dialog shows it greyed out (for a system administrator its "configure" link leads nowhere).</td>
+</tr>
+<tr>
+<td><code>inferrix.voice.dialer_url</code></td>
+<td><code>INFERRIX_VOICE_DIALER_URL</code></td>
+<td><code>http://127.0.0.1:8765</code></td>
+<td><code>inferrix-dialer</code>'s API on this host. Not an http(s) URL → voice is unconfigured, and the log says so at startup.</td>
+</tr>
+<tr>
+<td><code>inferrix.voice.dialer_token</code></td>
+<td><code>INFERRIX_VOICE_DIALER_TOKEN</code></td>
+<td><em>(empty)</em></td>
+<td>Bearer token for the dialer: the same value as the dialer's <code>INFERRIX_DIALER_TOKEN</code>. <strong>Empty, or holding a space or anything other than visible ASCII → voice is unconfigured.</strong> An empty value logs nothing; the others log one boot ERROR that names the setting.</td>
+</tr>
+<tr>
+<td><code>inferrix.voice.callback_base_url</code></td>
+<td><code>INFERRIX_VOICE_CALLBACK_BASE_URL</code></td>
+<td><code>http://127.0.0.1:8080</code></td>
+<td>This server as the dialer reaches it, for the precheck, acknowledge and result callbacks.</td>
+</tr>
+<tr>
+<td><code>inferrix.voice.token_secret</code></td>
+<td><code>INFERRIX_VOICE_TOKEN_SECRET</code></td>
+<td><em>(empty)</em></td>
+<td>Signs each call's token, the callbacks' only credential. <strong>Under 32 characters, blank, or equal to <code>INFERRIX_VOICE_DIALER_TOKEN</code> → voice is unconfigured</strong> (the dialer holds that token and must never be able to sign calls). Generate with <code>openssl rand -base64 32</code>. Changing it voids the calls still waiting in the dialer: they end <code>SKIPPED</code>.</td>
+</tr>
+<tr>
+<td><code>inferrix.voice.token_ttl_sec</code></td>
+<td><code>INFERRIX_VOICE_TOKEN_TTL_SEC</code></td>
+<td><code>3600</code></td>
+<td>How long a call's token is valid. It must exceed the longest wait in the dialer's queue; a call whose token expired before dialling is skipped.</td>
+</tr>
+</tbody>
+</table></div>
 <h2 id="13-rest-api-reference"><span class="sec-num">13</span><span>REST API reference</span></h2>
 <p>Inferrix-added endpoints. All are under <code>/api</code> and require a bearer token except where marked
 <code>noauth</code>. Stock ThingsBoard endpoints are unchanged and documented upstream.</p>
@@ -3088,6 +3138,39 @@ URL patterns); each checks its own permission.</p>
 <em>dashboard-report</em> endpoints live under <strong><code>/api</code></strong>. <code>POST /api/report/test</code> and
 <code>POST /api/v2/report/test</code> are two different endpoints.</p>
 </aside>
+<h3 id="137-voice-alarm-calls">13.7 Voice alarm calls</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/inferrix/voice/translate</code></td>
+<td>Body <code>{"text"}</code>, 1–600 characters. Answers <code>{"translations": {"hi": {"text", "placeholdersOk"}}}</code>. Sys admin or tenant admin. The dialer translates offline; nothing is stored. <code>400</code> while voice is off or the dialer's URL or token is unusable.</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/noauth/inferrix/voice/v1/precheck</code></td>
+<td><code>noauth</code>: the call's signed token is the credential. For the dialer only. <code>200 {"proceed", "reason"}</code>; <code>401</code> for a forged token.</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/noauth/inferrix/voice/v1/ack</code></td>
+<td><code>noauth</code>, token. Acknowledges the alarm as the called user, with that user's permissions. <code>200 {"acknowledged", "reason"}</code>; <code>401</code> for a forged token.</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/noauth/inferrix/voice/v1/result</code></td>
+<td><code>noauth</code>, token. Records the call on the alarm. <code>204</code>; <code>400</code> for an unknown outcome; <code>401</code> for a forged token, or one expired more than 15 minutes ago.</td>
+</tr>
+</tbody>
+</table></div>
+<p>The dialer's side of these calls is specified in <code>CONTRACT.md</code> in the <code>inferrix-dialer</code> repository.</p>
 <h2 id="14-troubleshooting"><span class="sec-num">14</span><span>Troubleshooting</span></h2>
 <div class="tw"><table>
 <thead>
@@ -3218,6 +3301,10 @@ URL patterns); each checks its own permission.</p>
 <td><code>GET /api/v1/info</code>'s <code>fw</code> cannot be trusted to name the running image. Confirm by behaviour.</td>
 </tr>
 <tr>
+<td>Voice calls are not placed, or the escalation carries on after an acknowledgement</td>
+<td>See <a href="#166-troubleshooting">§16.6</a>.</td>
+</tr>
+<tr>
 <td>Frontend build fails</td>
 <td>Node 18 is not supported; use Node 22.</td>
 </tr>
@@ -3306,5 +3393,301 @@ python3 docs/guide/render-guide.py --check    # fail if the committed HTML is st
 <p>Neither hook writes prose, amends a commit, or commits anything. What a feature <em>does</em> is a sentence a
 person has to write; the debt list is the reminder that one is owed. Publishing the rendered guide as
 an Artifact is likewise a deliberate step — a hook cannot do it.</p>
+<h2 id="16-voice-alarm-calls"><span class="sec-num">16</span><span>Voice alarm calls</span></h2>
+<p>An alarm notification rule can phone people. The call speaks the alarm in the person's language
+(English or Hindi) and asks them to press 1 to acknowledge. When nobody does, the call moves
+on to the next person. Every call is recorded on the alarm.</p>
+<p>Calls go out through <code>inferrix-dialer</code>, a separate program on the Cortex host. It registers as a SIP
+phone on the site's PBX: Cisco, or any other SIP PBX. Speech and translation run on that host, so
+nothing leaves the site.</p>
+<p>To Cortex, the dialer is one more delivery method, <strong>Voice call</strong>, beside email and SMS. The
+Notification center's templates, rules, escalation and per-user settings apply to it unchanged.</p>
+<h3 id="161-turning-it-on">16.1 Turning it on</h3>
+<ol>
+<li>Install <code>inferrix-dialer</code> on the Cortex host and register it with the PBX. Its <code>README.md</code> covers
+   the SIP account, the voices and the systemd service. Keep the <code>INFERRIX_DIALER_TOKEN</code> you give it.</li>
+<li>Add a <code>voice:</code> block to the external <code>/etc/thingsboard/conf/thingsboard.yml</code>. It goes inside the
+   existing <code>inferrix:</code> block; add that block if the file has none. The jar's own copy does not
+   count; see <a href="#22-configuration-file-layout">§2.2</a>.</li>
+</ol>
+<pre><code class="language-yaml">inferrix:
+  voice:
+    enabled: &quot;${INFERRIX_VOICE_ENABLED:false}&quot;
+    dialer_url: &quot;${INFERRIX_VOICE_DIALER_URL:http://127.0.0.1:8765}&quot;
+    dialer_token: &quot;${INFERRIX_VOICE_DIALER_TOKEN:}&quot;
+    callback_base_url: &quot;${INFERRIX_VOICE_CALLBACK_BASE_URL:http://127.0.0.1:8080}&quot;
+    token_secret: &quot;${INFERRIX_VOICE_TOKEN_SECRET:}&quot;
+    token_ttl_sec: &quot;${INFERRIX_VOICE_TOKEN_TTL_SEC:3600}&quot;
+</code></pre>
+<ol start="3">
+<li>Set the three values in <code>/etc/thingsboard/conf/thingsboard.conf</code>:</li>
+</ol>
+<pre><code class="language-bash">export INFERRIX_VOICE_ENABLED=true
+export INFERRIX_VOICE_DIALER_TOKEN=...   # the same value as the dialer's INFERRIX_DIALER_TOKEN
+export INFERRIX_VOICE_TOKEN_SECRET=...   # openssl rand -base64 32
+</code></pre>
+<ol start="4">
+<li>Restart: <code>sudo systemctl restart thingsboard</code>.</li>
+<li>Give everyone who should be called a phone number in their user profile, in international form:
+   <code>+96891234567</code>. That is a <code>+</code>, the country code, then digits only. The dialer refuses anything else.</li>
+<li>Optional: choose each person's language.<ul>
+<li>A server attribute <code>voiceLanguage</code> on the user (<code>en</code> or <code>hi</code>) comes first. Set it under
+  Users → the user → Attributes.</li>
+<li>Without one, the user's own UI language decides: Hindi gives Hindi, and anything else gives
+  English.</li>
+</ul>
+</li>
+</ol>
+<p>Every setting is listed in <a href="#127-voice-alarm-calls">§12.7</a>.</p>
+<p>While voice is off, or the token or the secret is missing, no call is placed. No error appears
+either: TB leaves Voice call out of rule notifications without a word.</p>
+<h3 id="162-writing-a-voice-template">16.2 Writing a voice template</h3>
+<p>Go to Notification center → Templates. Add or edit an <strong>Alarm</strong> template and switch on <strong>Voice call</strong>.</p>
+<ul>
+<li>
+<p>Write the message in English only, at most 600 characters, the way it should sound:</p>
+<aside class="callout">
+<p>Alert from Cortex. High temperature alarm on ${alarmOriginatorLabel}. Temperature ${details.data} degrees.</p>
+</aside>
+</li>
+<li>
+<p><strong>Write the alarm's name as words.</strong> Placeholders are filled in <em>after</em> translation. So
+  <code>${alarmType}</code> would be spoken in English, in the middle of a Hindi sentence.</p>
+</li>
+<li><code>${alarmOriginatorLabel}</code> speaks the device's label, and <code>${alarmOriginatorName}</code> its name. Both
+  are spoken as written. Try one on a test call before relying on it.</li>
+<li><strong>For a value, use the alarm's details.</strong><ul>
+<li>Make the alarm rule's <em>Alarm details</em> a bare number, such as <code>${temperature}</code>. The template
+  reads it as <code>${details.data}</code>.</li>
+<li>TB fills <code>${temperature}</code> only for a key the alarm rule uses: one its condition tests in a device
+  profile rule, or one of its arguments in a calculated-field rule. Any other placeholder is
+  removed before the call, so the value is silently missing.</li>
+<li>Write the unit as a word in the message.</li>
+<li>The dialer rounds a number with three or more decimals to one decimal: <code>32.48713</code> is spoken as
+  <code>32.5</code>. One or two decimals (<code>Room 2.04</code>, <code>at 10.30</code>) and dotted sequences such as IP addresses,
+  versions and dates are spoken as written.</li>
+</ul>
+</li>
+<li><strong>Press Translate.</strong> The Hindi is filled in from the English, by the dialer, offline.<ul>
+<li>It is a draft: have a native speaker read it before the template goes live.</li>
+<li>You can also write a translation yourself.</li>
+</ul>
+</li>
+<li><strong>Every <code>${...}</code> must survive translation, as often as it appears in the English.</strong> If one was
+  lost, changed or doubled, the editor says so and will not save. Fix the translation by hand.</li>
+<li><strong>The editor warns when a translation is stale.</strong> That happens when the English changes after
+  Translate. Translate again, or edit by hand. A translation you wrote yourself is never flagged.</li>
+<li><strong>An empty translation means English.</strong> That person hears English, and the call's record says
+  <em>(translation missing)</em>.</li>
+<li><strong>Ask to acknowledge (press 1)</strong> works for alarm notifications only.</li>
+</ul>
+<h3 id="163-escalation">16.3 Escalation</h3>
+<p>Go to Notification center → Rules. Add a rule with the trigger <strong>Alarm</strong>, the voice template, and an
+<strong>Escalation chain</strong>, for example:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>When</th>
+<th>Who is called</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>First recipient (immediately)</td>
+<td>Shift engineer</td>
+</tr>
+<tr>
+<td>After 5 minutes</td>
+<td>Supervisor</td>
+</tr>
+<tr>
+<td>After 15 minutes</td>
+<td>Facility manager</td>
+</tr>
+</tbody>
+</table></div>
+<p>Each delay counts from the alarm, not from the step before.</p>
+<p>Under <strong>Stop the escalation on the alarm status become</strong>, tick <strong>Acknowledged</strong> only.</p>
+<p>The statuses you tick must <em>all</em> hold before the escalation stops. With Cleared ticked too, an
+acknowledgement alone does not stop it: the later steps still go out and show as sent, and an email
+or SMS in the same template still reaches those people. The dialer skips their voice calls, because
+the alarm is acknowledged.</p>
+<ul>
+<li><strong>Steps run on time, not on call results.</strong> The second person is called at 5 minutes whether or
+  not the first answered, unless someone acknowledged by then.</li>
+<li><strong>The dialer has one line.</strong> Calls go out one at a time, in order, so a step with three people
+  calls them one after another.</li>
+<li><strong>Nothing happens after the last step.</strong> Add steps to call more people, or the same people again.</li>
+<li><strong>Acknowledging cancels the steps that have not started</strong>, whether by phone or in the web UI.</li>
+<li><strong>The dialer checks with Cortex just before dialling.</strong> A call is skipped if its alarm has since
+  been acknowledged, cleared or deleted. This is also how a cleared alarm stops the remaining steps:
+  they still show as sent, but nobody is called.</li>
+</ul>
+<h3 id="164-what-gets-recorded">16.4 What gets recorded</h3>
+<ul>
+<li><strong>Sent</strong> in the Notification center means the dialer queued the call. It does not mean anyone
+  answered.</li>
+<li><strong>Each ended call adds an alarm comment</strong> from the system, such as <em>Voice call to Asha Rao
+  (…3210), Hindi: acknowledged</em>. A skipped call adds none.</li>
+<li><strong>A refused press of 1 adds its own comment</strong>, such as <em>Voice acknowledgement by Asha Rao refused
+  (permission)</em>. A press on an alarm that is gone, or on an expired call, adds none.</li>
+<li><strong>An acknowledgement by phone is that person's acknowledgement</strong>, exactly as if they had clicked
+  it.</li>
+<li><strong>Each call adds <code>voiceCall</code> telemetry to the alarm's originator.</strong> It is timestamped when the
+  call ended, so calls can be charted and put in reports. A retried result overwrites its row only
+  while the dialer's clock is sane; the dialer runs on the Cortex host, so it shares that clock.
+  The value is a JSON object:<ul>
+<li><code>alarmId</code>, <code>alarmType</code>, <code>userId</code>, <code>userName</code>, <code>phoneLast4</code>, <code>language</code>, <code>outcome</code>, <code>sipStatus</code>,
+  <code>ringSec</code>, <code>talkSec</code>;</li>
+<li><code>speechFallback</code>: the message could not be synthesized, so a generic one was played;</li>
+<li><code>languageFallback</code>: there was no translation, so English was spoken.</li>
+</ul>
+</li>
+<li><strong>Only the last four digits of a phone number are stored.</strong></li>
+<li><strong>A voice notification that is not about an alarm is not recorded</strong>, except in the log.</li>
+</ul>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Outcome</th>
+<th>In the comment</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ACKNOWLEDGED</code></td>
+<td>acknowledged</td>
+<td>Pressed 1, and the alarm was acknowledged as that person.</td>
+</tr>
+<tr>
+<td><code>ACK_DENIED</code></td>
+<td>acknowledgement refused</td>
+<td>Pressed 1, but Cortex refused. The person may not acknowledge that alarm, the user is disabled, or the alarm is gone.</td>
+</tr>
+<tr>
+<td><code>ANSWERED</code></td>
+<td>answered, not acknowledged</td>
+<td>Heard the message without pressing 1, or Cortex could not be reached when they did.</td>
+</tr>
+<tr>
+<td><code>NO_ANSWER</code></td>
+<td>no answer</td>
+<td>Rang for 45 seconds, or the PBX reported the phone unavailable.</td>
+</tr>
+<tr>
+<td><code>BUSY</code></td>
+<td>busy</td>
+<td>The line was busy.</td>
+</tr>
+<tr>
+<td><code>REJECTED</code></td>
+<td>rejected</td>
+<td>The call was declined.</td>
+</tr>
+<tr>
+<td><code>FAILED</code></td>
+<td>failed</td>
+<td>Anything else, including a number the PBX would not route.</td>
+</tr>
+<tr>
+<td><code>SKIPPED</code></td>
+<td><em>(no comment)</em></td>
+<td>Not dialled: acknowledged, cleared, deleted or expired by the time its turn came.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="165-users-switching-calls-off">16.5 Users switching calls off</h3>
+<p>Each person can turn voice calls off under <strong>Account → Notification settings</strong>, per notification
+type, the same way as email or SMS. They are then not called, and the escalation carries on to the
+next step as usual. The switch is shown only while voice calls are enabled.</p>
+<h3 id="166-troubleshooting">16.6 Troubleshooting</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Cause</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Nobody is called, and Sent shows no voice error</td>
+<td>Voice is off, <code>INFERRIX_VOICE_DIALER_URL</code> is not an http(s) URL, <code>INFERRIX_VOICE_DIALER_TOKEN</code> is empty or holds a space or a non-ASCII character, or <code>INFERRIX_VOICE_TOKEN_SECRET</code> is under 32 characters or equals the dialer token. See <a href="#161-turning-it-on">§16.1</a>.</td>
+</tr>
+<tr>
+<td>Sent says <em>User does not have phone number</em></td>
+<td>The user's profile has no phone number.</td>
+</tr>
+<tr>
+<td>Sent says <em>Voice dialer is unreachable</em></td>
+<td><code>inferrix-dialer</code> is not running, or <code>dialer_url</code> is wrong. Check <code>systemctl status inferrix-dialer</code>.</td>
+</tr>
+<tr>
+<td>Sent says <em>Voice dialer refused the call (400): number not allowed</em></td>
+<td>The number is not a <code>+</code> and digits, or the dialer's <code>allow</code> list does not match it.</td>
+</tr>
+<tr>
+<td>Sent says <em>Voice dialer refused the call (401): unauthorized</em></td>
+<td><code>INFERRIX_VOICE_DIALER_TOKEN</code> differs from the dialer's <code>INFERRIX_DIALER_TOKEN</code>.</td>
+</tr>
+<tr>
+<td>Sent says <em>Voice dialer refused the call (503): queue full</em></td>
+<td>The dialer's queue is full (50 calls).</td>
+</tr>
+<tr>
+<td>A comment says <em>(translation missing)</em></td>
+<td>The template has no text in that person's language, so English was spoken. Translate the template.</td>
+</tr>
+<tr>
+<td>A comment says <em>refused (permission)</em></td>
+<td>That person's role does not allow acknowledging that alarm. Their role needs Alarm → Write, or call someone else.</td>
+</tr>
+<tr>
+<td>The escalation carries on after an acknowledgement</td>
+<td>The rule's escalation stops on more than Acknowledged. The dialer skips the voice calls, but an email or SMS in the same template still goes out. See <a href="#163-escalation">§16.3</a>.</td>
+</tr>
+<tr>
+<td>Every call ends <code>SKIPPED</code></td>
+<td>The alarms were already acknowledged or cleared. Or the calls waited longer than <code>token_ttl_sec</code>, or <code>INFERRIX_VOICE_TOKEN_SECRET</code> changed while they waited.</td>
+</tr>
+<tr>
+<td>Translate says <em>Voice calls are not enabled</em></td>
+<td>Voice is off, or the dialer's URL or token is missing or invalid. Translation needs the dialer, not the token secret.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="167-exposure-and-limits">16.7 Exposure and limits</h3>
+<ul>
+<li><strong>Keep the callbacks off the internet.</strong> The dialer reaches Cortex on this host
+  (<code>callback_base_url</code>), so block <code>/api/noauth/inferrix/voice/</code> at the reverse proxy. The call's
+  signed token is those endpoints' only credential.</li>
+<li><strong>Whoever answers acts as the person called.</strong> Pressing 1 acknowledges with that user's
+  permissions. Login checks such as two-factor authentication and password expiry do not apply to
+  a phone.</li>
+<li><strong>The call record is as visible as the alarm.</strong> Anyone who can read the alarm's comments or the
+  device's telemetry sees the person's name and the last four digits of their number. That includes
+  viewers of a public dashboard showing a public customer's device. TB's own "acknowledged by"
+  comments show as much.</li>
+<li><strong>The comment needs the telemetry write.</strong> The comment is written after the <code>voiceCall</code>
+  telemetry. Where that write always fails, no comment appears, although Sent shows the call. That
+  happens in three cases:<ul>
+<li>the tenant's API limits have disabled telemetry storage;</li>
+<li>TB's XSS check on time-series values, once switched on with <code>SQL_TS_VALUE_NO_XSS_VALIDATION=true</code>,
+  refuses markup in a user's name or the alarm type;</li>
+<li>the alarm was raised on an API usage state.</li>
+</ul>
+</li>
+<li><strong>The send dialog shows no voice preview.</strong></li>
+<li><strong>Adding a language.</strong><ul>
+<li>In Cortex: an entry in <code>VOICE_TRANSLATED_LANGUAGES</code>
+  (<code>ui-ngx/src/app/shared/models/inferrix-voice.models.ts</code>) with its <code>notification.voice-*</code> locale
+  key, and the same code in <code>VoiceDeliveryMethodNotificationTemplate.TRANSLATED_LANGUAGES</code>.
+  Also add it to <code>VoiceNotificationChannel.LANGUAGES</code>, which decides what a user's <code>voiceLanguage</code>
+  may be, and to <code>VoiceCallbackService.LANGUAGE_NAMES</code>, which names it in the call's comment.</li>
+<li>In <code>inferrix-dialer</code>: a Piper voice, its phrases and the Argos package, and the language in
+  <code>config.LANGUAGES</code> and <code>api.parse_translate</code>.</li>
+</ul>
+</li>
+</ul>
 </article>
 </div>

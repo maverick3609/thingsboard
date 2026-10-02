@@ -18,19 +18,23 @@
       </mat-error>
     }
   </mat-form-field>
-  <div class="flex flex-row items-center justify-between gap-2">
-    <div class="tb-form-panel-hint tb-error" aria-live="polite">
-      @if (stale) {
-        {{ 'notification.voice-translation-stale' | translate }}
-      }
+  <!-- A live region has to exist before its text does, so this wrapper is always here. It keeps the gap between
+       its children itself: an empty direct child of the host would add a second gap. -->
+  <div class="flex flex-col gap-4" aria-live="polite">
+    <div class="flex flex-row items-center justify-between gap-2">
+      <div class="tb-form-panel-hint tb-error">
+        @if (stale) {
+          {{ 'notification.voice-translation-stale' | translate }}
+        }
+      </div>
+      <button mat-stroked-button color="primary" type="button" [disabled]="!canTranslate" (click)="translate()">
+        {{ 'notification.voice-translate' | translate }}
+      </button>
     </div>
-    <button mat-stroked-button color="primary" type="button" [disabled]="!canTranslate" (click)="translate()">
-      {{ 'notification.voice-translate' | translate }}
-    </button>
+    @if (nothingCameBack) {
+      <div class="tb-form-panel-hint tb-error">{{ 'notification.voice-translation-none' | translate }}</div>
+    }
   </div>
-  @if (nothingCameBack) {
-    <div class="tb-form-panel-hint tb-error" aria-live="polite">{{ 'notification.voice-translation-none' | translate }}</div>
-  }
   <ng-container formGroupName="localizedBodies">
     @for (language of languages; track language.code) {
       <mat-form-field class="mat-block" subscriptSizing="dynamic">

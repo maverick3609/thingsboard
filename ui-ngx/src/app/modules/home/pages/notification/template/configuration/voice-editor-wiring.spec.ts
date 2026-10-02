@@ -91,13 +91,14 @@ describe('VOICE in the template editor', () => {
   });
 
   it('V7: fills the panel from a stored template', () => {
+    const stored = Object.fromEntries(VOICE_TRANSLATED_LANGUAGES.map(l => [l.code, hindi + l.code]));
     editor.writeValue({VOICE: {
-      body: english, localizedBodies: {hi: hindi}, localizedSource: english, ackRequired: true, method: 'VOICE'
+      body: english, localizedBodies: stored, localizedSource: english, ackRequired: true, method: 'VOICE'
     }} as any);
     toggles(NotificationDeliveryMethod.VOICE);
     fixture.debugElement.query(By.directive(MatExpansionPanel)).componentInstance.open();
     fixture.detectChanges();
-    expect(textareas().map(t => t.value)).toEqual([english, hindi]);
+    expect(textareas().map(t => t.value)).toEqual([english, ...VOICE_TRANSLATED_LANGUAGES.map(l => stored[l.code])]);
     expect(voice().get('ackRequired').value).toBeTrue();
     expect(editor.validate()).toBeNull();
   });
@@ -116,10 +117,12 @@ describe('VOICE in the template editor', () => {
   it('refuses to save a translation whose placeholders differ', () => {
     toggles(NotificationDeliveryMethod.VOICE);
     type(textareas()[0], english);
-    type(textareas()[1], 'अलार्म');
-    expect(editor.validate()).not.toBeNull();
-    type(textareas()[1], hindi);
-    expect(editor.validate()).toBeNull();
+    VOICE_TRANSLATED_LANGUAGES.forEach((_, i) => {
+      type(textareas()[1 + i], 'अलार्म');
+      expect(editor.validate()).not.toBeNull();
+      type(textareas()[1 + i], hindi);
+      expect(editor.validate()).toBeNull();
+    });
   });
 
   it('leaves a disabled VOICE out of the saved value and out of validation', () => {

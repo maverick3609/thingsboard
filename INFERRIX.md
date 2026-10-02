@@ -67,6 +67,7 @@ if you need to know which line of which upstream file carries a feature, read th
 | [Reporting](#7-reporting) | PE-style report templates, a drag-and-drop designer, PDF/CSV rendering, scheduled email delivery | Tenant admin | **No** — renderer is opt-in |
 | [Widget Data Export](#8-widget-data-export) | CSV / XLS / XLSX export button on dashboard widgets | Anyone who can view a dashboard | Yes, for table-type widgets |
 | [IO Controllers](#10-io-controllers) | Inferrix soft-PLC controllers as ordinary devices: discovery, adoption, live configuration, logic programs, firmware upload | Tenant admin (full), customer user (read) | Yes — but nothing appears until a controller is adopted |
+| [Voice alarm calls](#16-voice-alarm-calls) | A **Voice call** delivery method for alarm notification rules: the site's PBX phones people in English or Hindi, and pressing 1 acknowledges the alarm | Tenant admin (sets it up); anyone with a phone number in their profile can be called | **No** — off until `INFERRIX_VOICE_ENABLED=true` and `inferrix-dialer` is installed |
 | [Branding](#9-branding-and-navigation) | Inferrix logos, colours, titles, mail text baked into the default build | Everyone | Yes |
 | [Navigation](#9-branding-and-navigation) | Slimmed tenant sidebar; Edge Management and OTA removed; Utilities and Administration groups | Tenant admin | Yes |
 
@@ -1716,9 +1717,9 @@ The broker the platform points adopted controllers at is **not** configuration �
 | `inferrix.voice.enabled` | `INFERRIX_VOICE_ENABLED` | `false` | **Master switch.** Off → no call is placed, Voice call is missing from users' notification settings, and the send dialog shows it greyed out (for a system administrator its "configure" link leads nowhere). |
 | `inferrix.voice.dialer_url` | `INFERRIX_VOICE_DIALER_URL` | `http://127.0.0.1:8765` | `inferrix-dialer`'s API on this host. Not an http(s) URL → voice is unconfigured, and the log says so at startup. |
 | `inferrix.voice.dialer_token` | `INFERRIX_VOICE_DIALER_TOKEN` | *(empty)* | Bearer token for the dialer: the same value as the dialer's `INFERRIX_DIALER_TOKEN`. **Empty, or holding a space or anything other than visible ASCII → voice is unconfigured.** An empty value logs nothing; the others log one boot ERROR that names the setting. |
-| `inferrix.voice.callback_base_url` | `INFERRIX_VOICE_CALLBACK_BASE_URL` | `http://127.0.0.1:8080` | This server as the dialer reaches it, for the precheck, acknowledge and result callbacks. |
-| `inferrix.voice.token_secret` | `INFERRIX_VOICE_TOKEN_SECRET` | *(empty)* | Signs each call's token, the callbacks' only credential. **Under 32 characters, blank, or equal to `INFERRIX_VOICE_DIALER_TOKEN` → voice is unconfigured** (the dialer holds that token and must never be able to sign calls). Generate with `openssl rand -base64 32`. Changing it voids the calls still waiting in the dialer: they end `SKIPPED`. |
-| `inferrix.voice.token_ttl_sec` | `INFERRIX_VOICE_TOKEN_TTL_SEC` | `3600` | How long a call's token is valid. It must exceed the longest wait in the dialer's queue; a call whose token expired before dialling is skipped. |
+| `inferrix.voice.callback_base_url` | `INFERRIX_VOICE_CALLBACK_BASE_URL` | `http://127.0.0.1:8080` | This server as the dialer reaches it, for the precheck, acknowledge and result callbacks. Keep it on loopback. Change the port only if Cortex does not listen on 8080 (`HTTP_BIND_PORT`). Never use the public URL: [§16.7](#167-exposure-and-limits) blocks the callbacks there. |
+| `inferrix.voice.token_secret` | `INFERRIX_VOICE_TOKEN_SECRET` | *(empty)* | Signs each call's token, the callbacks' only credential. **Under 32 characters, blank, or equal to `INFERRIX_VOICE_DIALER_TOKEN` → voice is unconfigured** (the dialer holds that token and must never be able to sign calls). Generate with `openssl rand -base64 32`. Changing it voids the calls still waiting in the dialer: they are skipped, and only the dialer's log records them, because Cortex refuses their results. |
+| `inferrix.voice.token_ttl_sec` | `INFERRIX_VOICE_TOKEN_TTL_SEC` | `3600` | How long a call's token is valid. It must exceed the longest wait in the dialer's queue; a call whose token expired before dialling is skipped. An answered 600-character call takes about 3 minutes, so the default covers about 20 queued calls; raise it where messages are long. |
 
 ---
 
@@ -2010,9 +2011,10 @@ Notification center's templates, rules, escalation and per-user settings apply t
 
 1. Install `inferrix-dialer` on the Cortex host and register it with the PBX. Its `README.md` covers
    the SIP account, the voices and the systemd service. Keep the `INFERRIX_DIALER_TOKEN` you give it.
-2. Add a `voice:` block to the external `/etc/thingsboard/conf/thingsboard.yml`. It goes inside the
-   existing `inferrix:` block; add that block if the file has none. The jar's own copy does not
-   count; see [§2.2](#22-configuration-file-layout).
+2. Add a `voice:` block to the external `/etc/thingsboard/conf/thingsboard.yml`, as is conventional
+   (see [§2.2](#22-configuration-file-layout)). It is optional: the `INFERRIX_VOICE_*` variables of
+   step 3 bind without it, and the block only records the defaults. It goes inside the existing
+   `inferrix:` block; add that block if the file has none. The jar's own copy does not count.
 
 ```yaml
 inferrix:
@@ -2038,14 +2040,22 @@ export INFERRIX_VOICE_TOKEN_SECRET=...   # openssl rand -base64 32
    `+96891234567`. That is a `+`, the country code, then digits only. The dialer refuses anything else.
 6. Optional: choose each person's language.
     - A server attribute `voiceLanguage` on the user (`en` or `hi`) comes first. Set it under
-      Users → the user → Attributes.
+      Users → the user → Attributes. It must be a string: any other value is ignored, and the UI
+      language decides.
     - Without one, the user's own UI language decides: Hindi gives Hindi, and anything else gives
       English.
+7. Check that it works.
+    - `curl -s 127.0.0.1:8765/v1/health` shows `"registered": true`.
+    - Then send yourself a test notification: Notification center → Send notification, with
+      **Voice call** switched on and yourself as the only recipient. Your phone rings, and Sent shows
+      the call. A call that is not about an alarm does not ask for 1, and is recorded only in the log.
 
 Every setting is listed in [§12.7](#127-voice-alarm-calls).
 
 While voice is off, or the token or the secret is missing, no call is placed. No error appears
-either: TB leaves Voice call out of rule notifications without a word.
+either: TB leaves Voice call out of rule notifications without a word. The exception is a template
+whose only method is Voice call. With nothing left to send with, the log has an ERROR for each step
+of the escalation, with the exception message *No delivery methods to send notification with*.
 
 ### 16.2 Writing a voice template
 
@@ -2093,12 +2103,17 @@ Go to Notification center → Rules. Add a rule with the trigger **Alarm**, the 
 
 Each delay counts from the alarm, not from the step before.
 
-Under **Stop the escalation on the alarm status become**, tick **Acknowledged** only.
+Under **Stop the escalation on the alarm status become**, tick **Acknowledged** only. Never tick
+**Cleared**: the statuses you tick must *all* hold before the escalation stops, so with Cleared
+ticked too, an acknowledgement alone does not stop it. The later steps still go out and show as sent,
+and an email or SMS in the same template still reaches those people. The dialer skips their voice
+calls, because the alarm is acknowledged.
 
-The statuses you tick must *all* hold before the escalation stops. With Cleared ticked too, an
-acknowledgement alone does not stop it: the later steps still go out and show as sent, and an email
-or SMS in the same template still reaches those people. The dialer skips their voice calls, because
-the alarm is acknowledged.
+The rule's **Notify on** list matters too. *Alarm acknowledged* and *Alarm cleared* never phone
+anyone: the escalation stop or the check before dialling skips them. For a voice rule, leave them out
+of *Notify on*, or give them email or SMS. Every event in *Notify on* starts the whole chain again.
+With *Alarm severity changed* ticked, a change of severity calls the chain a second time, unless
+someone has acknowledged.
 
 - **Steps run on time, not on call results.** The second person is called at 5 minutes whether or
   not the first answered, unless someone acknowledged by then.
@@ -2108,14 +2123,16 @@ the alarm is acknowledged.
 - **Acknowledging cancels the steps that have not started**, whether by phone or in the web UI.
 - **The dialer checks with Cortex just before dialling.** A call is skipped if its alarm has since
   been acknowledged, cleared or deleted, or the person called has been deleted. This is also how a
-  cleared alarm stops the remaining steps: they still show as sent, but nobody is called.
+  cleared alarm stops the remaining steps: they still show as sent, but nobody is called. If Cortex
+  cannot answer the check, the dialer calls anyway.
 
 ### 16.4 What gets recorded
 
 - **Sent** in the Notification center means the dialer queued the call. It does not mean anyone
   answered.
 - **Each ended call adds an alarm comment** from the system, such as *Voice call to Asha Rao
-  (…3210), Hindi: acknowledged*. A skipped call adds none.
+  (…3210), Hindi: acknowledged*. A skipped call adds none. A result the dialer has to retry can add
+  the comment twice.
 - **A refused press of 1 adds its own comment**, such as *Voice acknowledgement by Asha Rao refused
   (permission)*. A press on an alarm that is gone, or on an expired call, adds none.
 - **An acknowledgement by phone is that person's acknowledgement**, exactly as if they had clicked
@@ -2133,13 +2150,13 @@ the alarm is acknowledged.
 
 | Outcome | In the comment | Meaning |
 |---|---|---|
-| `ACKNOWLEDGED` | acknowledged | Pressed 1, and the alarm was acknowledged as that person. |
+| `ACKNOWLEDGED` | acknowledged | Pressed 1, and the alarm was acknowledged as that person, or someone else had already acknowledged it. |
 | `ACK_DENIED` | acknowledgement refused | Pressed 1, but Cortex refused. The person may not acknowledge that alarm, the user is disabled, or the alarm is gone. |
 | `ANSWERED` | answered, not acknowledged | Heard the message without pressing 1, or Cortex could not be reached when they did. |
-| `NO_ANSWER` | no answer | Rang for 45 seconds, or the PBX reported the phone unavailable. |
+| `NO_ANSWER` | no answer | Rang for the dialer's ring timeout (45 s by default) without an answer, or the PBX reported the phone unavailable. |
 | `BUSY` | busy | The line was busy. |
 | `REJECTED` | rejected | The call was declined. |
-| `FAILED` | failed | Anything else, including a number the PBX would not route. |
+| `FAILED` | failed | Anything else: a number the PBX would not route, or a phone that never rang (the PBX unreachable, or nothing rang before the ring timeout). |
 | `SKIPPED` | *(no comment)* | Not dialled: by the time its turn came, the alarm was acknowledged, cleared or deleted, the person called had been deleted, or the call had expired. |
 
 ### 16.5 Users switching calls off
@@ -2161,18 +2178,28 @@ next step as usual. The switch is shown only while voice calls are enabled.
 | A comment says *(translation missing)* | The template has no text in that person's language, so English was spoken. Translate the template. |
 | A comment says *refused (permission)* | That person's role does not allow acknowledging that alarm. Their role needs Alarm → Write, or call someone else. |
 | A comment says *refused (user-disabled)* | The account is disabled, or was never activated (the person never set a password from the activation email). They are still called, but cannot acknowledge until the account is active. |
-| The escalation carries on after an acknowledgement | The rule's escalation stops on more than Acknowledged. The dialer skips the voice calls, but an email or SMS in the same template still goes out. See [§16.3](#163-escalation). |
-| Every call ends `SKIPPED` | The alarms were already acknowledged or cleared. Or the calls waited longer than `token_ttl_sec`, or `INFERRIX_VOICE_TOKEN_SECRET` changed while they waited. |
+| The escalation carries on after an acknowledgement | The rule's escalation does not stop on Acknowledged alone. The dialer skips the voice calls, but an email or SMS in the same template still goes out. See [§16.3](#163-escalation). |
+| Every call ends `SKIPPED` | The alarms were already acknowledged or cleared. Or the calls waited longer than `token_ttl_sec`, or `INFERRIX_VOICE_TOKEN_SECRET` changed while they waited (only in the dialer's log). |
+| Calls end `FAILED` with `sipStatus` 408 and `ringSec` about 32, or with `sipStatus` 487 or 0 and `ringSec` equal to the dialer's ring timeout | No phone rang: the PBX is unreachable, the dialer is not registered, or the PBX never alerted the phone. `curl -s 127.0.0.1:8765/v1/health` must show `"registered": true`; `journalctl -u inferrix-dialer` shows its `registration:` lines. |
+| Calls go out, but pressing 1 never acknowledges and no call comment appears | `callback_base_url` does not reach this server. The dialer's journal says *precheck unreachable* or *precheck answered*, *ack unreachable* or *ack answered*, and *giving up on the result* or *Cortex refused the result*. |
 | Translate says *Voice calls are not enabled* | Voice is off, or the dialer's URL or token is missing or invalid. Translation needs the dialer, not the token secret. |
+| Translate says *Voice dialer is unreachable* | The dialer is not running, or the translation took over a minute. The first one after the dialer starts is the slowest, because it loads the model. Press Translate again. |
+| Translate says *Voice dialer could not translate (500): internal error* | The dialer's translator failed; `journalctl -u inferrix-dialer` says why. On a new install, check step 4 of the dialer README (its one-time priming). |
 
 ### 16.7 Exposure and limits
 
 - **Keep the callbacks off the internet.** The dialer reaches Cortex on this host
   (`callback_base_url`), so block `/api/noauth/inferrix/voice/` at the reverse proxy. The call's
   signed token is those endpoints' only credential.
+- **Firewall the dialer's SIP and RTP ports.** A DTMF 1 injected into a call's media acknowledges
+  the alarm as the person called. Install step 8 in the dialer README allows both ports only from
+  the PBX and its media sources.
 - **Whoever answers acts as the person called.** Pressing 1 acknowledges with that user's
   permissions. Login checks such as two-factor authentication and password expiry do not apply to
   a phone.
+- **Users can edit their own phone number,** and a voice rule calls whatever is there. The dialer's
+  `[numbers] allow` list and the PBX's dialling restrictions keep calls off premium-rate and foreign
+  lines. The `+`-and-digits check in [§16.1](#161-turning-it-on) step 5 does not.
 - **The call record is as visible as the alarm.** Anyone who can read the alarm's comments or the
   device's telemetry sees the person's name and the last four digits of their number. That includes
   viewers of a public dashboard showing a public customer's device. TB's own "acknowledged by"
@@ -2191,5 +2218,9 @@ next step as usual. The switch is shown only while voice calls are enabled.
       key, and the same code in `VoiceDeliveryMethodNotificationTemplate.TRANSLATED_LANGUAGES`.
       Also add it to `VoiceNotificationChannel.LANGUAGES`, which decides what a user's `voiceLanguage`
       may be, and to `VoiceCallbackService.LANGUAGE_NAMES`, which names it in the call's comment.
+      Two more places name the languages: the UI-language mapping at the end of
+      `VoiceNotificationChannel.languageOf` (`startsWith("hi")`), which picks the language of a user
+      with no `voiceLanguage`, and the message of `VoiceDeliveryMethodNotificationTemplate.isLocalizedBodiesValid`,
+      which names Hindi.
     - In `inferrix-dialer`: a Piper voice, its phrases and the Argos package, and the language in
       `config.LANGUAGES` and `api.parse_translate`.

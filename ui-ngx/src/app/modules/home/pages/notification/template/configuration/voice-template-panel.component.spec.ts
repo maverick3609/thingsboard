@@ -387,6 +387,7 @@ describe('VoiceTemplatePanelComponent template', () => {
     panel.form.get('body').setValue('Fire. ' + english);
     fixture.detectChanges();
     expect(colour(hint('voice-translation-stale'))).toBe(red);
+    expect(hint('voice-translation-stale').getAttribute('aria-live')).toBe('polite'); // a screen reader announces it
 
     panel.form.get('localizedBodies.hi').setValue('');
     fixture.detectChanges();
@@ -417,6 +418,7 @@ describe('VoiceTemplatePanelComponent template', () => {
     translateButton().click();
     fixture.detectChanges();
     expect(colour(hint('voice-translation-none'))).toBe(red);
+    expect(hint('voice-translation-none').getAttribute('aria-live')).toBe('polite');
     expect(panel.form.dirty).toBeFalse();
 
     type(textareas()[1], 'हाथ से लिखा ${alarmOriginatorName}');

@@ -19,7 +19,7 @@
     }
   </mat-form-field>
   <div class="flex flex-row items-center justify-between gap-2">
-    <div class="tb-form-panel-hint tb-error">
+    <div class="tb-form-panel-hint tb-error" aria-live="polite">
       @if (stale) {
         {{ 'notification.voice-translation-stale' | translate }}
       }
@@ -29,7 +29,7 @@
     </button>
   </div>
   @if (nothingCameBack) {
-    <div class="tb-form-panel-hint tb-error">{{ 'notification.voice-translation-none' | translate }}</div>
+    <div class="tb-form-panel-hint tb-error" aria-live="polite">{{ 'notification.voice-translation-none' | translate }}</div>
   }
   <ng-container formGroupName="localizedBodies">
     @for (language of languages; track language.code) {

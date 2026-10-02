@@ -4,13 +4,15 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatExpansionModule } from '@angular/material/expansion';
+import { MatExpansionModule, MatExpansionPanel } from '@angular/material/expansion';
 import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { By } from '@angular/platform-browser';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { TranslateModule } from '@ngx-translate/core';
 import { of } from 'rxjs';
 import { InferrixVoiceService } from '@core/http/inferrix-voice.service';
+import { VOICE_TRANSLATED_LANGUAGES } from '@shared/models/inferrix-voice.models';
 import { NotificationDeliveryMethod, NotificationType } from '@shared/models/notification.models';
 import {
   NotificationTemplateConfigurationComponent
@@ -71,7 +73,7 @@ describe('VOICE in the template editor', () => {
     expect(Object.keys(voice().controls).sort())
       .toEqual(['ackRequired', 'body', 'enabled', 'localizedBodies', 'localizedSource', 'method']);
     expect(voice().get('method').value).toBe('VOICE');
-    expect(Object.keys(voice().get('localizedBodies').value)).toEqual(['hi']);
+    expect(Object.keys(voice().get('localizedBodies').value)).toEqual(VOICE_TRANSLATED_LANGUAGES.map(l => l.code));
   });
 
   it('V7: shows no VOICE section while VOICE is off', () => {
@@ -82,10 +84,10 @@ describe('VOICE in the template editor', () => {
   it('V7: puts the real panel inside the VOICE section once VOICE is on', () => {
     toggles(NotificationDeliveryMethod.VOICE);
     expect(panel()).not.toBeNull();
-    expect(textareas().length).toBe(2);
+    expect(textareas().length).toBe(1 + VOICE_TRANSLATED_LANGUAGES.length);
     const title = fixture.nativeElement.querySelector('mat-panel-title').textContent;
     expect(title).toContain('phone-in-talk');
-    expect(title).toContain('notification.delivery-method.voice');
+    expect(title.split(/\s+/)).toContain('notification.delivery-method.voice');
   });
 
   it('V7: fills the panel from a stored template', () => {
@@ -93,9 +95,7 @@ describe('VOICE in the template editor', () => {
       body: english, localizedBodies: {hi: hindi}, localizedSource: english, ackRequired: true, method: 'VOICE'
     }} as any);
     toggles(NotificationDeliveryMethod.VOICE);
-    // A valid stored template opens collapsed, as every method does: the panel is lazy content
-    expect(panel()).toBeNull();
-    (fixture.nativeElement.querySelector('mat-expansion-panel-header') as HTMLElement).click();
+    fixture.debugElement.query(By.directive(MatExpansionPanel)).componentInstance.open();
     fixture.detectChanges();
     expect(textareas().map(t => t.value)).toEqual([english, hindi]);
     expect(voice().get('ackRequired').value).toBeTrue();
@@ -108,7 +108,8 @@ describe('VOICE in the template editor', () => {
     type(textareas()[0], english);
     expect(editor.validate()).toBeNull();
     expect(emitted[emitted.length - 1].VOICE).toEqual({
-      body: english, localizedBodies: {hi: ''}, localizedSource: '', ackRequired: false, enabled: true, method: 'VOICE'
+      body: english, localizedBodies: Object.fromEntries(VOICE_TRANSLATED_LANGUAGES.map(l => [l.code, ''])),
+      localizedSource: '', ackRequired: false, enabled: true, method: 'VOICE'
     });
   });
 

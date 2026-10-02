@@ -5776,7 +5776,7 @@
         "use-template": "Use template",
         "view-all": "View all",
         "voice-ack-required": "Ask to acknowledge (press 1)",
-        "voice-ack-required-hint": "Only alarm notifications can be acknowledged by phone. Set the rule's clear rule to Acknowledged only, so an acknowledgement stops the escalation.",
+        "voice-ack-required-hint": "Only alarm notifications can be acknowledged by phone. In the rule, stop the escalation on Acknowledged alone, so an acknowledgement stops the calls.",
         "voice-hindi": "Hindi",
         "voice-message-english": "Message (English)",
         "voice-message-hint": "Spoken on the call. Write the alarm name as words: placeholders are filled in after translation, so ${alarmType} would stay English.",

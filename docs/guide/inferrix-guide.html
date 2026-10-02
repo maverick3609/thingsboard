@@ -3679,7 +3679,7 @@ next step as usual. The switch is shown only while voice calls are enabled.</p>
 <td>The alarms were already acknowledged or cleared. Or the calls waited longer than <code>token_ttl_sec</code>, or <code>INFERRIX_VOICE_TOKEN_SECRET</code> changed while they waited (only in the dialer's log).</td>
 </tr>
 <tr>
-<td>Calls end <code>FAILED</code> with <code>sipStatus</code> 408 and <code>ringSec</code> about 32, or with <code>sipStatus</code> 487 or 0 and <code>ringSec</code> equal to the dialer's ring timeout</td>
+<td>Calls end <code>FAILED</code> with <code>sipStatus</code> 408 and <code>ringSec</code> about 32, or with <code>sipStatus</code> 487 or 0 and <code>ringSec</code> at, or a few seconds past, the dialer's ring timeout</td>
 <td>No phone rang: the PBX is unreachable, the dialer is not registered, or the PBX never alerted the phone. <code>curl -s 127.0.0.1:8765/v1/health</code> must show <code>"registered": true</code>; <code>journalctl -u inferrix-dialer</code> shows its <code>registration:</code> lines.</td>
 </tr>
 <tr>

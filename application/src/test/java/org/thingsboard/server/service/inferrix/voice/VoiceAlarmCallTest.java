@@ -47,6 +47,7 @@ import org.thingsboard.server.dao.alarm.AlarmService;
 import org.thingsboard.server.dao.service.DaoSqlTest;
 import org.thingsboard.server.dao.user.UserService;
 import org.thingsboard.server.service.inferrix.voice.VoiceDialerClient.CallJob;
+import org.thingsboard.server.service.inferrix.voice.VoiceDialerClient.VoiceDialerException;
 import org.thingsboard.server.service.notification.AbstractNotificationApiTest;
 
 import java.util.HashMap;
@@ -63,6 +64,7 @@ import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -70,6 +72,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * The whole path with only the dialer mocked: a real alarm, a real notification rule with an
  * escalation table, the noauth callbacks as the dialer would call them, and what lands in the database.
+ * The callback service is a spy, stubbed only in aForgedTokenIsRefused to provoke failures.
  */
 @DaoSqlTest
 @TestPropertySource(properties = {
@@ -172,6 +175,8 @@ public class VoiceAlarmCallTest extends AbstractNotificationApiTest {
     public void aForgedTokenIsRefused() throws Exception {
         resetTokens();
         String forged = "eyJ2IjoxfQ.AAAA";
+        // Spring prints a @RequestBody with toString() at TRACE: the token must not be in it
+        assertThat(new InferrixVoiceController.TokenRequest(forged).toString()).doesNotContain(forged);
 
         doPost(CALLBACKS + "precheck", Map.of("token", forged)).andExpect(status().isUnauthorized());
         doPost(CALLBACKS + "ack", Map.of("token", forged)).andExpect(status().isUnauthorized());
@@ -180,8 +185,8 @@ public class VoiceAlarmCallTest extends AbstractNotificationApiTest {
             doPost(CALLBACKS + endpoint, Map.of()).andExpect(status().isUnauthorized());
         }
 
-        // The service's own ThingsboardException keeps its status: an alarm deleted mid-acknowledgement is a 404,
-        // which the dialer reports as refused.
+        // The service's own ThingsboardException keeps its status: a stubbed 404 stays a 404, which the dialer
+        // reports as refused.
         doThrow(new ThingsboardException(ThingsboardErrorCode.ITEM_NOT_FOUND)).when(callbacks).ack(any());
         doPost(CALLBACKS + "ack", Map.of("token", forged)).andExpect(status().isNotFound());
 
@@ -202,7 +207,8 @@ public class VoiceAlarmCallTest extends AbstractNotificationApiTest {
         } finally {
             controllerLog.detachAppender(logged);
         }
-        assertThat(logged.list).hasSize(3).allSatisfy(event -> assertThat(event.getFormattedMessage()).contains("secret detail"));
+        assertThat(logged.list).hasSize(3).allSatisfy(event ->
+                assertThat(event.getThrowableProxy().getMessage()).contains("secret detail"));
 
         // An interrupt is not swallowed with the failure: MockMvc runs on this thread, which must still be marked.
         doThrow(new InterruptedException()).when(callbacks).result(any());
@@ -221,6 +227,7 @@ public class VoiceAlarmCallTest extends AbstractNotificationApiTest {
 
         JsonNode response = doPost("/api/inferrix/voice/translate", Map.of("text", "Alarm on ${alarmOriginatorName}"), JsonNode.class);
 
+        verify(dialer).translate("Alarm on ${alarmOriginatorName}", VoiceDeliveryMethodNotificationTemplate.TRANSLATED_LANGUAGES);
         assertThat(response).isEqualTo(JacksonUtil.toJsonNode("""
                 {"translations": {"hi": {"text": "अलार्म", "placeholdersOk": false}}}"""));
         doPost("/api/inferrix/voice/translate", Map.of("text", "x".repeat(601))).andExpect(status().isBadRequest());
@@ -233,6 +240,15 @@ public class VoiceAlarmCallTest extends AbstractNotificationApiTest {
         when(dialer.translate(any(), any())).thenReturn(unflagged);
         assertThat(doPost("/api/inferrix/voice/translate", Map.of("text", "Alarm"), JsonNode.class)
                 .at("/translations/hi/placeholdersOk").asBoolean(true)).isFalse(); // never assumed to be fine
+
+        loginSysAdmin();
+        doPost("/api/inferrix/voice/translate", Map.of("text", "Alarm")).andExpect(status().isOk());
+        loginTenantAdmin();
+
+        // a dialer that cannot translate is a 500 with its own message, which the editor shows
+        when(dialer.translate(any(), any())).thenThrow(new VoiceDialerException("Voice dialer is unreachable"));
+        doPost("/api/inferrix/voice/translate", Map.of("text", "Alarm")).andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.message").value("Voice dialer is unreachable"));
 
         when(dialer.isConfigured()).thenReturn(false);
         doPost("/api/inferrix/voice/translate", Map.of("text", "Alarm")).andExpect(status().isBadRequest());

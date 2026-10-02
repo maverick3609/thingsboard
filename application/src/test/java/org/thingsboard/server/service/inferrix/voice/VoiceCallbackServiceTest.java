@@ -53,7 +53,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
@@ -130,8 +129,10 @@ class VoiceCallbackServiceTest {
 
     private List<String> comments() throws Exception {
         ArgumentCaptor<AlarmComment> comment = ArgumentCaptor.forClass(AlarmComment.class);
-        verify(tbAlarmCommentService, atLeast(0)).saveAlarmComment(any(), comment.capture(), isNull());
+        ArgumentCaptor<User> author = ArgumentCaptor.forClass(User.class);
+        verify(tbAlarmCommentService, atLeast(0)).saveAlarmComment(any(), comment.capture(), author.capture());
         comment.getAllValues().forEach(c -> assertThat(c.getType()).isEqualTo(AlarmCommentType.SYSTEM));
+        assertThat(author.getAllValues()).allSatisfy(a -> assertThat(a).isNull()); // a system comment has no author
         return comment.getAllValues().stream().map(c -> c.getComment().get("text").asText()).toList();
     }
 
@@ -201,6 +202,7 @@ class VoiceCallbackServiceTest {
 
         assertThat(service.ack(token())).isEqualTo(new Ack(false, "user-disabled"));
         verify(tbAlarmService, never()).ack(any(), any());
+        assertThat(service.precheck(token())).isEqualTo(new Precheck(false, "not-found"));
     }
 
     // ---- ack
@@ -269,6 +271,7 @@ class VoiceCallbackServiceTest {
     void aDisabledUserCannotAcknowledge() throws Exception {
         when(userAuthDetailsCache.getUserAuthDetails(eq(TENANT), eq(user.getId()))).thenReturn(new UserAuthDetails(user, false));
 
+        assertThat(service.precheck(token())).isEqualTo(new Precheck(true, null)); // never activated: still called
         assertThat(service.ack(token())).isEqualTo(new Ack(false, "user-disabled"));
         verify(tbAlarmService, never()).ack(any(), any());
         assertThat(comments()).containsExactly("Voice acknowledgement by an unknown or disabled user refused (user-disabled)");
@@ -279,6 +282,10 @@ class VoiceCallbackServiceTest {
 
         assertThat(service.ack(token())).isEqualTo(new Ack(false, "user-disabled"));
         verify(tbAlarmService, never()).ack(any(), any());
+
+        user.setAuthority(Authority.TENANT_ADMIN);
+
+        assertThat(service.ack(token())).isEqualTo(new Ack(true, null));
     }
 
     @Test
@@ -308,6 +315,12 @@ class VoiceCallbackServiceTest {
         when(alarmService.findAlarmById(eq(TENANT), eq(alarm.getId()))).thenReturn(alarm, acknowledged);
 
         assertThat(service.ack(token())).isEqualTo(new Ack(true, "already-acknowledged"));
+
+        // an alarm deleted while the acknowledgement ran is gone, not an error: the re-read finds nothing
+        when(tbAlarmService.ack(eq(alarm), any())).thenThrow(new ThingsboardException(ThingsboardErrorCode.ITEM_NOT_FOUND));
+        when(alarmService.findAlarmById(eq(TENANT), eq(alarm.getId()))).thenReturn(alarm, (Alarm) null);
+
+        assertThat(service.ack(token())).isEqualTo(new Ack(false, "not-found"));
     }
 
     @Test
@@ -328,6 +341,9 @@ class VoiceCallbackServiceTest {
         String bare = tokens.mint(VoiceCallClaims.of(TENANT, null, user.getId(), null, null, false));
         assertThat(service.ack(bare)).isEqualTo(new Ack(false, "not-an-alarm"));
         assertThat(service.precheck(bare)).isEqualTo(new Precheck(true, null));
+        // and it may carry the system tenant (a system administrator's notification), where no user is found
+        String system = tokens.mint(VoiceCallClaims.of(TenantId.SYS_TENANT_ID, null, user.getId(), null, null, false));
+        assertThat(service.precheck(system)).isEqualTo(new Precheck(true, null));
         service.result(result(bare, "NO_ANSWER", System.currentTimeMillis()));
         verifyNoInteractions(telemetryService);
         assertThat(comments()).isEmpty();
@@ -338,8 +354,9 @@ class VoiceCallbackServiceTest {
     @Test
     void resultWritesACommentAndTelemetry() throws Exception {
         long endedAt = System.currentTimeMillis() - 5000;
+        String token = token();
 
-        service.result(result(token(), "ACKNOWLEDGED", endedAt));
+        service.result(result(token, "ACKNOWLEDGED", endedAt));
 
         assertThat(comments()).containsExactly("Voice call to Asha Rao (…3210), Hindi: acknowledged");
         TsKvEntry entry = savedTelemetry();
@@ -356,6 +373,7 @@ class VoiceCallbackServiceTest {
         assertThat(call.get("languageFallback").asBoolean()).isFalse();
         assertThat(call.toString()).doesNotContain("+91 98765");
         assertThat(call.toString()).doesNotContain("98765"); // nor the number without its spaces
+        assertThat(result(token, "ACKNOWLEDGED", endedAt).toString()).doesNotContain(token); // nor may a log line show the token
     }
 
     @Test
@@ -368,6 +386,8 @@ class VoiceCallbackServiceTest {
 
     @Test
     void resultRefusesAnUnknownOutcome() {
+        assertThat(VoiceCallbackService.OUTCOMES).containsExactlyInAnyOrder("ACKNOWLEDGED", "ACK_DENIED", "ANSWERED",
+                "NO_ANSWER", "BUSY", "REJECTED", "FAILED", "SKIPPED");
         assertError(() -> service.result(result(token(), "EXPLODED", 0)), ThingsboardErrorCode.BAD_REQUEST_PARAMS);
         assertError(() -> service.result(result(token(), null, 0)), ThingsboardErrorCode.BAD_REQUEST_PARAMS);
         verifyNoInteractions(telemetryService);
@@ -375,7 +395,7 @@ class VoiceCallbackServiceTest {
 
     @Test
     void aLateResultIsAcceptedWithinTheGrace() throws Exception {
-        String late = token(new VoiceCallTokens(SECRET, -60), alarm.getId(), "hi", false);
+        String late = token(new VoiceCallTokens(SECRET, -840), alarm.getId(), "hi", false); // 14 minutes past expiry
 
         service.result(result(late, "NO_ANSWER", System.currentTimeMillis()));
 
@@ -384,7 +404,7 @@ class VoiceCallbackServiceTest {
 
     @Test
     void aResultPastTheGraceIsRefused() {
-        String stale = token(new VoiceCallTokens(SECRET, -1200), alarm.getId(), "hi", false);
+        String stale = token(new VoiceCallTokens(SECRET, -960), alarm.getId(), "hi", false); // 16 minutes past expiry
 
         assertError(() -> service.result(result(stale, "NO_ANSWER", 0)), ThingsboardErrorCode.AUTHENTICATION);
     }
@@ -422,6 +442,7 @@ class VoiceCallbackServiceTest {
         service.result(result(token(), "NO_ANSWER", System.currentTimeMillis()));
 
         assertThat(comments()).containsExactly("Voice call to a deleted user, Hindi: no answer");
+        assertThat(service.precheck(token())).isEqualTo(new Precheck(false, "not-found"));
     }
 
     @Test

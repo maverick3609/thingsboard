@@ -3520,8 +3520,8 @@ the alarm is acknowledged.</p>
 <li><strong>Nothing happens after the last step.</strong> Add steps to call more people, or the same people again.</li>
 <li><strong>Acknowledging cancels the steps that have not started</strong>, whether by phone or in the web UI.</li>
 <li><strong>The dialer checks with Cortex just before dialling.</strong> A call is skipped if its alarm has since
-  been acknowledged, cleared or deleted. This is also how a cleared alarm stops the remaining steps:
-  they still show as sent, but nobody is called.</li>
+  been acknowledged, cleared or deleted, or the person called has been deleted. This is also how a
+  cleared alarm stops the remaining steps: they still show as sent, but nobody is called.</li>
 </ul>
 <h3 id="164-what-gets-recorded">16.4 What gets recorded</h3>
 <ul>
@@ -3593,7 +3593,7 @@ the alarm is acknowledged.</p>
 <tr>
 <td><code>SKIPPED</code></td>
 <td><em>(no comment)</em></td>
-<td>Not dialled: acknowledged, cleared, deleted or expired by the time its turn came.</td>
+<td>Not dialled: by the time its turn came, the alarm was acknowledged, cleared or deleted, the person called had been deleted, or the call had expired.</td>
 </tr>
 </tbody>
 </table></div>
@@ -3641,6 +3641,10 @@ next step as usual. The switch is shown only while voice calls are enabled.</p>
 <tr>
 <td>A comment says <em>refused (permission)</em></td>
 <td>That person's role does not allow acknowledging that alarm. Their role needs Alarm → Write, or call someone else.</td>
+</tr>
+<tr>
+<td>A comment says <em>refused (user-disabled)</em></td>
+<td>The account is disabled, or was never activated (the person never set a password from the activation email). They are still called, but cannot acknowledge until the account is active.</td>
 </tr>
 <tr>
 <td>The escalation carries on after an acknowledgement</td>

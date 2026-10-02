@@ -53,6 +53,12 @@ public class InferrixVoiceController extends BaseController {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record TokenRequest(String token) {
+
+        /** Spring prints a request body in full at TRACE, so the token, a live credential, stays out of it. */
+        @Override
+        public String toString() {
+            return "TokenRequest[token=(hidden)]";
+        }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -128,8 +134,9 @@ public class InferrixVoiceController extends BaseController {
      * anyway after a failed precheck and records a failed ack as answered. So only the service's own
      * ThingsboardException may pick the status. BaseController would answer an IllegalArgumentException
      * or DataValidationException with a 400, which drops a result that could not be written, and would put
-     * the message of anything else into the body of a 500. Every other failure is a fixed 5xx, with the
-     * detail in the log. The token is never in an exception message, so it is never logged.
+     * the message of anything else into the body of a 500. Every other exception (an Error still reaches
+     * Spring's own 500) is a fixed 5xx, with the detail in the log. The token is never in an exception
+     * message, so it is never logged.
      */
     private <T> T guarded(String callback, Callable<T> call) throws ThingsboardException {
         try {
@@ -140,7 +147,7 @@ public class InferrixVoiceController extends BaseController {
             if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
-            log.warn("Voice {} callback failed: {}", callback, e.toString());
+            log.warn("Voice {} callback failed", callback, e);
             throw new ThingsboardException("Voice callback failed", ThingsboardErrorCode.GENERAL);
         }
     }

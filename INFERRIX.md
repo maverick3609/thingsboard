@@ -2107,8 +2107,8 @@ the alarm is acknowledged.
 - **Nothing happens after the last step.** Add steps to call more people, or the same people again.
 - **Acknowledging cancels the steps that have not started**, whether by phone or in the web UI.
 - **The dialer checks with Cortex just before dialling.** A call is skipped if its alarm has since
-  been acknowledged, cleared or deleted. This is also how a cleared alarm stops the remaining steps:
-  they still show as sent, but nobody is called.
+  been acknowledged, cleared or deleted, or the person called has been deleted. This is also how a
+  cleared alarm stops the remaining steps: they still show as sent, but nobody is called.
 
 ### 16.4 What gets recorded
 
@@ -2140,7 +2140,7 @@ the alarm is acknowledged.
 | `BUSY` | busy | The line was busy. |
 | `REJECTED` | rejected | The call was declined. |
 | `FAILED` | failed | Anything else, including a number the PBX would not route. |
-| `SKIPPED` | *(no comment)* | Not dialled: acknowledged, cleared, deleted or expired by the time its turn came. |
+| `SKIPPED` | *(no comment)* | Not dialled: by the time its turn came, the alarm was acknowledged, cleared or deleted, the person called had been deleted, or the call had expired. |
 
 ### 16.5 Users switching calls off
 
@@ -2160,6 +2160,7 @@ next step as usual. The switch is shown only while voice calls are enabled.
 | Sent says *Voice dialer refused the call (503): queue full* | The dialer's queue is full (50 calls). |
 | A comment says *(translation missing)* | The template has no text in that person's language, so English was spoken. Translate the template. |
 | A comment says *refused (permission)* | That person's role does not allow acknowledging that alarm. Their role needs Alarm → Write, or call someone else. |
+| A comment says *refused (user-disabled)* | The account is disabled, or was never activated (the person never set a password from the activation email). They are still called, but cannot acknowledge until the account is active. |
 | The escalation carries on after an acknowledgement | The rule's escalation stops on more than Acknowledged. The dialer skips the voice calls, but an email or SMS in the same template still goes out. See [§16.3](#163-escalation). |
 | Every call ends `SKIPPED` | The alarms were already acknowledged or cleared. Or the calls waited longer than `token_ttl_sec`, or `INFERRIX_VOICE_TOKEN_SECRET` changed while they waited. |
 | Translate says *Voice calls are not enabled* | Voice is off, or the dialer's URL or token is missing or invalid. Translation needs the dialer, not the token secret. |

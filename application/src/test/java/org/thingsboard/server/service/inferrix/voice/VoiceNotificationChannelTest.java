@@ -133,6 +133,16 @@ class VoiceNotificationChannelTest {
         assertThat(claims.alarmId()).isEqualTo(alarmUuid);
         assertThat(claims.language()).isEqualTo("hi");
         assertThat(claims.languageFallback()).isFalse();
+        assertThat(job.toString()).doesNotContain(job.token()).contains(job.callId()); // a log line must not carry the token
+        verify(attributesService).find(TENANT, user.getId(), AttributeScope.SERVER_SCOPE, VoiceNotificationChannel.LANGUAGE_ATTRIBUTE);
+
+        // an explicit English beats a Hindi UI
+        clearInvocations(dialer);
+        languageAttribute("en");
+
+        channel.sendNotification(user("+96891234567", "hi_IN"), template("Alarm on AHU 1", Map.of("hi", "AHU 1 पर अलार्म"), true), ctx);
+
+        assertThat(sentJob().language()).isEqualTo("en");
     }
 
     @Test
@@ -145,6 +155,7 @@ class VoiceNotificationChannelTest {
         assertThat(job.language()).isEqualTo("en");
         assertThat(job.text()).isEqualTo("Alarm on AHU 1");
         assertThat(tokens.verify(job.token()).languageFallback()).isTrue();
+        assertThat(job.ackRequired()).isFalse(); // an alarm call, but the template's switch is off
     }
 
     @Test

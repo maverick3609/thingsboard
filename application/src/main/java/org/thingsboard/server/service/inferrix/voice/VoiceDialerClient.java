@@ -134,6 +134,13 @@ public class VoiceDialerClient {
 
     public record CallJob(String callId, String to, String language, String text, boolean ackRequired,
                           String token, String callbackBaseUrl) {
+
+        /** Without the token: a live credential until it expires, so no log line may carry it. */
+        @Override
+        public String toString() {
+            return "CallJob[callId=" + callId + ", to=" + to + ", language=" + language + ", text=" + text
+                    + ", ackRequired=" + ackRequired + ", callbackBaseUrl=" + callbackBaseUrl + "]";
+        }
     }
 
     public static class VoiceDialerException extends RuntimeException {

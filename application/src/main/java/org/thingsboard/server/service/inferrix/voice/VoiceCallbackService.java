@@ -41,7 +41,10 @@ import java.util.concurrent.TimeUnit;
 /**
  * What inferrix-dialer's callbacks do. There is no session: the signed token says who was called
  * about which alarm. Every rule a person pressing "acknowledge" in the web UI would meet applies
- * here as that person: their tenant, their account being enabled, their role permissions.
+ * here as that person: their tenant, their account being enabled (and so activated), their authority
+ * (tenant administrator or customer user), their role permissions. Login checks do not apply:
+ * two-factor authentication and password expiry gate a session, and whoever answers the phone acts
+ * as the user (spec §5).
  */
 @Slf4j
 @Service
@@ -82,6 +85,14 @@ public class VoiceCallbackService {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record CallResult(String token, String callId, String outcome, int sipStatus, int ringSec, int talkSec,
                              boolean speechFallback, long endedAt) {
+
+        /** Spring prints a request body in full at TRACE, so the token, a live credential, stays out of it. */
+        @Override
+        public String toString() {
+            return "CallResult[callId=" + callId + ", outcome=" + outcome + ", sipStatus=" + sipStatus
+                    + ", ringSec=" + ringSec + ", talkSec=" + talkSec + ", speechFallback=" + speechFallback
+                    + ", endedAt=" + endedAt + "]";
+        }
     }
 
     /** Whether the call is still needed. Only a forged token is an error; everything else is an answer. */
@@ -94,8 +105,8 @@ public class VoiceCallbackService {
             return new Precheck(true, null);
         }
         Alarm alarm = findAlarm(claims);
-        if (alarm == null) {
-            return new Precheck(false, "not-found");
+        if (alarm == null || findUser(claims) == null) {
+            return new Precheck(false, "not-found"); // the alarm, or the person called, is gone
         }
         if (alarm.isAcknowledged()) {
             return new Precheck(false, "acknowledged");
@@ -108,8 +119,9 @@ public class VoiceCallbackService {
 
     /**
      * "1" was pressed. Acknowledges as the called user, with the same check AlarmController.ackAlarm
-     * makes for them. The permission check comes before "already acknowledged", so nobody learns an
-     * alarm's state from a token without being allowed to change it.
+     * makes for them. The permission check comes before "already acknowledged", so a user who may not
+     * acknowledge never hears that the alarm is acknowledged. (Precheck tells the token holder the
+     * alarm's state anyway.)
      */
     public Ack ack(String token) throws ThingsboardException {
         VoiceCallClaims claims = tokens.verify(token);
@@ -139,8 +151,11 @@ public class VoiceCallbackService {
         try {
             tbAlarmService.ack(alarm, actor);
         } catch (ThingsboardException e) {
-            Alarm now = alarmService.findAlarmById(claims.tenant(), alarm.getId());
-            if (now != null && now.isAcknowledged()) {
+            Alarm now = findAlarm(claims);
+            if (now == null) {
+                return new Ack(false, "not-found"); // deleted while we were acknowledging it
+            }
+            if (now.isAcknowledged()) {
                 return new Ack(true, "already-acknowledged"); // the web UI or another call got there first
             }
             throw e;

@@ -9,7 +9,7 @@
 export const VOICE_MAX_LENGTH = 600;
 
 export interface VoiceLanguage {
-  code: 'hi';
+  code: string;
   name: string;
 }
 

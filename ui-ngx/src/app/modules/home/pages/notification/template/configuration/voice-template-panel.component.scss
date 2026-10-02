@@ -1,0 +1,7 @@
+// SPDX-FileCopyrightText: Copyright The Inferrix Authors
+// SPDX-License-Identifier: Apache-2.0
+
+// A hint with `.tb-error` is red only inside the rule-node configs. `:host` makes this outrank TB's grey `.tb-form-panel-hint`.
+:host .tb-form-panel-hint.tb-error {
+  color: var(--mat-theme-error, #f44336);
+}

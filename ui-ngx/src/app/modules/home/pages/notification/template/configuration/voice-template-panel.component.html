@@ -28,12 +28,15 @@
       {{ 'notification.voice-translate' | translate }}
     </button>
   </div>
+  @if (nothingCameBack) {
+    <div class="tb-form-panel-hint tb-error">{{ 'notification.voice-translation-none' | translate }}</div>
+  }
   <ng-container formGroupName="localizedBodies">
     @for (language of languages; track language.code) {
       <mat-form-field class="mat-block" subscriptSizing="dynamic">
         <mat-label>{{ language.name | translate }}</mat-label>
         <textarea matInput cdkTextareaAutosize cols="1" cdkAutosizeMinRows="2"
-                  [formControlName]="language.code"></textarea>
+                  [formControlName]="language.code" (input)="nothingCameBack = false"></textarea>
         @if (form.get(['localizedBodies', language.code]).hasError('maxlength')) {
           <mat-error>
             {{ 'notification.message-max-length' | translate:

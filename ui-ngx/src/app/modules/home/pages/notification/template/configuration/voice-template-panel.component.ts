@@ -14,9 +14,9 @@ import {
 export function voiceTemplateForm(fb: FormBuilder): FormGroup {
   return fb.group({
     body: ['', [Validators.required, Validators.maxLength(VOICE_MAX_LENGTH)]],
-    localizedBodies: fb.group({
-      hi: ['', Validators.maxLength(VOICE_MAX_LENGTH)]
-    }),
+    localizedBodies: fb.group(Object.fromEntries(
+      VOICE_TRANSLATED_LANGUAGES.map(({code}) => [code, ['', Validators.maxLength(VOICE_MAX_LENGTH)]])
+    )),
     localizedSource: [''],
     ackRequired: [false]
   }, {validators: voicePlaceholders});
@@ -35,6 +35,7 @@ function voicePlaceholders(form: AbstractControl): ValidationErrors | null {
 @Component({
   selector: 'tb-voice-template-panel',
   templateUrl: './voice-template-panel.component.html',
+  styleUrls: ['./voice-template-panel.component.scss'],
   standalone: false
 })
 export class VoiceTemplatePanelComponent {
@@ -43,6 +44,8 @@ export class VoiceTemplatePanelComponent {
 
   readonly languages = VOICE_TRANSLATED_LANGUAGES;
   translating = false;
+  /** A translate was answered with no translation in it. Cleared by the next translate, or by an edit of a translated field. */
+  nothingCameBack = false;
 
   constructor(private voiceService: InferrixVoiceService) {}
 
@@ -51,10 +54,14 @@ export class VoiceTemplatePanelComponent {
     return !this.translating && this.form.get('body').valid;
   }
 
-  /** Machine-translated before, and the English has changed since. Hand-written translations never count. */
+  /**
+   * Machine-translated before, the English has changed since, and a translation is still there to be out of date.
+   * Hand-written translations never count.
+   */
   get stale(): boolean {
     const source = this.form.get('localizedSource').value;
-    return !!source && source !== this.form.get('body').value;
+    return !!source && source !== this.form.get('body').value
+      && this.languages.some(({code}) => !!this.form.get(['localizedBodies', code]).value);
   }
 
   placeholdersLost(code: string): boolean {
@@ -63,8 +70,12 @@ export class VoiceTemplatePanelComponent {
   }
 
   translate() {
+    if (!this.canTranslate) {
+      return;
+    }
     const body: string = this.form.get('body').value;
     this.translating = true;
+    this.nothingCameBack = false;
     this.voiceService.translate(body).pipe(
       finalize(() => this.translating = false)
     ).subscribe(({translations}) => {
@@ -79,10 +90,12 @@ export class VoiceTemplatePanelComponent {
           filled = true;
         }
       }
-      // Nothing came back: the stored text, and the English it came from, stay as they were
       if (filled) {
         this.form.get('localizedSource').setValue(body);
         this.form.markAsDirty();
+      } else {
+        // The stored text, and the English it came from, stay as they were: only the admin is told
+        this.nothingCameBack = true;
       }
     });
   }

@@ -28,6 +28,9 @@ import {
 import {
   NotificationActionButtonConfigurationComponent
 } from '@home/pages/notification/template/configuration/notification-action-button-configuration.component';
+import {
+  VoiceTemplatePanelComponent
+} from '@home/pages/notification/template/configuration/voice-template-panel.component';
 
 @NgModule({
   declarations: [
@@ -43,7 +46,8 @@ import {
     NotificationSettingsComponent,
     NotificationSettingFormComponent,
     NotificationTemplateConfigurationComponent,
-    NotificationActionButtonConfigurationComponent
+    NotificationActionButtonConfigurationComponent,
+    VoiceTemplatePanelComponent
   ],
   imports: [
     CommonModule,

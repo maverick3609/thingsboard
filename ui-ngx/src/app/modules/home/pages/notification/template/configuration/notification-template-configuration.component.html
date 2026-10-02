@@ -177,6 +177,21 @@
     </mat-expansion-panel>
   </section>
   <section class="tb-form-panel tb-slide-toggle stroked"
+           [formGroupName]="NotificationDeliveryMethod.VOICE"
+           *ngIf="templateConfigurationForm.get('VOICE.enabled').value">
+    <mat-expansion-panel class="tb-settings" expanded="{{ expandedForm(NotificationDeliveryMethod.VOICE) }}">
+      <mat-expansion-panel-header class="fill-width flex flex-row flex-wrap">
+        <mat-panel-title class="template-tittle">
+          <tb-icon>{{ NotificationDeliveryMethodInfoMap.get(NotificationDeliveryMethod.VOICE).icon }}</tb-icon>
+          {{ NotificationDeliveryMethodInfoMap.get(NotificationDeliveryMethod.VOICE).name | translate }}
+        </mat-panel-title>
+      </mat-expansion-panel-header>
+      <ng-template matExpansionPanelContent class="tb-extension-panel">
+        <tb-voice-template-panel [form]="templateConfigurationForm.get('VOICE')"></tb-voice-template-panel>
+      </ng-template>
+    </mat-expansion-panel>
+  </section>
+  <section class="tb-form-panel tb-slide-toggle stroked"
            [formGroupName]="NotificationDeliveryMethod.EMAIL"
            *ngIf="templateConfigurationForm.get('EMAIL.enabled').value">
     <mat-expansion-panel class="tb-settings" expanded="{{ expandedForm(NotificationDeliveryMethod.EMAIL) }}">

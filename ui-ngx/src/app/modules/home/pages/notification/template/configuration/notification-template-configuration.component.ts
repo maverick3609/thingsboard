@@ -25,6 +25,7 @@ import { coerceBoolean } from '@shared/decorators/coercion';
 import { TranslateService } from '@ngx-translate/core';
 import { EditorOptions } from 'hugerte';
 import { defaultHugeRteOptions } from '@shared/models/hugerte/hugerte.models';
+import { voiceTemplateForm } from '@home/pages/notification/template/configuration/voice-template-panel.component';
 
 @Component({
     selector: 'tb-template-configuration',
@@ -279,6 +280,9 @@ export class NotificationTemplateConfigurationComponent implements OnDestroy, Co
           themeColor: [''],
           button: [null]
         });
+        break;
+      case NotificationDeliveryMethod.VOICE:
+        deliveryMethodForm = voiceTemplateForm(this.fb);
         break;
       default:
         throw new Error(`Not configured templated for notification delivery method: ${deliveryMethod}`);

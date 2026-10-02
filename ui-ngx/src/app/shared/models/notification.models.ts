@@ -316,7 +316,8 @@ export interface DeliveryMethodNotificationTemplate extends
     & EmailDeliveryMethodNotificationTemplate
     & SlackDeliveryMethodNotificationTemplate
     & MicrosoftTeamsDeliveryMethodNotificationTemplate
-    & MobileDeliveryMethodNotificationTemplate>{
+    & MobileDeliveryMethodNotificationTemplate
+    & VoiceDeliveryMethodNotificationTemplate>{
   body: string;
   enabled: boolean;
   method: NotificationDeliveryMethod;
@@ -365,6 +366,12 @@ interface MobileDeliveryMethodNotificationTemplate {
   subject: string;
 }
 
+interface VoiceDeliveryMethodNotificationTemplate {
+  localizedBodies: {[language: string]: string};
+  localizedSource: string;
+  ackRequired: boolean;
+}
+
 export enum NotificationStatus {
   SENT = 'SENT',
   READ = 'READ'
@@ -376,7 +383,8 @@ export enum NotificationDeliveryMethod {
   SMS = 'SMS',
   EMAIL = 'EMAIL',
   SLACK = 'SLACK',
-  MICROSOFT_TEAMS = 'MICROSOFT_TEAMS'
+  MICROSOFT_TEAMS = 'MICROSOFT_TEAMS',
+  VOICE = 'VOICE'
 }
 
 export interface NotificationDeliveryMethodInfo {
@@ -417,6 +425,11 @@ export const NotificationDeliveryMethodInfoMap = new Map<NotificationDeliveryMet
     {
       name: 'notification.delivery-method.microsoft-teams',
       icon: 'mdi:microsoft-teams'
+    }],
+  [NotificationDeliveryMethod.VOICE,
+    {
+      name: 'notification.delivery-method.voice',
+      icon: 'mdi:phone-in-talk'
     }]
 ]);
 

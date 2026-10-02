@@ -58,7 +58,7 @@ public class VoiceDeliveryMethodNotificationTemplate extends DeliveryMethodNotif
     @AssertTrue(message = "Voice translations must be Hindi (hi), at most 600 chars each")
     public boolean isLocalizedBodiesValid() {
         return localizedBodies == null || localizedBodies.entrySet().stream().allMatch(e ->
-                TRANSLATED_LANGUAGES.contains(e.getKey()) && (e.getValue() == null || e.getValue().length() <= MAX_LENGTH));
+                e.getKey() != null && TRANSLATED_LANGUAGES.contains(e.getKey()) && (e.getValue() == null || e.getValue().length() <= MAX_LENGTH));
     }
 
     /** The translations as one string, so the XSS check that guards {@code body} covers them: it skips maps. */

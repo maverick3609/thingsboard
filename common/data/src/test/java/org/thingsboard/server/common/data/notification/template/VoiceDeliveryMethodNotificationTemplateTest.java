@@ -32,9 +32,13 @@ class VoiceDeliveryMethodNotificationTemplateTest {
         assertThat(voice.getMethod()).isEqualTo(NotificationDeliveryMethod.VOICE);
         assertThat(voice.isAckRequired()).isTrue();
         assertThat(voice.getLocalizedBodies()).containsEntry("hi", "अलार्म ${alarmOriginatorName}");
+        assertThat(voice.getLocalizedSource()).isEqualTo("Alarm on ${alarmOriginatorName}");
 
         JsonNode written = MAPPER.readTree(MAPPER.writerFor(DeliveryMethodNotificationTemplate.class).writeValueAsString(voice));
         assertThat(written.get("method").asText()).isEqualTo("VOICE");
+        assertThat(written.has("localizedBodies")).isTrue();
+        assertThat(written.has("localizedSource")).isTrue();
+        assertThat(written.has("ackRequired")).isTrue();
         assertThat(written.has("templatableValues")).isFalse();
         assertThat(written.has("localizedBodiesValid")).isFalse();
         assertThat(written.has("localizedText")).isFalse();
@@ -43,8 +47,11 @@ class VoiceDeliveryMethodNotificationTemplateTest {
     @Test
     void processingACopyLeavesTheOriginalAlone() {
         VoiceDeliveryMethodNotificationTemplate original = new VoiceDeliveryMethodNotificationTemplate();
+        original.setEnabled(true);
         original.setBody("Alarm on ${name}");
         original.setLocalizedBodies(new HashMap<>(Map.of("hi", "अलार्म ${name}")));
+        original.setLocalizedSource("Alarm on ${name}");
+        original.setAckRequired(true);
 
         VoiceDeliveryMethodNotificationTemplate copy = (VoiceDeliveryMethodNotificationTemplate) original.copy();
         copy.getTemplatableValues().forEach(value -> value.set(value.get().replace("${name}", "AHU 1")));
@@ -53,6 +60,10 @@ class VoiceDeliveryMethodNotificationTemplateTest {
         assertThat(copy.getLocalizedBodies()).containsEntry("hi", "अलार्म AHU 1");
         assertThat(original.getBody()).isEqualTo("Alarm on ${name}");
         assertThat(original.getLocalizedBodies()).containsEntry("hi", "अलार्म ${name}");
+        // TB copies the template whenever the request carries data, so the channel reads a copy: losing one of these is silent
+        assertThat(copy.isEnabled()).isTrue();
+        assertThat(copy.isAckRequired()).isTrue();
+        assertThat(copy.getLocalizedSource()).isEqualTo("Alarm on ${name}");
     }
 
     @Test
@@ -82,6 +93,10 @@ class VoiceDeliveryMethodNotificationTemplateTest {
         assertThat(template.isLocalizedBodiesValid()).isFalse();
 
         bodies.remove("ar");
+        bodies.put(null, "x"); // not a language either, and the validator must say so, not throw
+        assertThat(template.isLocalizedBodiesValid()).isFalse();
+
+        bodies.remove(null);
         bodies.put("hi", "x".repeat(VoiceDeliveryMethodNotificationTemplate.MAX_LENGTH + 1));
         assertThat(template.isLocalizedBodiesValid()).isFalse();
     }

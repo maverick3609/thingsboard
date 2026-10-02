@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.thingsboard.server.service.inferrix.voice;
 
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.thingsboard.common.util.JacksonUtil;
@@ -19,9 +21,12 @@ import java.util.Base64;
  * Signs and checks call tokens, {@code base64url(json) "." base64url(hmacSha256)}. A token is the
  * only credential on the dialer's callbacks, which have no session, and only Cortex can make one.
  * Expiry is reported, not enforced, because the callers differ: precheck answers "expired", while a
- * call's result is still accepted a little late (see VoiceCallbackService).
+ * call's result is still accepted a little late (see VoiceCallbackService). A secret that is blank,
+ * shorter than 32 characters or equal to the dialer's bearer token leaves voice unconfigured, because
+ * the dialer runs on this host and must not be able to mint tokens.
  */
 @Component
+@Slf4j
 public class VoiceCallTokens {
 
     static final int MIN_SECRET_LENGTH = 32;
@@ -32,10 +37,27 @@ public class VoiceCallTokens {
     private final byte[] secret;
     private final long ttlMs;
 
+    /** Spring's constructor: it also takes the dialer's token, to refuse a secret equal to it. */
+    @Autowired
     public VoiceCallTokens(@Value("${inferrix.voice.token_secret:}") String secret,
-                           @Value("${inferrix.voice.token_ttl_sec:3600}") long ttlSec) {
-        this.secret = secret != null && secret.length() >= MIN_SECRET_LENGTH ? secret.getBytes(StandardCharsets.UTF_8) : null;
+                           @Value("${inferrix.voice.token_ttl_sec:3600}") long ttlSec,
+                           @Value("${inferrix.voice.dialer_token:}") String dialerToken) {
+        this(blankIfDialerToken(secret, dialerToken), ttlSec);
+    }
+
+    public VoiceCallTokens(String secret, long ttlSec) {
+        this.secret = secret != null && secret.length() >= MIN_SECRET_LENGTH && !secret.isBlank()
+                ? secret.getBytes(StandardCharsets.UTF_8) : null;
         this.ttlMs = ttlSec * 1000;
+    }
+
+    private static String blankIfDialerToken(String secret, String dialerToken) {
+        if (secret == null || secret.isBlank() || !secret.equals(dialerToken)) {
+            return secret;
+        }
+        log.warn("inferrix.voice.token_secret is the same as inferrix.voice.dialer_token, so voice stays unconfigured; "
+                + "give each its own value");
+        return "";
     }
 
     public boolean isConfigured() {

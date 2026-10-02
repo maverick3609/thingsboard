@@ -940,7 +940,7 @@ After `git merge upstream/<ref>`:
 
   Check: `grep -c "NotificationDeliveryMethod.VOICE" common/data/src/main/java/org/thingsboard/server/common/data/notification/targets/NotificationTargetType.java` must show **1**.
 - **`DeliveryMethodNotificationTemplate.java`** (V3): **silent-drop**. Every saved VOICE template fails to deserialize with "Could not resolve type id 'VOICE'", and every rule using one fails. `VoiceDeliveryMethodNotificationTemplateTest` fails too. Check: `grep -c "VoiceDeliveryMethodNotificationTemplate.class" common/data/src/main/java/org/thingsboard/server/common/data/notification/template/DeliveryMethodNotificationTemplate.java` must show **2**.
-- **`thingsboard.yml`** (V4): **silent-drop**. Every key falls back to its `@Value` default, which is off and blank, so voice is unavailable and nothing errors. Servers read the external `/etc/thingsboard/conf/thingsboard.yml`, which needs the same block. Check: `grep -c '^  voice:' application/src/main/resources/thingsboard.yml` must show **1**.
+- **`thingsboard.yml`** (V4): **silent-drop**, but cosmetic on a server configured through env vars. Not compiler-enforced, so check by hand. Spring reads each `INFERRIX_VOICE_*` variable straight into the matching `@Value("${inferrix.voice.*}")` whether or not the yml block exists, and the `@Value` defaults equal the yml ones, so losing the block changes nothing at runtime and nothing errors. What is lost is the documentation: the defaults and the comments that say what each setting does. The external `/etc/thingsboard/conf/thingsboard.yml` needs no block for those values to bind. Check: `grep -c '^  voice:' application/src/main/resources/thingsboard.yml` must show **1**.
 
 ---
 

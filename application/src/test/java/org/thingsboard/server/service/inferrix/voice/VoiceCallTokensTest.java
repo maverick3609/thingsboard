@@ -30,8 +30,12 @@ class VoiceCallTokensTest {
     private final VoiceCallTokens tokens = new VoiceCallTokens(SECRET, 3600);
 
     private static VoiceCallClaims claims(String language) {
+        return claims(language, false);
+    }
+
+    private static VoiceCallClaims claims(String language, boolean languageFallback) {
         return VoiceCallClaims.of(TenantId.fromUUID(UUID.randomUUID()), new NotificationRequestId(UUID.randomUUID()),
-                new UserId(UUID.randomUUID()), new AlarmId(UUID.randomUUID()), language, false);
+                new UserId(UUID.randomUUID()), new AlarmId(UUID.randomUUID()), language, languageFallback);
     }
 
     private static void assertRefused(VoiceCallTokens tokens, String token) {
@@ -53,12 +57,15 @@ class VoiceCallTokensTest {
 
     @Test
     void roundTrip() throws Exception {
-        VoiceCallClaims claims = claims("hi");
+        VoiceCallClaims claims = claims("hi", true);
+        long before = System.currentTimeMillis();
 
         VoiceCallClaims verified = tokens.verify(tokens.mint(claims));
 
+        long after = System.currentTimeMillis();
+        assertThat(verified.languageFallback()).isTrue();
         assertThat(verified.withExpiry(0)).isEqualTo(claims);
-        assertThat(verified.expiresAt()).isGreaterThan(System.currentTimeMillis());
+        assertThat(verified.expiresAt()).isBetween(before + 3_600_000, after + 3_600_000); // 3600 s, in milliseconds
         assertThat(tokens.isExpired(verified, 0)).isFalse();
     }
 
@@ -78,6 +85,8 @@ class VoiceCallTokensTest {
         String second = tokens.mint(claims("en"));
 
         assertRefused(tokens, first.substring(0, first.indexOf('.')) + second.substring(second.indexOf('.')));
+        assertRefused(tokens, first.substring(0, first.indexOf('.') + 1));   // a well-formed claim, signature stripped
+        assertRefused(tokens, first.substring(0, first.length() - 1));       // signature truncated
     }
 
     @Test
@@ -120,13 +129,24 @@ class VoiceCallTokensTest {
     }
 
     @Test
-    void anUnsetOrShortSecretMintsAndAcceptsNothing() {
+    void anUnsetOrShortSecretMintsAndAcceptsNothing() throws Exception {
         String valid = tokens.mint(claims("en"));
-        for (String secret : new String[]{"", "short-secret", null}) {
-            VoiceCallTokens unconfigured = new VoiceCallTokens(secret, 3600);
+        VoiceCallTokens[] unusable = {
+                new VoiceCallTokens("", 3600),
+                new VoiceCallTokens("short-secret", 3600),
+                new VoiceCallTokens(null, 3600),
+                new VoiceCallTokens(" ".repeat(32), 3600),   // long enough, but blank
+                new VoiceCallTokens(SECRET, 3600, SECRET)};  // equal to the dialer's token, so the dialer could mint
+        for (VoiceCallTokens unconfigured : unusable) {
             assertThat(unconfigured.isConfigured()).isFalse();
             assertThatThrownBy(() -> unconfigured.mint(claims("en"))).isInstanceOf(IllegalStateException.class);
             assertRefused(unconfigured, valid);
+        }
+
+        for (String dialerToken : new String[]{"", "a-dialer-bearer-token-of-its-own-123"}) {
+            VoiceCallTokens separate = new VoiceCallTokens(SECRET, 3600, dialerToken);
+            assertThat(separate.isConfigured()).isTrue();
+            assertThat(separate.verify(valid).language()).isEqualTo("en");   // the same key as `tokens`
         }
     }
 

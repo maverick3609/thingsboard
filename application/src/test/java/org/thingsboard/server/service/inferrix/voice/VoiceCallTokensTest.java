@@ -37,6 +37,8 @@ class VoiceCallTokensTest {
     private static void assertRefused(VoiceCallTokens tokens, String token) {
         assertThatThrownBy(() -> tokens.verify(token))
                 .isInstanceOf(ThingsboardException.class)
+                .hasMessage("Invalid voice call token")
+                .hasNoCause()
                 .extracting(e -> ((ThingsboardException) e).getErrorCode())
                 .isEqualTo(ThingsboardErrorCode.AUTHENTICATION);
     }

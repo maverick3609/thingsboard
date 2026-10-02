@@ -2290,6 +2290,22 @@ inferrix:
     # The broker address handed to a controller during adoption lives in the 'inferrixController'
     # admin settings (host, port, tls, caCert, topicRoot), not here: it is fleet configuration an
     # operator changes, not a deployment secret.
+  # Voice alarm calls through inferrix-dialer, which runs on this host (INFERRIX.md §16).
+  voice:
+    # Off by default. When on, VOICE is offered for every user with a phone number, and each user can
+    # switch it off in their own notification settings.
+    enabled: "${INFERRIX_VOICE_ENABLED:false}"
+    # The dialer's loopback API, and the bearer token it expects (the dialer's INFERRIX_DIALER_TOKEN).
+    dialer_url: "${INFERRIX_VOICE_DIALER_URL:http://127.0.0.1:8765}"
+    dialer_token: "${INFERRIX_VOICE_DIALER_TOKEN:}"
+    # This server as the dialer reaches it. The callbacks go to /api/noauth/inferrix/voice/v1/*.
+    callback_base_url: "${INFERRIX_VOICE_CALLBACK_BASE_URL:http://127.0.0.1:8080}"
+    # HMAC key for the per-call tokens, the callbacks' only credential. At least 32 characters, or
+    # voice stays unconfigured. It never leaves this server. Generate with: openssl rand -base64 32
+    token_secret: "${INFERRIX_VOICE_TOKEN_SECRET:}"
+    # How long a call token stays valid. It must exceed the longest wait in the dialer's queue
+    # (up to 50 calls of about a minute each).
+    token_ttl_sec: "${INFERRIX_VOICE_TOKEN_TTL_SEC:3600}"
 
 license:
   # Inferrix licence key. Obtain it from Inferrix using the instance ID the server prints on its first boot.

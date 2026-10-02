@@ -928,6 +928,7 @@ After `git merge upstream/<ref>`:
 | V1 | `common/data/src/main/java/org/thingsboard/server/common/data/notification/NotificationDeliveryMethod.java` | `VOICE("voice call")` appended after `MOBILE_APP("mobile app")`, whose `;` becomes `,`. Append-only: the enum is stored by name in template, settings and stats JSON, so no migration and no version bump. Roll-forward only: once a VOICE template, user preference or stat is stored, a pre-VOICE jar cannot read it (user preferences silently fall back to defaults, losing opt-outs) | The delivery method itself |
 | V2 | `common/data/src/main/java/org/thingsboard/server/common/data/notification/targets/NotificationTargetType.java` | `NotificationDeliveryMethod.VOICE` appended to the `PLATFORM_USERS` set | Platform-user targets can receive VOICE. `UserNotificationSettings.deliveryMethods` derives from this set, so V2 adds VOICE to each user's default preferences and lets a saved VOICE preference pass validation. Whether the toggle is shown depends on the channel's `check()`, not on this set |
 | V3 | `common/data/src/main/java/org/thingsboard/server/common/data/notification/template/DeliveryMethodNotificationTemplate.java` | Two lines: `@DiscriminatorMapping(value = "VOICE", ...)` after the `MOBILE_APP` mapping in `@Schema`, and `@Type(name = "VOICE", value = VoiceDeliveryMethodNotificationTemplate.class)` after the `MOBILE_APP` `@Type` | Jackson polymorphism: without it a stored VOICE template cannot be read |
+| V4 | `application/src/main/resources/thingsboard.yml` | A `voice:` block (six keys) inside the existing top-level `inferrix:` block, after its `controller:` block and before `license:` | Deployment switches. The two secrets come from env vars (`INFERRIX_VOICE_DIALER_TOKEN`, `INFERRIX_VOICE_TOKEN_SECRET`) |
 
 ### Merge-recovery procedure
 
@@ -939,6 +940,7 @@ After `git merge upstream/<ref>`:
 
   Check: `grep -c "NotificationDeliveryMethod.VOICE" common/data/src/main/java/org/thingsboard/server/common/data/notification/targets/NotificationTargetType.java` must show **1**.
 - **`DeliveryMethodNotificationTemplate.java`** (V3): **silent-drop**. Every saved VOICE template fails to deserialize with "Could not resolve type id 'VOICE'", and every rule using one fails. `VoiceDeliveryMethodNotificationTemplateTest` fails too. Check: `grep -c "VoiceDeliveryMethodNotificationTemplate.class" common/data/src/main/java/org/thingsboard/server/common/data/notification/template/DeliveryMethodNotificationTemplate.java` must show **2**.
+- **`thingsboard.yml`** (V4): **silent-drop**. Every key falls back to its `@Value` default, which is off and blank, so voice is unavailable and nothing errors. Servers read the external `/etc/thingsboard/conf/thingsboard.yml`, which needs the same block. Check: `grep -c '^  voice:' application/src/main/resources/thingsboard.yml` must show **1**.
 
 ---
 

@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.thingsboard.server.dao.attributes.AttributesService;
 import org.thingsboard.server.dao.device.DeviceCredentialsService;
 import org.thingsboard.server.dao.device.DeviceProfileService;
@@ -79,7 +78,6 @@ class InferrixControllerWiringTest {
         });
     }
 
-    @Configuration(proxyBeanMethods = false)
     static class Collaborators {
 
         @Bean
@@ -124,7 +122,6 @@ class InferrixControllerWiringTest {
     }
 
     /** Mirrors the condition on the real service so the default-off behaviour is what is tested. */
-    @Configuration(proxyBeanMethods = false)
     static class DiscoveryConfig {
 
         @Bean(initMethod = "start", destroyMethod = "stop")

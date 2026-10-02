@@ -5,7 +5,6 @@ package org.thingsboard.server.service.inferrix.gateway;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.thingsboard.server.dao.attributes.AttributesService;
 import org.thingsboard.server.service.inferrix.InferrixSecretCodec;
 
@@ -51,7 +50,6 @@ class InferrixGatewayWiringTest {
                 });
     }
 
-    @Configuration
     static class Collaborators {
 
         @Bean

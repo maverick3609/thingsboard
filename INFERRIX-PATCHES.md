@@ -905,6 +905,43 @@ After `git merge upstream/<ref>`:
 
 ---
 
+## Feature: Voice Alarm Calls
+
+- **Intent (2026-10-02):** let alarm notification rules phone people through the site's PBX. `VOICE` is a new Notification Center delivery method. `VoiceNotificationChannel` hands each call to `inferrix-dialer`, a separate repo running on the Cortex host with a loopback API, which speaks the alarm offline and reports back. TB's own escalation table, persisted scheduled levels, clear rule and per-user opt-out do the rest. Spec: `vault/thingsboard/features/voice-alarm-calls-spec.md`. Plans: `docs/superpowers/plans/2026-10-02-voice-dialer.md` and `2026-10-02-voice-cortex.md`.
+- **Additive, no ledger rows:**
+  - `VoiceDeliveryMethodNotificationTemplate` (common/data);
+  - `application/.../service/inferrix/voice/**` (`VoiceCallClaims`, `VoiceCallTokens`, `VoiceDialerClient`, `VoiceNotificationChannel`, `VoiceCallbackService`);
+  - `controller/InferrixVoiceController.java`;
+  - `ui-ngx/.../shared/models/inferrix-voice.models.ts`, `core/http/inferrix-voice.service.ts`, and `modules/home/pages/notification/template/configuration/voice-template-panel.component.*`;
+  - all of their tests.
+- **Gate:** `inferrix.voice.enabled`, default false. While it is off:
+  - `VoiceNotificationChannel.check()` fails, so TB silently skips VOICE for rule-triggered requests;
+  - VOICE is hidden from users' notification settings and shown greyed out in the send dialog (for a system administrator its "configure" link leads nowhere).
+
+  The template editor still offers a VOICE section, because it lists every enum value, but nothing places a call.
+- **Status:** in progress on `feature/voice-alarm-calls`.
+
+### TB-core files modified
+
+| # | File | Change | Why |
+|---|------|--------|-----|
+| V1 | `common/data/src/main/java/org/thingsboard/server/common/data/notification/NotificationDeliveryMethod.java` | `VOICE("voice call")` appended after `MOBILE_APP("mobile app")`, whose `;` becomes `,`. Append-only: the enum is stored by name in template, settings and stats JSON, so no migration and no version bump | The delivery method itself |
+| V2 | `common/data/src/main/java/org/thingsboard/server/common/data/notification/targets/NotificationTargetType.java` | `NotificationDeliveryMethod.VOICE` appended to the `PLATFORM_USERS` set | Platform-user targets can receive VOICE. `UserNotificationSettings.deliveryMethods` derives from this set, which gives each user the opt-out toggle and lets a saved toggle pass validation |
+| V3 | `common/data/src/main/java/org/thingsboard/server/common/data/notification/template/DeliveryMethodNotificationTemplate.java` | Two lines: `@DiscriminatorMapping(value = "VOICE", ...)` after the `MOBILE_APP` mapping in `@Schema`, and `@Type(name = "VOICE", value = VoiceDeliveryMethodNotificationTemplate.class)` after the `MOBILE_APP` `@Type` | Jackson polymorphism: without it a stored VOICE template cannot be read |
+
+### Merge-recovery procedure
+
+- **`NotificationDeliveryMethod.java`** (V1): **compiler-enforced**. Losing it breaks the template class and the channel. Check: `grep -c 'VOICE("voice call")' common/data/src/main/java/org/thingsboard/server/common/data/notification/NotificationDeliveryMethod.java` must show **1**.
+- **`NotificationTargetType.java`** (V2): **silent-drop**. Losing it has three effects, none of them a build error:
+  - `DefaultNotificationCenter` filters VOICE out for platform-user targets, so rule-triggered calls stop without an error;
+  - the toggle vanishes from users' settings;
+  - saving a settings page that still holds a VOICE toggle fails validation.
+
+  Check: `grep -c "NotificationDeliveryMethod.VOICE" common/data/src/main/java/org/thingsboard/server/common/data/notification/targets/NotificationTargetType.java` must show **1**.
+- **`DeliveryMethodNotificationTemplate.java`** (V3): **silent-drop**. Every saved VOICE template fails to deserialize with "Could not resolve type id 'VOICE'", and every rule using one fails. `VoiceDeliveryMethodNotificationTemplateTest` fails too. Check: `grep -c "VoiceDeliveryMethodNotificationTemplate.class" common/data/src/main/java/org/thingsboard/server/common/data/notification/template/DeliveryMethodNotificationTemplate.java` must show **2**.
+
+---
+
 ## How to extend this ledger
 
 When you modify a TB-core file for a new feature:

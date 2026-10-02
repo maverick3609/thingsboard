@@ -13,7 +13,8 @@ public enum NotificationDeliveryMethod {
     SMS("SMS"),
     SLACK("Slack"),
     MICROSOFT_TEAMS("Microsoft Teams"),
-    MOBILE_APP("mobile app");
+    MOBILE_APP("mobile app"),
+    VOICE("voice call");
 
     @Getter
     private final String name;

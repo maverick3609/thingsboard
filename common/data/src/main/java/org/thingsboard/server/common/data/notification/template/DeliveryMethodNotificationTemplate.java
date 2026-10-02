@@ -25,7 +25,8 @@ import java.util.List;
                 @DiscriminatorMapping(value = "SMS", schema = SmsDeliveryMethodNotificationTemplate.class),
                 @DiscriminatorMapping(value = "SLACK", schema = SlackDeliveryMethodNotificationTemplate.class),
                 @DiscriminatorMapping(value = "MICROSOFT_TEAMS", schema = MicrosoftTeamsDeliveryMethodNotificationTemplate.class),
-                @DiscriminatorMapping(value = "MOBILE_APP", schema = MobileAppDeliveryMethodNotificationTemplate.class)
+                @DiscriminatorMapping(value = "MOBILE_APP", schema = MobileAppDeliveryMethodNotificationTemplate.class),
+                @DiscriminatorMapping(value = "VOICE", schema = VoiceDeliveryMethodNotificationTemplate.class)
         }
 )
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -36,7 +37,8 @@ import java.util.List;
         @Type(name = "SMS", value = SmsDeliveryMethodNotificationTemplate.class),
         @Type(name = "SLACK", value = SlackDeliveryMethodNotificationTemplate.class),
         @Type(name = "MICROSOFT_TEAMS", value = MicrosoftTeamsDeliveryMethodNotificationTemplate.class),
-        @Type(name = "MOBILE_APP", value = MobileAppDeliveryMethodNotificationTemplate.class)
+        @Type(name = "MOBILE_APP", value = MobileAppDeliveryMethodNotificationTemplate.class),
+        @Type(name = "VOICE", value = VoiceDeliveryMethodNotificationTemplate.class)
 })
 @Data
 @NoArgsConstructor

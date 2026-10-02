@@ -1,0 +1,53 @@
+<!--
+
+    SPDX-FileCopyrightText: Copyright The Inferrix Authors
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<div class="flex flex-col gap-4" [formGroup]="form">
+  <mat-form-field class="mat-block" subscriptSizing="dynamic">
+    <mat-label>{{ 'notification.voice-message-english' | translate }}</mat-label>
+    <textarea matInput cdkTextareaAutosize cols="1" cdkAutosizeMinRows="2" formControlName="body"></textarea>
+    <mat-hint>{{ 'notification.voice-message-hint' | translate }}</mat-hint>
+    @if (form.get('body').hasError('required')) {
+      <mat-error>{{ 'notification.message-required' | translate }}</mat-error>
+    }
+    @if (form.get('body').hasError('maxlength')) {
+      <mat-error>
+        {{ 'notification.message-max-length' | translate: {length: form.get('body').getError('maxlength').requiredLength} }}
+      </mat-error>
+    }
+  </mat-form-field>
+  <div class="flex flex-row items-center justify-between gap-2">
+    <div class="tb-form-panel-hint tb-error">
+      @if (stale) {
+        {{ 'notification.voice-translation-stale' | translate }}
+      }
+    </div>
+    <button mat-stroked-button color="primary" type="button" [disabled]="!canTranslate" (click)="translate()">
+      {{ 'notification.voice-translate' | translate }}
+    </button>
+  </div>
+  <ng-container formGroupName="localizedBodies">
+    @for (language of languages; track language.code) {
+      <mat-form-field class="mat-block" subscriptSizing="dynamic">
+        <mat-label>{{ language.name | translate }}</mat-label>
+        <textarea matInput cdkTextareaAutosize cols="1" cdkAutosizeMinRows="2"
+                  [formControlName]="language.code"></textarea>
+        @if (form.get(['localizedBodies', language.code]).hasError('maxlength')) {
+          <mat-error>
+            {{ 'notification.message-max-length' | translate:
+               {length: form.get(['localizedBodies', language.code]).getError('maxlength').requiredLength} }}
+          </mat-error>
+        }
+      </mat-form-field>
+      @if (placeholdersLost(language.code)) {
+        <div class="tb-form-panel-hint tb-error">{{ 'notification.voice-placeholders-lost' | translate }}</div>
+      }
+    }
+  </ng-container>
+  <mat-slide-toggle class="mat-slide" formControlName="ackRequired">
+    {{ 'notification.voice-ack-required' | translate }}
+  </mat-slide-toggle>
+  <div class="tb-form-panel-hint">{{ 'notification.voice-ack-required-hint' | translate }}</div>
+</div>

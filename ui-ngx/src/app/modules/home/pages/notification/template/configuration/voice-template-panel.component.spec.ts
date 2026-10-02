@@ -151,7 +151,6 @@ describe('VoiceTemplatePanelComponent', () => {
     panel.translate();
 
     expect(panel.form.get('localizedBodies.hi').value).toBe('हाथ से लिखा ${alarmOriginatorName}');
-    expect(panel.nothingCameBack).toBeTrue();
   });
 
   it('sends one request however often translate is called', () => {
@@ -208,6 +207,35 @@ describe('VoiceTemplatePanelComponent', () => {
     expect(panel.form.get('localizedSource').value).toBe('');
 
     answer = new Subject<VoiceTranslateResponse>();
+    panel.translate();
+
+    expect(panel.nothingCameBack).toBeFalse();
+  });
+
+  it('counts an empty translation as nothing coming back', () => {
+    answer = of({translations: {hi: {text: '', placeholdersOk: true}}});
+
+    panel.translate();
+
+    expect(panel.nothingCameBack).toBeTrue();
+  });
+
+  it('stops saying so once there is text, and says so again if the text is cleared', () => {
+    answer = of({translations: {}});
+    panel.translate();
+    expect(panel.nothingCameBack).toBeTrue();
+
+    panel.form.get('localizedBodies.hi').setValue('हाथ से लिखा ${alarmOriginatorName}');
+    expect(panel.nothingCameBack).toBeFalse();
+
+    panel.form.get('localizedBodies.hi').setValue('');
+    expect(panel.nothingCameBack).toBeTrue();
+  });
+
+  it('does not say nothing came back while hand-written text stands', () => {
+    panel.form.get('localizedBodies.hi').setValue('हाथ से लिखा ${alarmOriginatorName}');
+    answer = of({translations: {}});
+
     panel.translate();
 
     expect(panel.nothingCameBack).toBeFalse();
@@ -380,7 +408,7 @@ describe('VoiceTemplatePanelComponent template', () => {
     expect(colour(hint('voice-ack-required-hint'))).toBe(grey);
   });
 
-  it('says when nothing came back, until the next translate or an edit of a translated field', () => {
+  it('says when nothing came back, until there is text or the next translate', () => {
     panel.form.get('body').setValue(english);
     answer = of({translations: {}});
     fixture.detectChanges();
@@ -394,8 +422,7 @@ describe('VoiceTemplatePanelComponent template', () => {
     type(textareas()[1], 'हाथ से लिखा ${alarmOriginatorName}');
     expect(hint('voice-translation-none')).toBeNull();
 
-    translateButton().click();
-    fixture.detectChanges();
+    type(textareas()[1], '');
     expect(hint('voice-translation-none')).not.toBeNull();
 
     answer = new Subject<VoiceTranslateResponse>();

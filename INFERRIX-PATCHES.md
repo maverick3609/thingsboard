@@ -920,7 +920,7 @@ After `git merge upstream/<ref>`:
   - VOICE is hidden from users' notification settings and shown greyed out in the send dialog (for a system administrator its "configure" link leads nowhere).
 
   The template editor still offers a VOICE section, because it lists every enum value, but nothing places a call.
-- **Status:** complete, and merged into `inferrix-release-4.3` locally on 2026-10-03 (a fast-forward to `cd5cfc9c3a`); not pushed. Live calls through the PBX are operator-pending. They need `inferrix-dialer` (private repository `maverick3609/inferrix-dialer`) installed and registered (its plan, Task 9), and a native speaker's review of the Hindi before release.
+- **Status:** complete, merged into `inferrix-release-4.3` on 2026-10-03 (a fast-forward to `cd5cfc9c3a`) and pushed to `origin` the same day. Live calls through the PBX are operator-pending. They need `inferrix-dialer` (private repository `maverick3609/inferrix-dialer`) installed and registered (its plan, Task 9), and a native speaker's review of the Hindi before release.
 
 ### TB-core files modified
 

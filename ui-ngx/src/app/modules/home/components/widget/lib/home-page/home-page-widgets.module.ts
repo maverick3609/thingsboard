@@ -26,6 +26,9 @@ import { IotHubComponentsModule } from '@home/components/iot-hub/iot-hub-compone
 import {
   LicenseInfoCardComponent
 } from '@home/pages/home-links/license-info-card/license-info-card.component';
+import {
+  CommunityGrantDialogComponent
+} from '@home/components/widget/lib/home-page/community-grant-dialog.component';
 
 @NgModule({
   declarations:
@@ -44,7 +47,8 @@ import {
       QuickLinkComponent,
       AddQuickLinkDialogComponent,
       RecentDashboardsWidgetComponent,
-      IotHubWidgetComponent
+      IotHubWidgetComponent,
+      CommunityGrantDialogComponent
     ],
   imports: [
     CommonModule,
@@ -71,6 +75,7 @@ import {
     AddQuickLinkDialogComponent,
     RecentDashboardsWidgetComponent,
     IotHubWidgetComponent,
+    CommunityGrantDialogComponent,
     LicenseInfoCardComponent
   ]
 })

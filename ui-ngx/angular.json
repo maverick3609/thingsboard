@@ -237,9 +237,6 @@
             "include": [
               "src/**/*.spec.ts"
             ],
-            "exclude": [
-              "src/app/core/auth/auth.service.spec.ts"
-            ],
             "browsers": "ChromeHeadless"
           }
         }

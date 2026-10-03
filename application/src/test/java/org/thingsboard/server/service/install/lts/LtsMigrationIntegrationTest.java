@@ -43,7 +43,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 @DaoSqlTest
-// Cheap protection for the 8 methods sharing one DirtiesContext(AFTER_CLASS) schema: JUnit 4's default
+// Cheap protection for the 9 methods sharing one DirtiesContext(AFTER_CLASS) schema: JUnit 4's default
 // order is String.hashCode()-keyed, not declaration order. Individual tests still must not rely on order
 // for correctness (each establishes its own preconditions) — this just makes runs reproducible.
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
@@ -74,8 +74,6 @@ public class LtsMigrationIntegrationTest extends AbstractControllerTest {
     private List<LtsMigration> migrations;
 
     private Long originalSchemaVersion;
-    private String originalClusterId;
-    private String originalLicenseClaimToken;
     private WidgetsBundleId bundleId;
     private WidgetTypeId widgetTypeId;
 
@@ -88,15 +86,6 @@ public class LtsMigrationIntegrationTest extends AbstractControllerTest {
         if (originalSchemaVersion == null) {
             jdbcTemplate.execute("INSERT INTO tb_schema_settings (schema_version, product) VALUES (" + V_4_2_2_2 + ", 'CE')");
         }
-
-        // The 4.3.1.6 tests drop and re-create tb_cluster, so keep the row the shared test DB already has.
-        jdbcTemplate.query("SELECT cluster_id, license_claim_token FROM tb_cluster", rs -> {
-            if (rs.next()) {
-                originalClusterId = rs.getString("cluster_id");
-                originalLicenseClaimToken = rs.getString("license_claim_token");
-            }
-            return null;
-        });
 
         // Seed an obsolete system widget bundle with one (non-deprecated) widget type linked to it.
         WidgetsBundle bundle = new WidgetsBundle();
@@ -125,14 +114,6 @@ public class LtsMigrationIntegrationTest extends AbstractControllerTest {
             jdbcTemplate.execute("UPDATE tb_schema_settings SET schema_version = " + originalSchemaVersion);
         } else {
             jdbcTemplate.execute("DELETE FROM tb_schema_settings");
-        }
-        // Guarded so that a migration that failed to recreate tb_cluster reports its own assertion, not a tear-down error.
-        if (tableExists("tb_cluster")) {
-            jdbcTemplate.execute("DELETE FROM tb_cluster");
-            if (originalClusterId != null) {
-                jdbcTemplate.update("INSERT INTO tb_cluster (cluster_id, license_claim_token) VALUES (?::uuid, ?)",
-                        originalClusterId, originalLicenseClaimToken);
-            }
         }
         if (widgetTypeId != null && widgetTypeService.findWidgetTypeDetailsById(TenantId.SYS_TENANT_ID, widgetTypeId) != null) {
             widgetTypeService.deleteWidgetType(TenantId.SYS_TENANT_ID, widgetTypeId);
@@ -233,30 +214,6 @@ public class LtsMigrationIntegrationTest extends AbstractControllerTest {
 
         // The 4.3.1.2 schema SQL ran: the column exists again.
         assertTrue(columnExists("calculated_field", "additional_info"));
-    }
-
-    @Test
-    public void appliesSchemaForV4316CreatesTbClusterAndMintsOneClusterId() {
-        jdbcTemplate.execute("DROP TABLE IF EXISTS tb_cluster");
-        assertFalse(tableExists("tb_cluster"));
-
-        ltsMigrationService.applyMigrations("4.3.1.3", "4.3.1.6", NO_POST_SCHEMA_WORK);
-
-        assertTrue(tableExists("tb_cluster"));
-        assertEquals(Long.valueOf(1L), jdbcTemplate.queryForObject("SELECT COUNT(*) FROM tb_cluster", Long.class));
-    }
-
-    @Test
-    public void v4316KeepsAnExistingClusterId() {
-        UUID existing = UUID.randomUUID();
-        jdbcTemplate.execute("DROP TABLE IF EXISTS tb_cluster");
-        ltsMigrationService.applyMigrations("4.3.1.3", "4.3.1.6", NO_POST_SCHEMA_WORK);
-        jdbcTemplate.update("UPDATE tb_cluster SET cluster_id = ?::uuid", existing.toString());
-
-        ltsMigrationService.applyMigrations("4.3.1.3", "4.3.1.6", NO_POST_SCHEMA_WORK);
-
-        assertEquals(List.of(existing.toString()),
-                jdbcTemplate.queryForList("SELECT cluster_id FROM tb_cluster", String.class));
     }
 
     @Test

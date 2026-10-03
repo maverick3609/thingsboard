@@ -206,19 +206,7 @@ public enum ActionType {
     /**
      * SMS sent. Does not push to rule engine.
      */
-    SMS_SENT,
-    /**
-     * Community Grant instance checker run from an uploaded bundle. Does not push to rule engine.
-     */
-    COMMUNITY_GRANT_OFFLINE_CHECKER_RUN,
-    /**
-     * Community Grant access request to the registered owner. Does not push to rule engine.
-     */
-    COMMUNITY_GRANT_REQUEST_ACCESS,
-    /**
-     * Community Grant enrollment started or its report declared handed over. Does not push to rule engine.
-     */
-    COMMUNITY_GRANT_ENROLLMENT;
+    SMS_SENT;
 
     @Getter
     private final boolean read;

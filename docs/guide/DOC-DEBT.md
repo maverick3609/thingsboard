@@ -88,3 +88,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [x] `b5d6ed7773` feat(voice): dialer callbacks and translate endpoint, tested end to end
 - [x] `061ebb023d` feat(voice): voice template panel with offline translate
 - [x] `5638b30b24` fix(voice): red warnings, one language list, and pins for the panel's template
+- [ ] `c37f58ab92` fix(gateway): the five defects the on-screen pass found

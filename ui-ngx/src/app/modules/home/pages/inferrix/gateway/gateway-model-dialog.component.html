@@ -149,6 +149,7 @@
         }
         @default {
           <tb-gateway-form [properties]="data.properties" [layout]="data.layout"
+                           [title]="data.modelTitle"
                            [disabled]="data.readonly" [(ngModel)]="values"
                            [ngModelOptions]="{standalone: true}"></tb-gateway-form>
         }

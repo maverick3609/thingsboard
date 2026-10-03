@@ -1,16 +1,23 @@
 # Gateway data sources: matching the stack's own configuration UI
 
-**Status:** the type-by-type pass is **complete** — all 24 rows of the sequence below are done
-as of 2026-09-30. What is still owed is the on-screen pass over rows 6-24, and it is blocked on two
-things at once rather than on effort: no browser tooling has connected in any session that tried
-(2026-09-30: `playwright` timed out at 30s, `chrome-devtools` closed the connection), and Cortex
-itself is unreachable — `192.168.1.77` and `192.168.1.140` both answer nothing, while the gateway
-stack on `localhost:8080` answers 401 as it should. A pass needs a reachable Cortex first; the
-gateway being up is not enough, because these forms are rendered by Cortex. The dialog save-path question is **decided and implemented** — see
-"Saving a point that has nothing to save" below. Phase G7.
-**Measured against:** stack 5.1.0, gateway `Inferrix Gateway 155`
-(`86d5e330-b735-11f1-b695-2b2fc11a4c69`), live schema document read 2026-09-24. Later rows were
-measured against 5.1.3.
+**Status:** the type-by-type pass is **complete** — all 24 rows of the sequence below are done as of
+2026-09-30 — and the **on-screen pass ran on 2026-10-04**, against live Cortex over the VPN. It
+covered every type reachable from this gateway and found five defects, all fixed the same day; see
+[The on-screen pass](#the-on-screen-pass-2026-10-04). What it could not cover is rows 18-24 and the
+two BACnet point forms: those types are provisioned by the gateway rather than offered in the Add
+menu, or need a BACnet local device this gateway does not have, so no instance of them exists here
+to open. The dialog save-path question is **decided and implemented** — see "Saving a point that has
+nothing to save" below. Phase G7.
+**Measured against:** gateway `Inferrix Gateway 155` (`86d5e330-b735-11f1-b695-2b2fc11a4c69`), live
+schema document read 2026-09-24 on stack 5.1.0.
+
+> **"5.1.3" below means the source tree, not the running gateway.** The box these rules were read
+> from and measured against is one machine (see the note under this one), and the two halves of it
+> do not agree on a version: `GET /rest/v2/about` answers `stackVersion 5.1.1` while the checkout
+> beside it declares `<stack.version>5.1.3</stack.version>`. Established 2026-10-04. So every
+> "measured against 5.1.3" in this document means *read from 5.1.3 sources, measured on a 5.1.1
+> runtime*. Nothing in the pass turned up a rule where the two disagreed, but the distinction is the
+> honest one and a later reader should not take the label as a runtime version.
 
 > **`192.168.221.7:8443` and `localhost:8080` are the same instance**, established 2026-09-30 by
 > comparing data source xids — all 12 UUIDs identical, which cannot coincide — and confirmed by
@@ -2742,10 +2749,80 @@ exit status is the answer.**
 import closure. No gateway spec imports `gateway-model-dialog.component.ts` — it has no spec of its
 own — so 104 green specs said nothing about the file the build was failing on.
 
+## The on-screen pass (2026-10-04)
+
+Run against live Cortex (`192.168.221.77:8080`, v4.3.1.6) over the VPN, with `ng serve` proxying
+`/api` to it, as `tenant@inferrix.com`, driving the real browser. Every form below was opened, read
+field by field, and — where the type could be created — saved against the gateway for real. Probe
+rows were named `ZZ …`, created `enabled: false`, and deleted; the inventory is back at **12 data
+sources** and no point was ever saved.
+
+**What was covered.** All 16 types the Add menu offers, as data source forms. Point forms for
+`MODBUS.PL`, `META.PL`, `SNMP.PL`, `MQTT.PL`, `HTTP_RECEIVER.PL`, `HTTP_JSON_RETRIEVER.PL`,
+`PING.PL`, `POE_LIGHTING.PL`, `SCRIPTING.PL`, `SYSTEM_ATTRIBUTES.PL` through a probe source, and for
+`VIRTUAL.PL`, `VIRTUAL_MESH_NODE.PL`, `MESH_CONTROLLER.PL`, `INTERNAL.PL` by opening a point that
+already exists. No raw locale key appeared in any of them, and every `readonly` the layouts declare
+rendered as a disabled control — `VIRTUAL_MESH_NODE.PL` showed `dataType`, `attributeId` and `type`
+disabled with `settable` live, and `MESH_CONTROLLER.PL` showed both its fields disabled, which is
+the `[disabled]` fix of row 23 working on screen.
+
+**What it could not cover.** Rows 18-24 and the two BACnet point forms. The mesh device, light
+controller, asset tag, Modbus slave and virtual switch types are provisioned by the gateway and are
+not in the Add menu, so with no live instance there is nothing to open; a BACnet point needs a
+source, and a BACnet source needs a local device this gateway does not have. `OPC.DS` was opened for
+completeness and behaves as "no layout" should: `tb-dynamic-form` renders it, one field per row, no
+pairing and no Advanced panel of ours — nothing crashes, nothing is laid out.
+
+**Five defects, all found by looking and all fixed.**
+
+1. **A delegated advanced field came back inside a second "Advanced" panel.** `alarmLevels` is an
+   array, so it is handed to `tb-dynamic-form`, and it carries `group: 'Advanced'` because that is
+   what lifts it into our panel. TB's renderer draws a group as a panel titled after it — so the
+   field arrived inside an "Advanced" inside our "Advanced", three cards deep with the array's own.
+   On every type that has alarm levels, which is most of them. Fixed by stripping `group` from the
+   property handed to the delegated renderer; the group has done its work by then.
+2. **A delegated card ran into the row below it.** Stacked rows have no gap — that is how
+   ThingsBoard stacks `tb-standard-fields` — and it reads fine when every row is outlined fields. A
+   `tb-dynamic-form` card is different: its bottom border lands on the next row's outline and the
+   two read as one box. On `BACNET_MSTP.DS` the Local device and COV timeout fields looked like
+   members of the Polling interval card above them. 8px under any row holding a stroked card.
+3. **A point dialog showed two "Advanced" headers with nothing to tell them apart.** It stacks two
+   forms — the locator's and `DataPointModel`'s — and `DataPointModel`'s whole form is Advanced. On
+   `META.PL` they ran together. The point's own block now carries a "Point settings" heading; a data
+   source, which has one form, carries none.
+4. **Four types could not be saved from a form that showed nothing wrong.** The gateway refuses a
+   `BACNET_*.DS` with no `localDeviceConfig`, a `MODBUS_IP.DS` with no `transportType`/`host`/`port`,
+   an `SNMP.DS` with no `host`, and a `MODBUS_SERIAL.DS` with no `commPortId` — all measured live as
+   `422`, and by then this dialog has closed and taken the operator's work with it. Each is now
+   `required` in the layout, plus `port` seeded to 502 and floored at 1. `covSubscriptionTimeoutMinutes`
+   is required as well as floored, because Angular's `minValidator` passes an empty box.
+5. **A scripting source could not be created at all.** `commonValidation` refuses one that is not
+   polling, has no cron pattern and has no point flagged for update — and over REST a new source has
+   no points and `useCron` is not a field of `ScriptDataSourceModel`, so polling is the only
+   reachable one of the three. `polling: true` is now seeded, and the hint no longer sends an
+   operator after a cron pattern they cannot set. Filed with the gateway as D151/D152, along with the
+   message coming back as the raw key `scripting.validate.mustUpdate`.
+
+**Two further gateway findings, filed not fixed.** A `brokerUri` with no scheme at all (`myhost`) is
+a `500` rather than a validation message — `validateURI` dereferences a null scheme — while a
+malformed one is a clean `422` (D150); and the "local device not found" branch names a property
+`localDeviceConfg` that no form has (D153). Cortex's answer to the first is a hint on the field
+naming the five schemes the gateway accepts, which is all a client can do about it.
+
+**What the pass did not change, and why.** The dialog closes when Save is clicked and the write
+happens after it is gone, so a refusal from the gateway costs the operator the whole form; they see
+the gateway's own message in the panel banner, correctly naming the field, but the form is not
+coming back. Every fix above is a client-side gate that stops the common cases reaching that path.
+Making the dialog hold itself open until the write succeeds is the real fix and is not small: six
+openers, and `create` is computed before the dialog from `model.xid` while the operator may type one
+inside it, so a naive re-open would retry a `POST` as a `PUT`. Left as a known gap rather than done
+badly.
+
 ## Our own known gaps
 
-Cortex-side, not the gateway's. Neither is worth a fix inside a per-type row; both want the on-screen
-pass that rows 6-11 are already owed.
+Cortex-side, not the gateway's. The on-screen pass above closed the ones it could reach; what is left
+here either needs a type this gateway does not have, or is a change too large to make inside a
+per-type row.
 
 - ~~**Saving a provisioned point through our own dialog erases `settable` on five mesh types.**~~
   **Fixed 2026-09-30** (`e97c9d3388`), the way "Saving a point that has nothing to save" above
@@ -2760,8 +2837,11 @@ pass that rows 6-11 are already owed.
   hint rides `[tb-hint-tooltip-icon]` on the projected label — not the `.tb-gateway-form-hint`
   `mat-icon` the `pointer-events: auto` rule targets. If Material kills pointer events on the
   disabled toggle the way it does on a disabled form field, the hint is unreadable and `readonly`
-  buys nothing over `hidden` for those five types. Unverified: it needs the on-screen pass, and it is
-  the first thing to look at when that pass happens.
+  buys nothing over `hidden` for those five types. **Still unverified after the 2026-10-04 pass**: the
+  disabled toggle renders (`VIRTUAL_MESH_NODE.PL`'s `settable` is the live one, and it is *not*
+  read-only there), but no type reachable from this gateway marks a boolean `readonly`, so there was
+  nothing on screen to hover. It needs one of the five mesh types, which means a gateway that has
+  provisioned them.
 
 - **`tb-dynamic-form` ignores `[disabled]`, so an unworked type's form looks editable when it is
   not.** The defeat row 23 found in our own `GatewayFormComponent` is in TB's renderer too, and for
@@ -2780,6 +2860,16 @@ pass that rows 6-11 are already owed.
   and the types that still reach those two fallbacks are the ones no layout has been written for —
   each of which removes one when it lands. Worth a separate TB-core change if the fallbacks outlive
   the rollout.
+
+- **A refused save costs the operator the whole form.** The dialog closes on Save and the write
+  happens after it is gone, so a `422` from the gateway lands on a page with no form on it. The
+  message itself is good — `gatewayErrorMessage` unpacks the per-field list and the panel banner
+  shows "localDeviceConfig: Required value" — but there is nothing left to correct. Found by the
+  2026-10-04 pass and mitigated rather than fixed: the four `required` rules that pass added stop
+  the cases it actually hit. The fix is to hold the dialog open until the write succeeds, and it is
+  not a small change — six openers call `open()`/`editPoint()`, and `create` is decided from
+  `model.xid` *before* the dialog while the add form lets the operator type one, so re-opening with
+  the returned model would retry a create as an update.
 
 - **A failed schema read leaves every Add form empty, with nothing said.** `load()` fires the schema
   request and the type request independently and swallows both errors on purpose — the list is worth

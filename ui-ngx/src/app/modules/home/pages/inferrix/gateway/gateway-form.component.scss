@@ -33,3 +33,15 @@
     margin-top: 8px;
   }
 }
+
+/* A delegated field comes back as `tb-dynamic-form`'s own stroked card. Stacked rows have no gap
+   between them -- that is how ThingsBoard stacks `tb-standard-fields`, and it reads fine when every
+   row is outlined fields. A card is different: its bottom border lands on the next row's outline
+   and the two read as one box. On `BACNET_MSTP.DS` the Local device and COV subscription timeout
+   fields looked like members of the Polling interval card above them. Same 8px the panel gets.
+
+   `::ng-deep`, because the card belongs to `tb-dynamic-form`: emulated encapsulation hangs this
+   component's attribute off the last compound selector, which the card never carries. */
+:host ::ng-deep .tb-gateway-form .tb-form-row:has(.tb-form-panel.stroked) {
+  margin-bottom: 8px;
+}

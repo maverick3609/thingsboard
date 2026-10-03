@@ -249,7 +249,11 @@ export class GatewayFormComponent implements ControlValueAccessor, OnChanges {
     this.nestedApplied = Object.create(null);
     this.shown.filter(property => !RENDERED_TYPES.includes(property.type)).forEach(property => {
       this.slices[property.id] = {[property.id]: this.value[property.id]};
-      this.delegatedProperties[property.id] = [property];
+      // Without the group. It is what lifted the field into the Advanced panel above, and it has
+      // nothing left to say once it is in there -- but `tb-dynamic-form` renders a group as a panel
+      // of its own titled after it, so a delegated advanced field came back wrapped in a second
+      // "Advanced" panel inside ours. `alarmLevels` is the live case, on every type that has it.
+      this.delegatedProperties[property.id] = [{...property, group: undefined}];
     });
     this.layoutRows();
     this.applyDisabled();

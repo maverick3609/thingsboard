@@ -102,6 +102,21 @@ export interface GatewayModelDialogData {
    */
   deviceId?: string;
   locatorTitle?: string;
+  /**
+   * A heading over the model's own fields, where the form above it is a locator.
+   *
+   * Only a point dialog stacks two forms, and before this they ran together: `DataPointModel`'s
+   * whole form is Advanced, so a `META.PL` point showed two "Advanced" headers one under the other
+   * with nothing to say which was which. Left unset by a data source, where there is one form and
+   * a heading over it would be chrome.
+   *
+   * Bound on the model switch's `@default` arm alone, and that is not an oversight to tidy up: the
+   * other three arms are `.DS` model types, `editPoint` is the only opener that sets this, and a
+   * point's model is never a data source — so a binding there could only ever pass `undefined`.
+   * Worse than inert if it were ever reached, since `title` is a native DOM property and a stray
+   * one paints a browser tooltip rather than failing the build.
+   */
+  modelTitle?: string;
   readonly: boolean;
   /** Shown instead of a locator form when the gateway published no schema for that protocol. */
   locatorMissing?: boolean;

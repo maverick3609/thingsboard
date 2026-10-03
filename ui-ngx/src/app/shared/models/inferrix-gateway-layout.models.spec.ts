@@ -330,6 +330,24 @@ describe('gateway form layouts', () => {
       .forEach(id => expect(advanced.has(id)).withContext(id).toBe(true));
   });
 
+  it('asks for the three Modbus/IP connection fields the gateway refuses a source without', () => {
+    // Measured live: a save with the connection untouched comes back 422 naming all three --
+    // `transportType` and `host` "Required value", `port` "Invalid value". The first two are null
+    // on `ModbusIpDataSourceModel` and `ModbusIpDataSourceDefinition.validate` asks for them; the
+    // third is a bare `int` on the model, so an absent one is 0 while the VO's own 502 never
+    // applies. `scaleFactor` needs nothing here: the model carries the VO's 1.5.
+    const layout = GATEWAY_FORM_LAYOUTS['MODBUS_IP.DS'];
+    expect(layout.required).toEqual(['transportType', 'host', 'port']);
+    expect(layout.defaults).toEqual({port: 502});
+    expect(layout.min).toEqual({port: 1});
+  });
+
+  it('asks for the serial port, which nothing else supplies', () => {
+    // `ModbusSerialDataSourceDefinition.validate` refuses a blank `commPortId`. The rest of that
+    // method's fields are the line settings, and every one of those is seeded.
+    expect(GATEWAY_FORM_LAYOUTS['MODBUS_SERIAL.DS'].required).toEqual(['commPortId']);
+  });
+
   it('keeps the transport acronyms rather than humanising them', () => {
     const items = GATEWAY_FORM_LAYOUTS['MODBUS_IP.DS'].options.transportType;
     expect(items.map(item => item.value)).toEqual(['TCP', 'TCP_KEEP_ALIVE', 'UDP']);
@@ -457,6 +475,20 @@ describe('gateway form layouts', () => {
       .toEqual([['localDeviceConfig', 'covSubscriptionTimeoutMinutes']]);
   });
 
+  it('refuses a BACnet data source with no local device, rather than letting the gateway do it', () => {
+    // Measured on the live gateway: a save with `localDeviceConfig` absent comes back 422,
+    // `{"property":"localDeviceConfig","message":"Required value"}`, and the dialog has already
+    // closed by then -- so the operator loses the form and sees only a toast.
+    // `BACnetDataSourceDefinition.validate` is unconditional about it, and the same method also
+    // refuses a `covSubscriptionTimeoutMinutes` below 1, which the default alone does not prevent
+    // an operator from clearing.
+    ['BACNET_IP.DS', 'BACNET_MSTP.DS'].forEach(modelType => {
+      expect(GATEWAY_FORM_LAYOUTS[modelType].required)
+        .toEqual(['localDeviceConfig', 'covSubscriptionTimeoutMinutes']);
+      expect(GATEWAY_FORM_LAYOUTS[modelType].min).toEqual({covSubscriptionTimeoutMinutes: 1});
+    });
+  });
+
   it('leaves the two lookup fields to the component rather than listing them', () => {
     // A layout is a constant; the object types and their properties are HTTP. Naming either here
     // would be a list that goes stale against the gateway it is meant to describe.
@@ -567,6 +599,14 @@ describe('gateway form layouts', () => {
     expect(snmp.options.snmpVersion.map(item => item.value)).toEqual(['v1', 'v2c', 'v3']);
   });
 
+  it('asks for the SNMP agent\'s address, and for nothing the version gate can hide', () => {
+    // Measured live: a save with the address empty comes back 422 `{"property":"host"}`. The other
+    // five `validate.required` fields in `SnmpDataSourceDefinition` are the v3 ones, and those are
+    // gated -- a gate hides a row but keeps its control, so requiring one would block Save from a
+    // field the operator cannot see. The general rule is the invariant below.
+    expect(snmp.required).toEqual(['host']);
+  });
+
   it('asks for a community string on v1 and v2c, and for a user on v3', () => {
     // The branch in `SnmpDataSourceDefinition.validate`: readCommunity either side of it, and
     // securityName / contextName / the two protocols only under v3.
@@ -591,11 +631,23 @@ describe('gateway form layouts', () => {
     // control would dead-end the save with nothing on screen to fix.
     expect(snmp.hints.authPassphrase).toContain('Required');
     expect(snmp.hints.privPassphrase).toContain('Required');
-    expect(snmp.required).toBeUndefined();
+    // Nothing the version gate can close is required. `host`, which no gate reaches, is.
+    Object.keys(snmp.visibleWhen).forEach(id =>
+      expect(snmp.required).withContext(id).not.toContain(id));
   });
 
   const mqtt = GATEWAY_FORM_LAYOUTS['MQTT.DS'];
   const mqttPoint = GATEWAY_FORM_LAYOUTS['MQTT.PL'];
+
+  it('names the broker URI schemes, because an empty box does not', () => {
+    // Measured live: `http://127.0.0.1:1/zz` comes back 422 "Invalid broker uri schema".
+    // `validateURI` admits ws, wss, tcp, ssl and local and nothing else -- `mqtt://` is the obvious
+    // guess and is refused -- tcp/ssl/local must carry no path, and ssl without a CA certificate is
+    // refused on a second field that lives under Advanced.
+    ['tcp://', 'ssl://', 'ws://', 'wss://', 'local://', 'no path', 'CA certificate']
+      .forEach(part => expect(mqtt.hints.brokerUri).withContext(part).toContain(part));
+    expect(mqtt.hints.brokerUri).not.toContain('mqtt://');
+  });
 
   it('offers the three QoS levels VALID_TYPES admits, and not the one a broker answers with', () => {
     // `QosType` declares FAILURE(128) and leaves it out of `VALID_TYPES`; `validate` refuses it on
@@ -818,6 +870,17 @@ describe('gateway form layouts', () => {
     expect(pingPoint.defaults.dataType).toBe('BINARY');
   });
 
+  it('never requires a field another field can hide', () => {
+    // `visible()` decides which rows render; the control stays in the form either way, with the
+    // validators it was built with. A field that is both required and gated therefore blocks Save
+    // from somewhere the operator cannot see and cannot fill -- no message, no red field, nothing
+    // but a button that does nothing. Five of `SNMP.DS`'s `validate.required` fields are gated on
+    // the version, which is what this rule is here to keep out of `required`.
+    Object.entries(GATEWAY_FORM_LAYOUTS).forEach(([modelType, layout]) =>
+      (layout.required ?? []).filter(id => (layout.visibleWhen ?? {})[id])
+        .forEach(id => fail(`${modelType}.${id} is required and visibility-gated`)));
+  });
+
   it('never gives a field a floor above zero without also requiring it', () => {
     // Angular's `minValidator` returns null -- valid -- when the control is empty, so a floor alone
     // passes an untouched box. The null then lands on the REST model's primitive `int` as 0, which
@@ -924,6 +987,17 @@ describe('gateway form layouts', () => {
     expect(scripting.sendEmpty).toContain('script');
     expect(scripting.required).toBeUndefined();
     expect(scripting.defaults.script).toBe('');
+  });
+
+  it('starts a scripting source polling, because through REST nothing else can run it', () => {
+    // `commonValidation` refuses a source where `!polling && !useCron && !hasUpdateEvent`.
+    // `hasUpdateEvent` reads the points, and an add has none; `useCron` is not a field of
+    // `ScriptDataSourceModel` at all, so REST cannot set it. Polling on is therefore the only
+    // savable shape of a new scripting source -- measured, a create with it off comes back 422
+    // `{"property":"polling","message":"scripting.validate.mustUpdate"}`.
+    expect(scripting.defaults.polling).toBe(true);
+    // And the hint must not send an operator after the cron pattern it cannot reach from here.
+    expect(scripting.hints.polling).not.toContain('cron');
   });
 
   it('sends an empty scriptPermissions, because an absent one is a 500', () => {

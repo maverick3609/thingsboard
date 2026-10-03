@@ -5,6 +5,7 @@ import { UntypedFormBuilder } from '@angular/forms';
 import { FormFieldSetProperty, FormProperty, FormPropertyType,
   FormSelectItem } from '@shared/models/dynamic-form.models';
 import { GATEWAY_FORM_LAYOUTS } from '@shared/models/inferrix-gateway-layout.models';
+import { GATEWAY_ADVANCED_GROUP } from '@shared/models/inferrix-gateway-schema.models';
 import { GatewayFormComponent } from './gateway-form.component';
 
 /**
@@ -140,6 +141,20 @@ describe('gateway form layout mechanics', () => {
     // Only that one field, and the array itself stays an array.
     expect(contextItemFields()[1].type).toBe(FormPropertyType.text);
     expect(form.delegatedProperties.context[0].type).toBe(FormPropertyType.array);
+  });
+
+  it('does not hand a delegated field the group that put it in Advanced', () => {
+    // Found on screen, on `BACNET_MSTP.DS`: `alarmLevels` is an array, so it is delegated, and it
+    // carries `group: 'Advanced'` because that is what lifts it into our panel. `tb-dynamic-form`
+    // renders a group as a panel of its own titled after it, so the field arrived inside a second
+    // "Advanced" panel nested in ours -- two identical headings, three cards deep with the array's.
+    // The group has done its work by then; it must not travel on.
+    form.properties = [property('alarmLevels', FormPropertyType.array,
+      {group: GATEWAY_ADVANCED_GROUP, arrayItemType: FormPropertyType.fieldset,
+        properties: CONTEXT_ITEM_FIELDS})];
+    build();
+    expect(form.advancedRows.length).toBe(1);
+    expect(form.delegatedProperties.alarmLevels[0].group).toBeUndefined();
   });
 
   it('applies the list once, so the delegated form is not rebuilt on every pass', () => {

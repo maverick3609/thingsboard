@@ -419,10 +419,19 @@ const BACNET_WRITE_PRIORITIES: FormSelectItem[] =
  *
  * `covSubscriptionTimeoutMinutes` is defaulted for the reason Modbus serial's line settings are:
  * `BACnetDataSourceModel` declares a bare `int`, so an absent key is 0, `validate` rejects
- * anything below 1, and the VO's own 60 never applies. The number here is that 60.
+ * anything below 1, and the VO's own 60 never applies. The number here is that 60. The floor is
+ * stated as well as the default, because a default only decides what an untouched field holds --
+ * and required with it, because Angular's `minValidator` passes an empty box.
+ *
+ * Both rules are enforced here rather than left to the round trip: this dialog closes when Save is
+ * clicked and the write happens after it is gone, so a refusal from the gateway costs the operator
+ * everything they typed. Measured on the live gateway, which answers a missing local device with
+ * `422 {"property":"localDeviceConfig","message":"Required value"}`.
  */
 const BACNET_DATA_SOURCE: GatewayFormLayout = {
   defaults: {covSubscriptionTimeoutMinutes: 60},
+  required: ['localDeviceConfig', 'covSubscriptionTimeoutMinutes'],
+  min: {covSubscriptionTimeoutMinutes: 1},
   rows: [['localDeviceConfig', 'covSubscriptionTimeoutMinutes']]
 };
 
@@ -1821,8 +1830,22 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    *
    * `host` and `port` pair explicitly so `transportType` keeps a row of its own: the three read as
    * one address and the schema does not order them that way.
+   *
+   * All three are also the connection the gateway refuses a source without. Measured live: an
+   * untouched connection comes back `422` naming each one -- `transportType` and `host` "Required
+   * value", `port` "Invalid value" -- and this dialog has already closed by the time that lands.
+   * `transportType` and `host` are null on `ModbusIpDataSourceModel` and
+   * `ModbusIpDataSourceDefinition.validate` asks for both; `port` is a bare `int` there, so an
+   * absent one is 0 and the VO's own 502 never applies, which is the 502 seeded below. No default
+   * for the transport: the gateway has no opinion either, and picking one for an operator would
+   * silently choose how the PLC is spoken to. `scaleFactor` has the same shape of rule --
+   * `validate` refuses `<= 1.0` -- and needs nothing here, because the model does carry the VO's
+   * 1.5.
    */
   'MODBUS_IP.DS': {
+    required: ['transportType', 'host', 'port'],
+    defaults: {port: 502},
+    min: {port: 1},
     advanced: ['multipleWritesOnly', 'contiguousBatches', 'maxReadBitCount',
       'maxReadRegisterCount', 'maxWriteRegisterCount', 'discardDataDelay', 'logIO',
       'ioLogFileSizeMBytes', 'maxHistoricalIOLogs', 'lingerTime', 'scaleFactor',
@@ -1869,6 +1892,9 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * judgement `/v2/server/network-interfaces` already carries.
    */
   'MODBUS_SERIAL.DS': {
+    // `validate` refuses a blank one, and unlike the line settings below nothing can seed it: the
+    // port is whichever device file this gateway's adapter enumerated as.
+    required: ['commPortId'],
     // The same tuning as MODBUS_IP.DS, minus the four socket fields a serial line has no use for,
     // plus three of its own. Flow control is NONE on every RS-485 bus and `echo` is a property of
     // the adapter, not of the poll -- real settings, rarely the reason anyone opened this form.
@@ -2088,6 +2114,10 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * field set as v1.
    */
   'SNMP.DS': {
+    // The one `validate.required` field here that no gate can hide. The other five are the v3 ones
+    // below: a gate keeps its control, so requiring one would block Save from a row the operator
+    // cannot see. Measured live -- an empty address answers `422 {"property":"host"}`.
+    required: ['host'],
     advanced: ['retries', 'timeout', 'trapPort', 'maxRequestVars', 'localAddress',
       'engineId', 'contextEngineId'],
     options: {snmpVersion: SNMP_VERSIONS, authProtocol: SNMP_AUTH_PROTOCOLS,
@@ -2226,6 +2256,15 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
       x509ClientCrt: FormPropertyType.textarea},
     options: {qosType: MQTT_QOS_TYPES},
     required: ['brokerUri', 'topicFilters'],
+    hints: {
+      // `MqttDataSourceDefinition.validateURI` reads the scheme off a `java.net.URI` and refuses
+      // anything outside this set -- `mqtt://`, the one an operator is likeliest to try, among
+      // them. `tcp`, `ssl` and `local` must also carry no path, and `ssl` is refused unless the CA
+      // certificate under Advanced is filled in. None of it is guessable from an empty box, and a
+      // refusal arrives after this dialog has closed.
+      brokerUri: 'tcp://, ssl://, ws://, wss:// or local://. tcp, ssl and local take a host and '
+        + 'port with no path after it, and ssl also needs the CA certificate under Advanced.'
+    },
     visibleWhen: {
       x509ClientCrt: {by: 'useCertificate', values: [true]},
       privateKey: {by: 'useCertificate', values: [true]}
@@ -2821,7 +2860,10 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
    * **The rule this form cannot express** is the one on `polling`: a source that is not polling,
    * has no cron pattern and has no context variable flagged for update is refused
    * *"scripting.validate.mustUpdate"* — because nothing would ever run it. That reads three fields,
-   * one of them on the points below, and a layout has no word for it. The hint says it instead.
+   * one of them on the points below, and a layout has no word for it. The hint says it instead, and
+   * the default makes the one shape a *new* source can take the one it opens on: `useCron` has no
+   * field on `ScriptDataSourceModel`, so of the gateway's three ways to run a script only polling
+   * is reachable through REST, and the points that would supply the third do not exist yet.
    *
    * `script` is a bare `{"type": "string"}` again, so it needs the same `textarea` `META.PL` needs.
    * It is compiled on every save: a syntax error is a 422 naming `script`. An **absent** one is a
@@ -2848,9 +2890,9 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
         + 'error is refused here rather than at the next poll. Each point below is a variable this '
         + 'script assigns to.',
       updateEvent: 'Which kind of change to a context point re-runs the script.',
-      polling: 'Run the script on the polling interval as well. Something has to make the script '
-        + 'run: with this off, the source needs either a cron pattern or a point below with '
-        + '"Re-run the script" on, and the gateway refuses it otherwise.',
+      polling: 'Run the script on the polling interval. Something has to make the script run: with '
+        + 'this off, the gateway accepts the source only once a point below has "Re-run the script" '
+        + 'on, so a new source cannot be saved without it.',
       historicalSetting: 'Let the script see historical values as well as the current ones.',
       logSize: 'Megabytes per script log file before it is rotated.',
       logCount: 'How many rotated script log files to keep.'
@@ -2858,8 +2900,14 @@ export const GATEWAY_FORM_LAYOUTS: {[modelType: string]: GatewayFormLayout} = {
     // What `new ScriptDataSourceVO()` holds. The REST model declares `logSize` and `logCount` as
     // primitives, so a source created without them logs into a 0 MB file and keeps none of them --
     // measured, a POST omitting both reads back `0.0` and `0`.
+    // `polling` is this layout's choice rather than the gateway's -- the VO and the model both
+    // leave the `boolean` false. It is seeded because false is unsavable on a create: `useCron` is
+    // not a field of `ScriptDataSourceModel`, and `hasUpdateEvent` reads points that do not exist
+    // yet, so `commonValidation` refuses every new source with it off. Measured: 422
+    // `{"property":"polling","message":"scripting.validate.mustUpdate"}` -- and that message comes
+    // back as the raw key, because the gateway ships no translation for it.
     defaults: {updateEvent: 'UPDATE', logLevel: 'NONE', logSize: 1, logCount: 5,
-      executionDelaySeconds: 0, scriptPermissions: '', script: ''},
+      executionDelaySeconds: 0, scriptPermissions: '', script: '', polling: true},
     rows: [['polling', 'updateEvent'], ['logLevel', 'executionDelaySeconds'],
       ['logSize', 'logCount']]
   },

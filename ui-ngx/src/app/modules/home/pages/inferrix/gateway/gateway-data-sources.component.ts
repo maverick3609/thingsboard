@@ -290,6 +290,7 @@ export class GatewayDataSourcesComponent extends GatewayListPanelComponent<Gatew
           locatorType,
           deviceId: this.deviceId,
           locatorTitle: this.translate.instant('inferrix.gateway.point-locator'),
+          modelTitle: this.translate.instant('inferrix.gateway.point-settings'),
           locatorMissing: !locatorProperties.length,
           readonly: this.readonly
         }

@@ -4315,6 +4315,7 @@
       "point-data-type": "Data type",
       "point-value": "Value",
       "point-locator": "Point locator",
+      "point-settings": "Point settings",
       "read-point-value": "Read the current value",
       "no-value": "No value recorded",
       "no-schema-for-type": "This gateway published no schema for this type, so its fields cannot be shown.",

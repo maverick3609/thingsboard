@@ -55,9 +55,12 @@ expect -f $D/ssh-run.exp $U $H "$PASS" '
   echo "'"$PASS"'" | sudo -S cp -a /usr/share/thingsboard/bin/thingsboard.jar /usr/share/thingsboard/bin/thingsboard.jar.bak-preswap
   echo "'"$PASS"'" | sudo -S -u postgres psql -d thingsboard -tAc "SELECT schema_version FROM tb_schema_settings;"
   echo "'"$PASS"'" | sudo -S -u postgres psql -d thingsboard -tAc "SELECT to_regclass('"'"'public.scheduler_event'"'"');"
+  # queue: a running TB hides a dead Kafka, and the restart then crash-loops (see Pitfalls)
+  echo "'"$PASS"'" | sudo -S grep -E "^export TB_QUEUE_TYPE=" /etc/thingsboard/conf/thingsboard.conf
+  systemctl is-active zookeeper kafka ; ss -ltn | grep -c ":9092 "
 '
 ```
-Verify: remote md5 matches local; backup listed; note the schema version and whether `scheduler_event` already exists.
+Verify: remote md5 matches local; backup listed; note the schema version and whether `scheduler_event` already exists. If `TB_QUEUE_TYPE=kafka`, both units must print `active` and the `:9092` count must be at least 1. **Otherwise stop here:** bring Kafka up first (`systemctl start zookeeper kafka`, then wait for `:9092`). Never cut over onto a dead queue.
 
 ## Stage 2 — cutover (DOWNTIME — confirm first)
 Give **each** sudo its own password; `psql` reads the overlay via `-f` (never stdin) so the password pipe and SQL never collide, and nothing depends on sudo's cache:
@@ -100,6 +103,7 @@ expect -f $D/ssh-run.exp $U $H "$PASS" '
 ## Pitfalls (learned in production)
 - **Per-command `sudo -S`.** The sudo credential cache does NOT survive across commands over a non-TTY ssh session. Piping the password once (`sudo -v`) then using bare `sudo` later fails mid-run — it once aborted a cutover right before the restart, leaving the service **down**. Pipe `$P` to every `sudo`.
 - **Never gate the restart on a `sudo` verify that can itself fail auth.** A false-negative check must not leave the service stopped. If a post-swap verify errors, still start the service, then diagnose.
+- **A running TB hides a dead Kafka.** With `TB_QUEUE_TYPE=kafka` (as on `.77`), TB keeps answering HTTP 200 while Kafka is down. It did for five days (2026-09-28 to 2026-10-03), processing no telemetry the whole time. A fresh boot cannot survive it: the boot exits `status=1` after about 2 minutes of Kafka timeouts, and systemd retries every 30 s, so the unit shows `activating`. Rolling back the jar does not help, because the rollback jar needs Kafka too. Start Kafka instead. If Stage 3 shows `activating` or repeated `status=1/FAILURE`, run `systemctl is-active zookeeper kafka` before rolling back.
 - **`psql` input vs sudo password.** `sudo -S` consumes stdin for the password; `psql < file` also wants stdin. Use `psql -f <file>` (copied to a `644` `/tmp` path readable by the `postgres` user) so they never collide.
 - **Checksum every upload** before swapping; a stalled/short scp is silent otherwise.
 - **scp does NOT truncate an existing larger file.** Uploading over a same-named file left from an earlier deploy writes the new bytes over the front and leaves the old file's tail attached. The result is a jar of the wrong length that java will load and fail on in ways that look like anything but a bad upload. Seen in production: a 637,634,046-byte jar under a 632,965,028-byte one, caught only by the md5 step. **Always scp to a name nothing occupies** (`tb-<sha>-boot.jar`), or `rm -f` the destination first. The tell while it runs: the destination size never starts at 0 and never changes.
@@ -111,7 +115,7 @@ expect -f $D/ssh-run.exp $U $H "$PASS" '
 | Stage | Action | Downtime |
 |-------|--------|----------|
 | Build | `mvn clean install -DskipTests` → boot jar | no |
-| 1 | scp jar+overlay, md5 verify, backup jar, DB audit | no |
+| 1 | scp jar+overlay, md5 verify, backup jar, DB audit, Kafka up (if `TB_QUEUE_TYPE=kafka`) | no |
 | 2 | stop → swap (owner `thingsboard`, mode 500) → overlay `-f` → verify → start | **yes** |
 | 3 | HTTP 200 + boot marker + no `does not exist`/`FATAL` | no |
 | RB | swap back `*.bak-preswap`, restart | yes |

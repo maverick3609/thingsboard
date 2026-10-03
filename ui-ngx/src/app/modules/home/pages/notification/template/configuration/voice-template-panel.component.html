@@ -49,7 +49,7 @@
         }
       </mat-form-field>
       @if (placeholdersLost(language.code)) {
-        <div class="tb-form-panel-hint tb-error">{{ 'notification.voice-placeholders-lost' | translate }}</div>
+        <div class="tb-form-panel-hint tb-error" role="alert">{{ 'notification.voice-placeholders-lost' | translate }}</div>
       }
     }
   </ng-container>

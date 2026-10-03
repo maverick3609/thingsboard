@@ -399,6 +399,7 @@ describe('VoiceTemplatePanelComponent template', () => {
     panel.form.get('localizedBodies.hi').setValue('अलार्म');
     fixture.detectChanges();
     expect(colour(hint('voice-placeholders-lost'))).toBe(red);
+    expect(hint('voice-placeholders-lost').getAttribute('role')).toBe('alert'); // announced when it appears
 
     panel.form.get('localizedBodies.hi').setValue(hindi);
     fixture.detectChanges();

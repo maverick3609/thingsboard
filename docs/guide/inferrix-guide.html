@@ -1836,7 +1836,7 @@ Audit logs come free. The Inferrix tabs sit in front of them:</p>
 </tr>
 <tr>
 <td>Points</td>
-<td>Live values from the <strong>active</strong> configuration; write a value to an output point (<code>do</code>, <code>ao</code>, Modbus RTU holding registers).</td>
+<td>Live values from the <strong>active</strong> configuration; write a value to a point the configuration marks writable.</td>
 </tr>
 <tr>
 <td>Settings</td>
@@ -1860,6 +1860,15 @@ Audit logs come free. The Inferrix tabs sit in front of them:</p>
 </tr>
 </tbody>
 </table></div>
+<p><strong>The Write button appears only where the configuration marks the point writable</strong>, which is not the
+same as the point's class. The <code>Writable</code> flag on a configuration point record is the only thing that
+decides it: the firmware checks that flag before it accepts a value, and a point without it is
+refused with <em>"That point is not marked writable."</em> Class is no guide at all — a Modbus RTU discrete
+input and a writable Modbus coil are the same class on the Points tab, and an on-board DO or AO whose
+record leaves the flag clear is an output you still cannot set. So if a point you expect to be
+settable has no Write button, the fix is in the configuration plane, on that point's <code>Writable</code>
+flag — not on this tab. The tab reads the active configuration when it opens, so a flag changed and
+applied elsewhere shows up on the next refresh.</p>
 <p>Every panel waits until its tab is opened before it talks to the device. That is a hard requirement,
 not an optimisation: <strong>the firmware serves two clients at a time</strong>, and the platform will block up to
 30 seconds on a per-device lock, so a page that fanned out its reads would hang itself.</p>

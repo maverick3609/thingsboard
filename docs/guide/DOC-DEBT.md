@@ -85,3 +85,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [x] `c37f58ab92` fix(gateway): the five defects the on-screen pass found
 - [x] `b9bac772ee` fix(gateway): gate the runtime monitor behind tenant admin
 - [x] `7b5786f543` fix(gateway): the broker URI messages demanded a port the check never did
+- [x] `97fbc652ed` fix(controller): an RTU input is not settable, so stop offering the write

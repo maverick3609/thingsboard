@@ -1197,12 +1197,22 @@ Audit logs come free. The Inferrix tabs sit in front of them:
 | Tab | What it does |
 |---|---|
 | Details | Entity form, the identity block read from attributes, and live health read from the device. |
-| Points | Live values from the **active** configuration; write a value to an output point (`do`, `ao`, Modbus RTU holding registers). |
+| Points | Live values from the **active** configuration; write a value to a point the configuration marks writable. |
 | Settings | Identity, network, MQTT, discovery and time forms; the peer table; the ownership password. |
 | Configuration | The draft/active configuration plane — [§10.6](#106-the-configuration-plane). |
 | Logic | Program editor, compile/verify/push, and PID auto-tune — [§10.8](#108-logic-programs). |
 | Software | Firmware and logic upload, restart-and-verify — [§10.9](#109-firmware-and-logic-upload). |
 | Diagnostics | Network and memory counters, logic status, MQTT and ping probes, attestation. |
+
+**The Write button appears only where the configuration marks the point writable**, which is not the
+same as the point's class. The `Writable` flag on a configuration point record is the only thing that
+decides it: the firmware checks that flag before it accepts a value, and a point without it is
+refused with *"That point is not marked writable."* Class is no guide at all — a Modbus RTU discrete
+input and a writable Modbus coil are the same class on the Points tab, and an on-board DO or AO whose
+record leaves the flag clear is an output you still cannot set. So if a point you expect to be
+settable has no Write button, the fix is in the configuration plane, on that point's `Writable`
+flag — not on this tab. The tab reads the active configuration when it opens, so a flag changed and
+applied elsewhere shows up on the next refresh.
 
 Every panel waits until its tab is opened before it talks to the device. That is a hard requirement,
 not an optimisation: **the firmware serves two clients at a time**, and the platform will block up to

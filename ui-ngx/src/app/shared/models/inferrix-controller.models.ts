@@ -112,8 +112,39 @@ export interface ControllerPoint {
   n: string;
 }
 
-/** The source classes `POST /api/v1/points/{id}` accepts; every other class is read-only. */
+/**
+ * The source classes `POST /api/v1/points/{id}` can ever accept; every other class is read-only.
+ *
+ * Necessary but **not sufficient**, and the difference matters: writability is a property of the
+ * point, not of its class. `rtu` covers every Modbus point whatever its function code, so a point
+ * on FC2 (discrete inputs) or FC4 (input registers) lands here too and can never be written; `do`
+ * and `ao` likewise cover on-board channels whose config leaves the writable bit clear. On one
+ * bench board 13 of 36 points were in a class listed here while their config said read-only.
+ *
+ * Only {@link POINT_FLAG_WRITABLE} in the point's config record answers the real question, so this
+ * is the fallback for a device whose config cannot be read, nothing more. Prefer
+ * {@link writablePointIds}.
+ */
 export const WRITABLE_POINT_TYPES = ['do', 'ao', 'rtu'];
+
+/**
+ * Bit 0 of a config point's `flags`: the firmware writes this point when asked, and refuses with
+ * `not_writable` when it is clear. It is the only authority on whether a write is possible —
+ * the live `GET /api/v1/points` reply carries no flag of its own (firmware 0.1.17).
+ */
+export const POINT_FLAG_WRITABLE = 1;
+
+/**
+ * The ids of the points a controller will actually accept a write for, read off its config.
+ *
+ * Takes the records of the `points` config section. A record with no `flags` is treated as
+ * read-only: absent is not permission.
+ */
+export function writablePointIds(configPoints: any[]): Set<number> {
+  return new Set((configPoints || [])
+    .filter(record => (record?.flags & POINT_FLAG_WRITABLE) === POINT_FLAG_WRITABLE)
+    .map(record => record.point_id));
+}
 
 /**
  * The body of a point write.
@@ -757,7 +788,8 @@ export const CONTROLLER_CONFIG_SECTIONS: ControllerConfigSection[] = [
         required: true, defaultValue: NO_SCALING, hint: 'inferrix.scaling-idx-hint',
         optionsFrom: 'scalings'},
       {key: 'flags', label: 'inferrix.flags', type: 'flags', required: true, defaultValue: 0,
-        bits: [{value: 1, label: 'inferrix.flag-writable'}, {value: 2, label: 'inferrix.flag-refresh'}]},
+        bits: [{value: POINT_FLAG_WRITABLE, label: 'inferrix.flag-writable'},
+          {value: 2, label: 'inferrix.flag-refresh'}]},
       {key: 'refresh_s', label: 'inferrix.refresh-interval', type: 'number', min: 0, max: 65535,
         required: true, defaultValue: 0}
     ]
@@ -815,6 +847,15 @@ export const CONTROLLER_CONFIG_SECTIONS: ControllerConfigSection[] = [
     ]
   }
 ];
+
+/**
+ * The `points` section, for readers that want the point records rather than a form.
+ *
+ * Looked up rather than declared twice so the live Points tab and the config editor can never read
+ * two different sections; a spec pins that it resolves.
+ */
+export const POINTS_CONFIG_SECTION =
+  CONTROLLER_CONFIG_SECTIONS.find(section => section.key === 'points');
 
 /**
  * The id the platform gives a new record: the lowest the section does not already hold.

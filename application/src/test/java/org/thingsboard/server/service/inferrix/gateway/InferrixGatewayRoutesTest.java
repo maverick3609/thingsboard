@@ -511,11 +511,21 @@ class InferrixGatewayRoutesTest {
         // to one of these later is swallowed into admin-only without anyone remembering to list
         // it -- which is the failure direction we want, since a looser prefix can only ever demand
         // MORE authority. Every currently declared route in these families is covered.
+        // The prefix list is spelled out here rather than reusing the production one, so that
+        // adding a family has to be a decision in two places. It had drifted: /v2/utilities was
+        // added to the production list and never to this one, and /v2/stack-monitor was missing
+        // from both.
+        String[] families = {"/v2/system-setting", "/v2/platform-integration", "/v2/server",
+                "/v2/utilities", "/v2/stack-monitor"};
         for (String path : new String[]{"/v2/platform-integration/server-details",
                 "/v2/platform-integration/mqtt-configuration", "/v2/platform-integration/provisioned",
-                "/v2/server/languages", "/v2/system-setting/license-key", "/v2/anything-added-later"}) {
-            boolean inFamily = path.startsWith("/v2/system-setting")
-                    || path.startsWith("/v2/platform-integration") || path.startsWith("/v2/server");
+                "/v2/server/languages", "/v2/system-setting/license-key",
+                "/v2/utilities/gw/serial-ports", "/v2/stack-monitor", "/v2/stack-monitor/42",
+                "/v2/anything-added-later"}) {
+            boolean inFamily = false;
+            for (String family : families) {
+                inFamily |= path.equals(family) || path.startsWith(family + "/");
+            }
             assertEquals(inFamily, InferrixGatewayRoutes.requiresTenantAdmin("GET", path), path);
         }
         // Case folding matches isAllowed's, so a lowercase verb cannot slip past as a read.
@@ -533,6 +543,18 @@ class InferrixGatewayRoutesTest {
         // The host's serial devices are the same kind of reconnaissance as its network interfaces,
         // so the whole /v2/utilities family is tenant-admin only rather than this one route.
         assertTrue(InferrixGatewayRoutes.requiresTenantAdmin("GET", "/v2/utilities/gw/serial-ports"));
+        // The runtime monitor is an administrator read on the gateway for the same reason the
+        // settings are -- StackMonitorResource calls ensureAdminRole, exactly as
+        // SystemSettingsResource does -- so Cortex has to gate it the same way.
+        //
+        // Measured reachable by a CUSTOMER_USER against a live gateway on 2026-10-04: HTTP 200,
+        // where /v2/system-setting and the platform-link family both answered 403. Nothing objected
+        // because it is a non-writing GET, so changesGatewayState says false, and the family was
+        // simply never listed. Its 108 counters name every data source configured on the box and
+        // report the licence headroom, and a customer user is not an administrator of the gateway
+        // just because a gateway was assigned to their customer.
+        assertTrue(InferrixGatewayRoutes.requiresTenantAdmin("GET", "/v2/stack-monitor"));
+        assertTrue(InferrixGatewayRoutes.requiresTenantAdmin("GET", "/v2/stack-monitor/42"));
         // But the ordinary configuration plane stays readable by a customer user, which is the
         // whole point of having two levels rather than locking the page to tenant admins.
         assertFalse(InferrixGatewayRoutes.requiresTenantAdmin("GET", "/v2/publisher"));

@@ -270,7 +270,18 @@ public final class InferrixGatewayRoutes {
             "/v2/system-setting",
             "/v2/platform-integration",
             "/v2/server",
-            "/v2/utilities");
+            "/v2/utilities",
+            // The runtime monitor, for the same reason as the settings: StackMonitorResource calls
+            // ensureAdminRole, exactly as SystemSettingsResource does, so it is an administrator
+            // read on the gateway and must be one through us too. It was missing, and the omission
+            // was invisible from either side -- a non-writing GET, so changesGatewayState says
+            // false, and no other rule had an opinion. Measured against a live gateway on
+            // 2026-10-04: a CUSTOMER_USER whose customer had been assigned a gateway read it with
+            // HTTP 200, while /v2/system-setting and the platform-link family both answered 403.
+            // What it returns is 108 counters that name every data source configured on the box
+            // and report the licence headroom; being assigned a gateway does not make someone its
+            // administrator.
+            "/v2/stack-monitor");
 
     /** Event-handler routes that carry a handler model in their body. */
     private static final Pattern EVENT_HANDLER_WRITE =

@@ -83,3 +83,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [x] `061ebb023d` feat(voice): voice template panel with offline translate
 - [x] `5638b30b24` fix(voice): red warnings, one language list, and pins for the panel's template
 - [x] `c37f58ab92` fix(gateway): the five defects the on-screen pass found
+- [x] `b9bac772ee` fix(gateway): gate the runtime monitor behind tenant admin

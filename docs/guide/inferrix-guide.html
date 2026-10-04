@@ -1867,8 +1867,16 @@ not an optimisation: <strong>the firmware serves two clients at a time</strong>,
 token, which only adoption obtains.</p>
 <h3 id="106-the-configuration-plane">10.6 The configuration plane</h3>
 <p>The controller holds an <strong>active</strong> configuration (<code>icc</code> version) and a <strong>draft</strong>. All editing happens
-against the draft; <strong>Apply</strong> validates and promotes it, <strong>Discard</strong> throws it away. A failed apply
-names the offending record with the device's own <code>ICC_*</code> verdict.</p>
+against the draft; <strong>Apply</strong> validates and promotes it, <strong>Discard</strong> throws it away.</p>
+<p><strong>A failed apply does not name the offending record.</strong> The device answers a bare <code>ICC_*</code> verdict and
+nothing else, so "which of my 1024 points was it?" is a question the firmware cannot answer. The
+Configuration tab turns that verdict into the next thing to do instead: one sentence saying what the
+device refused, the reassurance that matters most — <em>nothing changed on the controller, it is still
+running its previous configuration</em> — and then the list of rules that produce that verdict, to check
+the draft against. The raw <code>ICC_*</code> name comes last, for anyone matching it against the firmware. All
+eighteen verdicts the verifier can return are mapped this way. <code>swap_in_progress</code> is reported as an
+ordinary error rather than a checklist, because it means "try again in a moment", not "something is
+wrong with the draft".</p>
 <div class="tw"><table>
 <thead>
 <tr>
@@ -1924,9 +1932,26 @@ shorter than the 64 the telemetry key allows.</p>
 table is never given less room than a full page needs, so a page of records is read without scrolling
 inside it; a tall panel scrolls as a whole instead. The same holds for the Points tab.</p>
 <p>Every field that names another section's record — a point's <code>query_id</code>, a publish policy's
-<code>point_id</code>, a scaling reference — is <strong>picked from a list</strong>, never typed, and the list shows the
-record's name beside its id (<code>#9 · DO1</code>). An id typed by hand is only caught when the whole draft is
-applied, which is the worst moment to learn it was wrong.</p>
+<code>point_id</code>, a scaling reference — is <strong>picked from a list</strong>, never typed, and the list shows enough of
+the record to recognise it rather than only its id: a query reads <code>#1 · unit 10 · FC2 · reg 0-3</code>, a
+scaling <code>#0 · ×1 ÷10 +0</code>, a bus <code>#0 · 9600 baud · 8E1</code>. An id typed by hand is only caught when the
+whole draft is applied, which is the worst moment to learn it was wrong. Two lists narrow themselves
+further: a publish policy offers only points that do not have one yet, since a point may have exactly
+one, and a scaling reference offers <strong>No scaling</strong> at the top in place of the magic <code>65535</code>.</p>
+<p><strong>Enumerated values are chosen, not typed, and the choices carry their meaning.</strong> A bus names its
+baud rates (only 9600 through 115200 — the verifier rejects 1200, 2400 and 4800) and spells out its
+framing (<code>8E1 — even parity, 1 stop bit (Modbus default)</code>) instead of taking an opaque byte. A query
+names its function code (<code>FC3 — Read holding registers</code>). A publish policy's <strong>QoS</strong> offers <em>At most
+once (QoS 0)</em> and <em>At least once (QoS 1)</em> and nothing else, because the firmware's verifier refuses
+<code>qos &gt; 1</code> — there is no QoS 2 on this device to offer.</p>
+<p><strong>A local point's channel is picked by its terminal.</strong> <code>source_ref</code> means a different quantity for
+every source — a query id on a Modbus point, a remote point id on a peer one — and on the four local
+sources it is the physical channel. Those are offered as a list built from the counts the board itself
+reports, labelled both ways at once (<code>DI1 (channel 0)</code>): the operator is looking at a terminal
+silkscreened from 1 while the record has to say 0. A board that did not answer, or that reports an
+implausible count, keeps a plain number box — guessing from the platform's default profile would
+offer channels that may not exist and hide ones that do. On a peer point the <code>offset</code> is a peer id,
+so it is bounded by the four peer slots rather than the 65535 a raw field would allow.</p>
 <p>Two details regularly cost an afternoon:</p>
 <ul>
 <li><strong><code>deadband_bits</code> is a raw IEEE-754 single-precision bit pattern</strong>, not a number. The UI converts;
@@ -2212,7 +2237,7 @@ Set <code>TB_GATEWAY_DASHBOARD_SYNC_ENABLED=false</code> in <code>/etc/thingsboa
 <code>DashboardSyncService</code> git-pulls ThingsBoard's stock gateways dashboard back every 24 hours.</p>
 </aside>
 <h3 id="113-what-the-tabs-do">11.3 What the tabs do</h3>
-<p>A gateway's details page carries ten tabs. Each one talks to the device only once its tab is
+<p>A gateway's details page carries eleven tabs. Each one talks to the device only once its tab is
 opened — every panel is a real call across a LAN to a small box behind a per-device connection
 limiter, so a panel that loaded on construction would spend one on every details drawer an operator
 happens to open.</p>
@@ -2234,11 +2259,15 @@ happens to open.</p>
 </tr>
 <tr>
 <td><strong>Data sources</strong></td>
-<td>The protocol connections — a Modbus device, a BACnet network, an MQTT broker</td>
+<td>The protocol connections — a Modbus device, a BACnet network, an MQTT broker — and, inside each one, its data points</td>
 </tr>
 <tr>
-<td><strong>Data points</strong></td>
-<td>The individual measured and controlled values of one data source</td>
+<td><strong>Publishers</strong></td>
+<td>What the gateway sends outward, and which points each publisher carries</td>
+</tr>
+<tr>
+<td><strong>Platform provisioning</strong></td>
+<td>Turning a gateway data source into a device on this platform — <a href="#116-publishers-and-provisioning-onto-the-platform">§11.6</a></td>
 </tr>
 <tr>
 <td><strong>Event log</strong></td>
@@ -2283,10 +2312,18 @@ the gateway is still reachable, the probe still succeeds, and the version is sim
 four panels want it, while ThingsBoard ships with <code>HTTP_COMPRESSION_ENABLED</code> defaulting to false — so
 it is cached in the browser for the same 30 minutes the platform already caches it for. Turning HTTP
 compression on is worth doing anyway: this document gzips to 27 KB.</p>
-<p><strong>Data points are always scoped to one data source.</strong> A gateway in a building carries thousands of
-points; an unscoped list would page through all of them, and an operator looking for the points of
-one Modbus device would never find them. Live values are read one point at a time, on request,
+<p><strong>Points are edited inside the thing that owns them, and there is no separate points tab.</strong> A gateway
+in a building carries thousands of points; a flat list would page through all of them, and an operator
+looking for the points of one Modbus device would never find them. So a data source's points open
+within that data source, and a publisher's published points within that publisher — which is also the
+only place a publisher's points exist at all. Live values are read one point at a time, on request,
 because the gateway has no bulk point-value endpoint.</p>
+<p><strong>A point edit is saved when you make it, not when you save the form around it.</strong> The dialog says so
+on screen, because the two halves behave differently and that is genuinely surprising: the parent's
+own fields wait for Save, while adding, editing, deleting or toggling a point in the table below
+writes to the gateway immediately. It follows from the gateway's API — points are separate objects
+with their own routes — and the alternative, holding a batch of point edits against a parent save,
+would make a half-failed batch unexplainable.</p>
 <h3 id="114-forms-come-from-the-gateway-not-from-cortex">11.4 Forms come from the gateway, not from Cortex</h3>
 <p>Most of what these tabs edit is rendered from a schema the gateway publishes, so a Modbus data source
 and a BACnet one are the same component with different inputs. That is the economic argument for the
@@ -2304,10 +2341,10 @@ here:</p>
   password, a private key. Shown as a password field, and <strong>an empty one means "unchanged"</strong> rather
   than "erase it", because the field is always empty on load whether or not a credential is stored.</li>
 <li><strong><code>required</code></strong> — marked in the form, so a mandatory field is refused before the round trip rather
-  than after it. Published since 2026-09-23 (stack ask A13) and, so far, <strong>on one field</strong>: the
-  polling interval every polling data source needs. The stack emits <code>required</code> per annotation, so
-  every other mandatory field is still an unmarked one and is still discovered as a 422 from the
-  device carrying the field's name.</li>
+  than after it. Published since 2026-09-23 (stack ask A13), but on <strong>two names only</strong>: a polling
+  data source's interval (<code>timePeriod</code>) and its unit (<code>timePeriodType</code>). The stack emits <code>required</code>
+  from an annotation, and almost nothing carries that annotation, so nearly every field the gateway
+  will actually refuse arrives unmarked. Cortex supplies those itself — see below.</li>
 </ul>
 <p>A few things are hand-written on purpose rather than for want of a schema:</p>
 <ul>
@@ -2316,6 +2353,57 @@ here:</p>
 <li><strong>Alert routing</strong>, because it has no subtypes and so is not a schema family at all.</li>
 <li><strong>Schedules and rule sets</strong>, for the same reason — and the published schema would not have helped
   if it existed: it describes a weekly schedule as an object while the gateway sends an array.</li>
+</ul>
+<p><strong>What the schema cannot say, a layout says.</strong> A schema describes the shape of a record; it does not
+describe how to present one, and it does not carry most of what the gateway will refuse. So each
+protocol type has a <strong>layout</strong> in Cortex — a small table naming the fields to pair on a row, the ones
+to fold into Advanced, the ones to hide, the sensible default to start from, and the rules the device
+enforces without publishing. Every type the Add menu offers has one except OPC, which renders
+straight from the schema: one field per row, no pairing, no Advanced panel. Nothing breaks there, but
+nothing is laid out either, and that is the clearest illustration of what a layout is for.</p>
+<p>Four kinds of gap make it necessary, all of them real:</p>
+<ul>
+<li><strong>The schema types a field too loosely to lay out.</strong> A virtual point's change type is declared as a
+  plain string with ten legal values; a meta point's script is a plain string holding the body of a
+  JavaScript function. Rendered literally, both are an empty text box.</li>
+<li><strong>Which values are legal depends on another field,</strong> and the schema never says so. A virtual point's
+  change type depends on its data type, so the list has to narrow when the data type changes — and
+  changing it clears a value that is no longer legal, rather than leaving a stale one to be refused.</li>
+<li><strong>The schema gives no order and no grouping.</strong> Without a layout, fields appear two to a row in
+  whatever order the document happens to list them, so a host and a port can end up on different rows
+  while two unrelated tuning fields share one.</li>
+<li><strong>The gateway enforces rules it does not publish</strong> — and some of them are not even a clean refusal.
+  An MQTT broker address that is absent <em>or empty</em> is an HTTP 500, not a validation message; a
+  scripting source with no permissions string is a 500 for the same reason. A layout fills those in or
+  demands them before the request is made.</li>
+</ul>
+<p>That last one is why <strong>Cortex marks fields required that the gateway's schema does not</strong> — thirteen
+types' worth, plus floors on numeric fields the device rejects at zero, plus a seeded polling interval
+on every polling type. It is not second-guessing the device: each rule was read out of the gateway's
+own validator and then confirmed against a live gateway. It matters more than it sounds, because of
+how the dialog saves: <strong>it closes when you press Save, and the write happens after it is gone.</strong> A
+refusal therefore lands on a page with no form on it. The message is accurate and names the field, but
+what you typed is not coming back — so a rule that can be checked in the browser is worth checking
+there.</p>
+<p><strong>A layout can only ever restrict.</strong> The schema arrives from a device on a LAN and renders in a tenant
+administrator's browser, and ThingsBoard's form renderer compiles a property's <code>condition</code> to
+executable JavaScript — so the mapper that turns schema into form only ever <em>constructs</em> properties
+from a fixed table of types, never copies an object out of the document, and never sets a <code>condition</code>
+at all. A layout is a constant in this repository, never device data, and it is held to the same rule
+in code: marking a field read-only adds to whatever the gateway already disabled and cannot re-enable
+anything, a floor is the larger of the layout's and the schema's, requiring a field can only add, and
+retyping a field refuses to produce a password. The one thing to know about <code>readonly</code> is that it is a
+presentation choice, not a permission: it stops an operator editing a value the gateway computes, and
+nothing more.</p>
+<p>Three consequences worth knowing before they look like faults:</p>
+<ul>
+<li><strong>A read-only field still round-trips.</strong> It is disabled, not dropped, so saving a record preserves
+  the values the gateway computed rather than blanking them.</li>
+<li><strong>Two types cannot be saved at all.</strong> The two Modbus slave shapes open read-only with the reason on
+  screen, because any write the platform can make destroys the row. Enabling and disabling them from
+  the table still works.</li>
+<li><strong>A data source the gateway provisioned itself offers no Add point.</strong> Its points come from the
+  device that owns them; existing ones still open, toggle and delete.</li>
 </ul>
 <h3 id="115-schedules">11.5 Schedules</h3>
 <p>A schedule is a weekly active/inactive pattern. Set-point handlers and alert routing follow it, so
@@ -2340,10 +2428,58 @@ design work. The cost is stated in the stack's own release notes: creating an ev
 reaches <code>Runtime.getRuntime().exec</code> through a process handler's command, so the permission now
 carries command execution on the gateway host and <strong>is no longer meaningfully less than a gateway
 administrator</strong>. Cortex will not create or change a process handler for exactly that reason
-(<a href="#117-what-cortex-will-not-do-to-a-gateway">§11.7</a>); the gateway itself will, for anything else
+(<a href="#119-what-cortex-will-not-do-to-a-gateway">§11.9</a>); the gateway itself will, for anything else
 holding the permission.</p>
 </aside>
-<h3 id="116-the-system-tab-is-read-only-deliberately">11.6 The System tab is read-only, deliberately</h3>
+<h3 id="116-publishers-and-provisioning-onto-the-platform">11.6 Publishers and provisioning onto the platform</h3>
+<p>A <strong>publisher</strong> is the gateway object that sends selected point values outward. Its published points
+exist nowhere else — there is no global list of them — so they are edited inside the publisher, the
+same way a data source's points are (<a href="#113-what-the-tabs-do">§11.3</a>). Publishers can be added by
+type, edited, enabled, disabled and deleted from their own tab.</p>
+<p><strong>Platform provisioning turns a gateway data source into a device on this platform.</strong> One data source
+becomes one device, fed by a publisher the gateway builds for it; the telemetry keys that device
+receives are whatever points that publisher carries. The tab lists data sources as <strong>not provisioned</strong>
+or <strong>provisioned</strong>, and provisioning one means choosing the device profile it should land on — there
+is deliberately no default, because the profile decides what the device is for and guessing would put
+plant on the wrong one.</p>
+<p>Four things about it regularly surprise people, and all four are the gateway's nature rather than a
+defect:</p>
+<ul>
+<li><strong>The button says "Queued", not "Provisioned".</strong> The gateway answers as soon as it has accepted the
+  request and then works through the queue roughly one data source a minute. The tab is showing you
+  what it knows, which is that the gateway took the job.</li>
+<li><strong>Refreshing clears those "Queued" marks.</strong> That is on purpose: they are this session's optimism,
+  not gateway state, and a row that failed on the gateway has to become retryable.</li>
+<li><strong>The profile cannot be changed afterwards.</strong> Correcting it means deleting the device on the
+  platform and provisioning the data source again.</li>
+<li><strong>"Not provisioned" is the gateway's own bookkeeping.</strong> A publisher somebody built by hand can be
+  delivering telemetry perfectly while its data source still lists as unprovisioned, because nothing
+  recorded the mapping.</li>
+</ul>
+<p><strong>Unprovisioning deletes the feeding publisher and the telemetry stops — but the platform device may
+survive it</strong> and need deleting by hand. The confirmation names the device for exactly that reason.
+There is also a sync action, which re-reads this platform's device profiles into the gateway's copy of
+them; it is what to press when a profile you just created is not in the list.</p>
+<p>The whole family is <strong>tenant-administrator only</strong>, so a customer user sees nothing useful on this tab.</p>
+<h3 id="117-where-the-gateway-sends-its-data">11.7 Where the gateway sends its data</h3>
+<p>The Details tab carries a <strong>platform broker</strong> panel, and it is worth being clear about which direction
+it describes: this is where the gateway <em>dials this platform's MQTT broker</em> to deliver telemetry — the
+opposite direction to the connection settings above it, which are how Cortex reaches the gateway. The
+panel shows the broker address and client id, and <strong>Change broker</strong> opens the address, the topic
+filters, keep-alive, connect timeout, auto-reconnect and clean-session.</p>
+<ul>
+<li><strong>The address is checked before it is sent</strong> — it has to name one of the four schemes the gateway's
+  MQTT client installs a module for (<code>tcp</code>, <code>ssl</code>, <code>ws</code>, <code>wss</code>) and carry a host.</li>
+<li><strong>The credential is carried through, never retyped.</strong> Client id, user name, password, TLS settings
+  and QoS belong to the device's own platform credential, so the dialog preserves them rather than
+  offering them for editing. Repointing a gateway at a new broker address does not re-key it.</li>
+<li><strong>A change reconnects the gateway's MQTT client in place, within seconds, without restarting the
+  gateway.</strong> That is the whole point of editing it from here: an address typo used to mean somebody
+  visiting the box.</li>
+<li><strong>The panel is read live through the proxy</strong>, so it is blank when the gateway is unreachable, and
+  for a customer user.</li>
+</ul>
+<h3 id="118-the-system-tab-is-read-only-deliberately">11.8 The System tab is read-only, deliberately</h3>
 <p>It reports the gateway's version, module list, licence usage, network interfaces, languages, runtime
 monitor values and system settings. It writes nothing, and that is a decision rather than an unfinished
 phase: the gateway's settings-write route takes an arbitrary key over its entire configuration
@@ -2355,7 +2491,7 @@ passphrase or private key. That is not an access control and never was — it is
 cases the gateway's fix does not cover: an older gateway is still adoptable and still sends both,
 and the next <code>…Token</code> a later version adds has no business in a diagnostics table that gets
 screenshotted into a ticket.</p>
-<h3 id="117-what-cortex-will-not-do-to-a-gateway">11.7 What Cortex will not do to a gateway</h3>
+<h3 id="119-what-cortex-will-not-do-to-a-gateway">11.9 What Cortex will not do to a gateway</h3>
 <p>The platform proxies only an explicit allowlist of verb-and-path pairs. Three families are excluded
 by decision, and adding any of them is a deliberate act, not a follow-up task:</p>
 <div class="tw"><table>
@@ -2376,7 +2512,7 @@ by decision, and adding any of them is a deliberate act, not a follow-up task:</
 </tr>
 <tr>
 <td><code>PUT /v2/system-setting/{key}</code></td>
-<td>An arbitrary-key write over the gateway's whole configuration keyspace (<a href="#116-the-system-tab-is-read-only-deliberately">§11.6</a>)</td>
+<td>An arbitrary-key write over the gateway's whole configuration keyspace (<a href="#118-the-system-tab-is-read-only-deliberately">§11.8</a>)</td>
 </tr>
 <tr>
 <td><code>PUT /v2/point-value/{xid}</code></td>
@@ -2397,7 +2533,7 @@ reads that one discriminator, and both the controller and <code>InferrixGatewayA
 hand-written POST is refused the same as the UI, which is what makes this table a boundary rather
 than a description of the screens. <code>DELETE</code> is deliberately not inspected: it carries no body, and
 removing a process handler only reduces what the gateway can be made to run.</p>
-<h3 id="118-who-can-see-and-do-what">11.8 Who can see and do what</h3>
+<h3 id="1110-who-can-see-and-do-what">11.10 Who can see and do what</h3>
 <ul>
 <li><strong>Tenant administrators</strong> adopt gateways and change their configuration.</li>
 <li><strong>Customer users</strong> see the gateways assigned to their customer, read-only.</li>
@@ -2409,7 +2545,7 @@ removing a process handler only reduces what the gateway can be made to run.</p>
   cannot tell them apart. The proxy identifies and refuses them explicitly, and the IO Controller
   proxy shares the same guard.</li>
 </ul>
-<h3 id="119-troubleshooting">11.9 Troubleshooting</h3>
+<h3 id="1111-troubleshooting">11.11 Troubleshooting</h3>
 <div class="tw"><table>
 <thead>
 <tr>
@@ -2444,11 +2580,35 @@ removing a process handler only reduces what the gateway can be made to run.</p>
 </tr>
 <tr>
 <td>A PROCESS event handler cannot be edited</td>
-<td>Deliberate. Its configuration is a command line the gateway runs (<a href="#117-what-cortex-will-not-do-to-a-gateway">§11.7</a>); change it in the gateway's own interface, or delete it from here</td>
+<td>Deliberate. Its configuration is a command line the gateway runs (<a href="#119-what-cortex-will-not-do-to-a-gateway">§11.9</a>); change it in the gateway's own interface, or delete it from here</td>
 </tr>
 <tr>
 <td>"Add point" is disabled</td>
 <td>The gateway did not publish a <code>pointLocatorType</code> for this data source type <em>and</em> it has no points to learn one from. One real type does this (<code>BACNET_MSTP.DS</code>); create its first point in the gateway's own interface</td>
+</tr>
+<tr>
+<td>A save was refused and the form is gone</td>
+<td>Known limitation, not a lost write — nothing was saved. The dialog closes when Save is pressed and the write happens after it, so the gateway's refusal arrives with no form left to correct. The message names the offending field; re-open the form and it is the one to fix (<a href="#114-forms-come-from-the-gateway-not-from-cortex">§11.4</a>)</td>
+</tr>
+<tr>
+<td>A form looks editable but has no Save</td>
+<td>A type with no layout of its own — OPC is the one the Add menu offers. ThingsBoard's renderer ignores the disabled flag, so the fields accept typing that goes nowhere. Misleading, not unsafe: there is no Save to press</td>
+</tr>
+<tr>
+<td>An Add form has only the name and nothing else</td>
+<td>The schema read failed rather than returning an empty document, and the list is deliberately still shown. No polling interval is seeded either, so saving gives a 422. Reload the page once the gateway is reachable</td>
+</tr>
+<tr>
+<td>Provisioning a data source stays on "Queued"</td>
+<td>Expected for up to a minute or so per data source — the gateway accepts the request and drains its queue slowly. Refresh to clear the mark and see what the gateway actually did (<a href="#116-publishers-and-provisioning-onto-the-platform">§11.6</a>)</td>
+</tr>
+<tr>
+<td>A data source lists as not provisioned but its telemetry is arriving</td>
+<td>Its publisher was built by hand, so nothing recorded the mapping that the tab reads. Harmless</td>
+</tr>
+<tr>
+<td>Telemetry stopped after unprovisioning, and the device is still there</td>
+<td>Both are correct. Unprovisioning deletes the publisher that was feeding the device; the device itself is left for you to delete</td>
 </tr>
 <tr>
 <td>A schedule will not enable</td>

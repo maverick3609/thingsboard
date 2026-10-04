@@ -7,78 +7,72 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [x] `cf3f553754` feat(controllers): page the config sections and pick ids instead of typing them
 - [x] `509612a38e` feat(gateways): configure an Inferrix gateway from Cortex (G1-G6)
 - [x] `e21455f4a8` fix(gateway): read the version the gateway actually reports
-- [ ] `36db410f6a` fix(controllers): stop the Draft/Active toggle being truncated
-- [ ] `ed5240a62a` fix(gateway): lay the schema forms out like the gateway's own editor
-- [ ] `e59ab8f82e` fix(gateway): make the detector list load at all
-- [ ] `af724e12d0` fix(gateway): stop the forms nagging before they are touched
-- [ ] `ccb8071b18` feat(gateway): name a detector's type the way the gateway names it
-- [ ] `b5ea073a0f` fix(gateway): switch a schedule the same way its list does
+- [x] `ed5240a62a` fix(gateway): lay the schema forms out like the gateway's own editor
 - [x] `68a03db4fb` feat(gateway): let an operator move a gateway to a new address
-- [ ] `9450fc6ae1` fix(gateway): let the broker address be repaired from Cortex
-- [ ] `254a310113` feat(gateway): provision a gateway's data sources onto the platform
-- [ ] `4d0a10e54e` fix(gateway): make the provisioning tab readable and its dialog name the device
-- [ ] `392d2ccfd5` feat(inferrix): page the two dialog tables that could outgrow their dialog
-- [ ] `bc80c34043` feat(gateway): configure points inside their parent, and add publishers
-- [ ] `0a20f55230` feat(gateway): let the broker address be changed from Cortex
-- [ ] `5da7be3e66` feat(controller): choose every enumerated config value, and say why Apply failed
-- [ ] `0c07436a86` feat(controller): pick a point's channel, and name what QoS means
-- [ ] `da58696668` feat(gateway): open a data source form on what the operator came for
-- [ ] `d732e61eea` feat(gateway): show a virtual point the five fields it actually has
-- [ ] `9aadbf192f` feat(gateway): stop offering to edit what a mesh node reports
-- [ ] `0c577a9cff` feat(gateway): let a protocol bring a component, not just a layout
-- [ ] `f0063b3bb9` feat(gateway): lay out a Modbus/IP source and its point the way the protocol works
-- [ ] `8241c60f97` feat(gateway): give a Modbus serial line the settings it actually has
-- [ ] `90631c3e09` feat(gateway): let a BACnet point say which object it reads, and how
-- [ ] `03403f4d9a` feat(gateway): give BACnet MS/TP the BACnet form, and the locator type the gateway withholds
-- [ ] `c2c8ed9744` feat(gateway): lay out an SNMP source around its version, and stop an add from becoming an update
-- [ ] `ca21b1010c` feat(gateway): give a meta point a script box and a point picker
-- [ ] `233eefa2e3` fix(gateway): stop an edit from erasing a credential the gateway will not show
-- [ ] `33264c14a0` feat(gateway): lay out an MQTT source and its point, and refuse what the broker cannot parse
-- [ ] `d7791ea3a8` feat(gateway): lay out an HTTP receiver around the two lists that are its security
-- [ ] `f0262aef6f` fix(gateway): hand out a copy of a layout's defaults, not the table's own values
-- [ ] `0681b77ab3` feat(gateway): lay out a JSON retriever, and seed the poll period every polling type needs
-- [ ] `bc6bb134e1` fix(gateway): leave the bearer token clearable, because the gateway hands it back
-- [ ] `408bc7503b` feat(gateway): let a layout carry a hint, since three types now describe nothing
-- [ ] `7720f433ac` fix(gateway): stop offering a data type three locators cannot produce, and give a number a floor
-- [ ] `edf4872a7c` feat(gateway): lay out the internal monitoring source, whose one useful field the gateway will not name
-- [ ] `6688788e45` fix(gateway): make a hint on a disabled field readable, and correct four claims
-- [ ] `cbcd72a748` fix(gateway): stop escaping a hint nothing renders as HTML
-- [ ] `96be19bbb9` feat(gateway): follow the gateway's 5.1.3 rules, and take back what it fixed
-- [ ] `d439911113` feat(gateway): lay out the mesh controller, whose attribute table 34 classes share
-- [ ] `c51bc5c7bf` fix(gateway): undo two row-13 decisions the review took apart, and one bad row
-- [ ] `bbe49ab250` fix(gateway): refuse a layout that retypes a secret
-- [ ] `2467eb1cb9` feat(gateway): lay out the ping source, whose rules the stack's own form has backwards
-- [ ] `7fe38586ef` feat(gateway): lay out PoE lighting, whose point type is a 500 waiting to happen
-- [ ] `344b7b47d5` feat(gateway): lay out scripting, and bring sendEmpty back for a worse case
-- [ ] `5bbcfa7926` fix(gateway): pair every floor above zero with required, and admit the tsc check was not one
-- [ ] `6a5b11d825` fix(gateway): the blanket locator data-type rule is not blanket
-- [ ] `b64e505a4c` fix(gateway): send an empty script too, and make sendEmpty and defaults a pair
-- [ ] `794dfb0dbf` fix(gateway): five sentences that were not true, one with a consequence
-- [ ] `4c93e576ca` fix(gateway): default the PoE timeout Cortex hides, and say why the two required fields are right
-- [ ] `0e34efd130` feat(gateway): lay out system attributes, the last type the Add menu offers
-- [ ] `eada1f7d7c` feat(gateway): lay out the thermostat, and prove the mesh attribute table moves
-- [ ] `169c4ce882` fix(gateway): the Add menu is not complete, and a dead branch misread three ways
-- [ ] `951c0e94ca` fix(gateway): timerValue's two rules fail differently, and a title it had not earned
-- [ ] `dcc1da972d` fix(gateway): IMAGE is broken the same way MULTISTATE is, and say what a dropped type costs
-- [ ] `2fc1c4d9d1` feat(gateway): lay out the 22 remaining mesh device types as one form
-- [ ] `d54333675d` fix(gateway): the mesh family is 26 types, not 24, and seven thermostat attributes are settable
-- [ ] `e9f611fa6f` fix(gateway): our own save erases settable, and nine smaller corrections
-- [ ] `dbdf604258` feat(gateway): add the current sensor, and read settable from the provisioner too
-- [ ] `0ba773d9de` feat(gateway): lay out the ten mirrored mesh nodes, and let one be written to
-- [ ] `436a11e652` feat(gateway): lay out the four light controllers, and the gateway's own gaps in them
-- [ ] `677c601d78` fix(gateway): a CT rating that cannot work, and two claims that overstated what ctId does
-- [ ] `416d36e281` fix(gateway): the missing labels are in no bundle, and the thermostat has seven
-- [ ] `9a589efecb` fix(gateway): withdraw row 20's settable reversal, which was wrong and destructive
-- [ ] `5076202e10` fix(gateway): lock the light controllers' settable before it repeats row 20
-- [ ] `6ab9a34bf0` fix(gateway): say that the current sensor's frequency is invented, and file three more
-- [ ] `9db5457513` feat(gateway): lay out the three asset tags, checking settable's source first
-- [ ] `9edb565005` feat(gateway): lay out the two Modbus slave shapes, which cannot be saved at all
-- [ ] `8f350f52e7` feat(gateway): lay out the virtual switch, the last of the 148 model types
-- [ ] `e97c9d3388` fix(gateway): stop our own save erasing settable, by not sending what nothing edited
-- [ ] `108568eae5` feat(gateway): pick a serial port instead of typing one, and gate the route as recon
-- [ ] `e42d992eb9` fix(gateway): Angular re-enables every field a layout disabled, and nine claims
-- [ ] `a7216e5a35` fix(gateway): a row that changed nothing, five counts, and the reviews' doc debt
-- [ ] `0e68aef393` fix(gateway): apply unsavable in the dialog, not at one of six callers
+- [x] `9450fc6ae1` fix(gateway): let the broker address be repaired from Cortex
+- [x] `254a310113` feat(gateway): provision a gateway's data sources onto the platform
+- [x] `4d0a10e54e` fix(gateway): make the provisioning tab readable and its dialog name the device
+- [x] `bc80c34043` feat(gateway): configure points inside their parent, and add publishers
+- [x] `0a20f55230` feat(gateway): let the broker address be changed from Cortex
+- [x] `5da7be3e66` feat(controller): choose every enumerated config value, and say why Apply failed
+- [x] `0c07436a86` feat(controller): pick a point's channel, and name what QoS means
+- [x] `da58696668` feat(gateway): open a data source form on what the operator came for
+- [x] `d732e61eea` feat(gateway): show a virtual point the five fields it actually has
+- [x] `9aadbf192f` feat(gateway): stop offering to edit what a mesh node reports
+- [x] `0c577a9cff` feat(gateway): let a protocol bring a component, not just a layout
+- [x] `f0063b3bb9` feat(gateway): lay out a Modbus/IP source and its point the way the protocol works
+- [x] `8241c60f97` feat(gateway): give a Modbus serial line the settings it actually has
+- [x] `90631c3e09` feat(gateway): let a BACnet point say which object it reads, and how
+- [x] `03403f4d9a` feat(gateway): give BACnet MS/TP the BACnet form, and the locator type the gateway withholds
+- [x] `c2c8ed9744` feat(gateway): lay out an SNMP source around its version, and stop an add from becoming an update
+- [x] `ca21b1010c` feat(gateway): give a meta point a script box and a point picker
+- [x] `233eefa2e3` fix(gateway): stop an edit from erasing a credential the gateway will not show
+- [x] `33264c14a0` feat(gateway): lay out an MQTT source and its point, and refuse what the broker cannot parse
+- [x] `d7791ea3a8` feat(gateway): lay out an HTTP receiver around the two lists that are its security
+- [x] `f0262aef6f` fix(gateway): hand out a copy of a layout's defaults, not the table's own values
+- [x] `0681b77ab3` feat(gateway): lay out a JSON retriever, and seed the poll period every polling type needs
+- [x] `bc6bb134e1` fix(gateway): leave the bearer token clearable, because the gateway hands it back
+- [x] `408bc7503b` feat(gateway): let a layout carry a hint, since three types now describe nothing
+- [x] `7720f433ac` fix(gateway): stop offering a data type three locators cannot produce, and give a number a floor
+- [x] `edf4872a7c` feat(gateway): lay out the internal monitoring source, whose one useful field the gateway will not name
+- [x] `6688788e45` fix(gateway): make a hint on a disabled field readable, and correct four claims
+- [x] `cbcd72a748` fix(gateway): stop escaping a hint nothing renders as HTML
+- [x] `96be19bbb9` feat(gateway): follow the gateway's 5.1.3 rules, and take back what it fixed
+- [x] `d439911113` feat(gateway): lay out the mesh controller, whose attribute table 34 classes share
+- [x] `c51bc5c7bf` fix(gateway): undo two row-13 decisions the review took apart, and one bad row
+- [x] `bbe49ab250` fix(gateway): refuse a layout that retypes a secret
+- [x] `2467eb1cb9` feat(gateway): lay out the ping source, whose rules the stack's own form has backwards
+- [x] `7fe38586ef` feat(gateway): lay out PoE lighting, whose point type is a 500 waiting to happen
+- [x] `344b7b47d5` feat(gateway): lay out scripting, and bring sendEmpty back for a worse case
+- [x] `5bbcfa7926` fix(gateway): pair every floor above zero with required, and admit the tsc check was not one
+- [x] `6a5b11d825` fix(gateway): the blanket locator data-type rule is not blanket
+- [x] `b64e505a4c` fix(gateway): send an empty script too, and make sendEmpty and defaults a pair
+- [x] `794dfb0dbf` fix(gateway): five sentences that were not true, one with a consequence
+- [x] `4c93e576ca` fix(gateway): default the PoE timeout Cortex hides, and say why the two required fields are right
+- [x] `0e34efd130` feat(gateway): lay out system attributes, the last type the Add menu offers
+- [x] `eada1f7d7c` feat(gateway): lay out the thermostat, and prove the mesh attribute table moves
+- [x] `169c4ce882` fix(gateway): the Add menu is not complete, and a dead branch misread three ways
+- [x] `951c0e94ca` fix(gateway): timerValue's two rules fail differently, and a title it had not earned
+- [x] `dcc1da972d` fix(gateway): IMAGE is broken the same way MULTISTATE is, and say what a dropped type costs
+- [x] `2fc1c4d9d1` feat(gateway): lay out the 22 remaining mesh device types as one form
+- [x] `d54333675d` fix(gateway): the mesh family is 26 types, not 24, and seven thermostat attributes are settable
+- [x] `e9f611fa6f` fix(gateway): our own save erases settable, and nine smaller corrections
+- [x] `dbdf604258` feat(gateway): add the current sensor, and read settable from the provisioner too
+- [x] `0ba773d9de` feat(gateway): lay out the ten mirrored mesh nodes, and let one be written to
+- [x] `436a11e652` feat(gateway): lay out the four light controllers, and the gateway's own gaps in them
+- [x] `677c601d78` fix(gateway): a CT rating that cannot work, and two claims that overstated what ctId does
+- [x] `416d36e281` fix(gateway): the missing labels are in no bundle, and the thermostat has seven
+- [x] `9a589efecb` fix(gateway): withdraw row 20's settable reversal, which was wrong and destructive
+- [x] `5076202e10` fix(gateway): lock the light controllers' settable before it repeats row 20
+- [x] `6ab9a34bf0` fix(gateway): say that the current sensor's frequency is invented, and file three more
+- [x] `9db5457513` feat(gateway): lay out the three asset tags, checking settable's source first
+- [x] `9edb565005` feat(gateway): lay out the two Modbus slave shapes, which cannot be saved at all
+- [x] `8f350f52e7` feat(gateway): lay out the virtual switch, the last of the 148 model types
+- [x] `e97c9d3388` fix(gateway): stop our own save erasing settable, by not sending what nothing edited
+- [x] `108568eae5` feat(gateway): pick a serial port instead of typing one, and gate the route as recon
+- [x] `e42d992eb9` fix(gateway): Angular re-enables every field a layout disabled, and nine claims
+- [x] `a7216e5a35` fix(gateway): a row that changed nothing, five counts, and the reviews' doc debt
+- [x] `0e68aef393` fix(gateway): apply unsavable in the dialog, not at one of six callers
 - [x] `7d6f3bc9df` feat(voice): sign call tokens and add the inferrix.voice settings (V4)
 - [x] `2b2405070e` fix(voice): an unsigned or truncated token, a blank secret, or one equal to the dialer token is refused
 - [x] `7fe9be67f5` feat(voice): loopback client for inferrix-dialer
@@ -88,4 +82,4 @@ Appended by `docs/guide/docs-sync.sh --audit`. Tick an item off once
 - [x] `b5d6ed7773` feat(voice): dialer callbacks and translate endpoint, tested end to end
 - [x] `061ebb023d` feat(voice): voice template panel with offline translate
 - [x] `5638b30b24` fix(voice): red warnings, one language list, and pins for the panel's template
-- [ ] `c37f58ab92` fix(gateway): the five defects the on-screen pass found
+- [x] `c37f58ab92` fix(gateway): the five defects the on-screen pass found

@@ -23,6 +23,12 @@ export interface GatewayBrokerDialogData {
  * Checked here because the gateway does not check it. A URI with any other scheme is stored
  * happily and then fails inside the client on the reconnect the save triggers — so the first sign
  * of the typo is a gateway that has gone quiet, with the old address already overwritten.
+ *
+ * What it demands is a **scheme and a host**; the port is optional and a path is permitted.
+ * `inferrix.gateway.broker-uri-invalid` and `broker-uri-hint` say exactly that, and said something
+ * stricter until 2026-10-04 — they claimed a port was required, which this never asked for. Tighten
+ * the pattern and those two strings have to move with it, or the form refuses an address while
+ * telling the operator it is valid.
  */
 const BROKER_URI = /^(tcp|ssl|ws|wss):\/\/[^\s/]+(\/\S*)?$/;
 

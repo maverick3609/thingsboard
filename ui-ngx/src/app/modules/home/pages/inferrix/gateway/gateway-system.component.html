@@ -95,7 +95,16 @@
         key in `???key(i18n_en)???` form or an unfilled `{0}` placeholder. Shown as sent: inventing
         a label here would hide a gateway-side i18n gap rather than fix it.
       -->
-      @for (item of monitor; track item.name) {
+      <!--
+        Tracked by position, not by `name` or `id`. Neither identifies a row: `name` is what the
+        gateway rendered and repeats verbatim -- this gateway reports eight monitors all called
+        `publisher.monitor.GENERIC_QUEUE_SIZE_MONITOR_ID`, one per publisher -- and `id` is optional,
+        absent before stack 5.1.3, and generic by design on exactly those rows. Duplicate track keys
+        are not cosmetic: Angular reuses the DOM node of the first match, so refreshing could show a
+        value against the wrong monitor. The list is read-only and replaced wholesale on refresh, so
+        position is stable for as long as it is rendered. Found as NG0955 in the console.
+      -->
+      @for (item of monitor; track $index) {
         <div class="tb-form-row no-border">
           <div class="flex-1">{{ item.name }}</div>
           <div>{{ valueOf(item.value) }}</div>
